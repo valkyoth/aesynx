@@ -1,0 +1,20 @@
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CapKind {
+    Memory,
+    Object,
+    Endpoint,
+    AddressSpace,
+    Task,
+    Process,
+    Device,
+    Mmio,
+    Irq,
+    Dma,
+    Driver,
+    Queue,
+    Clock,
+    Log,
+    SystemControl,
+    Model,
+    Telemetry,
+}

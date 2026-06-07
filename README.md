@@ -13,6 +13,7 @@ Planning documents:
 - [Release Plan](docs/RELEASE_PLAN.md)
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
 - [Security Policy](SECURITY.md)
+- [Threat Model](docs/threat-model.md)
 - [Security Controls](docs/security-controls.md)
 - [Supply-Chain Security](docs/supply-chain-security.md)
 - [Unsafe Policy](docs/unsafe-policy.md)

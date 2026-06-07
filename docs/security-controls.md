@@ -13,6 +13,7 @@ claim that the controls are implemented today.
 | Unsafe code | Unsafe confined to documented boundaries | Policy only | `docs/unsafe-policy.md` |
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
 | Supply chain | Executable dependency and workflow changes require review | Policy only | `docs/supply-chain-security.md` |
+| Release pentest | Passing pentest report required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
 | Capabilities | No ambient authority as design center | Planned | `docs/IMPLEMENTATION_PLAN.md` |
 | Drivers | MMIO/IRQ/DMA caps and revocation lifecycle | Planned | `docs/IMPLEMENTATION_PLAN.md` |
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |

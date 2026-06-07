@@ -10,10 +10,12 @@ docs/IMPLEMENTATION_PLAN.md
 docs/RELEASE_PLAN.md
 docs/ARCHITECTURE_DECISIONS.md
 docs/userspace-vision.md
+docs/threat-model.md
 docs/unsafe-policy.md
 docs/supply-chain-security.md
 docs/security-controls.md
 docs/modularity-policy.md
+security/pentest/README.md
 '
 
 for file in $required_files; do

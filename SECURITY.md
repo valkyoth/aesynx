@@ -35,7 +35,12 @@ scripts/checks.sh
 cargo deny check
 cargo audit
 scripts/generate-sbom.sh
+scripts/validate-release-readiness.sh vX.Y.Z
 ```
+
+No release tag is allowed until the exact commit being tagged has a completed
+pentest report with `Status: PASS`. The report belongs in
+`security/pentest/<tag>.md`, and the release-readiness script verifies it.
 
 As implementation matures, the gate must expand to include:
 

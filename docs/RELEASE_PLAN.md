@@ -22,6 +22,7 @@ Every release must have:
 
 - A clear definition of done.
 - A QEMU or host-test verification command.
+- A completed pentest report for the exact commit being tagged.
 - Serial-output markers where applicable.
 - No hidden dependency on the developer's machine.
 - Documentation of known limitations.
@@ -33,6 +34,24 @@ Every release should prefer:
 - Host model tests before kernel implementation for tricky logic.
 - Deterministic behavior before AI-assisted behavior.
 - Capability-aware APIs even when enforcement is still simple.
+
+## Pentest Before Tags
+
+Every version must pass a security review and pentest before it is tagged.
+This applies to tiny `v0.N.P` patch tags as well as milestone tags. A version is
+not tag-ready until:
+
+- `scripts/checks.sh` passes.
+- `cargo deny check` passes.
+- `cargo audit` passes.
+- `scripts/generate-sbom.sh` succeeds when release artifacts exist.
+- A pentest report exists at `security/pentest/<tag>.md`.
+- The pentest report names the exact `Commit:` being tagged.
+- The pentest report has `Status: PASS`.
+- `scripts/validate-release-readiness.sh <tag>` passes.
+
+When a version's implementation criteria are done, say so explicitly and do not
+create the tag until the pentest has been completed and recorded.
 
 ## Phase 0: Project Foundation
 
