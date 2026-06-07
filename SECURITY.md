@@ -38,8 +38,10 @@ scripts/generate-sbom.sh
 scripts/validate-release-readiness.sh vX.Y.Z
 ```
 
-GitHub security automation must include CodeQL with the default query suite for
-Rust before tagging a release.
+GitHub security automation must include CodeQL default setup for Rust before
+tagging a release. Do not add a custom CodeQL workflow while default setup is
+enabled, because GitHub rejects SARIF from mixed default and advanced
+configurations.
 
 No release tag is allowed until the exact commit being tagged has a completed
 pentest report with `Status: PASS`. The report belongs in

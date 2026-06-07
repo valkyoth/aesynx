@@ -14,7 +14,7 @@ claim that the controls are implemented today.
 | Kernel engineering | `no_std`, internal primitives, minimal unsafe, external dependency exceptions | Configured | `docs/kernel-engineering-policy.md`, `scripts/validate-kernel-policy.sh` |
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
 | Supply chain | Executable dependency and workflow changes require review | Policy only | `docs/supply-chain-security.md` |
-| Static analysis | CodeQL default Rust analysis on push, PR, and weekly schedule | Configured | `.github/workflows/codeql.yml` |
+| Static analysis | GitHub CodeQL default setup for Rust | Configured externally | GitHub code scanning default setup |
 | Release pentest | Passing pentest report required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
 | Capabilities | No ambient authority as design center | Model active | `crates/aesynx-cap`, `docs/IMPLEMENTATION_PLAN.md` |
 | Capability audit | Derive/grant audit hook required before authenticated call paths | Model active | `CapAuditLog`, `derive_with_audit`, `grant_with_audit` |
