@@ -98,7 +98,7 @@ pub struct CoreTelemetrySnapshot {
     pub service_queue_depth: u64,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub struct TaskTelemetry {
     pub cpu_time_ns: u64,
     pub messages_sent: u64,

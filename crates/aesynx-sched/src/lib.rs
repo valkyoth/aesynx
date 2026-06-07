@@ -10,9 +10,41 @@ pub const MAX_TASK_BUDGET_TICKS: u64 = 1_000_000;
 pub struct Task {
     pub id: TaskId,
     pub owner_core: CoreId,
-    pub state: TaskState,
+    state: TaskState,
     pub priority: Priority,
     pub budget: TimeBudget,
+}
+
+impl Task {
+    #[must_use]
+    pub const fn new(
+        id: TaskId,
+        owner_core: CoreId,
+        priority: Priority,
+        budget: TimeBudget,
+    ) -> Self {
+        Self {
+            id,
+            owner_core,
+            state: TaskState::Runnable,
+            priority,
+            budget,
+        }
+    }
+
+    #[must_use]
+    pub const fn state(self) -> TaskState {
+        self.state
+    }
+
+    pub const fn transition(&mut self, next: TaskState) -> Result<(), SchedError> {
+        if !task_transition_allowed(self.state, next) {
+            return Err(SchedError::InvalidStateTransition);
+        }
+
+        self.state = next;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -68,11 +100,33 @@ impl TimeBudget {
 pub enum SchedError {
     PriorityOutOfRange,
     BudgetExceedsLimit,
+    InvalidStateTransition,
+}
+
+const fn task_transition_allowed(current: TaskState, next: TaskState) -> bool {
+    matches!(
+        (current, next),
+        (TaskState::Runnable, TaskState::Running)
+            | (TaskState::Running, TaskState::Runnable)
+            | (TaskState::Running, TaskState::WaitingOnMessage)
+            | (TaskState::Running, TaskState::WaitingOnTimer)
+            | (TaskState::Running, TaskState::WaitingOnObject)
+            | (TaskState::Running, TaskState::Suspended)
+            | (TaskState::WaitingOnMessage, TaskState::Runnable)
+            | (TaskState::WaitingOnTimer, TaskState::Runnable)
+            | (TaskState::WaitingOnObject, TaskState::Runnable)
+            | (TaskState::Suspended, TaskState::Runnable)
+            | (_, TaskState::Dead)
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_PRIORITY, MAX_TASK_BUDGET_TICKS, Priority, SchedError, TimeBudget};
+    use aesynx_abi::{CoreId, TaskId};
+
+    use super::{
+        MAX_PRIORITY, MAX_TASK_BUDGET_TICKS, Priority, SchedError, Task, TaskState, TimeBudget,
+    };
 
     #[test]
     fn priority_rejects_user_values_above_limit() {
@@ -94,5 +148,27 @@ mod tests {
     fn bounded_scheduler_values_expose_raw_values() {
         assert_eq!(Priority::new(1).map(Priority::get), Ok(1));
         assert_eq!(TimeBudget::new(10).map(TimeBudget::ticks), Ok(10));
+    }
+
+    #[test]
+    fn task_state_transitions_are_checked() {
+        let priority = match Priority::new(1) {
+            Ok(priority) => priority,
+            Err(error) => return assert_eq!(error, SchedError::PriorityOutOfRange),
+        };
+        let budget = match TimeBudget::new(10) {
+            Ok(budget) => budget,
+            Err(error) => return assert_eq!(error, SchedError::BudgetExceedsLimit),
+        };
+        let mut task = Task::new(TaskId::new(1), CoreId::new(0), priority, budget);
+
+        assert_eq!(
+            task.transition(TaskState::WaitingOnMessage),
+            Err(SchedError::InvalidStateTransition)
+        );
+        assert_eq!(task.transition(TaskState::Running), Ok(()));
+        assert_eq!(task.transition(TaskState::WaitingOnMessage), Ok(()));
+        assert_eq!(task.transition(TaskState::Runnable), Ok(()));
+        assert_eq!(task.transition(TaskState::Dead), Ok(()));
     }
 }

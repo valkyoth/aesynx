@@ -408,15 +408,16 @@ Generic page flags:
 
 ```rust
 pub struct GenericPageFlags {
-    pub read: bool,
-    pub write: bool,
-    pub execute: bool,
-    pub user: bool,
-    pub global: bool,
+    pub access: PageAccess,
+    pub privilege: PagePrivilege,
+    global: bool,
     pub device_memory: bool,
     pub cacheable: bool,
 }
 ```
+
+Global TLB mappings are exposed through a checked builder method and are only
+valid for kernel mappings.
 
 ### 5.3 Interrupt Controller
 
@@ -425,7 +426,7 @@ pub trait InterruptController {
     fn init() -> Result<(), InterruptError>;
     fn enable_irq(irq: IrqLine) -> Result<(), InterruptError>;
     fn disable_irq(irq: IrqLine) -> Result<(), InterruptError>;
-    fn acknowledge(irq: IrqLine);
+    fn acknowledge(irq: IrqLine) -> Result<(), InterruptError>;
     fn send_ipi(target: CoreId, vector: IpiVector) -> Result<(), InterruptError>;
 }
 ```
@@ -988,13 +989,15 @@ Start cooperative.
 pub struct Task {
     pub id: TaskId,
     pub owner_core: CoreId,
-    pub state: TaskState,
+    state: TaskState,
     pub priority: Priority,
     pub budget: TimeBudget,
     pub context: KernelContext,
     pub telemetry: TaskTelemetry,
 }
 ```
+
+Task state is private and changes through checked transitions.
 
 States:
 
@@ -1306,9 +1309,12 @@ pub struct DeviceObject {
     pub address: DeviceAddress,
     pub resources: DeviceResources,
     pub owner_core: CoreId,
-    pub state: DeviceState,
+    state: DeviceState,
 }
 ```
+
+Device state is private and changes through checked transitions so probing,
+binding, running, draining, and terminal states remain ordered.
 
 ### 15.4 Driver Context
 
@@ -1509,6 +1515,9 @@ pub struct TaskTelemetry {
     pub queue_wait_ns: u64,
 }
 ```
+
+Task telemetry is a moved, single-writer value rather than a copyable shared
+counter set.
 
 Driver telemetry:
 

@@ -33,7 +33,7 @@ pub trait InterruptController {
     fn init() -> Result<(), InterruptError>;
     fn enable_irq(irq: IrqLine) -> Result<(), InterruptError>;
     fn disable_irq(irq: IrqLine) -> Result<(), InterruptError>;
-    fn acknowledge(irq: IrqLine);
+    fn acknowledge(irq: IrqLine) -> Result<(), InterruptError>;
     fn send_ipi(target: CoreId, vector: IpiVector) -> Result<(), InterruptError>;
 }
 

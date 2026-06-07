@@ -24,7 +24,7 @@ impl AddressSpace {
 pub struct GenericPageFlags {
     pub access: PageAccess,
     pub privilege: PagePrivilege,
-    pub global: bool,
+    global: bool,
     pub device_memory: bool,
     pub cacheable: bool,
 }
@@ -58,6 +58,20 @@ impl GenericPageFlags {
         self.cacheable = false;
         self
     }
+
+    pub const fn with_global(mut self) -> Result<Self, MmError> {
+        if matches!(self.privilege, PagePrivilege::User) {
+            return Err(MmError::GlobalUserMappingNotAllowed);
+        }
+
+        self.global = true;
+        Ok(self)
+    }
+
+    #[must_use]
+    pub const fn is_global(self) -> bool {
+        self.global
+    }
 }
 
 impl Default for GenericPageFlags {
@@ -77,7 +91,7 @@ pub enum PageAccess {
 impl PageAccess {
     #[must_use]
     pub const fn readable(self) -> bool {
-        true
+        matches!(self, Self::ReadOnly | Self::ReadWrite | Self::ReadExecute)
     }
 
     #[must_use]
@@ -98,12 +112,18 @@ pub enum PagePrivilege {
     User,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MmError {
+    GlobalUserMappingNotAllowed,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{GenericPageFlags, PageAccess, PagePrivilege};
 
     #[test]
     fn page_access_cannot_be_write_and_execute() {
+        assert!(PageAccess::ReadOnly.readable());
         assert!(PageAccess::ReadWrite.writable());
         assert!(!PageAccess::ReadWrite.executable());
         assert!(!PageAccess::ReadExecute.writable());
@@ -116,5 +136,19 @@ mod tests {
 
         assert_eq!(flags.privilege, PagePrivilege::User);
         assert_eq!(flags.access, PageAccess::ReadOnly);
+    }
+
+    #[test]
+    fn only_kernel_mappings_can_be_global() {
+        assert_eq!(
+            GenericPageFlags::user(PageAccess::ReadOnly).with_global(),
+            Err(super::MmError::GlobalUserMappingNotAllowed)
+        );
+        assert_eq!(
+            GenericPageFlags::kernel(PageAccess::ReadOnly)
+                .with_global()
+                .map(GenericPageFlags::is_global),
+            Ok(true)
+        );
     }
 }

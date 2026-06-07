@@ -44,12 +44,12 @@ structure, security baseline, and kernel build-shape checks are active.
 | Toolchain | Active | Stable Rust `1.96.0`, edition 2024, resolver `3`. |
 | Kernel crate policy | Active | Crates under `crates/` must be `no_std`, deny unsafe by default, and avoid external dependencies without exceptions. |
 | Capability model | Model active | Private non-copy authority values, permission validation, audited derive/grant paths, generation/epoch validation, and revoke authority checks. |
-| Memory model | Model active | Page flags make writable+executable access unrepresentable. |
+| Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build skeleton | Active | x86_64 target metadata, linker script, Cargo config validation, `cargo xtask build-kernel`, and an optional nightly custom-target probe. |
-| Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, and CodeQL default Rust workflow. |
+| Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
 | Release gate | Active | Tags require local checks, SBOM, CodeQL on GitHub, and a passing pentest report for the exact commit. |
 
 ## Planned Next

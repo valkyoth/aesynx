@@ -43,6 +43,12 @@ if grep -RInE 'PRIVATE KEY|BEGIN RSA|BEGIN EC PRIVATE|BEGIN OPENSSH PRIVATE|api[
     exit 1
 fi
 
+if [ -d .github/workflows ] && grep -RInE '^[[:space:]]*uses:[[:space:]]*[^[:space:]#]+@[A-Za-z0-9._-]+([[:space:]]*#.*)?$' .github/workflows \
+    | grep -vE '@[0-9a-f]{40}([[:space:]]|$)' 2>/dev/null; then
+    echo "security policy: GitHub Actions must be pinned to commit SHA" >&2
+    exit 1
+fi
+
 if ! grep -q 'EUPL-1.2' deny.toml; then
     echo "security policy: deny.toml must include EUPL-1.2 in license policy" >&2
     exit 1
