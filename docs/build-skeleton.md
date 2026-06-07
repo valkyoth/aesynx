@@ -19,6 +19,11 @@ path yet. Until the boot pipeline is ready, `cargo xtask build-kernel` performs
 the stable host validation for `aesynx-kernel` and verifies that the custom
 target and linker files exist.
 
+Confirmed with Cargo `1.96.0`: `cargo build -Z build-std=core --target
+targets/x86_64-unknown-aesynx.json -p aesynx-kernel` is still rejected on the
+stable channel. The project should not rely on that path unless a future
+milestone explicitly documents a nightly exception or a stable alternative.
+
 Nightly-only build paths must be documented as exceptions before they are used.
 
 ## Current Commands
