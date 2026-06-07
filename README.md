@@ -35,9 +35,10 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 ## What Works Today
 
 `v0.2.0` is the tagged build-skeleton line. `main` is currently carrying the
-`v0.3.0` QEMU image-skeleton candidate. It does not boot the Rust kernel yet,
-but the project structure, security baseline, kernel build-shape checks, and
-QEMU stage-0 boot smoke are active.
+completed `v0.3.0` QEMU image-skeleton implementation, pending pushed GitHub
+checks and final tag evidence. It does not boot the Rust kernel yet, but the
+project structure, security baseline, kernel build-shape checks, and QEMU
+stage-0 boot smoke are active.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -100,7 +101,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.2.0
+cargo xtask release-ready v0.3.0
 ```
 
 ## Security Posture

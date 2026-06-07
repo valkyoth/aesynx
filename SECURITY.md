@@ -7,8 +7,8 @@ metadata as high-risk until reviewed and tested.
 
 ## Supported Versions
 
-Aesynx has no released version yet. Security fixes apply to the main development
-line until the first release branch exists.
+Aesynx has tagged early research milestones. Security fixes apply to the main
+development line until release branches exist.
 
 ## Reporting
 

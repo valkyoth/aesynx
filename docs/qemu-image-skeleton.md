@@ -1,6 +1,6 @@
 # Aesynx QEMU Image Skeleton
 
-Status: v0.3 candidate
+Status: v0.3 implementation complete; tag pending release gates
 
 `v0.3.0` introduces the first generated QEMU boot image. The image is a raw
 1.44 MiB BIOS-bootable disk containing a temporary Aesynx stage-0 serial probe.

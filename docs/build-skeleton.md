@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.3 image-skeleton candidate
+Status: v0.3 image-skeleton implementation complete
 
 The repository contains the first x86_64 kernel build shape:
 
