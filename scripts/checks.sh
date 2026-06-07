@@ -27,18 +27,18 @@ if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
     cargo test --workspace
 
     echo "checks: dependency policy"
-    if command -v cargo-deny >/dev/null 2>&1; then
+    if cargo deny --version >/dev/null 2>&1; then
         cargo deny check
     else
-        echo "checks: cargo-deny not installed; skipping local dependency policy check" >&2
+        echo "checks: cargo deny not installed; skipping local dependency policy check" >&2
     fi
 
     if [ -f Cargo.lock ]; then
         echo "checks: RustSec advisories"
-        if command -v cargo-audit >/dev/null 2>&1; then
+        if cargo audit --version >/dev/null 2>&1; then
             cargo audit
         else
-            echo "checks: cargo-audit not installed; skipping local advisory check" >&2
+            echo "checks: cargo audit not installed; skipping local advisory check" >&2
         fi
     else
         echo "checks: Cargo.lock not present yet; skipping cargo audit until crates land"

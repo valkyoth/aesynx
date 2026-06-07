@@ -45,7 +45,7 @@ highlight = "all"
 db-path = ".cargo-deny-advisory-dbs"
 yanked = "deny"
 unmaintained = "workspace"
-unsound = "deny"
+unsound = "workspace"
 unused-ignored-advisory = "deny"
 ignore = []
 

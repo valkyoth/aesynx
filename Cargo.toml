@@ -41,17 +41,19 @@ unwrap_used = "deny"
 expect_used = "deny"
 
 [workspace.dependencies]
-aesynx-abi = { path = "crates/aesynx-abi" }
-aesynx-ai-policy = { path = "crates/aesynx-ai-policy" }
-aesynx-arch = { path = "crates/aesynx-arch" }
-aesynx-boot = { path = "crates/aesynx-boot" }
-aesynx-cap = { path = "crates/aesynx-cap" }
-aesynx-device = { path = "crates/aesynx-device" }
-aesynx-ipc = { path = "crates/aesynx-ipc" }
-aesynx-log = { path = "crates/aesynx-log" }
-aesynx-mm = { path = "crates/aesynx-mm" }
-aesynx-object = { path = "crates/aesynx-object" }
-aesynx-platform = { path = "crates/aesynx-platform" }
-aesynx-rt = { path = "crates/aesynx-rt" }
-aesynx-telemetry = { path = "crates/aesynx-telemetry" }
-aesynx-time = { path = "crates/aesynx-time" }
+aesynx-abi = { path = "crates/aesynx-abi", version = "0.1.0" }
+aesynx-ai-policy = { path = "crates/aesynx-ai-policy", version = "0.1.0" }
+aesynx-arch = { path = "crates/aesynx-arch", version = "0.1.0" }
+aesynx-boot = { path = "crates/aesynx-boot", version = "0.1.0" }
+aesynx-cap = { path = "crates/aesynx-cap", version = "0.1.0" }
+aesynx-device = { path = "crates/aesynx-device", version = "0.1.0" }
+aesynx-ipc = { path = "crates/aesynx-ipc", version = "0.1.0" }
+aesynx-log = { path = "crates/aesynx-log", version = "0.1.0" }
+aesynx-mm = { path = "crates/aesynx-mm", version = "0.1.0" }
+aesynx-object = { path = "crates/aesynx-object", version = "0.1.0" }
+aesynx-platform = { path = "crates/aesynx-platform", version = "0.1.0" }
+aesynx-rt = { path = "crates/aesynx-rt", version = "0.1.0" }
+aesynx-sched = { path = "crates/aesynx-sched", version = "0.1.0" }
+aesynx-shell = { path = "crates/aesynx-shell", version = "0.1.0" }
+aesynx-telemetry = { path = "crates/aesynx-telemetry", version = "0.1.0" }
+aesynx-time = { path = "crates/aesynx-time", version = "0.1.0" }
