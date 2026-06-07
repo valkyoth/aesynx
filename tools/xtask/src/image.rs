@@ -104,7 +104,7 @@ fn build_image(root: &Path) -> Result<ImagePaths, String> {
     let serial_log = output_dir.join(SERIAL_LOG_NAME);
 
     let mut bytes = vec![0u8; IMAGE_SIZE];
-    let boot_sector = stage0_boot_sector();
+    let boot_sector = stage0_boot_sector()?;
     bytes[..boot_sector.len()].copy_from_slice(&boot_sector);
     fs::write(&image, bytes).map_err(|error| format!("failed to write image: {error}"))?;
 
@@ -205,7 +205,7 @@ fn serial_log_contains_marker(path: &Path) -> bool {
     fs::read_to_string(path).is_ok_and(|contents| contents.contains(SERIAL_MARKER))
 }
 
-fn stage0_boot_sector() -> [u8; 512] {
+fn stage0_boot_sector() -> Result<[u8; 512], String> {
     let mut bytes = Vec::new();
 
     bytes.extend_from_slice(&[0xfa]); // cli
@@ -226,7 +226,7 @@ fn stage0_boot_sector() -> [u8; 512] {
     let jump_halt_operand = bytes.len() + 1;
     bytes.extend_from_slice(&[0x74, 0x00]); // jz halt
     let call_write = append_call_placeholder(&mut bytes);
-    append_short_jump(&mut bytes, message_loop);
+    append_short_jump(&mut bytes, message_loop)?;
 
     let halt = bytes.len();
     bytes.extend_from_slice(&[0xfa, 0xf4, 0xeb, 0xfd]); // cli; hlt; jmp $
@@ -235,24 +235,30 @@ fn stage0_boot_sector() -> [u8; 512] {
     append_serial_init(&mut bytes);
 
     let serial_write = bytes.len();
-    append_serial_write(&mut bytes);
+    append_serial_write(&mut bytes)?;
 
     let message = bytes.len();
     bytes.extend_from_slice(
         b"Aesynx v0.3.0 boot image skeleton\r\n[TEST] bootloader=skeleton\r\n\0",
     );
 
-    patch_u16(&mut bytes, message_operand, 0x7c00 + message as u16);
-    patch_call(&mut bytes, call_init, serial_init);
-    patch_call(&mut bytes, call_write, serial_write);
-    patch_i8(&mut bytes, jump_halt_operand, halt, jump_halt_operand + 1);
+    patch_u16(&mut bytes, message_operand, 0x7c00 + message as u16)?;
+    patch_call(&mut bytes, call_init, serial_init)?;
+    patch_call(&mut bytes, call_write, serial_write)?;
+    patch_i8(&mut bytes, jump_halt_operand, halt, jump_halt_operand + 1)?;
+
+    if bytes.len() > 510 {
+        return Err(format!(
+            "stage0 boot sector payload overflows: {} bytes",
+            bytes.len()
+        ));
+    }
 
     let mut sector = [0u8; 512];
-    let payload_len = bytes.len().min(510);
-    sector[..payload_len].copy_from_slice(&bytes[..payload_len]);
+    sector[..bytes.len()].copy_from_slice(&bytes);
     sector[510] = 0x55;
     sector[511] = 0xaa;
-    sector
+    Ok(sector)
 }
 
 fn append_call_placeholder(bytes: &mut Vec<u8>) -> usize {
@@ -261,10 +267,10 @@ fn append_call_placeholder(bytes: &mut Vec<u8>) -> usize {
     opcode
 }
 
-fn append_short_jump(bytes: &mut Vec<u8>, target: usize) {
+fn append_short_jump(bytes: &mut Vec<u8>, target: usize) -> Result<(), String> {
     let opcode = bytes.len();
     bytes.extend_from_slice(&[0xeb, 0x00]);
-    patch_i8(bytes, opcode + 1, target, opcode + 2);
+    patch_i8(bytes, opcode + 1, target, opcode + 2)
 }
 
 fn append_serial_init(bytes: &mut Vec<u8>) {
@@ -292,7 +298,7 @@ fn append_serial_init(bytes: &mut Vec<u8>) {
     bytes.push(0xc3); // ret
 }
 
-fn append_serial_write(bytes: &mut Vec<u8>) {
+fn append_serial_write(bytes: &mut Vec<u8>) -> Result<(), String> {
     bytes.push(0x50); // push ax
     let wait = bytes.len();
     bytes.extend_from_slice(&[0xba, 0xfd, 0x03]); // mov dx, 0x3fd
@@ -304,35 +310,63 @@ fn append_serial_write(bytes: &mut Vec<u8>) {
     bytes.extend_from_slice(&[0xba, 0xf8, 0x03]); // mov dx, 0x3f8
     bytes.push(0xee); // out dx, al
     bytes.push(0xc3); // ret
-    patch_i8(bytes, retry_operand, wait, retry_operand + 1);
+    patch_i8(bytes, retry_operand, wait, retry_operand + 1)
 }
 
-fn patch_call(bytes: &mut [u8], opcode: usize, target: usize) {
+fn patch_call(bytes: &mut [u8], opcode: usize, target: usize) -> Result<(), String> {
     let after_instruction = opcode + 3;
-    let displacement = (target as isize - after_instruction as isize) as i16;
+    let displacement =
+        i16::try_from(target as isize - after_instruction as isize).map_err(|_| {
+            format!("stage0 call target out of rel16 range: opcode={opcode} target={target}")
+        })?;
     let [lo, hi] = displacement.to_le_bytes();
-    bytes[opcode + 1] = lo;
-    bytes[opcode + 2] = hi;
+    write_byte(bytes, opcode + 1, lo)?;
+    write_byte(bytes, opcode + 2, hi)?;
+    Ok(())
 }
 
-fn patch_u16(bytes: &mut [u8], operand: usize, value: u16) {
+fn patch_u16(bytes: &mut [u8], operand: usize, value: u16) -> Result<(), String> {
     let [lo, hi] = value.to_le_bytes();
-    bytes[operand] = lo;
-    bytes[operand + 1] = hi;
+    write_byte(bytes, operand, lo)?;
+    write_byte(bytes, operand + 1, hi)?;
+    Ok(())
 }
 
-fn patch_i8(bytes: &mut [u8], operand: usize, target: usize, after_instruction: usize) {
-    let displacement = (target as isize - after_instruction as isize) as i8;
-    bytes[operand] = displacement as u8;
+fn patch_i8(
+    bytes: &mut [u8],
+    operand: usize,
+    target: usize,
+    after_instruction: usize,
+) -> Result<(), String> {
+    let displacement =
+        i8::try_from(target as isize - after_instruction as isize).map_err(|_| {
+            format!("stage0 jump target out of rel8 range: operand={operand} target={target}")
+        })?;
+    write_byte(bytes, operand, displacement as u8)
+}
+
+fn write_byte(bytes: &mut [u8], index: usize, value: u8) -> Result<(), String> {
+    let Some(byte) = bytes.get_mut(index) else {
+        return Err(format!(
+            "stage0 patch index out of bounds: index={index} len={}",
+            bytes.len()
+        ));
+    };
+
+    *byte = value;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{SERIAL_MARKER, stage0_boot_sector};
+    use super::{SERIAL_MARKER, patch_i8, stage0_boot_sector};
 
     #[test]
     fn stage0_boot_sector_has_bios_signature() {
-        let sector = stage0_boot_sector();
+        let sector = match stage0_boot_sector() {
+            Ok(sector) => sector,
+            Err(error) => return assert_eq!(error, String::new()),
+        };
 
         assert_eq!(sector.len(), 512);
         assert_eq!(sector[510], 0x55);
@@ -341,9 +375,26 @@ mod tests {
 
     #[test]
     fn stage0_boot_sector_contains_serial_marker() {
-        let sector = stage0_boot_sector();
+        let sector = match stage0_boot_sector() {
+            Ok(sector) => sector,
+            Err(error) => return assert_eq!(error, String::new()),
+        };
         let marker = SERIAL_MARKER.as_bytes();
 
         assert!(sector.windows(marker.len()).any(|window| window == marker));
+    }
+
+    #[test]
+    fn stage0_patch_rejects_out_of_bounds_operand() {
+        let mut bytes = [0u8; 1];
+
+        assert!(patch_i8(&mut bytes, 2, 0, 0).is_err());
+    }
+
+    #[test]
+    fn stage0_patch_rejects_out_of_range_jump() {
+        let mut bytes = [0u8; 1];
+
+        assert!(patch_i8(&mut bytes, 0, 1024, 0).is_err());
     }
 }

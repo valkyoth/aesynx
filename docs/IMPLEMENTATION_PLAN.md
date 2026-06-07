@@ -512,6 +512,10 @@ pub struct BootInfo {
 
 The generic kernel receives only `BootInfo`.
 
+`KernelImageInfo` contains KASLR-sensitive addresses. Its fields are private,
+debug output is redacted, and address access is limited to the boot
+initialization path.
+
 ### 6.3 Logging
 
 Early logging:
@@ -1007,17 +1011,19 @@ Start cooperative.
 
 ```rust
 pub struct Task {
-    pub id: TaskId,
-    pub owner_core: CoreId,
+    id: TaskId,
+    owner_core: CoreId,
     state: TaskState,
-    pub priority: Priority,
-    pub budget: TimeBudget,
+    priority: Priority,
+    budget: TimeBudget,
     pub context: KernelContext,
     pub telemetry: TaskTelemetry,
 }
 ```
 
-Task state is private and changes through checked transitions.
+Task identity, ownership, priority, budget, and state are private. State changes
+through checked transitions; scheduling configuration changes require explicit
+future authority paths.
 
 States:
 
@@ -1323,18 +1329,20 @@ Bus drivers discover. Device drivers operate. Class drivers expose stable servic
 
 ```rust
 pub struct DeviceObject {
-    pub id: ObjectId,
-    pub name: DeviceName,
-    pub bus: BusKind,
-    pub address: DeviceAddress,
-    pub resources: DeviceResources,
-    pub owner_core: CoreId,
+    id: ObjectId,
+    name: DeviceName,
+    bus: BusKind,
+    address: DeviceAddress,
+    resources: DeviceResources,
+    owner_core: CoreId,
     state: DeviceState,
 }
 ```
 
-Device state is private and changes through checked transitions so probing,
-binding, running, draining, and terminal states remain ordered.
+Device identity, resources, owner core, and state are private. State changes
+through checked transitions so probing, binding, running, draining, and
+terminal states remain ordered. Owner transfer requires an explicit future
+authority path.
 
 ### 15.4 Driver Context
 
@@ -1525,19 +1533,20 @@ Task telemetry:
 
 ```rust
 pub struct TaskTelemetry {
-    pub cpu_time_ns: u64,
-    pub messages_sent: u64,
-    pub messages_received: u64,
-    pub object_reads: u64,
-    pub object_writes: u64,
-    pub cap_checks: u64,
-    pub faults: u64,
-    pub queue_wait_ns: u64,
+    cpu_time_ns: u64,
+    messages_sent: u64,
+    messages_received: u64,
+    object_reads: u64,
+    object_writes: u64,
+    cap_checks: u64,
+    faults: u64,
+    queue_wait_ns: u64,
 }
 ```
 
 Task telemetry is a moved, single-writer value rather than a copyable shared
-counter set.
+counter set. Counters are updated through append-only increment/add methods and
+read through snapshots.
 
 Driver telemetry:
 

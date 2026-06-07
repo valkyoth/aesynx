@@ -41,9 +41,12 @@ pub trait InterruptController {
 pub struct IpiVector(u8);
 
 impl IpiVector {
-    #[must_use]
-    pub const fn new(value: u8) -> Self {
-        Self(value)
+    pub const fn new(value: u8) -> Result<Self, ArchError> {
+        if value < 0x20 {
+            return Err(ArchError::ReservedVector);
+        }
+
+        Ok(Self(value))
     }
 
     #[must_use]
@@ -65,6 +68,7 @@ pub enum MemoryError {
 pub enum ArchError {
     Unsupported,
     NotInitialized,
+    ReservedVector,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -72,4 +76,15 @@ pub enum InterruptError {
     Unsupported,
     InvalidIrq,
     ControllerUnavailable,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ArchError, IpiVector};
+
+    #[test]
+    fn ipi_vector_rejects_reserved_exception_vectors() {
+        assert_eq!(IpiVector::new(0x1f), Err(ArchError::ReservedVector));
+        assert_eq!(IpiVector::new(0x20).map(IpiVector::get), Ok(0x20));
+    }
 }

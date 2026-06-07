@@ -8,11 +8,11 @@ pub const MAX_TASK_BUDGET_TICKS: u64 = 1_000_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Task {
-    pub id: TaskId,
-    pub owner_core: CoreId,
+    id: TaskId,
+    owner_core: CoreId,
     state: TaskState,
-    pub priority: Priority,
-    pub budget: TimeBudget,
+    priority: Priority,
+    budget: TimeBudget,
 }
 
 impl Task {
@@ -33,8 +33,28 @@ impl Task {
     }
 
     #[must_use]
+    pub const fn id(self) -> TaskId {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn owner_core(self) -> CoreId {
+        self.owner_core
+    }
+
+    #[must_use]
     pub const fn state(self) -> TaskState {
         self.state
+    }
+
+    #[must_use]
+    pub const fn priority(self) -> Priority {
+        self.priority
+    }
+
+    #[must_use]
+    pub const fn budget(self) -> TimeBudget {
+        self.budget
     }
 
     pub const fn transition(&mut self, next: TaskState) -> Result<(), SchedError> {
@@ -170,5 +190,23 @@ mod tests {
         assert_eq!(task.transition(TaskState::WaitingOnMessage), Ok(()));
         assert_eq!(task.transition(TaskState::Runnable), Ok(()));
         assert_eq!(task.transition(TaskState::Dead), Ok(()));
+    }
+
+    #[test]
+    fn task_identity_and_scheduling_fields_are_read_only() {
+        let priority = match Priority::new(1) {
+            Ok(priority) => priority,
+            Err(error) => return assert_eq!(error, SchedError::PriorityOutOfRange),
+        };
+        let budget = match TimeBudget::new(10) {
+            Ok(budget) => budget,
+            Err(error) => return assert_eq!(error, SchedError::BudgetExceedsLimit),
+        };
+        let task = Task::new(TaskId::new(1), CoreId::new(0), priority, budget);
+
+        assert_eq!(task.id(), TaskId::new(1));
+        assert_eq!(task.owner_core(), CoreId::new(0));
+        assert_eq!(task.priority(), priority);
+        assert_eq!(task.budget(), budget);
     }
 }

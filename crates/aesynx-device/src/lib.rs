@@ -5,10 +5,10 @@ use aesynx_abi::{CoreId, DeviceId, ObjectId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DeviceObject {
-    pub id: DeviceId,
-    pub object_id: ObjectId,
-    pub bus: BusKind,
-    pub owner_core: CoreId,
+    id: DeviceId,
+    object_id: ObjectId,
+    bus: BusKind,
+    owner_core: CoreId,
     state: DeviceState,
 }
 
@@ -22,6 +22,26 @@ impl DeviceObject {
             owner_core,
             state: DeviceState::Discovered,
         }
+    }
+
+    #[must_use]
+    pub const fn id(self) -> DeviceId {
+        self.id
+    }
+
+    #[must_use]
+    pub const fn object_id(self) -> ObjectId {
+        self.object_id
+    }
+
+    #[must_use]
+    pub const fn bus(self) -> BusKind {
+        self.bus
+    }
+
+    #[must_use]
+    pub const fn owner_core(self) -> CoreId {
+        self.owner_core
     }
 
     #[must_use]
@@ -108,5 +128,20 @@ mod tests {
         assert_eq!(device.transition(DeviceState::Bound), Ok(()));
         assert_eq!(device.transition(DeviceState::Running), Ok(()));
         assert_eq!(device.transition(DeviceState::Crashed), Ok(()));
+    }
+
+    #[test]
+    fn device_identity_and_owner_are_read_only() {
+        let device = DeviceObject::new(
+            DeviceId::new(1),
+            ObjectId::new(2),
+            BusKind::VirtioMmio,
+            CoreId::new(0),
+        );
+
+        assert_eq!(device.id(), DeviceId::new(1));
+        assert_eq!(device.object_id(), ObjectId::new(2));
+        assert_eq!(device.bus(), BusKind::VirtioMmio);
+        assert_eq!(device.owner_core(), CoreId::new(0));
     }
 }

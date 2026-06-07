@@ -3,7 +3,7 @@
 
 use core::cell::Cell;
 use core::marker::PhantomData;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering, fence};
 
 #[derive(Debug, Default)]
 pub struct CoreTelemetry {
@@ -66,7 +66,11 @@ impl CoreTelemetry {
     }
 
     #[must_use]
+    /// Returns an advisory snapshot. Counters are sampled independently and may
+    /// not represent one single instant under concurrent updates.
     pub fn snapshot(&self) -> CoreTelemetrySnapshot {
+        fence(Ordering::Acquire);
+
         CoreTelemetrySnapshot {
             run_queue_len: self.run_queue_len.load(Ordering::Relaxed),
             ipc_rx_depth: self.ipc_rx_depth.load(Ordering::Relaxed),
@@ -100,6 +104,81 @@ pub struct CoreTelemetrySnapshot {
 
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct TaskTelemetry {
+    cpu_time_ns: u64,
+    messages_sent: u64,
+    messages_received: u64,
+    object_reads: u64,
+    object_writes: u64,
+    cap_checks: u64,
+    faults: u64,
+    queue_wait_ns: u64,
+    _single_writer: PhantomData<Cell<()>>,
+}
+
+impl TaskTelemetry {
+    pub fn add_cpu_time_ns(&mut self, value: u64) -> Result<(), TelemetryError> {
+        self.cpu_time_ns = self
+            .cpu_time_ns
+            .checked_add(value)
+            .ok_or(TelemetryError::CounterOverflow)?;
+        Ok(())
+    }
+
+    pub fn inc_messages_sent(&mut self) -> Result<(), TelemetryError> {
+        self.messages_sent = increment_counter(self.messages_sent)?;
+        Ok(())
+    }
+
+    pub fn inc_messages_received(&mut self) -> Result<(), TelemetryError> {
+        self.messages_received = increment_counter(self.messages_received)?;
+        Ok(())
+    }
+
+    pub fn inc_object_reads(&mut self) -> Result<(), TelemetryError> {
+        self.object_reads = increment_counter(self.object_reads)?;
+        Ok(())
+    }
+
+    pub fn inc_object_writes(&mut self) -> Result<(), TelemetryError> {
+        self.object_writes = increment_counter(self.object_writes)?;
+        Ok(())
+    }
+
+    pub fn inc_cap_checks(&mut self) -> Result<(), TelemetryError> {
+        self.cap_checks = increment_counter(self.cap_checks)?;
+        Ok(())
+    }
+
+    pub fn inc_faults(&mut self) -> Result<(), TelemetryError> {
+        self.faults = increment_counter(self.faults)?;
+        Ok(())
+    }
+
+    pub fn add_queue_wait_ns(&mut self, value: u64) -> Result<(), TelemetryError> {
+        self.queue_wait_ns = self
+            .queue_wait_ns
+            .checked_add(value)
+            .ok_or(TelemetryError::CounterOverflow)?;
+        Ok(())
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> TaskTelemetrySnapshot {
+        TaskTelemetrySnapshot {
+            cpu_time_ns: self.cpu_time_ns,
+            messages_sent: self.messages_sent,
+            messages_received: self.messages_received,
+            object_reads: self.object_reads,
+            object_writes: self.object_writes,
+            cap_checks: self.cap_checks,
+            faults: self.faults,
+            queue_wait_ns: self.queue_wait_ns,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TaskTelemetrySnapshot {
     pub cpu_time_ns: u64,
     pub messages_sent: u64,
     pub messages_received: u64,
@@ -108,12 +187,20 @@ pub struct TaskTelemetry {
     pub cap_checks: u64,
     pub faults: u64,
     pub queue_wait_ns: u64,
-    _single_writer: PhantomData<Cell<()>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TelemetryError {
+    CounterOverflow,
+}
+
+fn increment_counter(value: u64) -> Result<u64, TelemetryError> {
+    value.checked_add(1).ok_or(TelemetryError::CounterOverflow)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::CoreTelemetry;
+    use super::{CoreTelemetry, TaskTelemetry, TelemetryError};
 
     #[test]
     fn core_telemetry_records_counter_updates() {
@@ -143,5 +230,40 @@ mod tests {
         assert_eq!(snapshot.cap_faults, 1);
         assert_eq!(snapshot.page_faults, 1);
         assert_eq!(snapshot.driver_irqs, 1);
+    }
+
+    #[test]
+    fn task_telemetry_updates_are_append_only() {
+        let mut telemetry = TaskTelemetry::default();
+
+        assert_eq!(telemetry.add_cpu_time_ns(10), Ok(()));
+        assert_eq!(telemetry.inc_messages_sent(), Ok(()));
+        assert_eq!(telemetry.inc_messages_received(), Ok(()));
+        assert_eq!(telemetry.inc_object_reads(), Ok(()));
+        assert_eq!(telemetry.inc_object_writes(), Ok(()));
+        assert_eq!(telemetry.inc_cap_checks(), Ok(()));
+        assert_eq!(telemetry.inc_faults(), Ok(()));
+        assert_eq!(telemetry.add_queue_wait_ns(20), Ok(()));
+
+        let snapshot = telemetry.snapshot();
+        assert_eq!(snapshot.cpu_time_ns, 10);
+        assert_eq!(snapshot.messages_sent, 1);
+        assert_eq!(snapshot.messages_received, 1);
+        assert_eq!(snapshot.object_reads, 1);
+        assert_eq!(snapshot.object_writes, 1);
+        assert_eq!(snapshot.cap_checks, 1);
+        assert_eq!(snapshot.faults, 1);
+        assert_eq!(snapshot.queue_wait_ns, 20);
+    }
+
+    #[test]
+    fn task_telemetry_rejects_counter_overflow() {
+        let mut telemetry = TaskTelemetry::default();
+
+        assert_eq!(telemetry.add_cpu_time_ns(u64::MAX), Ok(()));
+        assert_eq!(
+            telemetry.add_cpu_time_ns(1),
+            Err(TelemetryError::CounterOverflow)
+        );
     }
 }
