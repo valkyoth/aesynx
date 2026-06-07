@@ -17,7 +17,8 @@ claim that the controls are implemented today.
 | Static analysis | GitHub CodeQL default setup for Rust | Configured externally | GitHub code scanning default setup |
 | Release pentest | Passing pentest report required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
 | Capabilities | No ambient authority as design center | Model active | `crates/aesynx-cap`, `docs/IMPLEMENTATION_PLAN.md` |
-| Capability audit | Derive/grant audit hook required before authenticated call paths | Model active | `CapAuditLog`, `derive_with_audit`, `grant_with_audit` |
+| Capability audit | Derive/grant authority transfer must use audited call paths | Model active | `CapAuditLog`, `derive_with_audit`, `grant_with_audit` |
+| Capability unforgeability | Capability fields are private and capability values are not `Copy` or `Clone` | Model active | `Capability` accessors |
 | Capability revocation | REVOKE authority check required before epoch mutation | Model active | `ensure_revoke_authority`, `RevocationEpochStore` |
 | Drivers | MMIO/IRQ/DMA caps and revocation lifecycle | Planned | `docs/IMPLEMENTATION_PLAN.md` |
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |

@@ -399,8 +399,8 @@ pub trait ArchMemory {
         virt: VirtAddr,
     ) -> Result<PhysAddr, MemoryError>;
     fn translate(space: &AddressSpace, virt: VirtAddr) -> Option<PhysAddr>;
-    fn activate_address_space(space: &AddressSpace);
-    fn flush_tlb(addr: Option<VirtAddr>);
+    fn activate_address_space(space: &AddressSpace) -> Result<(), MemoryError>;
+    fn flush_tlb(addr: Option<VirtAddr>) -> Result<(), MemoryError>;
 }
 ```
 
@@ -663,16 +663,20 @@ bits 56..63  type tag
 pub struct CapId(u64);
 
 pub struct Capability {
-    pub object_id: ObjectId,
-    pub base: Option<VirtAddr>,
-    pub len: Option<u64>,
-    pub perms: CapPerms,
-    pub owner: PrincipalId,
-    pub generation: u32,
-    pub revocation_epoch: u64,
-    pub kind: CapKind,
+    object_id: ObjectId,
+    base: Option<VirtAddr>,
+    len: Option<u64>,
+    perms: CapPerms,
+    owner: PrincipalId,
+    generation: u32,
+    revocation_epoch: u64,
+    kind: CapKind,
 }
 ```
+
+Capability fields are private. Bootstrap root construction stays inside the
+capability crate, and normal authority transfer must use audited derivation or
+grant paths.
 
 Permissions:
 
@@ -885,14 +889,22 @@ pub struct Message {
 
 #[repr(C)]
 pub struct MessageHeader {
-    pub src: CoreId,
+    src: CoreId,
+    dst: CoreId,
+    kind: MessageKind,
+    seq: u64,
+    reply_to: Option<MessageId>,
+}
+
+pub struct MessageRequest {
     pub dst: CoreId,
     pub kind: MessageKind,
-    pub seq: u64,
     pub reply_to: Option<MessageId>,
-    pub caps: SmallCapVec,
 }
 ```
+
+Tasks submit message requests. The kernel stamps `src` and `seq` from verified
+sender identity and kernel sequence state before dispatch.
 
 Message kinds:
 
@@ -1582,11 +1594,14 @@ Scheduler output:
 
 ```rust
 pub struct ScheduleAdvice {
-    pub target_core: CoreId,
-    pub confidence: u16,
-    pub reason_code: DecisionReasonCode,
+    target_core: CoreId,
+    confidence: Confidence,
+    reason: DecisionReason,
 }
 ```
+
+`Confidence` is a bounded newtype, so model or heuristic confidence values
+above the project maximum are rejected at construction.
 
 All kernel models use fixed-point integer math until there is a proven reason to do otherwise.
 

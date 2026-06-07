@@ -23,31 +23,93 @@ pub trait CapAuditLog {
     fn record(&mut self, event: CapAuditEvent) -> Result<(), DeriveError>;
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Capability {
-    pub object_id: ObjectId,
-    pub base: Option<VirtAddr>,
-    pub len: Option<u64>,
-    pub perms: CapPerms,
-    pub owner: PrincipalId,
-    pub generation: u32,
-    pub revocation_epoch: u64,
-    pub kind: CapKind,
+    object_id: ObjectId,
+    base: Option<VirtAddr>,
+    len: Option<u64>,
+    perms: CapPerms,
+    owner: PrincipalId,
+    generation: u32,
+    revocation_epoch: u64,
+    kind: CapKind,
 }
 
 impl Capability {
     #[must_use]
-    pub const fn allows(self, required: CapPerms) -> bool {
+    #[allow(dead_code)]
+    pub(crate) const fn new_root(
+        object_id: ObjectId,
+        kind: CapKind,
+        owner: PrincipalId,
+        perms: CapPerms,
+        generation: u32,
+        revocation_epoch: u64,
+    ) -> Self {
+        Self {
+            object_id,
+            base: None,
+            len: None,
+            perms,
+            owner,
+            generation,
+            revocation_epoch,
+            kind,
+        }
+    }
+
+    #[must_use]
+    pub const fn object_id(&self) -> ObjectId {
+        self.object_id
+    }
+
+    #[must_use]
+    pub const fn base(&self) -> Option<VirtAddr> {
+        self.base
+    }
+
+    #[must_use]
+    pub const fn range_len(&self) -> Option<u64> {
+        self.len
+    }
+
+    #[must_use]
+    pub const fn perms(&self) -> CapPerms {
+        self.perms
+    }
+
+    #[must_use]
+    pub const fn owner(&self) -> PrincipalId {
+        self.owner
+    }
+
+    #[must_use]
+    pub const fn generation(&self) -> u32 {
+        self.generation
+    }
+
+    #[must_use]
+    pub const fn revocation_epoch(&self) -> u64 {
+        self.revocation_epoch
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> CapKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn allows(&self, required: CapPerms) -> bool {
         self.perms.contains(required)
     }
 
     #[must_use]
-    pub const fn matches_revocation_epoch(self, current_epoch: u64) -> bool {
+    pub const fn matches_revocation_epoch(&self, current_epoch: u64) -> bool {
         self.revocation_epoch == current_epoch
     }
 
     pub const fn validate_live(
-        self,
+        &self,
         current_generation: u32,
         current_epoch: u64,
     ) -> Result<(), CapValidationError> {
@@ -62,23 +124,18 @@ impl Capability {
         Ok(())
     }
 
-    /// Bootstrap/test helper. Real authenticated call paths must use
-    /// `derive_with_audit` so capability chain-of-custody is recorded.
-    pub fn derive(self, request: DeriveRequest) -> Result<Self, DeriveError> {
-        self.derive_inner(request)
-    }
-
     pub fn derive_with_audit(
         self,
         request: DeriveRequest,
         audit: &mut impl CapAuditLog,
     ) -> Result<Self, DeriveError> {
+        let source_owner = self.owner;
         let child = self.derive_inner(request)?;
         audit
             .record(CapAuditEvent {
                 action: CapAuditAction::Derive,
                 object_id: child.object_id,
-                source_owner: self.owner,
+                source_owner,
                 target_owner: child.owner,
                 perms: child.perms,
                 generation: child.generation,
@@ -89,23 +146,18 @@ impl Capability {
         Ok(child)
     }
 
-    /// Bootstrap/test helper. Real authenticated call paths must use
-    /// `grant_with_audit` so capability chain-of-custody is recorded.
-    pub fn grant(self, target_owner: PrincipalId) -> Result<Self, DeriveError> {
-        self.grant_inner(target_owner)
-    }
-
     pub fn grant_with_audit(
         self,
         target_owner: PrincipalId,
         audit: &mut impl CapAuditLog,
     ) -> Result<Self, DeriveError> {
+        let source_owner = self.owner;
         let child = self.grant_inner(target_owner)?;
         audit
             .record(CapAuditEvent {
                 action: CapAuditAction::Grant,
                 object_id: child.object_id,
-                source_owner: self.owner,
+                source_owner,
                 target_owner: child.owner,
                 perms: child.perms,
                 generation: child.generation,
@@ -153,6 +205,34 @@ impl Capability {
     }
 }
 
+#[cfg(test)]
+struct TestCapabilitySpec {
+    object_id: ObjectId,
+    base: Option<VirtAddr>,
+    len: Option<u64>,
+    perms: CapPerms,
+    owner: PrincipalId,
+    generation: u32,
+    revocation_epoch: u64,
+    kind: CapKind,
+}
+
+#[cfg(test)]
+impl Capability {
+    const fn new_for_test(spec: TestCapabilitySpec) -> Self {
+        Self {
+            object_id: spec.object_id,
+            base: spec.base,
+            len: spec.len,
+            perms: spec.perms,
+            owner: spec.owner,
+            generation: spec.generation,
+            revocation_epoch: spec.revocation_epoch,
+            kind: spec.kind,
+        }
+    }
+}
+
 fn range_is_subset(
     parent_base: Option<VirtAddr>,
     parent_len: Option<u64>,
@@ -195,8 +275,10 @@ mod tests {
         Capability, DeriveError, DeriveRequest,
     };
 
+    use super::TestCapabilitySpec;
+
     fn parent_cap(perms: CapPerms) -> Capability {
-        Capability {
+        Capability::new_for_test(TestCapabilitySpec {
             object_id: ObjectId::new(7),
             base: Some(VirtAddr::new(100)),
             len: Some(50),
@@ -205,7 +287,7 @@ mod tests {
             generation: 3,
             revocation_epoch: 9,
             kind: CapKind::Memory,
-        }
+        })
     }
 
     #[derive(Default)]
@@ -218,6 +300,24 @@ mod tests {
             self.last_event = Some(event);
             Ok(())
         }
+    }
+
+    fn audited_derive(
+        parent: Capability,
+        request: DeriveRequest,
+    ) -> Result<Capability, DeriveError> {
+        let mut audit = TestAudit::default();
+
+        parent.derive_with_audit(request, &mut audit)
+    }
+
+    fn audited_grant(
+        parent: Capability,
+        target_owner: PrincipalId,
+    ) -> Result<Capability, DeriveError> {
+        let mut audit = TestAudit::default();
+
+        parent.grant_with_audit(target_owner, &mut audit)
     }
 
     #[test]
@@ -234,18 +334,18 @@ mod tests {
             len: Some(10),
         };
 
-        let expected = Capability {
-            object_id: parent.object_id,
+        let expected = Capability::new_for_test(TestCapabilitySpec {
+            object_id: parent.object_id(),
             base: Some(VirtAddr::new(120)),
             len: Some(10),
             perms: CapPerms::READ,
             owner: PrincipalId::new(2),
-            generation: parent.generation,
-            revocation_epoch: parent.revocation_epoch,
-            kind: parent.kind,
-        };
+            generation: parent.generation(),
+            revocation_epoch: parent.revocation_epoch(),
+            kind: parent.kind(),
+        });
 
-        assert_eq!(parent.derive(request), Ok(expected));
+        assert_eq!(audited_derive(parent, request), Ok(expected));
     }
 
     #[test]
@@ -262,7 +362,7 @@ mod tests {
         assert_eq!(
             parent
                 .derive_with_audit(request, &mut audit)
-                .map(|cap| cap.owner),
+                .map(|cap| cap.owner()),
             Ok(PrincipalId::new(2))
         );
         assert_eq!(
@@ -282,7 +382,7 @@ mod tests {
         };
 
         assert_eq!(
-            parent.derive(request),
+            audited_derive(parent, request),
             Err(DeriveError::MissingDerivePermission)
         );
     }
@@ -298,7 +398,7 @@ mod tests {
         };
 
         assert_eq!(
-            parent.derive(request),
+            audited_derive(parent, request),
             Err(DeriveError::PermissionsEscalate)
         );
     }
@@ -313,7 +413,10 @@ mod tests {
             len: Some(40),
         };
 
-        assert_eq!(parent.derive(request), Err(DeriveError::RangeEscalates));
+        assert_eq!(
+            audited_derive(parent, request),
+            Err(DeriveError::RangeEscalates)
+        );
     }
 
     #[test]
@@ -321,7 +424,7 @@ mod tests {
         let parent = parent_cap(CapPerms::READ);
 
         assert_eq!(
-            parent.grant(PrincipalId::new(2)),
+            audited_grant(parent, PrincipalId::new(2)),
             Err(DeriveError::MissingGrantPermission)
         );
     }
@@ -329,12 +432,18 @@ mod tests {
     #[test]
     fn grant_preserves_authority_and_changes_owner() {
         let parent = parent_cap(CapPerms::READ.union(CapPerms::GRANT));
-        let expected = Capability {
+        let expected = Capability::new_for_test(TestCapabilitySpec {
+            object_id: parent.object_id(),
+            base: parent.base(),
+            len: parent.range_len(),
+            perms: parent.perms(),
             owner: PrincipalId::new(2),
-            ..parent
-        };
+            generation: parent.generation(),
+            revocation_epoch: parent.revocation_epoch(),
+            kind: parent.kind(),
+        });
 
-        assert_eq!(parent.grant(PrincipalId::new(2)), Ok(expected));
+        assert_eq!(audited_grant(parent, PrincipalId::new(2)), Ok(expected));
     }
 
     #[test]
@@ -345,7 +454,7 @@ mod tests {
         assert_eq!(
             parent
                 .grant_with_audit(PrincipalId::new(2), &mut audit)
-                .map(|cap| cap.owner),
+                .map(|cap| cap.owner()),
             Ok(PrincipalId::new(2))
         );
         assert_eq!(

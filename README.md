@@ -43,9 +43,9 @@ structure, security baseline, and kernel build-shape checks are active.
 | Rust workspace | Active | Modular crate layout with no root `src/` implementation pile. |
 | Toolchain | Active | Stable Rust `1.96.0`, edition 2024, resolver `3`. |
 | Kernel crate policy | Active | Crates under `crates/` must be `no_std`, deny unsafe by default, and avoid external dependencies without exceptions. |
-| Capability model | Model active | Permission validation, derive/grant checks, audited variants, generation/epoch validation, and revoke authority checks. |
+| Capability model | Model active | Private non-copy authority values, permission validation, audited derive/grant paths, generation/epoch validation, and revoke authority checks. |
 | Memory model | Model active | Page flags make writable+executable access unrepresentable. |
-| IPC model | Model active | Message types plus bounded inline payloads. |
+| IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build skeleton | Active | x86_64 target metadata, linker script, Cargo config validation, `cargo xtask build-kernel`, and an optional nightly custom-target probe. |

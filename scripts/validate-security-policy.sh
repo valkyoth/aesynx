@@ -38,7 +38,6 @@ if grep -RInE 'PRIVATE KEY|BEGIN RSA|BEGIN EC PRIVATE|BEGIN OPENSSH PRIVATE|api[
     --exclude-dir=target \
     --exclude-dir=sbom \
     --exclude='validate-security-policy.sh' \
-    --exclude='*.md' \
     2>/dev/null; then
     echo "security policy: possible secret material found" >&2
     exit 1

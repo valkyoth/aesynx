@@ -25,8 +25,8 @@ pub trait ArchMemory {
     ) -> Result<(), MemoryError>;
     fn unmap_page(space: &mut AddressSpace, virt: VirtAddr) -> Result<PhysAddr, MemoryError>;
     fn translate(space: &AddressSpace, virt: VirtAddr) -> Option<PhysAddr>;
-    fn activate_address_space(space: &AddressSpace);
-    fn flush_tlb(addr: Option<VirtAddr>);
+    fn activate_address_space(space: &AddressSpace) -> Result<(), MemoryError>;
+    fn flush_tlb(addr: Option<VirtAddr>) -> Result<(), MemoryError>;
 }
 
 pub trait InterruptController {

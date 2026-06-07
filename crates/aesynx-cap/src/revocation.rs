@@ -7,7 +7,7 @@ pub trait RevocationEpochStore {
 
     fn revoke_object(
         &mut self,
-        authority: Capability,
+        authority: &Capability,
         object_id: ObjectId,
     ) -> Result<u64, RevocationError> {
         ensure_revoke_authority(authority, object_id)?;
@@ -16,14 +16,14 @@ pub trait RevocationEpochStore {
 }
 
 pub fn ensure_revoke_authority(
-    authority: Capability,
+    authority: &Capability,
     object_id: ObjectId,
 ) -> Result<(), RevocationError> {
-    if authority.object_id != object_id {
+    if authority.object_id() != object_id {
         return Err(RevocationError::WrongObject);
     }
 
-    if !authority.perms.contains(CapPerms::REVOKE) {
+    if !authority.perms().contains(CapPerms::REVOKE) {
         return Err(RevocationError::MissingRevokePermission);
     }
 
@@ -59,16 +59,7 @@ mod tests {
     }
 
     fn cap(object_id: ObjectId, perms: CapPerms) -> Capability {
-        Capability {
-            object_id,
-            base: None,
-            len: None,
-            perms,
-            owner: PrincipalId::new(1),
-            generation: 1,
-            revocation_epoch: 1,
-            kind: CapKind::Object,
-        }
+        Capability::new_root(object_id, CapKind::Object, PrincipalId::new(1), perms, 1, 1)
     }
 
     #[test]
@@ -76,15 +67,15 @@ mod tests {
         let object_id = ObjectId::new(7);
 
         assert_eq!(
-            ensure_revoke_authority(cap(object_id, CapPerms::READ), object_id),
+            ensure_revoke_authority(&cap(object_id, CapPerms::READ), object_id),
             Err(RevocationError::MissingRevokePermission)
         );
         assert_eq!(
-            ensure_revoke_authority(cap(ObjectId::new(8), CapPerms::REVOKE), object_id),
+            ensure_revoke_authority(&cap(ObjectId::new(8), CapPerms::REVOKE), object_id),
             Err(RevocationError::WrongObject)
         );
         assert_eq!(
-            ensure_revoke_authority(cap(object_id, CapPerms::REVOKE), object_id),
+            ensure_revoke_authority(&cap(object_id, CapPerms::REVOKE), object_id),
             Ok(())
         );
     }
@@ -95,12 +86,12 @@ mod tests {
         let mut store = TestEpochStore::default();
 
         assert_eq!(
-            store.revoke_object(cap(object_id, CapPerms::READ), object_id),
+            store.revoke_object(&cap(object_id, CapPerms::READ), object_id),
             Err(RevocationError::MissingRevokePermission)
         );
         assert_eq!(store.epoch, 0);
         assert_eq!(
-            store.revoke_object(cap(object_id, CapPerms::REVOKE), object_id),
+            store.revoke_object(&cap(object_id, CapPerms::REVOKE), object_id),
             Ok(1)
         );
     }

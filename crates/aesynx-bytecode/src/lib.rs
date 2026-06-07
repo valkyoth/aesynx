@@ -5,14 +5,66 @@ use aesynx_cap::CapPerms;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Instruction {
-    LoadCap { dst: u8, cap_slot: u16 },
-    CheckPerm { reg: u8, perms: CapPerms },
-    ReadU64 { dst: u8, base: u8, offset: u16 },
-    WriteU64 { base: u8, offset: u16, src: u8 },
-    SendMsg { endpoint: u8, payload: u8 },
-    BranchIf { reg: u8, target: u16 },
-    Return { reg: u8 },
+    LoadCap {
+        dst: u8,
+        cap_slot: u16,
+    },
+    CheckPerm {
+        reg: u8,
+        perms: CapPerms,
+    },
+    ReadU64 {
+        dst: u8,
+        base: u8,
+        offset: UncheckedOffset,
+    },
+    WriteU64 {
+        base: u8,
+        offset: UncheckedOffset,
+        src: u8,
+    },
+    SendMsg {
+        endpoint: u8,
+        payload: u8,
+    },
+    BranchIf {
+        reg: u8,
+        target: UncheckedTarget,
+    },
+    Return {
+        reg: u8,
+    },
     Yield,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UncheckedTarget(u16);
+
+impl UncheckedTarget {
+    #[must_use]
+    pub const fn new(value: u16) -> Self {
+        Self(value)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UncheckedOffset(u16);
+
+impl UncheckedOffset {
+    #[must_use]
+    pub const fn new(value: u16) -> Self {
+        Self(value)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -2,8 +2,15 @@
 #![deny(unsafe_code)]
 
 pub trait ClockSource {
-    fn now_ticks(&self) -> u64;
-    fn monotonic_ns(&self) -> u64;
+    fn now_ticks(&self) -> Result<u64, ClockError>;
+    fn monotonic_ns(&self) -> Result<u64, ClockError>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ClockError {
+    Unavailable,
+    Uninitialized,
+    Overflow,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
