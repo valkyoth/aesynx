@@ -15,6 +15,7 @@ docs/unsafe-policy.md
 docs/supply-chain-security.md
 docs/security-controls.md
 docs/modularity-policy.md
+docs/kernel-engineering-policy.md
 security/pentest/README.md
 '
 

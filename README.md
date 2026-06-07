@@ -17,6 +17,7 @@ Planning documents:
 - [Threat Model](docs/threat-model.md)
 - [Security Controls](docs/security-controls.md)
 - [Supply-Chain Security](docs/supply-chain-security.md)
+- [Kernel Engineering Policy](docs/kernel-engineering-policy.md)
 - [Unsafe Policy](docs/unsafe-policy.md)
 - [Modularity Policy](docs/modularity-policy.md)
 - [Licensing Notes](docs/licensing.md)

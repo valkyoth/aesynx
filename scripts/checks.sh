@@ -10,6 +10,9 @@ perl scripts/check-doc-links.pl
 echo "checks: modularity policy"
 scripts/validate-modularity-policy.sh
 
+echo "checks: kernel engineering policy"
+scripts/validate-kernel-policy.sh
+
 if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
     echo "checks: cargo metadata"
     cargo metadata --format-version 1 >/dev/null

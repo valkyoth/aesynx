@@ -9,17 +9,24 @@ internals.
 
 ## Default Rule
 
-New Rust crates should prefer:
+Kernel and runtime crates under `crates/` must use:
+
+```rust
+#![no_std]
+#![deny(unsafe_code)]
+```
+
+Unsafe is forbidden by default. Any crate or module that needs unsafe must first
+be admitted as an explicit exception in this document, with a narrowly scoped
+purpose and tests/evidence.
+
+Host-only tools may use `std`, but they still inherit the workspace lint policy.
+
+New Rust crates should also prefer:
 
 ```rust
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(unused_must_use)]
-```
-
-Crates that do not need unsafe should use:
-
-```rust
-#![deny(unsafe_code)]
 ```
 
 ## Allowed Unsafe Boundaries
@@ -77,4 +84,3 @@ Before 1.0, add a script that fails when:
 - MMIO volatile access appears outside driver/arch MMIO wrappers.
 - Panic-like macros appear in security-critical runtime paths without a
   documented exception.
-

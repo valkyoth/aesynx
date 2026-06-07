@@ -11,6 +11,7 @@ claim that the controls are implemented today.
 | Dependency policy | License, source, advisory, and duplicate-version checks | Configured | `deny.toml` |
 | Security reporting | Private-first vulnerability process | Configured | `SECURITY.md` |
 | Unsafe code | Unsafe confined to documented boundaries | Policy only | `docs/unsafe-policy.md` |
+| Kernel engineering | `no_std`, internal primitives, minimal unsafe, external dependency exceptions | Configured | `docs/kernel-engineering-policy.md`, `scripts/validate-kernel-policy.sh` |
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
 | Supply chain | Executable dependency and workflow changes require review | Policy only | `docs/supply-chain-security.md` |
 | Release pentest | Passing pentest report required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
