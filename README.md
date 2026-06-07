@@ -34,9 +34,10 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.1.0` is the tagged repository foundation line. `main` is currently carrying
-the `v0.2.0` build-skeleton candidate. It is not bootable yet, but the project
-structure, security baseline, and kernel build-shape checks are active.
+`v0.2.0` is the tagged build-skeleton line. `main` is currently carrying the
+`v0.3.0` QEMU image-skeleton candidate. It does not boot the Rust kernel yet,
+but the project structure, security baseline, kernel build-shape checks, and
+QEMU stage-0 boot smoke are active.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -49,6 +50,7 @@ structure, security baseline, and kernel build-shape checks are active.
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build skeleton | Active | x86_64 target metadata, linker script, Cargo config validation, `cargo xtask build-kernel`, and an optional nightly custom-target probe. |
+| QEMU image skeleton | Active | `cargo xtask image` creates a raw image and `cargo xtask qemu` verifies a serial marker from the v0.3 stage-0 boot probe. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
 | Release gate | Active | Tags require local checks, SBOM, CodeQL on GitHub, and a passing pentest report for the exact commit. |
 
@@ -56,8 +58,7 @@ structure, security baseline, and kernel build-shape checks are active.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Boot image | Planned | `v0.3.0`; bootloader/image pipeline and controlled QEMU boot attempt. |
-| First serial boot | Planned | Phase 1; print an Aesynx boot marker over serial. |
+| First Rust kernel serial boot | Planned | `v0.4.0`; replace the v0.3 stage-0 probe with a kernel entry and Aesynx boot marker. |
 | Real arch mechanisms | Planned | Interrupt control, core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -80,6 +81,13 @@ Validate the current kernel build skeleton:
 
 ```bash
 cargo xtask build-kernel
+```
+
+Create and smoke-test the v0.3 QEMU image skeleton:
+
+```bash
+cargo xtask image
+cargo xtask qemu
 ```
 
 Try the documented custom-target experiment when a nightly toolchain is
@@ -113,6 +121,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Release Plan](docs/RELEASE_PLAN.md)
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
 - [Build Skeleton](docs/build-skeleton.md)
+- [QEMU Image Skeleton](docs/qemu-image-skeleton.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)
 - [Security Policy](SECURITY.md)

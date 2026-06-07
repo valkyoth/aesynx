@@ -1,0 +1,18 @@
+# Aesynx v0.3.0 QEMU boot image skeleton.
+#
+# This is a temporary dependency-free stage-0 boot probe. It exists so
+# `cargo xtask image` can create a bootable QEMU raw image and `cargo xtask qemu`
+# can verify that QEMU attempts boot and receives serial output before the real
+# kernel entry and bootloader handoff land in v0.4+.
+
+format = "raw-bios-stage0"
+architecture = "x86_64"
+platform = "qemu"
+serial = "com1"
+serial_marker = "[TEST] bootloader=skeleton"
+next_milestone = "v0.4.0"
+
+[qemu]
+machine = "q35"
+memory = "128M"
+display = "none"

@@ -149,20 +149,24 @@ Create a bootable image pipeline.
 
 Deliverables:
 
-- Limine or chosen bootloader integration.
-- Boot config.
-- Image builder.
-- QEMU runner.
-- Serial configured.
+- Temporary Aesynx stage-0 boot probe.
+- Boot config in `boot/qemu/stage0.toml`.
+- Raw image builder in `cargo xtask image`.
+- QEMU runner in `cargo xtask qemu`.
+- Serial marker capture.
+- Documentation that real kernel boot and final bootloader handoff begin in
+  `v0.4.0`.
 
 Verification:
 
 - `cargo xtask image` creates an image.
-- `cargo xtask qemu` starts QEMU and attempts boot.
+- `cargo xtask qemu` starts QEMU and observes
+  `[TEST] bootloader=skeleton` over serial.
 
 Exit criteria:
 
-- Boot attempt reaches kernel or produces a controlled bootloader error.
+- Boot attempt reaches the stage-0 probe and produces deterministic serial
+  output.
 
 ## Phase 1: First Boot
 

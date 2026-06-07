@@ -89,7 +89,7 @@ fn stable_validation(root: &Path) -> ExitCode {
     println!("xtask: kernel host check passed");
     println!("xtask: custom target metadata validated at {KERNEL_TARGET}");
     println!("xtask: linker script validated at {KERNEL_LINKER}");
-    println!("xtask: stable build skeleton is ready for v0.2.0");
+    println!("xtask: stable kernel build skeleton is ready");
     println!(
         "xtask: optional custom target probe is available with: cargo xtask build-kernel --custom-target-probe"
     );

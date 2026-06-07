@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.2 release candidate foundation
+Status: v0.3 image-skeleton candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -50,8 +50,12 @@ cargo xtask image
 cargo xtask qemu
 ```
 
-These commands intentionally return a controlled "not implemented until
-v0.3.0" failure until the boot image pipeline exists.
+`cargo xtask image` creates `build/qemu/aesynx-v0.3.0.raw` with a temporary
+stage-0 boot probe. `cargo xtask qemu` starts QEMU, captures serial output, and
+expects `[TEST] bootloader=skeleton`.
+
+The v0.3 image proves that image generation and QEMU launch work. It does not
+claim a Rust kernel entry point; that starts in `v0.4.0`.
 
 ## Target Shape
 

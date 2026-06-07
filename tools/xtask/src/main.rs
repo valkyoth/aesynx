@@ -1,4 +1,5 @@
 mod build_kernel;
+mod image;
 mod process;
 mod workspace;
 
@@ -18,8 +19,8 @@ fn main() -> ExitCode {
     match command.as_str() {
         "build-kernel" => build_kernel::run(&rest),
         "check" => process::run_script("scripts/checks.sh"),
-        "image" => not_ready("image", "v0.3.0"),
-        "qemu" => not_ready("qemu", "v0.3.0"),
+        "image" => image::build(&rest),
+        "qemu" => image::qemu(&rest),
         "release-ready" => release_ready(&rest),
         "status" => {
             print_status();
@@ -46,11 +47,6 @@ fn release_ready(args: &[String]) -> ExitCode {
     }
 }
 
-fn not_ready(command: &str, milestone: &str) -> ExitCode {
-    eprintln!("xtask: {command} pipeline is intentionally not implemented until {milestone}");
-    ExitCode::from(3)
-}
-
 fn print_status() {
     println!("Aesynx workspace foundation is active.");
 }
@@ -60,8 +56,8 @@ fn print_help() {
     println!("  build-kernel                         validate kernel build skeleton");
     println!("  build-kernel --custom-target-probe   try nightly build-std custom target probe");
     println!("  check                                run local repository checks");
-    println!("  image                                create boot image once v0.3.0 lands");
-    println!("  qemu                                 run QEMU once v0.3.0 lands");
+    println!("  image                                create v0.3 QEMU boot image skeleton");
+    println!("  qemu                                 run v0.3 QEMU boot smoke");
     println!("  release-ready TAG                    validate release pentest gate for TAG");
     println!("  status                               print workspace status");
     println!("  help                                 print this help");
