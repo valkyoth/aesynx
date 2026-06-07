@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "checks: repository security policy"
+scripts/validate-security-policy.sh
+
+echo "checks: documentation links"
+perl scripts/check-doc-links.pl
+
+echo "checks: modularity policy"
+scripts/validate-modularity-policy.sh
+
+if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
+    echo "checks: cargo metadata"
+    cargo metadata --format-version 1 >/dev/null
+
+    echo "checks: formatting"
+    cargo fmt --all --check
+
+    echo "checks: dependency policy"
+    if command -v cargo-deny >/dev/null 2>&1; then
+        cargo deny check
+    else
+        echo "checks: cargo-deny not installed; skipping local dependency policy check" >&2
+    fi
+
+    if [ -f Cargo.lock ]; then
+        echo "checks: RustSec advisories"
+        if command -v cargo-audit >/dev/null 2>&1; then
+            cargo audit
+        else
+            echo "checks: cargo-audit not installed; skipping local advisory check" >&2
+        fi
+    else
+        echo "checks: Cargo.lock not present yet; skipping cargo audit until crates land"
+    fi
+fi
+
+if [ -f Cargo.toml ] && grep -q '^members = \[\]$' Cargo.toml; then
+    echo "checks: empty Rust workspace; cargo checks start when the first crate is added"
+fi
+
+echo "checks: ok"

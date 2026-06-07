@@ -1,0 +1,43 @@
+name: Aesynx CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  checks:
+    name: Security, docs, and Rust checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Install security tools
+        run: |
+          cargo install --locked cargo-deny
+          cargo install --locked cargo-audit
+
+      - name: Install optional SBOM tool
+        run: cargo install --locked cargo-sbom --version 0.10.0
+
+      - name: Run local check gate
+        run: scripts/checks.sh
+
+      - name: Generate SBOM
+        run: scripts/generate-sbom.sh

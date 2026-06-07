@@ -1,0 +1,66 @@
+# Rust build output
+/target/
+/fuzz/target/
+/fuzz/artifacts/
+/fuzz/corpus/
+
+# Local tool/runtime state
+/.agents/
+/.codex/
+/.cargo-deny-advisory-dbs/
+
+# QEMU/kernel generated artifacts
+/build/
+/dist/
+/images/
+/release-reports/
+*.img
+*.iso
+*.qcow2
+*.raw
+*.elf
+*.bin
+*.map
+*.sym
+*.dmp
+*.trace
+
+# Logs and diagnostics
+*.log
+logs/
+*.pid
+serial.out
+qemu.log
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.secret
+*.token
+*.key
+*.pem
+*.p12
+*.pfx
+*.der
+*.crt
+*.csr
+
+# Generated SBOM/release evidence
+/sbom/
+/release-evidence/
+*.spdx.json
+*.cdx.json
+
+# Python/local script state
+__pycache__/
+*.py[cod]
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
