@@ -111,7 +111,8 @@ Exit criteria:
 
 Goal:
 
-Make custom-target kernel builds possible.
+Make the x86_64 custom-target kernel build shape reviewable and locally
+verifiable on stable Rust.
 
 Deliverables:
 
@@ -122,17 +123,23 @@ Deliverables:
 - `crates/aesynx-log` scaffold.
 - `tools/xtask` commands:
   - `cargo xtask build-kernel`
+  - `cargo xtask build-kernel --custom-target-probe`
   - `cargo xtask image`
   - `cargo xtask qemu`
 
 Verification:
 
-- Kernel object builds or fails only on known missing boot pieces.
+- `cargo xtask build-kernel` validates the target metadata, linker script,
+  Cargo config, and host kernel crate.
+- Optional `cargo xtask build-kernel --custom-target-probe` documents the
+  nightly-only `build-std` custom target path without making it the stable
+  release gate.
 - Host crates check.
 
 Exit criteria:
 
-- Build system shape is stable.
+- Build system shape is stable and no command silently implies a complete
+  bootable kernel image.
 
 ### v0.3.0 - QEMU Image Skeleton
 

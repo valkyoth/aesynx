@@ -34,8 +34,9 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.1.0` is the repository foundation line. It is not bootable yet, but the
-project structure and security baseline are active.
+`v0.1.0` is the tagged repository foundation line. `main` is currently carrying
+the `v0.2.0` build-skeleton candidate. It is not bootable yet, but the project
+structure, security baseline, and kernel build-shape checks are active.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -47,7 +48,7 @@ project structure and security baseline are active.
 | IPC model | Model active | Message types plus bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
-| Build skeleton | Active | x86_64 target metadata, linker script, and `cargo xtask build-kernel` host validation. |
+| Build skeleton | Active | x86_64 target metadata, linker script, Cargo config validation, `cargo xtask build-kernel`, and an optional nightly custom-target probe. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, and CodeQL default Rust workflow. |
 | Release gate | Active | Tags require local checks, SBOM, CodeQL on GitHub, and a passing pentest report for the exact commit. |
 
@@ -79,6 +80,13 @@ Validate the current kernel build skeleton:
 
 ```bash
 cargo xtask build-kernel
+```
+
+Try the documented custom-target experiment when a nightly toolchain is
+available:
+
+```bash
+cargo xtask build-kernel --custom-target-probe
 ```
 
 After a pentest report is completed for a tag:
