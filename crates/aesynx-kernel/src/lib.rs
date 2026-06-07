@@ -12,11 +12,11 @@ pub fn describe_boot(info: &BootInfo<'_>, log: &impl LogSink) {
         aesynx_boot::ArchKind::Aarch64 => "arch=aarch64",
         aesynx_boot::ArchKind::Unknown => "arch=unknown",
     };
-    if let Ok(message) = LogMessage::new(BOOT_BANNER) {
-        log.write_str(LogLevel::Info, "kernel", message);
-    }
+    write_boot_log(log, BOOT_BANNER);
+    write_boot_log(log, message);
+}
 
-    if let Ok(message) = LogMessage::new(message) {
-        log.write_str(LogLevel::Info, "kernel", message);
-    }
+fn write_boot_log(log: &impl LogSink, message: &'static str) {
+    let message = LogMessage::new(message).unwrap_or(LogMessage::REJECTED);
+    log.write_str(LogLevel::Info, "kernel", message);
 }

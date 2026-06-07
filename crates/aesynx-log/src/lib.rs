@@ -19,6 +19,10 @@ pub struct LogMessage<'a> {
 }
 
 impl<'a> LogMessage<'a> {
+    pub const REJECTED: LogMessage<'static> = LogMessage {
+        value: "log message rejected",
+    };
+
     pub const fn new(value: &'a str) -> Result<Self, LogError> {
         if value.len() > MAX_LOG_MESSAGE_LEN {
             return Err(LogError::MessageTooLong);
