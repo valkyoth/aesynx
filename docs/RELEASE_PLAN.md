@@ -53,6 +53,26 @@ not tag-ready until:
 When a version's implementation criteria are done, say so explicitly and do not
 create the tag until the pentest has been completed and recorded.
 
+### Pentest Handoff Flow
+
+Use this loop for every version:
+
+1. The implementation owner finishes the criteria and says it is time for a
+   pentest, including the exact commit under review.
+2. The maintainer runs the pentest and writes temporary findings to root
+   `PENTEST.md`.
+3. The findings are reviewed, release-scope issues are addressed where
+   appropriate, documentation or release notes are updated, `PENTEST.md` is
+   deleted, and the fixes are reported.
+4. The maintainer either runs another follow-up pentest or requests a commit
+   and waits for GitHub.
+5. When GitHub CI and CodeQL default setup are green, the maintainer updates
+   `security/pentest/<tag>.md` with the exact commit and `Status: PASS`.
+6. `cargo xtask release-ready <tag>` must pass before tagging.
+
+Never commit root `PENTEST.md`; it is a local scratch handoff file and is
+ignored by git.
+
 ## Phase 0: Project Foundation
 
 ### v0.1.0 - Repository Foundation

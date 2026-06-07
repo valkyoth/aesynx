@@ -46,6 +46,9 @@ configurations.
 No release tag is allowed until the exact commit being tagged has a completed
 pentest report with `Status: PASS`. The report belongs in
 `security/pentest/<tag>.md`, and the release-readiness script verifies it.
+Temporary pentest findings are exchanged through ignored root `PENTEST.md`;
+release-scope findings must be reviewed, addressed where appropriate, and
+`PENTEST.md` deleted before committing.
 
 As implementation matures, the gate must expand to include:
 
