@@ -13,8 +13,8 @@ if grep -q '^members = \[\]$' Cargo.toml; then
     exit 0
 fi
 
-if ! command -v cargo-sbom >/dev/null 2>&1; then
-    echo "sbom: cargo-sbom not installed; install with: cargo install --locked cargo-sbom --version 0.10.0" >&2
+if ! cargo sbom --version >/dev/null 2>&1; then
+    echo "sbom: cargo sbom not installed; install with: cargo install --locked cargo-sbom --version 0.10.0" >&2
     exit 1
 fi
 
