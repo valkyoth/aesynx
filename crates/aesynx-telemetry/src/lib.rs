@@ -3,7 +3,7 @@
 
 use core::cell::Cell;
 use core::marker::PhantomData;
-use core::sync::atomic::{AtomicU64, Ordering, fence};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Debug, Default)]
 pub struct CoreTelemetry {
@@ -66,11 +66,12 @@ impl CoreTelemetry {
     }
 
     #[must_use]
-    /// Returns an advisory snapshot. Counters are sampled independently and may
-    /// not represent one single instant under concurrent updates.
+    /// Returns an advisory snapshot.
+    ///
+    /// Each counter is sampled independently with relaxed ordering. The result
+    /// is suitable for telemetry and scheduling hints, but it is not a coherent
+    /// multi-counter transaction under concurrent updates.
     pub fn snapshot(&self) -> CoreTelemetrySnapshot {
-        fence(Ordering::Acquire);
-
         CoreTelemetrySnapshot {
             run_queue_len: self.run_queue_len.load(Ordering::Relaxed),
             ipc_rx_depth: self.ipc_rx_depth.load(Ordering::Relaxed),

@@ -1529,6 +1529,10 @@ pub struct CoreTelemetry {
 }
 ```
 
+`CoreTelemetry::snapshot()` is an advisory per-counter sample. It must not be
+used as a coherent multi-counter transaction unless a future writer-side
+generation or seqlock protocol is added.
+
 Task telemetry:
 
 ```rust

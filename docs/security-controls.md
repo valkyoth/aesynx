@@ -22,7 +22,7 @@ claim that the controls are implemented today.
 | CI action integrity | Workflow actions must be pinned to commit SHA | Active | `scripts/validate-security-policy.sh`, `.github/workflows/ci.yml` |
 | State transitions | Task and device state changes must use checked transition APIs | Model active | `Task::transition`, `DeviceObject::transition` |
 | Boot address secrecy | KASLR-sensitive kernel image addresses are private and debug-redacted | Model active | `KernelImageInfo` |
-| Telemetry integrity | Task telemetry uses append-only counters and snapshots | Model active | `TaskTelemetry` |
+| Telemetry integrity | Task telemetry uses append-only counters; core telemetry snapshots are advisory per-counter samples | Model active | `TaskTelemetry`, `CoreTelemetry` |
 | Capability revocation | REVOKE authority check required before epoch mutation | Model active | `ensure_revoke_authority`, `RevocationEpochStore` |
 | Drivers | MMIO/IRQ/DMA caps and revocation lifecycle | Planned | `docs/IMPLEMENTATION_PLAN.md` |
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |
