@@ -20,13 +20,101 @@ impl AddressSpace {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GenericPageFlags {
-    pub read: bool,
-    pub write: bool,
-    pub execute: bool,
-    pub user: bool,
+    pub access: PageAccess,
+    pub privilege: PagePrivilege,
     pub global: bool,
     pub device_memory: bool,
     pub cacheable: bool,
+}
+
+impl GenericPageFlags {
+    #[must_use]
+    pub const fn kernel(access: PageAccess) -> Self {
+        Self {
+            access,
+            privilege: PagePrivilege::Kernel,
+            global: false,
+            device_memory: false,
+            cacheable: true,
+        }
+    }
+
+    #[must_use]
+    pub const fn user(access: PageAccess) -> Self {
+        Self {
+            access,
+            privilege: PagePrivilege::User,
+            global: false,
+            device_memory: false,
+            cacheable: true,
+        }
+    }
+
+    #[must_use]
+    pub const fn device(mut self) -> Self {
+        self.device_memory = true;
+        self.cacheable = false;
+        self
+    }
+}
+
+impl Default for GenericPageFlags {
+    fn default() -> Self {
+        Self::kernel(PageAccess::ReadOnly)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PageAccess {
+    #[default]
+    ReadOnly,
+    ReadWrite,
+    ReadExecute,
+}
+
+impl PageAccess {
+    #[must_use]
+    pub const fn readable(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn writable(self) -> bool {
+        matches!(self, Self::ReadWrite)
+    }
+
+    #[must_use]
+    pub const fn executable(self) -> bool {
+        matches!(self, Self::ReadExecute)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PagePrivilege {
+    #[default]
+    Kernel,
+    User,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{GenericPageFlags, PageAccess, PagePrivilege};
+
+    #[test]
+    fn page_access_cannot_be_write_and_execute() {
+        assert!(PageAccess::ReadWrite.writable());
+        assert!(!PageAccess::ReadWrite.executable());
+        assert!(!PageAccess::ReadExecute.writable());
+        assert!(PageAccess::ReadExecute.executable());
+    }
+
+    #[test]
+    fn user_mapping_is_explicit() {
+        let flags = GenericPageFlags::user(PageAccess::ReadOnly);
+
+        assert_eq!(flags.privilege, PagePrivilege::User);
+        assert_eq!(flags.access, PageAccess::ReadOnly);
+    }
 }

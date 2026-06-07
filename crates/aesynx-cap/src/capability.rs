@@ -1,6 +1,6 @@
 use aesynx_abi::{ObjectId, PrincipalId, VirtAddr};
 
-use crate::{CapKind, CapPerms, DeriveError, DeriveRequest};
+use crate::{CapKind, CapPerms, CapValidationError, DeriveError, DeriveRequest};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Capability {
@@ -25,6 +25,22 @@ impl Capability {
         self.revocation_epoch == current_epoch
     }
 
+    pub const fn validate_live(
+        self,
+        current_generation: u32,
+        current_epoch: u64,
+    ) -> Result<(), CapValidationError> {
+        if self.generation != current_generation {
+            return Err(CapValidationError::StaleGeneration);
+        }
+
+        if self.revocation_epoch != current_epoch {
+            return Err(CapValidationError::Revoked);
+        }
+
+        Ok(())
+    }
+
     pub fn derive(self, request: DeriveRequest) -> Result<Self, DeriveError> {
         if !self.perms.contains(CapPerms::DERIVE) {
             return Err(DeriveError::MissingDerivePermission);
@@ -47,6 +63,17 @@ impl Capability {
             generation: self.generation,
             revocation_epoch: self.revocation_epoch,
             kind: self.kind,
+        })
+    }
+
+    pub fn grant(self, target_owner: PrincipalId) -> Result<Self, DeriveError> {
+        if !self.perms.contains(CapPerms::GRANT) {
+            return Err(DeriveError::MissingGrantPermission);
+        }
+
+        Ok(Self {
+            owner: target_owner,
+            ..self
         })
     }
 }
@@ -88,7 +115,7 @@ fn bounded_range_contains(
 mod tests {
     use aesynx_abi::{ObjectId, PrincipalId, VirtAddr};
 
-    use crate::{CapKind, CapPerms, Capability, DeriveError, DeriveRequest};
+    use crate::{CapKind, CapPerms, CapValidationError, Capability, DeriveError, DeriveRequest};
 
     fn parent_cap(perms: CapPerms) -> Capability {
         Capability {
@@ -174,5 +201,38 @@ mod tests {
         };
 
         assert_eq!(parent.derive(request), Err(DeriveError::RangeEscalates));
+    }
+
+    #[test]
+    fn grant_requires_grant_permission() {
+        let parent = parent_cap(CapPerms::READ);
+
+        assert_eq!(
+            parent.grant(PrincipalId::new(2)),
+            Err(DeriveError::MissingGrantPermission)
+        );
+    }
+
+    #[test]
+    fn grant_preserves_authority_and_changes_owner() {
+        let parent = parent_cap(CapPerms::READ.union(CapPerms::GRANT));
+        let expected = Capability {
+            owner: PrincipalId::new(2),
+            ..parent
+        };
+
+        assert_eq!(parent.grant(PrincipalId::new(2)), Ok(expected));
+    }
+
+    #[test]
+    fn live_validation_rejects_stale_generation_and_epoch() {
+        let parent = parent_cap(CapPerms::READ);
+
+        assert_eq!(parent.validate_live(3, 9), Ok(()));
+        assert_eq!(
+            parent.validate_live(2, 9),
+            Err(CapValidationError::StaleGeneration)
+        );
+        assert_eq!(parent.validate_live(3, 8), Err(CapValidationError::Revoked));
     }
 }

@@ -2,7 +2,7 @@
 #![deny(unsafe_code)]
 
 use aesynx_boot::BootInfo;
-use aesynx_log::{LogLevel, LogSink};
+use aesynx_log::{LogLevel, LogMessage, LogSink};
 
 pub const BOOT_BANNER: &str = "Aesynx: booting";
 
@@ -12,6 +12,11 @@ pub fn describe_boot(info: &BootInfo<'_>, log: &impl LogSink) {
         aesynx_boot::ArchKind::Aarch64 => "arch=aarch64",
         aesynx_boot::ArchKind::Unknown => "arch=unknown",
     };
-    log.write_str(LogLevel::Info, BOOT_BANNER);
-    log.write_str(LogLevel::Info, message);
+    if let Ok(message) = LogMessage::new(BOOT_BANNER) {
+        log.write_str(LogLevel::Info, "kernel", message);
+    }
+
+    if let Ok(message) = LogMessage::new(message) {
+        log.write_str(LogLevel::Info, "kernel", message);
+    }
 }

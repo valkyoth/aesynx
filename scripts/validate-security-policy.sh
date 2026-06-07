@@ -32,14 +32,14 @@ if grep -RInE "$retired_name_pattern" README.md docs SECURITY.md Cargo.toml deny
     exit 1
 fi
 
-if grep -RInE 'PRIVATE KEY|BEGIN RSA|BEGIN EC PRIVATE|BEGIN OPENSSH PRIVATE|api[_-]?key|secret[[:space:]]*=|token[[:space:]]*=' . \
+if grep -RInE 'PRIVATE KEY|BEGIN RSA|BEGIN EC PRIVATE|BEGIN OPENSSH PRIVATE|api[_-]?key[[:space:]]*[=:]|secret[[:space:]]*[=:]|token[[:space:]]*[=:]|password[[:space:]]*[=:]|credential[[:space:]]*[=:]' . \
     --exclude-dir=.git \
     --exclude-dir=.cargo-deny-advisory-dbs \
+    --exclude-dir=target \
+    --exclude-dir=sbom \
     --exclude='validate-security-policy.sh' \
     --exclude='*.md' \
-    --exclude='*.toml' \
-    --exclude='*.yml' \
-    --exclude='*.yaml' 2>/dev/null; then
+    2>/dev/null; then
     echo "security policy: possible secret material found" >&2
     exit 1
 fi

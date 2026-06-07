@@ -8,6 +8,7 @@
 /.agents/
 /.codex/
 /.cargo-deny-advisory-dbs/
+/PENTEST.md
 
 # QEMU/kernel generated artifacts
 /build/

@@ -3,7 +3,7 @@
 
 use aesynx_abi::{CpuHardwareId, PhysAddr, VirtAddr};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct BootInfo<'a> {
     pub arch: ArchKind,
     pub platform: PlatformKind,
@@ -61,9 +61,12 @@ pub struct CpuInfo {
     pub enabled: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct KernelImageInfo {
+    /// KASLR-sensitive virtual start address. Do not log or expose outside the boot path.
     pub virt_start: VirtAddr,
+    /// KASLR-sensitive virtual end address. Do not log or expose outside the boot path.
     pub virt_end: VirtAddr,
+    /// KASLR-sensitive physical start address. Do not log or expose outside the boot path.
     pub phys_start: PhysAddr,
 }

@@ -1,4 +1,5 @@
 use std::env;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 const KERNEL_TARGET: &str = "targets/x86_64-unknown-aesynx.json";
@@ -35,12 +36,21 @@ fn main() -> ExitCode {
 }
 
 fn build_kernel() -> ExitCode {
-    if !required_path_exists(KERNEL_TARGET) || !required_path_exists(KERNEL_LINKER) {
+    let root = match workspace_root() {
+        Ok(root) => root,
+        Err(error) => {
+            eprintln!("xtask: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if !required_path_exists(&root, KERNEL_TARGET) || !required_path_exists(&root, KERNEL_LINKER) {
         return ExitCode::FAILURE;
     }
 
     let mut command = Command::new("cargo");
     command.args(["check", "-p", "aesynx-kernel"]);
+    command.current_dir(&root);
     let host_check = run_command(&mut command, "cargo check -p aesynx-kernel");
     if host_check != ExitCode::SUCCESS {
         return host_check;
@@ -53,13 +63,31 @@ fn build_kernel() -> ExitCode {
 }
 
 fn run_script(path: &str) -> ExitCode {
-    let mut command = Command::new(path);
+    let root = match workspace_root() {
+        Ok(root) => root,
+        Err(error) => {
+            eprintln!("xtask: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let script = root.join(path);
+    let mut command = Command::new(script);
+    command.current_dir(root);
     run_command(&mut command, path)
 }
 
 fn run_script_with_arg(path: &str, arg: &str) -> ExitCode {
-    let mut command = Command::new(path);
+    let root = match workspace_root() {
+        Ok(root) => root,
+        Err(error) => {
+            eprintln!("xtask: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let script = root.join(path);
+    let mut command = Command::new(script);
     command.arg(arg);
+    command.current_dir(root);
     run_command(&mut command, path)
 }
 
@@ -77,13 +105,25 @@ fn run_command(command: &mut Command, label: &str) -> ExitCode {
     }
 }
 
-fn required_path_exists(path: &str) -> bool {
-    if std::path::Path::new(path).exists() {
+fn required_path_exists(root: &Path, path: &str) -> bool {
+    if root.join(path).exists() {
         return true;
     }
 
     eprintln!("xtask: required path missing: {path}");
     false
+}
+
+fn workspace_root() -> Result<PathBuf, &'static str> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let Some(tools_dir) = manifest_dir.parent() else {
+        return Err("cannot resolve tools directory from CARGO_MANIFEST_DIR");
+    };
+    let Some(root) = tools_dir.parent() else {
+        return Err("cannot resolve workspace root from tools directory");
+    };
+
+    Ok(root.to_path_buf())
 }
 
 fn not_ready(command: &str, milestone: &str) -> ExitCode {

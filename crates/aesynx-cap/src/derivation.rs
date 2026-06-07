@@ -13,6 +13,13 @@ pub struct DeriveRequest {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DeriveError {
     MissingDerivePermission,
+    MissingGrantPermission,
     PermissionsEscalate,
     RangeEscalates,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CapValidationError {
+    Revoked,
+    StaleGeneration,
 }

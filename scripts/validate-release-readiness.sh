@@ -8,13 +8,10 @@ fi
 
 tag="$1"
 
-case "$tag" in
-    v[0-9]*.[0-9]*.[0-9]*) ;;
-    *)
-        echo "release readiness: tag must look like vX.Y.Z: $tag" >&2
-        exit 2
-        ;;
-esac
+if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+    echo "release readiness: tag must look like vX.Y.Z: $tag" >&2
+    exit 2
+fi
 
 report="security/pentest/$tag.md"
 
@@ -25,12 +22,12 @@ fi
 
 head_commit="$(git rev-parse HEAD)"
 
-if ! grep -q "^Tag: $tag$" "$report"; then
+if ! grep -Fxq "Tag: $tag" "$report"; then
     echo "release readiness: report must contain exact tag line: Tag: $tag" >&2
     exit 1
 fi
 
-if ! grep -q "^Commit: $head_commit$" "$report"; then
+if ! grep -Fxq "Commit: $head_commit" "$report"; then
     echo "release readiness: report must target current HEAD: $head_commit" >&2
     exit 1
 fi

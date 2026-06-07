@@ -1,8 +1,8 @@
 #![no_std]
 #![deny(unsafe_code)]
 
-use aesynx_abi::{CoreId, ROOT_CORE};
-use aesynx_arch::ArchCpu;
+use aesynx_abi::CoreId;
+use aesynx_arch::{ArchCpu, ArchError};
 
 pub struct Aarch64;
 
@@ -21,19 +21,23 @@ impl ArchCpu for Aarch64 {
         }
     }
 
-    fn enable_interrupts() {}
-
-    fn disable_interrupts() {}
-
-    fn interrupts_enabled() -> bool {
-        false
+    fn enable_interrupts() -> Result<(), ArchError> {
+        Err(ArchError::Unsupported)
     }
 
-    fn current_core_id() -> CoreId {
-        ROOT_CORE
+    fn disable_interrupts() -> Result<(), ArchError> {
+        Err(ArchError::Unsupported)
     }
 
-    fn read_timestamp() -> u64 {
-        0
+    fn interrupts_enabled() -> Result<bool, ArchError> {
+        Err(ArchError::Unsupported)
+    }
+
+    fn current_core_id() -> Result<CoreId, ArchError> {
+        Err(ArchError::Unsupported)
+    }
+
+    fn read_timestamp() -> Result<u64, ArchError> {
+        Err(ArchError::Unsupported)
     }
 }

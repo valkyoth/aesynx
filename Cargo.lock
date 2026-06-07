@@ -47,6 +47,9 @@ dependencies = [
 [[package]]
 name = "aesynx-bytecode"
 version = "0.1.0"
+dependencies = [
+ "aesynx-cap",
+]
 
 [[package]]
 name = "aesynx-cap"

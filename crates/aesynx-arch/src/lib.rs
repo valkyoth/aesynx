@@ -8,11 +8,11 @@ pub trait ArchCpu {
     fn arch_name() -> &'static str;
     fn wait_for_interrupt();
     fn halt_forever() -> !;
-    fn enable_interrupts();
-    fn disable_interrupts();
-    fn interrupts_enabled() -> bool;
-    fn current_core_id() -> CoreId;
-    fn read_timestamp() -> u64;
+    fn enable_interrupts() -> Result<(), ArchError>;
+    fn disable_interrupts() -> Result<(), ArchError>;
+    fn interrupts_enabled() -> Result<bool, ArchError>;
+    fn current_core_id() -> Result<CoreId, ArchError>;
+    fn read_timestamp() -> Result<u64, ArchError>;
 }
 
 pub trait ArchMemory {
@@ -59,6 +59,12 @@ pub enum MemoryError {
     AlreadyMapped,
     NotMapped,
     OutOfMemory,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ArchError {
+    Unsupported,
+    NotInitialized,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

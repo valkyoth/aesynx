@@ -45,6 +45,7 @@ aesynx-abi = { path = "crates/aesynx-abi", version = "0.1.0" }
 aesynx-ai-policy = { path = "crates/aesynx-ai-policy", version = "0.1.0" }
 aesynx-arch = { path = "crates/aesynx-arch", version = "0.1.0" }
 aesynx-boot = { path = "crates/aesynx-boot", version = "0.1.0" }
+aesynx-bytecode = { path = "crates/aesynx-bytecode", version = "0.1.0" }
 aesynx-cap = { path = "crates/aesynx-cap", version = "0.1.0" }
 aesynx-device = { path = "crates/aesynx-device", version = "0.1.0" }
 aesynx-ipc = { path = "crates/aesynx-ipc", version = "0.1.0" }
