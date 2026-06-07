@@ -38,6 +38,9 @@ scripts/generate-sbom.sh
 scripts/validate-release-readiness.sh vX.Y.Z
 ```
 
+GitHub security automation must include CodeQL with the default query suite for
+Rust before tagging a release.
+
 No release tag is allowed until the exact commit being tagged has a completed
 pentest report with `Status: PASS`. The report belongs in
 `security/pentest/<tag>.md`, and the release-readiness script verifies it.
