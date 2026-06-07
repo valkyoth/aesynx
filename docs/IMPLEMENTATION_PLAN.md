@@ -31,6 +31,13 @@ The 1.0 target is a working QEMU version with:
 
 Unix/POSIX/Linux compatibility is not part of this plan. Native Aesynx userspace is part of this plan.
 
+Container-like hosted execution is a long-term requirement, but it should be
+implemented as Aesynx-native capsules: isolated object roots, explicit
+capability sets, resource budgets, and virtualized service endpoints. A hosted
+runtime can later run Aesynx userspace concepts on another host kernel for
+development and CI, but Linux container compatibility must not define the
+kernel ABI. See [Hosted Execution Roadmap](hosted-execution-roadmap.md).
+
 ## 1. Core Position
 
 Aesynx is not "Linux in Rust" and not "Windows rewritten." It is a clean research kernel whose design center is:
@@ -870,9 +877,22 @@ For 1.0:
 
 Long-term:
 
+- Content-addressed immutable object store.
+- Versioned root references.
+- Versioned name-index objects.
 - Append log.
 - Checkpoints.
 - Crash recovery.
+- Integrity verification on object reads.
+- Deduplication by content hash.
+
+Native disk persistence should follow the object model. Aesynx names such as
+`/bin/aesh` are lookup entries in name-index objects, not proof that the kernel
+has a path-first filesystem. A read-only FAT32 path may exist for EFI boot
+compatibility, but it is a shim for loading the bootloader and initial object
+bundle, not the native storage format.
+
+See [Storage Roadmap](storage-roadmap.md).
 - NVMe backend.
 - Signed objects.
 - Rollback and secure updates.

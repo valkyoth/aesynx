@@ -92,7 +92,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.1.0
+cargo xtask release-ready v0.2.0
 ```
 
 ## Security Posture
@@ -113,6 +113,8 @@ pentest report in `security/pentest/<tag>.md`.
 - [Release Plan](docs/RELEASE_PLAN.md)
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
 - [Build Skeleton](docs/build-skeleton.md)
+- [Storage Roadmap](docs/storage-roadmap.md)
+- [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)
 - [Security Policy](SECURITY.md)
 - [Threat Model](docs/threat-model.md)
 - [Security Controls](docs/security-controls.md)

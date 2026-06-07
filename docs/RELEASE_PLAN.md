@@ -1448,6 +1448,32 @@ Exit criteria:
 
 - Object model exists beyond boot bundle.
 
+### v0.53.1 - Object Store API Shape
+
+Goal:
+
+Keep the object graph independent from its future backing store.
+
+Deliverables:
+
+- Storage-neutral object read/write traits.
+- Immutable object record shape.
+- Versioned root reference model.
+- Name-index object model.
+- Content hash field for immutable payloads.
+- Capability checks documented for object reads and root/name-index updates.
+
+Verification:
+
+- Host tests create objects through the storage-neutral API.
+- Host tests update a name index by publishing a new immutable object.
+- Host tests roll back a root reference to a previous object.
+
+Exit criteria:
+
+- Moving from RAM storage to persistent storage does not require changing shell
+  or kernel object APIs.
+
 ### v0.54.0 - Object Shell Commands
 
 Goal:
@@ -1958,10 +1984,17 @@ commands:
 
 ### v1.1 - Storage Persistence
 
-- Append-log object backend.
+- Content-addressed object backend.
+- Append-log persistence.
+- Versioned root references.
+- Versioned name-index objects.
+- Integrity verification on reads.
+- Deduplication by content hash.
 - Checkpoints.
 - Reboot recovery.
+- Garbage collection for unreachable immutable objects.
 - Virtio block integration.
+- Read-only FAT32 EFI boot shim where needed for boot compatibility.
 
 ### v1.2 - Stronger Driver Isolation
 
@@ -1990,6 +2023,26 @@ commands:
 - Fixed-point model object.
 - Safe scheduler advice.
 - Regression/rollback testing.
+
+### v1.6 - Hosted Execution And Capsules Preview
+
+- Native capsule model.
+- Capsule manifest format.
+- Object namespace root per capsule.
+- Capability root per capsule.
+- CPU, memory, IPC, and object-store budgets.
+- Virtualized clock, entropy, console, network, and storage service endpoints.
+- Capsule lifecycle: create, start, suspend, revoke, kill.
+- Hosted Aesynx runtime design for running Aesynx userspace on another host
+  kernel during development and CI.
+
+### v1.7 - Micro-VM Compatibility Research
+
+- Micro-VM service design.
+- Virtio-style virtual devices backed by Aesynx services.
+- Capability-scoped guest storage and networking.
+- Explicit non-goal: unchanged OCI/Linux containers before the native capsule
+  model is mature.
 
 ### v2.0 - Multi-Architecture Research Release
 

@@ -146,6 +146,10 @@ Implications:
 - Boot bundle is an object bundle.
 - Shell can expose `/bin`-like names, but internally they resolve to object IDs.
 - POSIX path semantics are not a kernel requirement.
+- Persistent storage should be content-addressed immutable objects with
+  versioned root/name-index references.
+- FAT32 may be used as a read-only EFI boot shim, but it is not the native
+  storage model.
 
 ## ADR-009: Per-Core Ownership Is The Scalability Model
 
@@ -163,3 +167,26 @@ Implications:
 - No global object registry as final design.
 - No global allocator lock as final design.
 - Early global bootstrap state must be explicitly temporary.
+
+## ADR-010: Capsules Instead Of Linux-Style Containers As The Native Model
+
+Decision:
+
+Aesynx should support container-like workflows through native capsules:
+isolated object roots, explicit capabilities, resource budgets, and virtualized
+service endpoints. A hosted runtime may later run Aesynx userspace on another
+host kernel for development and CI.
+
+Rationale:
+
+Linux containers are tightly coupled to Linux namespaces, cgroups, mounts,
+signals, and filesystem semantics. Copying that model would pull Aesynx toward
+Unix compatibility before the native object/capability model is mature.
+
+Implications:
+
+- Capsules are native Aesynx isolation units, not OCI/Linux containers.
+- Hosted Aesynx execution is useful, but it maps to the Aesynx component/object
+  ABI rather than defining a POSIX ABI.
+- Micro-VM or Linux compatibility support is a later service layer, not a 1.0
+  kernel goal.
