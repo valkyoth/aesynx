@@ -1,0 +1,15 @@
+[build]
+# Keep ordinary workspace commands on the host target. `xtask build-kernel`
+# validates the kernel crate while the custom target path matures.
+
+[alias]
+xtask = "run -p xtask --"
+
+[target.'cfg(target_os = "aesynx")']
+linker = "rust-lld"
+rustflags = [
+    "-C",
+    "link-arg=-Tlinker/kernel-x86_64.ld",
+    "-C",
+    "panic=abort",
+]

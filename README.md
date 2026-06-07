@@ -12,6 +12,7 @@ Planning documents:
 - [Userspace Vision](docs/userspace-vision.md)
 - [Release Plan](docs/RELEASE_PLAN.md)
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
+- [Build Skeleton](docs/build-skeleton.md)
 - [Security Policy](SECURITY.md)
 - [Threat Model](docs/threat-model.md)
 - [Security Controls](docs/security-controls.md)
