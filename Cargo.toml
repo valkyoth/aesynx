@@ -1,5 +1,27 @@
 [workspace]
-members = []
+members = [
+    "crates/aesynx-abi",
+    "crates/aesynx-ai-policy",
+    "crates/aesynx-arch",
+    "crates/aesynx-arch-aarch64",
+    "crates/aesynx-arch-x86_64",
+    "crates/aesynx-boot",
+    "crates/aesynx-bytecode",
+    "crates/aesynx-cap",
+    "crates/aesynx-device",
+    "crates/aesynx-ipc",
+    "crates/aesynx-kernel",
+    "crates/aesynx-log",
+    "crates/aesynx-mm",
+    "crates/aesynx-object",
+    "crates/aesynx-platform",
+    "crates/aesynx-rt",
+    "crates/aesynx-sched",
+    "crates/aesynx-shell",
+    "crates/aesynx-telemetry",
+    "crates/aesynx-time",
+    "tools/xtask",
+]
 resolver = "3"
 
 [workspace.package]
@@ -17,3 +39,19 @@ undocumented_unsafe_blocks = "deny"
 panic = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
+
+[workspace.dependencies]
+aesynx-abi = { path = "crates/aesynx-abi" }
+aesynx-ai-policy = { path = "crates/aesynx-ai-policy" }
+aesynx-arch = { path = "crates/aesynx-arch" }
+aesynx-boot = { path = "crates/aesynx-boot" }
+aesynx-cap = { path = "crates/aesynx-cap" }
+aesynx-device = { path = "crates/aesynx-device" }
+aesynx-ipc = { path = "crates/aesynx-ipc" }
+aesynx-log = { path = "crates/aesynx-log" }
+aesynx-mm = { path = "crates/aesynx-mm" }
+aesynx-object = { path = "crates/aesynx-object" }
+aesynx-platform = { path = "crates/aesynx-platform" }
+aesynx-rt = { path = "crates/aesynx-rt" }
+aesynx-telemetry = { path = "crates/aesynx-telemetry" }
+aesynx-time = { path = "crates/aesynx-time" }

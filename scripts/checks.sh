@@ -17,6 +17,15 @@ if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
     echo "checks: formatting"
     cargo fmt --all --check
 
+    echo "checks: workspace check"
+    cargo check --workspace
+
+    echo "checks: clippy"
+    cargo clippy --workspace --all-targets -- -D warnings
+
+    echo "checks: tests"
+    cargo test --workspace
+
     echo "checks: dependency policy"
     if command -v cargo-deny >/dev/null 2>&1; then
         cargo deny check
