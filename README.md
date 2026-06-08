@@ -37,10 +37,11 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 ## What Works Today
 
 `v0.3.0` is the tagged QEMU image-skeleton line. `main` is currently carrying
-the `v0.4.0` first Rust kernel serial-boot implementation candidate. It builds
-a release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it
-into a Limine ISO, records build and boot tool versions in the image manifest,
-boots it in QEMU, and verifies the kernel-owned serial marker.
+the `v0.4.0` first Rust kernel serial-boot release candidate. The v0.4 pentest
+follow-up is clear; the remaining pre-tag gate is GitHub CI and CodeQL green.
+It builds a release-profile freestanding `x86_64-unknown-none` kernel ELF,
+packages it into a Limine ISO, records build and boot tool versions in the
+image manifest, boots it in QEMU, and verifies the kernel-owned serial marker.
 
 | Area | Status | Notes |
 | --- | --- | --- |

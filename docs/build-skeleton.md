@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.4 first serial boot implementation candidate
+Status: v0.4 first serial boot release candidate
 
 The repository contains the first x86_64 kernel build shape:
 
