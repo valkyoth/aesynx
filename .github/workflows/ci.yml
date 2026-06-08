@@ -36,8 +36,27 @@ jobs:
       - name: Install optional SBOM tool
         run: cargo install --locked cargo-sbom --version 0.10.0
 
+      - name: Install boot smoke tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang gawk lld mtools nasm qemu-system-x86 xorriso
+          curl -sSfL https://github.com/Limine-Bootloader/Limine/releases/download/v12.3.2/limine-12.3.2.tar.gz -o /tmp/limine-12.3.2.tar.gz
+          printf '%s  %s\n' 'c505283106eaddfa5bbc56d8c1b1cf333d12654dcb37f80e685d3576e8702865' '/tmp/limine-12.3.2.tar.gz' | sha256sum -c -
+          mkdir -p /tmp/limine-12.3.2
+          tar -xzf /tmp/limine-12.3.2.tar.gz -C /tmp/limine-12.3.2 --strip-components=1
+          cd /tmp/limine-12.3.2
+          ./configure --enable-bios --enable-bios-cd --enable-uefi-x86-64 --enable-uefi-cd
+          make -j"$(nproc)"
+          sudo make install
+          limine --version
+          xorriso --version
+          qemu-system-x86_64 --version
+
       - name: Run local check gate
         run: scripts/checks.sh
 
       - name: Generate SBOM
         run: scripts/generate-sbom.sh
+
+      - name: Run QEMU boot smoke
+        run: cargo xtask qemu

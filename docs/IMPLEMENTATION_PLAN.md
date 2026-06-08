@@ -519,6 +519,11 @@ The v0.4 serial path is an early single-core diagnostic path. It must use only
 typed admitted UART ports, bounded transmit polling, and direct fixed-string
 boot output until a real synchronized logger exists.
 
+The v0.4 QEMU Limine config keeps KASLR disabled only because the kernel does
+not yet consume Limine handoff metadata. Enabling KASLR is gated on BootInfo
+normalization reading the randomized virtual and physical kernel image
+addresses and populating `KernelImageInfo`.
+
 ### 6.2 BootInfo
 
 Bootloader-specific metadata is normalized into:
@@ -542,6 +547,11 @@ The generic kernel receives only `BootInfo`.
 `KernelImageInfo` contains KASLR-sensitive addresses. Its fields are private,
 debug output is redacted, and address access is limited to the boot
 initialization path.
+
+BootInfo normalization must be the point where the QEMU boot config switches to
+KASLR enabled. A config or hardware boot path that leaves KASLR disabled after
+`KernelImageInfo` is populated is a release-blocking security exception unless
+the release notes justify it explicitly.
 
 ### 6.3 Logging
 
@@ -1792,6 +1802,10 @@ Before 1.0, CI should run:
 - kernel build.
 - QEMU boot smoke.
 - serial-output assertions.
+
+From v0.4 onward, the CI boot smoke installs a checksum-pinned Limine release,
+captures Rust/Limine/xorriso/QEMU versions in the image manifest, and verifies
+the Rust-owned serial marker.
 
 ### 19.3 QEMU Serial Expectations
 

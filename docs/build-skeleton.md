@@ -37,8 +37,8 @@ the v0.2 release gate.
 cargo xtask build-kernel
 ```
 
-Validates the kernel crate and build skeleton, then builds the freestanding
-`x86_64-unknown-none` kernel ELF used by the QEMU image.
+Validates the kernel crate and build skeleton, then builds the release-profile
+freestanding `x86_64-unknown-none` kernel ELF used by the QEMU image.
 
 ```bash
 cargo xtask build-kernel --custom-target-probe
@@ -53,8 +53,9 @@ cargo xtask qemu
 ```
 
 `cargo xtask image` creates `build/qemu/aesynx-v0.4.0.iso` with Limine and the
-Rust kernel ELF. `cargo xtask qemu` starts QEMU, captures serial output, and
-expects `[TEST] boot=ok`.
+release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
+and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
+output, and expects `[TEST] boot=ok`.
 
 The v0.4 image proves that Limine can load the Rust kernel ELF and reach
 `_start`. It does not claim BootInfo parsing, page-table ownership, interrupts,

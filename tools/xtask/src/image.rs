@@ -1,4 +1,7 @@
+mod host_tools;
+
 use crate::workspace;
+use host_tools::{HostToolVersions, MIN_LIMINE_VERSION_TEXT, validate_host_tools};
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,6 +18,7 @@ const SERIAL_LOG_NAME: &str = "aesynx-v0.4.0.serial.log";
 const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
+const KERNEL_PROFILE: &str = "release";
 const SERIAL_MARKER: &str = "[TEST] boot=ok";
 const QEMU_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -97,7 +101,7 @@ struct ImagePaths {
 
 fn build_image(root: &Path) -> Result<ImagePaths, String> {
     validate_boot_config(root)?;
-    validate_host_tools()?;
+    let host_tools = validate_host_tools()?;
 
     let output_dir = root.join(BUILD_DIR);
     fs::create_dir_all(&output_dir)
@@ -112,7 +116,7 @@ fn build_image(root: &Path) -> Result<ImagePaths, String> {
     prepare_staging(root, &staging_dir, &kernel_elf)?;
     create_limine_iso(&staging_dir, &image)?;
     install_limine_bios(&image)?;
-    write_manifest(&manifest, &image, &kernel_elf)?;
+    write_manifest(&manifest, &image, &kernel_elf, &host_tools)?;
 
     Ok(ImagePaths {
         image,
@@ -139,20 +143,6 @@ fn validate_boot_config(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_host_tools() -> Result<(), String> {
-    for tool in ["limine", "xorriso", "qemu-system-x86_64"] {
-        let output = Command::new(tool)
-            .arg("--version")
-            .output()
-            .map_err(|error| format!("required host tool unavailable: {tool}: {error}"))?;
-        if !output.status.success() {
-            return Err(format!("required host tool failed version check: {tool}"));
-        }
-    }
-
-    Ok(())
-}
-
 fn build_kernel_elf(root: &Path) -> Result<PathBuf, String> {
     let mut command = Command::new("cargo");
     command.args([
@@ -163,17 +153,18 @@ fn build_kernel_elf(root: &Path) -> Result<PathBuf, String> {
         KERNEL_PACKAGE,
         "--bin",
         KERNEL_BINARY,
+        "--release",
     ]);
     command.current_dir(root);
     run_status(
         &mut command,
-        "cargo build --target x86_64-unknown-none -p aesynx-kernel --bin aesynx-kernel",
+        "cargo build --target x86_64-unknown-none -p aesynx-kernel --bin aesynx-kernel --release",
     )?;
 
     let kernel = root
         .join("target")
         .join(KERNEL_TARGET)
-        .join("debug")
+        .join(KERNEL_PROFILE)
         .join(KERNEL_BINARY);
     if !kernel.is_file() {
         return Err(format!("kernel ELF was not produced: {}", kernel.display()));
@@ -281,11 +272,22 @@ fn install_limine_bios(image: &Path) -> Result<(), String> {
     run_status(&mut command, "limine bios-install")
 }
 
-fn write_manifest(manifest: &Path, image: &Path, kernel_elf: &Path) -> Result<(), String> {
+fn write_manifest(
+    manifest: &Path,
+    image: &Path,
+    kernel_elf: &Path,
+    host_tools: &HostToolVersions,
+) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.4.0 first serial boot\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nserial_marker={SERIAL_MARKER}\n",
+        "name=Aesynx v0.4.0 first serial boot\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\nserial_marker={SERIAL_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
         image.display(),
-        kernel_elf.display()
+        kernel_elf.display(),
+        host_tools.rustc,
+        host_tools.cargo,
+        host_tools.limine,
+        MIN_LIMINE_VERSION_TEXT,
+        host_tools.xorriso,
+        host_tools.qemu
     );
     fs::write(manifest, manifest_contents)
         .map_err(|error| format!("failed to write manifest: {error}"))
@@ -389,7 +391,7 @@ fn command_error(description: &str, output: std::process::Output) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{BOOT_CONFIG_MARKERS, KERNEL_TARGET, SERIAL_MARKER};
+    use super::{BOOT_CONFIG_MARKERS, KERNEL_PROFILE, KERNEL_TARGET, SERIAL_MARKER};
 
     #[test]
     fn qemu_marker_tracks_v0_4_boot_contract() {
@@ -399,6 +401,11 @@ mod tests {
     #[test]
     fn kernel_target_is_stable_freestanding_target() {
         assert_eq!(KERNEL_TARGET, "x86_64-unknown-none");
+    }
+
+    #[test]
+    fn image_kernel_profile_is_release() {
+        assert_eq!(KERNEL_PROFILE, "release");
     }
 
     #[test]

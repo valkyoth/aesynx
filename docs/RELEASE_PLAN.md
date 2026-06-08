@@ -178,14 +178,17 @@ Boot x86_64 QEMU and print over serial.
 
 Deliverables:
 
-- Stable `x86_64-unknown-none` kernel ELF build.
+- Stable `x86_64-unknown-none` release kernel ELF build.
 - Limine ISO image path.
 - Boot config in `boot/qemu/limine.conf`.
+- KASLR explicitly disabled only for the v0.4 QEMU smoke config.
 - `_start` entry.
 - Minimal panic handler.
 - UART 16550 write path.
 - Early `serial_println!`.
 - Documented unsafe boundary for x86_64 port I/O.
+- Image manifest records Rust, Limine, xorriso, and QEMU version banners.
+- CI QEMU boot smoke validates the serial marker.
 
 Expected serial:
 
@@ -197,8 +200,8 @@ arch=x86_64 platform=qemu
 
 Verification:
 
-- `cargo xtask build-kernel` builds the freestanding kernel ELF.
-- `cargo xtask image` creates the Limine ISO.
+- `cargo xtask build-kernel` builds the release freestanding kernel ELF.
+- `cargo xtask image` creates the release-profile Limine ISO and manifest.
 - `cargo xtask qemu` observes `[TEST] boot=ok` over serial.
 
 Exit criteria:
@@ -217,6 +220,8 @@ Deliverables:
 - `BootInfo`.
 - Memory map structures.
 - Kernel image metadata.
+- KASLR-enabled QEMU boot after Limine handoff parsing can populate
+  `KernelImageInfo`.
 - Optional framebuffer metadata.
 - Optional RSDP metadata.
 

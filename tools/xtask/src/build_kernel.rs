@@ -99,18 +99,19 @@ fn stable_validation(root: &Path) -> ExitCode {
         "aesynx-kernel",
         "--bin",
         "aesynx-kernel",
+        "--release",
     ]);
     command.current_dir(root);
     let kernel_build = run_command(
         &mut command,
-        "cargo build --target x86_64-unknown-none -p aesynx-kernel --bin aesynx-kernel",
+        "cargo build --target x86_64-unknown-none -p aesynx-kernel --bin aesynx-kernel --release",
     );
     if kernel_build != ExitCode::SUCCESS {
         return kernel_build;
     }
 
     println!("xtask: kernel host check passed");
-    println!("xtask: stable freestanding kernel ELF built for {STABLE_BOOT_TARGET}");
+    println!("xtask: stable release freestanding kernel ELF built for {STABLE_BOOT_TARGET}");
     println!("xtask: custom target metadata validated at {KERNEL_TARGET}");
     println!("xtask: linker script validated at {KERNEL_LINKER}");
     println!("xtask: stable kernel build path is ready");

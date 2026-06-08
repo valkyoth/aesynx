@@ -3,8 +3,9 @@
 Status: v0.4 implementation candidate
 
 `v0.4.0` replaces the temporary v0.3 stage-0 probe with a Rust kernel entry.
-The image path now builds a freestanding `x86_64-unknown-none` ELF, packages it
-with Limine, boots it in QEMU, and validates serial output from Rust `_start`.
+The image path now builds a release-profile freestanding `x86_64-unknown-none`
+ELF, packages it with Limine, boots it in QEMU, and validates serial output
+from Rust `_start`.
 
 ## Commands
 
@@ -20,6 +21,10 @@ cargo xtask qemu
 build/qemu/aesynx-v0.4.0.iso
 build/qemu/aesynx-v0.4.0.manifest
 ```
+
+The manifest records the kernel profile, the Limine minimum version, and the
+Rust, Limine, xorriso, and QEMU version banners used to create and smoke-test
+the image.
 
 `cargo xtask qemu` expects:
 
@@ -40,6 +45,9 @@ arch=x86_64 platform=qemu
   not load mixed-permission program headers onto the same page.
 - The v0.4 boot entry writes fixed strings directly, so the boot ELF avoids a
   writable `.got` section.
+- `boot/qemu/limine.conf` keeps KASLR disabled for the QEMU smoke image until
+  Limine BootInfo parsing can populate `KernelImageInfo` with the randomized
+  load addresses.
 
 ## Boundary
 
@@ -57,6 +65,7 @@ This milestone does not prove:
 
 - BootInfo parsing.
 - Memory-map normalization.
+- KASLR-enabled boot.
 - Page-table ownership.
 - Interrupts or exceptions.
 - Panic diagnostics beyond a minimal serial fallback.

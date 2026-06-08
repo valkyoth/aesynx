@@ -30,12 +30,13 @@ scripts/generate-sbom.sh
 
 Active and future release gates:
 
-- Reproducible kernel/image build check.
+- Release-profile kernel/image build check.
 - QEMU boot smoke with serial markers.
+- Toolchain, Limine, xorriso, and QEMU version capture.
 - SBOM for source workspace and generated release artifacts.
 - Release notes with artifact checksums.
 - Signed tag verification.
-- Toolchain, Limine, xorriso, and QEMU version capture.
+- Reproducible kernel/image build check.
 
 ## Review Triggers
 
@@ -56,4 +57,5 @@ Require security review for:
 
 The current repository has a QEMU smoke-tested research boot image. It does not
 yet provide reproducible release artifacts, measured boot, signed images, or a
-verified dependency closure.
+verified dependency closure. The v0.4 image manifest records Rust and host
+boot-tool versions, but it is not yet a full provenance or attestation system.

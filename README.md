@@ -38,7 +38,8 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 `v0.3.0` is the tagged QEMU image-skeleton line. `main` is currently carrying
 the `v0.4.0` first Rust kernel serial-boot implementation candidate. It builds
-a freestanding `x86_64-unknown-none` kernel ELF, packages it into a Limine ISO,
+a release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it
+into a Limine ISO, records build and boot tool versions in the image manifest,
 boots it in QEMU, and verifies the kernel-owned serial marker.
 
 | Area | Status | Notes |
@@ -52,7 +53,7 @@ boots it in QEMU, and verifies the kernel-owned serial marker.
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a Limine ISO and `cargo xtask qemu` verifies `[TEST] boot=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] boot=ok` from Rust `_start`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
@@ -93,6 +94,10 @@ Create and smoke-test the v0.4 Limine QEMU image:
 cargo xtask image
 cargo xtask qemu
 ```
+
+These commands require Limine 12.3.2 or newer, xorriso, and
+`qemu-system-x86_64`. The generated manifest records the exact Rust, Limine,
+xorriso, and QEMU version banners.
 
 Try the documented custom-target experiment when a nightly toolchain is
 available:
