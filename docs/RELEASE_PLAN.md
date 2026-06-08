@@ -224,11 +224,25 @@ Deliverables:
   `KernelImageInfo`.
 - Optional framebuffer metadata.
 - Optional RSDP metadata.
+- Limine request boundary documented in `docs/unsafe-policy.md`.
+- QEMU serial marker for successful BootInfo normalization.
+
+Expected serial:
+
+```text
+Aesynx: booting
+arch=x86_64 platform=qemu
+memmap regions=<n> usable=<n> usable_bytes=<n>
+rsdp=present
+[TEST] bootinfo=ok
+[TEST] boot=ok
+```
 
 Verification:
 
 - Serial prints memory-map summary.
 - BootInfo unit tests for synthetic maps.
+- `cargo xtask qemu` observes `[TEST] bootinfo=ok` and `[TEST] boot=ok`.
 
 Exit criteria:
 

@@ -11,14 +11,15 @@ use std::time::{Duration, Instant};
 
 const BOOT_CONFIG: &str = "boot/qemu/limine.conf";
 const BUILD_DIR: &str = "build/qemu";
-const STAGING_DIR_NAME: &str = "aesynx-v0.4.0-iso";
-const IMAGE_NAME: &str = "aesynx-v0.4.0.iso";
-const MANIFEST_NAME: &str = "aesynx-v0.4.0.manifest";
-const SERIAL_LOG_NAME: &str = "aesynx-v0.4.0.serial.log";
+const STAGING_DIR_NAME: &str = "aesynx-v0.5.0-iso";
+const IMAGE_NAME: &str = "aesynx-v0.5.0.iso";
+const MANIFEST_NAME: &str = "aesynx-v0.5.0.manifest";
+const SERIAL_LOG_NAME: &str = "aesynx-v0.5.0.serial.log";
 const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
 const KERNEL_PROFILE: &str = "release";
+const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
 const SERIAL_MARKER: &str = "[TEST] boot=ok";
 const QEMU_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -27,6 +28,7 @@ const BOOT_CONFIG_MARKERS: &[&str] = &[
     "/Aesynx",
     "protocol: limine",
     "path: boot():/boot/aesynx-kernel",
+    "kaslr: yes",
 ];
 
 pub fn build(args: &[String]) -> ExitCode {
@@ -80,7 +82,9 @@ pub fn qemu(args: &[String]) -> ExitCode {
 
     match run_qemu(&paths) {
         Ok(()) => {
-            println!("xtask: QEMU boot smoke saw serial marker: {SERIAL_MARKER}");
+            println!(
+                "xtask: QEMU boot smoke saw serial markers: {BOOTINFO_MARKER}, {SERIAL_MARKER}"
+            );
             println!("xtask: serial log: {}", paths.serial_log.display());
             ExitCode::SUCCESS
         }
@@ -279,7 +283,7 @@ fn write_manifest(
     host_tools: &HostToolVersions,
 ) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.4.0 first serial boot\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\nserial_marker={SERIAL_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        "name=Aesynx v0.5.0 BootInfo normalization\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
         image.display(),
         kernel_elf.display(),
         host_tools.rustc,
@@ -355,7 +359,9 @@ fn run_qemu(paths: &ImagePaths) -> Result<(), String> {
 }
 
 fn serial_log_contains_marker(path: &Path) -> bool {
-    fs::read_to_string(path).is_ok_and(|contents| contents.contains(SERIAL_MARKER))
+    fs::read_to_string(path).is_ok_and(|contents| {
+        contents.contains(BOOTINFO_MARKER) && contents.contains(SERIAL_MARKER)
+    })
 }
 
 fn copy_file(from: &Path, to: &Path, description: &str) -> Result<(), String> {
@@ -391,10 +397,13 @@ fn command_error(description: &str, output: std::process::Output) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{BOOT_CONFIG_MARKERS, KERNEL_PROFILE, KERNEL_TARGET, SERIAL_MARKER};
+    use super::{
+        BOOT_CONFIG_MARKERS, BOOTINFO_MARKER, KERNEL_PROFILE, KERNEL_TARGET, SERIAL_MARKER,
+    };
 
     #[test]
-    fn qemu_marker_tracks_v0_4_boot_contract() {
+    fn qemu_markers_track_v0_5_boot_contract() {
+        assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
         assert_eq!(SERIAL_MARKER, "[TEST] boot=ok");
     }
 

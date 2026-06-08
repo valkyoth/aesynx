@@ -9,12 +9,39 @@ use core::panic::PanicInfo;
 use aesynx_arch::ArchCpu;
 
 #[cfg(target_os = "none")]
+mod limine;
+
+#[cfg(target_os = "none")]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     aesynx_arch_x86_64::serial::init();
-    aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
-    aesynx_arch_x86_64::serial::write_str("arch=x86_64 platform=qemu\n");
-    aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
+
+    let mut scratch = limine::EarlyBootScratch::new();
+    match limine::normalize(&mut scratch) {
+        Ok(info) => {
+            let summary = info.memory_map.summary();
+            aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
+            aesynx_arch_x86_64::serial::write_str("arch=x86_64 platform=qemu\n");
+            aesynx_arch_x86_64::serial_println!(
+                "memmap regions={} usable={} usable_bytes={}",
+                summary.region_count,
+                summary.usable_regions,
+                summary.usable_bytes
+            );
+            if info.rsdp.is_some() {
+                aesynx_arch_x86_64::serial::write_str("rsdp=present\n");
+            } else {
+                aesynx_arch_x86_64::serial::write_str("rsdp=absent\n");
+            }
+            aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=ok\n");
+            aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
+        }
+        Err(_error) => {
+            aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
+            aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=fail\n");
+        }
+    }
+
     aesynx_arch_x86_64::X86_64::halt_forever()
 }
 

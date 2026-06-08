@@ -519,10 +519,10 @@ The v0.4 serial path is an early single-core diagnostic path. It must use only
 typed admitted UART ports, bounded transmit polling, and direct fixed-string
 boot output until a real synchronized logger exists.
 
-The v0.4 QEMU Limine config keeps KASLR disabled only because the kernel does
-not yet consume Limine handoff metadata. Enabling KASLR is gated on BootInfo
-normalization reading the randomized virtual and physical kernel image
-addresses and populating `KernelImageInfo`.
+The v0.4 QEMU Limine config kept KASLR disabled because the kernel did not yet
+consume Limine handoff metadata. v0.5 switches the QEMU Limine config to
+`kaslr: yes` and uses the Limine executable-address response to populate
+`KernelImageInfo`.
 
 ### 6.2 BootInfo
 
@@ -534,8 +534,8 @@ pub struct BootInfo {
     pub platform: PlatformKind,
     pub memory_map: MemoryMap,
     pub framebuffer: Option<FramebufferInfo>,
-    pub rsdp: Option<PhysAddr>,
-    pub device_tree: Option<PhysAddr>,
+    pub rsdp: Option<VirtAddr>,
+    pub device_tree: Option<VirtAddr>,
     pub cpu_topology: CpuTopology,
     pub kernel_image: KernelImageInfo,
     pub modules: ModuleList,
@@ -548,7 +548,7 @@ The generic kernel receives only `BootInfo`.
 debug output is redacted, and address access is limited to the boot
 initialization path.
 
-BootInfo normalization must be the point where the QEMU boot config switches to
+BootInfo normalization is the point where the QEMU boot config switches to
 KASLR enabled. A config or hardware boot path that leaves KASLR disabled after
 `KernelImageInfo` is populated is a release-blocking security exception unless
 the release notes justify it explicitly.

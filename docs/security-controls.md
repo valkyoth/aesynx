@@ -10,7 +10,7 @@ claim that the controls are implemented today.
 | Project naming | Single project name, no retired names | Active | `scripts/validate-security-policy.sh` |
 | Dependency policy | License, source, advisory, and duplicate-version checks | Configured | `deny.toml` |
 | Security reporting | Private-first vulnerability process | Configured | `SECURITY.md` |
-| Unsafe code | Unsafe confined to documented boundaries | First boundary active | `docs/unsafe-policy.md`, `crates/aesynx-arch-x86_64/src/port.rs` |
+| Unsafe code | Unsafe confined to documented boundaries | Active boundaries documented | `docs/unsafe-policy.md`, `crates/aesynx-arch-x86_64/src/port.rs`, `crates/aesynx-kernel/src/limine.rs` |
 | Kernel engineering | `no_std`, internal primitives, minimal unsafe, external dependency exceptions | Configured | `docs/kernel-engineering-policy.md`, `scripts/validate-kernel-policy.sh` |
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
 | Componentization | System must not collapse into one huge OS binary; components remain independently versioned and rollback-capable | Policy active | `docs/modularity-policy.md`, `docs/ARCHITECTURE_DECISIONS.md` |
@@ -22,14 +22,15 @@ claim that the controls are implemented today.
 | Capability unforgeability | Capability fields are private and capability values are not `Copy` or `Clone` | Model active | `Capability` accessors |
 | CI action integrity | Workflow actions must be pinned to commit SHA | Active | `scripts/validate-security-policy.sh`, `.github/workflows/ci.yml` |
 | State transitions | Task and device state changes must use checked transition APIs | Model active | `Task::transition`, `DeviceObject::transition` |
-| Boot address secrecy | KASLR-sensitive kernel image addresses are private and debug-redacted | Model active | `KernelImageInfo` |
+| Boot address secrecy | KASLR-sensitive kernel image addresses are private, debug-redacted, and populated from Limine executable-address metadata | Active candidate | `KernelImageInfo`, `cargo xtask qemu` |
+| BootInfo normalization | Bootloader-specific handoff data normalizes before generic kernel use | Active candidate | `aesynx-boot`, `crates/aesynx-kernel/src/limine.rs` |
 | Telemetry integrity | Task telemetry uses append-only counters; core telemetry snapshots are advisory per-counter samples | Model active | `TaskTelemetry`, `CoreTelemetry` |
 | Capability revocation | REVOKE authority check required before epoch mutation | Model active | `ensure_revoke_authority`, `RevocationEpochStore` |
 | Early serial safety | COM1 output uses admitted ports, bounded polling, and a single-core marker type | Active for boot | `crates/aesynx-arch-x86_64/src/serial.rs`, `crates/aesynx-arch-x86_64/src/port.rs` |
 | Drivers | MMIO/IRQ/DMA caps and revocation lifecycle | Planned | `docs/IMPLEMENTATION_PLAN.md` |
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |
 | AI | Bounded assistant and policy fallback | Planned | `docs/IMPLEMENTATION_PLAN.md`, `docs/userspace-vision.md` |
-| QEMU testing | Boot smoke validates first Rust serial marker | Active for boot | `cargo xtask qemu`, `docs/RELEASE_PLAN.md` |
+| QEMU testing | Boot smoke validates BootInfo and Rust serial markers | Active for boot | `cargo xtask qemu`, `docs/RELEASE_PLAN.md` |
 | Future bootloader | Rust UEFI bootloader must stay a minimal signed/measured security gateway | Planned | `docs/bootloader-roadmap.md` |
 
 ## Admission Rule

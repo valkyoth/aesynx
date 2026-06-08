@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.4 first serial boot release candidate
+Status: v0.5 BootInfo normalization implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -52,14 +52,15 @@ cargo xtask image
 cargo xtask qemu
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.4.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.5.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
-output, and expects `[TEST] boot=ok`.
+output, and expects `[TEST] bootinfo=ok` and `[TEST] boot=ok`.
 
-The v0.4 image proves that Limine can load the Rust kernel ELF and reach
-`_start`. It does not claim BootInfo parsing, page-table ownership, interrupts,
-or allocator setup.
+The v0.5 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+and provide handoff metadata that normalizes into Aesynx `BootInfo`. It does
+not claim page-table ownership, interrupts, memory allocation, or bootloader
+memory reclamation.
 
 ## Target Shape
 

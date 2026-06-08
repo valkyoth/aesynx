@@ -36,12 +36,12 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.3.0` is the tagged QEMU image-skeleton line. `main` is currently carrying
-the `v0.4.0` first Rust kernel serial-boot release candidate. The v0.4 pentest
-follow-up is clear; the remaining pre-tag gate is GitHub CI and CodeQL green.
-It builds a release-profile freestanding `x86_64-unknown-none` kernel ELF,
+`v0.4.0` is the tagged first Rust kernel serial-boot line. `main` is currently
+carrying the `v0.5.0` BootInfo-normalization implementation candidate. It
+builds a release-profile freestanding `x86_64-unknown-none` kernel ELF,
 packages it into a Limine ISO, records build and boot tool versions in the
-image manifest, boots it in QEMU, and verifies the kernel-owned serial marker.
+image manifest, boots it in QEMU, normalizes Limine handoff metadata into
+Aesynx `BootInfo`, and verifies kernel-owned serial markers.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -54,7 +54,8 @@ image manifest, boots it in QEMU, and verifies the kernel-owned serial marker.
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] boot=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] bootinfo=ok` and `[TEST] boot=ok` from Rust `_start`. |
+| BootInfo normalization | Active candidate | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
@@ -64,7 +65,7 @@ image manifest, boots it in QEMU, and verifies the kernel-owned serial marker.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| BootInfo normalization | Planned | `v0.5.0`; normalize Limine/bootloader metadata into generic Aesynx `BootInfo`. |
+| BootInfo completion | Active | `v0.5.0`; harden BootInfo parsing, docs, release notes, and pentest follow-up. |
 | Real arch mechanisms | Planned | Interrupt control, core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -89,7 +90,7 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.4 Limine QEMU image:
+Create and smoke-test the v0.5 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -110,7 +111,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.4.0
+cargo xtask release-ready v0.5.0
 ```
 
 ## Security Posture
@@ -133,6 +134,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Build Skeleton](docs/build-skeleton.md)
 - [QEMU Image Skeleton](docs/qemu-image-skeleton.md)
 - [First Serial Boot](docs/first-serial-boot.md)
+- [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

@@ -1,6 +1,6 @@
 # Aesynx First Serial Boot
 
-Status: v0.4 release candidate; pentest cleared, pending GitHub green before tag
+Status: v0.4 tagged milestone; v0.5 extends this with BootInfo normalization
 
 `v0.4.0` replaces the temporary v0.3 stage-0 probe with a Rust kernel entry.
 The image path now builds a release-profile freestanding `x86_64-unknown-none`

@@ -72,13 +72,24 @@ Limitations: not synchronized for SMP, not a general serial driver, and not suit
 
 ```text
 Location: crates/aesynx-kernel/src/main.rs
-Status: active in v0.4
+Status: active in v0.5
 Purpose: export the architecture entry symbol consumed by the bootloader
 Preconditions: Limine loads the x86_64 kernel ELF and transfers control to _start
 Unsafe operation: Rust 2024 unsafe no_mangle attribute on _start
 Safety argument: the symbol name is fixed by the linker script and boot contract; the function never returns and does not expose a callable safe API to Rust code
-Tests/evidence: readelf shows _start as the ELF entry; cargo xtask qemu observes the Rust boot marker
-Limitations: no BootInfo argument is consumed yet; bootloader metadata normalization starts in v0.5
+Tests/evidence: readelf shows _start as the ELF entry; cargo xtask qemu observes the BootInfo and Rust boot markers
+Limitations: early boot only; full panic and fault diagnostics start in later milestones
+```
+
+```text
+Location: crates/aesynx-kernel/src/limine.rs
+Status: active in v0.5
+Purpose: parse Limine bootloader handoff responses and normalize them into Aesynx BootInfo
+Preconditions: Limine v12.3.2-compatible bootloader loads the kernel, honours request sections, fills response pointers before _start, and keeps response data valid in bootloader-reclaimable memory during early boot
+Unsafe operation: raw reads of Limine response pointers, raw pointer traversal of memory-map and framebuffer arrays, linker-provided __kernel_end symbol address, and mutable Limine request statics written by the bootloader before Rust executes
+Safety argument: the unsafe code is confined to the boot handoff boundary; it checks for null responses, bounds memory-map copies to MAX_EARLY_MEMORY_REGIONS, validates lossy integer conversions, and passes only value-copied metadata into the safe aesynx-boot normalization API
+Tests/evidence: cargo xtask qemu observes [TEST] bootinfo=ok and [TEST] boot=ok; aesynx-boot unit tests cover synthetic memory-map normalization and invalid empty-map rejection
+Limitations: no bootloader memory reclamation, page-table ownership, SMP topology parsing, module parsing, or framebuffer output yet
 ```
 
 New entries should use this format:
