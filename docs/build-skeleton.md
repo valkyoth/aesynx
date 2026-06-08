@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.5 BootInfo normalization implementation candidate
+Status: v0.6 early diagnostics implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -50,17 +50,23 @@ explicit probe for the future kernel-object path, not a stable requirement.
 ```bash
 cargo xtask image
 cargo xtask qemu
+cargo xtask qemu --panic-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.5.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.6.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] bootinfo=ok` and `[TEST] boot=ok`.
 
-The v0.5 image proves that Limine can load the Rust kernel ELF, reach `_start`,
-and provide handoff metadata that normalizes into Aesynx `BootInfo`. It does
-not claim page-table ownership, interrupts, memory allocation, or bootloader
-memory reclamation.
+`cargo xtask qemu --panic-smoke` creates a separate
+`build/qemu/aesynx-v0.6.0-panic.iso`, enables the kernel `panic-smoke` feature,
+and expects `[TEST] panic=ok`.
+
+The v0.6 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+provide handoff metadata that normalizes into Aesynx `BootInfo`, and produce
+readable early panic diagnostics. It does not claim page-table ownership,
+interrupts, memory allocation, exception handling, or bootloader memory
+reclamation.
 
 ## Target Shape
 

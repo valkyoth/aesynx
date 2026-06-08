@@ -270,7 +270,7 @@ Expected serial:
 
 Verification:
 
-- Deliberate panic test produces expected marker.
+- `cargo xtask qemu --panic-smoke` produces `[TEST] panic=ok`.
 
 Exit criteria:
 

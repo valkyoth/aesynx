@@ -1,6 +1,8 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+pub mod diagnostics;
+
 use aesynx_boot::BootInfo;
 use aesynx_log::{LogLevel, LogMessage, LogSink};
 

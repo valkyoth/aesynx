@@ -9,16 +9,42 @@ use core::panic::PanicInfo;
 use aesynx_arch::ArchCpu;
 
 #[cfg(target_os = "none")]
+use aesynx_kernel::diagnostics::{self, BootPhase};
+
+#[cfg(all(target_os = "none", not(feature = "panic-smoke")))]
 mod limine;
 
 #[cfg(target_os = "none")]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     aesynx_arch_x86_64::serial::init();
+    diagnostics::set_boot_phase(BootPhase::Entry);
+    kernel_entry()
+}
 
+#[cfg(all(target_os = "none", feature = "panic-smoke"))]
+fn kernel_entry() -> ! {
+    panic_smoke_entry()
+}
+
+#[cfg(all(target_os = "none", not(feature = "panic-smoke")))]
+fn kernel_entry() -> ! {
+    boot_entry()
+}
+
+#[cfg(all(target_os = "none", feature = "panic-smoke"))]
+fn panic_smoke_entry() -> ! {
+    diagnostics::set_boot_phase(BootPhase::PanicSmoke);
+    trigger_panic_smoke();
+}
+
+#[cfg(all(target_os = "none", not(feature = "panic-smoke")))]
+fn boot_entry() -> ! {
     let mut scratch = limine::EarlyBootScratch::new();
+    diagnostics::set_boot_phase(BootPhase::BootloaderHandoff);
     match limine::normalize(&mut scratch) {
         Ok(info) => {
+            diagnostics::set_boot_phase(BootPhase::BootInfoNormalized);
             let summary = aesynx_kernel::boot_summary(&info);
             aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
             aesynx_arch_x86_64::serial::write_str(summary.arch_label);
@@ -38,6 +64,7 @@ pub extern "C" fn _start() -> ! {
             }
             aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=ok\n");
             aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
+            diagnostics::set_boot_phase(BootPhase::Running);
         }
         Err(_error) => {
             aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
@@ -48,11 +75,38 @@ pub extern "C" fn _start() -> ! {
     aesynx_arch_x86_64::X86_64::halt_forever()
 }
 
+#[cfg(all(target_os = "none", feature = "panic-smoke"))]
+#[allow(clippy::panic)]
+fn trigger_panic_smoke() -> ! {
+    panic!("intentional v0.6.0 panic smoke");
+}
+
 #[cfg(target_os = "none")]
 #[panic_handler]
-fn panic(_info: &PanicInfo<'_>) -> ! {
+fn panic(info: &PanicInfo<'_>) -> ! {
     aesynx_arch_x86_64::serial::init();
+    let snapshot = diagnostics::panic_snapshot();
     aesynx_arch_x86_64::serial::write_str("Aesynx: panic during early boot\n");
+    aesynx_arch_x86_64::serial_println!(
+        "panic core={} phase={}",
+        snapshot.core.get(),
+        snapshot.phase.label()
+    );
+    if let Some(location) = info.location() {
+        aesynx_arch_x86_64::serial_println!(
+            "panic location={} line={} column={}",
+            location.file(),
+            location.line(),
+            location.column()
+        );
+    } else {
+        aesynx_arch_x86_64::serial::write_str("panic location=unknown\n");
+    }
+    aesynx_arch_x86_64::serial_println!("panic message={}", info.message());
+    aesynx_arch_x86_64::serial::write_str("panic registers=unavailable\n");
+    diagnostics::set_boot_phase(BootPhase::Panic);
+    #[cfg(feature = "panic-smoke")]
+    aesynx_arch_x86_64::serial::write_str("[TEST] panic=ok\n");
     aesynx_arch_x86_64::X86_64::halt_forever()
 }
 

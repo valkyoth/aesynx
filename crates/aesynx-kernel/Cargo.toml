@@ -13,5 +13,9 @@ aesynx-arch-x86_64 = { path = "../aesynx-arch-x86_64", version = "0.1.0" }
 aesynx-boot.workspace = true
 aesynx-log.workspace = true
 
+[features]
+default = []
+panic-smoke = []
+
 [lints]
 workspace = true

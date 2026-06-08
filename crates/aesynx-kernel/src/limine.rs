@@ -89,6 +89,9 @@ fn read_memory_regions(
         // Each pointer is expected to reference a valid memmap entry in
         // bootloader-reclaimable memory for the duration of early boot.
         let entry_ptr = unsafe { entries.add(index).read() };
+        // SAFETY: Limine supplied this pointer through the bounded memmap
+        // entries array. `limine_ref` performs null and alignment checks before
+        // creating a reference.
         let entry = if let Some(entry) = unsafe { limine_ref(entry_ptr) } {
             entry
         } else {
@@ -150,8 +153,12 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     }
 
     // SAFETY: Limine reports at least one framebuffer pointer. We only consume
-    // the first one for v0.5 and validate lossy integer conversions below.
+    // the first one during early boot and validate lossy integer conversions
+    // below.
     let framebuffer_ptr = unsafe { framebuffers.read() };
+    // SAFETY: Limine supplied this pointer through the framebuffer array.
+    // `limine_ref` performs null and alignment checks before creating a
+    // reference.
     let framebuffer = if let Some(framebuffer) = unsafe { limine_ref(framebuffer_ptr) } {
         framebuffer
     } else {

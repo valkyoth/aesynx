@@ -11,16 +11,21 @@ use std::time::{Duration, Instant};
 
 const BOOT_CONFIG: &str = "boot/qemu/limine.conf";
 const BUILD_DIR: &str = "build/qemu";
-const STAGING_DIR_NAME: &str = "aesynx-v0.5.0-iso";
-const IMAGE_NAME: &str = "aesynx-v0.5.0.iso";
-const MANIFEST_NAME: &str = "aesynx-v0.5.0.manifest";
-const SERIAL_LOG_NAME: &str = "aesynx-v0.5.0.serial.log";
+const STAGING_DIR_NAME: &str = "aesynx-v0.6.0-iso";
+const IMAGE_NAME: &str = "aesynx-v0.6.0.iso";
+const MANIFEST_NAME: &str = "aesynx-v0.6.0.manifest";
+const SERIAL_LOG_NAME: &str = "aesynx-v0.6.0.serial.log";
+const PANIC_STAGING_DIR_NAME: &str = "aesynx-v0.6.0-panic-iso";
+const PANIC_IMAGE_NAME: &str = "aesynx-v0.6.0-panic.iso";
+const PANIC_MANIFEST_NAME: &str = "aesynx-v0.6.0-panic.manifest";
+const PANIC_SERIAL_LOG_NAME: &str = "aesynx-v0.6.0-panic.serial.log";
 const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
 const KERNEL_PROFILE: &str = "release";
 const BOOTINFO_FAIL_MARKER: &str = "[TEST] bootinfo=fail";
 const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
+const PANIC_MARKER: &str = "[TEST] panic=ok";
 const SERIAL_MARKER: &str = "[TEST] boot=ok";
 const QEMU_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -46,7 +51,7 @@ pub fn build(args: &[String]) -> ExitCode {
         }
     };
 
-    match build_image(&root) {
+    match build_image(&root, SmokeKind::Boot) {
         Ok(paths) => {
             println!("xtask: wrote QEMU Limine image: {}", paths.image.display());
             println!("xtask: wrote image manifest: {}", paths.manifest.display());
@@ -60,10 +65,13 @@ pub fn build(args: &[String]) -> ExitCode {
 }
 
 pub fn qemu(args: &[String]) -> ExitCode {
-    if !args.is_empty() {
-        eprintln!("xtask: qemu accepts no arguments");
-        return ExitCode::from(2);
-    }
+    let smoke = match parse_qemu_args(args) {
+        Ok(smoke) => smoke,
+        Err(error) => {
+            eprintln!("xtask: {error}");
+            return ExitCode::from(2);
+        }
+    };
 
     let root = match workspace::root() {
         Ok(root) => root,
@@ -73,7 +81,7 @@ pub fn qemu(args: &[String]) -> ExitCode {
         }
     };
 
-    let paths = match build_image(&root) {
+    let paths = match build_image(&root, smoke) {
         Ok(paths) => paths,
         Err(error) => {
             eprintln!("xtask: {error}");
@@ -81,10 +89,12 @@ pub fn qemu(args: &[String]) -> ExitCode {
         }
     };
 
-    match run_qemu(&paths) {
+    match run_qemu(&paths, smoke) {
         Ok(()) => {
             println!(
-                "xtask: QEMU boot smoke saw serial markers: {BOOTINFO_MARKER}, {SERIAL_MARKER}"
+                "xtask: QEMU {} smoke saw serial markers: {}",
+                smoke.name(),
+                smoke.markers()
             );
             println!("xtask: serial log: {}", paths.serial_log.display());
             ExitCode::SUCCESS
@@ -96,6 +106,36 @@ pub fn qemu(args: &[String]) -> ExitCode {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SmokeKind {
+    Boot,
+    Panic,
+}
+
+impl SmokeKind {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Boot => "boot",
+            Self::Panic => "panic",
+        }
+    }
+
+    fn markers(self) -> &'static str {
+        match self {
+            Self::Boot => "[TEST] bootinfo=ok, [TEST] boot=ok",
+            Self::Panic => "[TEST] panic=ok",
+        }
+    }
+}
+
+fn parse_qemu_args(args: &[String]) -> Result<SmokeKind, &'static str> {
+    match args {
+        [] => Ok(SmokeKind::Boot),
+        [flag] if flag == "--panic-smoke" => Ok(SmokeKind::Panic),
+        _ => Err("qemu accepts no arguments except --panic-smoke"),
+    }
+}
+
 struct ImagePaths {
     image: PathBuf,
     manifest: PathBuf,
@@ -104,7 +144,7 @@ struct ImagePaths {
     kernel_elf: PathBuf,
 }
 
-fn build_image(root: &Path) -> Result<ImagePaths, String> {
+fn build_image(root: &Path, smoke: SmokeKind) -> Result<ImagePaths, String> {
     validate_boot_config(root)?;
     let host_tools = validate_host_tools()?;
 
@@ -112,16 +152,17 @@ fn build_image(root: &Path) -> Result<ImagePaths, String> {
     fs::create_dir_all(&output_dir)
         .map_err(|error| format!("failed to create {}: {error}", output_dir.display()))?;
 
-    let image = output_dir.join(IMAGE_NAME);
-    let manifest = output_dir.join(MANIFEST_NAME);
-    let serial_log = output_dir.join(SERIAL_LOG_NAME);
-    let staging_dir = output_dir.join(STAGING_DIR_NAME);
-    let kernel_elf = build_kernel_elf(root)?;
+    let names = image_names(smoke);
+    let image = output_dir.join(names.image);
+    let manifest = output_dir.join(names.manifest);
+    let serial_log = output_dir.join(names.serial_log);
+    let staging_dir = output_dir.join(names.staging_dir);
+    let kernel_elf = build_kernel_elf(root, smoke)?;
 
     prepare_staging(root, &staging_dir, &kernel_elf)?;
     create_limine_iso(&staging_dir, &image)?;
     install_limine_bios(&image)?;
-    write_manifest(&manifest, &image, &kernel_elf, &host_tools)?;
+    write_manifest(&manifest, &image, &kernel_elf, &host_tools, smoke)?;
 
     Ok(ImagePaths {
         image,
@@ -130,6 +171,30 @@ fn build_image(root: &Path) -> Result<ImagePaths, String> {
         staging_dir,
         kernel_elf,
     })
+}
+
+struct ImageNames {
+    image: &'static str,
+    manifest: &'static str,
+    serial_log: &'static str,
+    staging_dir: &'static str,
+}
+
+fn image_names(smoke: SmokeKind) -> ImageNames {
+    match smoke {
+        SmokeKind::Boot => ImageNames {
+            image: IMAGE_NAME,
+            manifest: MANIFEST_NAME,
+            serial_log: SERIAL_LOG_NAME,
+            staging_dir: STAGING_DIR_NAME,
+        },
+        SmokeKind::Panic => ImageNames {
+            image: PANIC_IMAGE_NAME,
+            manifest: PANIC_MANIFEST_NAME,
+            serial_log: PANIC_SERIAL_LOG_NAME,
+            staging_dir: PANIC_STAGING_DIR_NAME,
+        },
+    }
 }
 
 fn validate_boot_config(root: &Path) -> Result<(), String> {
@@ -148,7 +213,7 @@ fn validate_boot_config(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn build_kernel_elf(root: &Path) -> Result<PathBuf, String> {
+fn build_kernel_elf(root: &Path, smoke: SmokeKind) -> Result<PathBuf, String> {
     let mut command = Command::new("cargo");
     command.args([
         "build",
@@ -160,6 +225,9 @@ fn build_kernel_elf(root: &Path) -> Result<PathBuf, String> {
         KERNEL_BINARY,
         "--release",
     ]);
+    if smoke == SmokeKind::Panic {
+        command.args(["--features", "panic-smoke"]);
+    }
     command.current_dir(root);
     run_status(
         &mut command,
@@ -282,9 +350,11 @@ fn write_manifest(
     image: &Path,
     kernel_elf: &Path,
     host_tools: &HostToolVersions,
+    smoke: SmokeKind,
 ) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.5.0 BootInfo normalization\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        "name=Aesynx v0.6.0 Early diagnostics\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        smoke.name(),
         image.display(),
         kernel_elf.display(),
         host_tools.rustc,
@@ -298,7 +368,7 @@ fn write_manifest(
         .map_err(|error| format!("failed to write manifest: {error}"))
 }
 
-fn run_qemu(paths: &ImagePaths) -> Result<(), String> {
+fn run_qemu(paths: &ImagePaths, smoke: SmokeKind) -> Result<(), String> {
     let _ = fs::remove_file(&paths.serial_log);
 
     let serial_arg = format!("file:{}", paths.serial_log.display());
@@ -322,7 +392,7 @@ fn run_qemu(paths: &ImagePaths) -> Result<(), String> {
     let mut marker_seen = false;
 
     while started.elapsed() < QEMU_TIMEOUT {
-        if serial_log_contains_marker(&paths.serial_log) {
+        if serial_log_contains_marker(&paths.serial_log, smoke) {
             marker_seen = true;
             break;
         }
@@ -338,7 +408,7 @@ fn run_qemu(paths: &ImagePaths) -> Result<(), String> {
     }
 
     if !marker_seen {
-        marker_seen = serial_log_contains_marker(&paths.serial_log);
+        marker_seen = serial_log_contains_marker(&paths.serial_log, smoke);
     }
 
     let _ = child.kill();
@@ -350,7 +420,9 @@ fn run_qemu(paths: &ImagePaths) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "QEMU boot smoke did not see serial marker {SERIAL_MARKER:?} within {} seconds; image={} kernel={} staging={}",
+            "QEMU {} smoke did not see serial markers {} within {} seconds; image={} kernel={} staging={}",
+            smoke.name(),
+            smoke.markers(),
             QEMU_TIMEOUT.as_secs(),
             paths.image.display(),
             paths.kernel_elf.display(),
@@ -359,11 +431,14 @@ fn run_qemu(paths: &ImagePaths) -> Result<(), String> {
     }
 }
 
-fn serial_log_contains_marker(path: &Path) -> bool {
-    fs::read_to_string(path).is_ok_and(|contents| {
-        !contents.contains(BOOTINFO_FAIL_MARKER)
-            && contents.contains(BOOTINFO_MARKER)
-            && contents.contains(SERIAL_MARKER)
+fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
+    fs::read_to_string(path).is_ok_and(|contents| match smoke {
+        SmokeKind::Boot => {
+            !contents.contains(BOOTINFO_FAIL_MARKER)
+                && contents.contains(BOOTINFO_MARKER)
+                && contents.contains(SERIAL_MARKER)
+        }
+        SmokeKind::Panic => contents.contains(PANIC_MARKER),
     })
 }
 
@@ -399,40 +474,4 @@ fn command_error(description: &str, output: std::process::Output) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        BOOT_CONFIG_MARKERS, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, KERNEL_PROFILE, KERNEL_TARGET,
-        SERIAL_MARKER,
-    };
-
-    #[test]
-    fn qemu_markers_track_v0_5_boot_contract() {
-        assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
-        assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
-        assert_eq!(SERIAL_MARKER, "[TEST] boot=ok");
-    }
-
-    #[test]
-    fn kernel_target_is_stable_freestanding_target() {
-        assert_eq!(KERNEL_TARGET, "x86_64-unknown-none");
-    }
-
-    #[test]
-    fn image_kernel_profile_is_release() {
-        assert_eq!(KERNEL_PROFILE, "release");
-    }
-
-    #[test]
-    fn boot_config_markers_cover_limine_kernel_path() {
-        assert!(
-            BOOT_CONFIG_MARKERS
-                .iter()
-                .any(|marker| marker.contains("protocol: limine"))
-        );
-        assert!(
-            BOOT_CONFIG_MARKERS
-                .iter()
-                .any(|marker| marker.contains("path: boot():/boot/aesynx-kernel"))
-        );
-    }
-}
+mod tests;
