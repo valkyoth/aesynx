@@ -8,6 +8,8 @@ use aesynx_arch::{ArchCpu, ArchError};
 
 #[allow(unsafe_code)]
 mod port;
+#[allow(unsafe_code)]
+pub mod registers;
 
 pub struct X86_64;
 

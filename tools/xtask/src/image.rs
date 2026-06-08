@@ -26,6 +26,7 @@ const KERNEL_PROFILE: &str = "release";
 const BOOTINFO_FAIL_MARKER: &str = "[TEST] bootinfo=fail";
 const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
 const PANIC_MARKER: &str = "[TEST] panic=ok";
+const PANIC_REGISTERS_MARKER: &str = "panic registers=";
 const SERIAL_MARKER: &str = "[TEST] boot=ok";
 const QEMU_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -438,7 +439,9 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
                 && contents.contains(BOOTINFO_MARKER)
                 && contents.contains(SERIAL_MARKER)
         }
-        SmokeKind::Panic => contents.contains(PANIC_MARKER),
+        SmokeKind::Panic => {
+            contents.contains(PANIC_MARKER) && contents.contains(PANIC_REGISTERS_MARKER)
+        }
     })
 }
 

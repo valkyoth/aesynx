@@ -86,6 +86,7 @@ fn trigger_panic_smoke() -> ! {
 fn panic(info: &PanicInfo<'_>) -> ! {
     aesynx_arch_x86_64::serial::init();
     let snapshot = diagnostics::panic_snapshot();
+    let registers = aesynx_arch_x86_64::registers::EarlyRegisterSnapshot::capture();
     aesynx_arch_x86_64::serial::write_str("Aesynx: panic during early boot\n");
     aesynx_arch_x86_64::serial_println!(
         "panic core={} phase={}",
@@ -103,7 +104,15 @@ fn panic(info: &PanicInfo<'_>) -> ! {
         aesynx_arch_x86_64::serial::write_str("panic location=unknown\n");
     }
     aesynx_arch_x86_64::serial_println!("panic message={}", info.message());
-    aesynx_arch_x86_64::serial::write_str("panic registers=unavailable\n");
+    aesynx_arch_x86_64::serial_println!(
+        "panic registers=rsp_present={} rbp_present={} rsp_align={} rbp_align={} rflags=0x{:x} cr3_offset=0x{:x}",
+        registers.stack_pointer_present(),
+        registers.frame_pointer_present(),
+        registers.stack_pointer_alignment(),
+        registers.frame_pointer_alignment(),
+        registers.public_rflags(),
+        registers.cr3_page_offset()
+    );
     diagnostics::set_boot_phase(BootPhase::Panic);
     #[cfg(feature = "panic-smoke")]
     aesynx_arch_x86_64::serial::write_str("[TEST] panic=ok\n");

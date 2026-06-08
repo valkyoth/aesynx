@@ -25,11 +25,14 @@ Aesynx: panic during early boot
 panic core=0 phase=<phase>
 panic location=<file> line=<line> column=<column>
 panic message=<message>
-panic registers=unavailable
+panic registers=rsp_present=<bool> rbp_present=<bool> rsp_align=<n> rbp_align=<n> rflags=0x<n> cr3_offset=0x<n>
 ```
 
-Register capture is explicitly unavailable in v0.6. Real register and fault
-decoding starts after descriptor tables and exception handlers land.
+On x86_64, `crates/aesynx-arch-x86_64/src/registers.rs` captures `rsp`, `rbp`,
+`rflags`, and `cr3` for the panic path. Raw address-bearing values stay private
+and are not printed; serial output exposes only presence, stack alignment,
+public RFLAGS bits, and CR3 low flag/PCID bits. Full register and fault decoding
+starts after descriptor tables and exception handlers land.
 
 ## Serial Contract
 
@@ -58,13 +61,14 @@ enabled and expects:
 This milestone proves:
 
 - Boot phase tracking works before allocator setup.
-- Panic output includes core, phase, file, line, column, and message.
+- Panic output includes core, phase, file, line, column, message, and redacted
+  x86_64 register summary.
 - QEMU can machine-check a deliberate panic path.
 
 This milestone does not prove:
 
 - Interrupt or exception handling.
 - Page-fault diagnostics.
-- Real register dumps.
+- Raw register dumps.
 - SMP-safe diagnostics.
 - Persistent telemetry buffers.

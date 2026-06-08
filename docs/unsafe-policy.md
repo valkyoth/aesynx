@@ -82,6 +82,17 @@ Limitations: interrupt-state control is still unsupported; early boot currently 
 ```
 
 ```text
+Location: crates/aesynx-arch-x86_64/src/registers.rs
+Status: active in v0.6
+Purpose: capture a redacted early x86_64 register summary for panic diagnostics
+Preconditions: called during early kernel execution on x86_64 after Limine transfers control to the kernel
+Unsafe operation: core::arch::asm! reads rsp, rbp, rflags, and cr3
+Safety argument: the instructions copy architectural register values into general-purpose outputs and do not create Rust references; pushfq/pop temporarily use the current stack to read RFLAGS and restore stack position before returning; raw address-bearing values remain private and serial output exposes only redacted alignment or flag summaries
+Tests/evidence: register snapshot unit tests verify Debug redaction and summary accessors; cargo xtask qemu --panic-smoke observes the panic register-summary line
+Limitations: not a full interrupt-frame dump, does not capture fault address, does not expose raw KASLR-sensitive register values, and is x86_64-only
+```
+
+```text
 Location: crates/aesynx-arch-aarch64/src/lib.rs
 Status: admitted for future AArch64 target builds in v0.5
 Purpose: terminal AArch64 CPU halt path
