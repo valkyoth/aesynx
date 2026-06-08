@@ -110,7 +110,8 @@ fn panic(info: &PanicInfo<'_>) -> ! {
     } else {
         aesynx_arch_x86_64::serial::write_str("panic location=unknown\n");
     }
-    aesynx_arch_x86_64::serial_println!("panic message={}", info.message());
+    let mut serial = aesynx_arch_x86_64::serial::Com1::new();
+    let _ = diagnostics::write_panic_message(&mut serial, format_args!("{}", info.message()));
     aesynx_arch_x86_64::serial_println!(
         "panic registers=rsp_present={} rbp_present={} rsp_align={} rbp_align={} rflags=0x{:x} cr3_offset=0x{:x}",
         registers.stack_pointer_present(),

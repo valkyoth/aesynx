@@ -42,6 +42,10 @@ panic message=<message>
 panic registers=rsp_present=<bool> rbp_present=<bool> rsp_align=<n> rbp_align=<n> rflags=0x<n> cr3_offset=0x<n>
 ```
 
+The panic message line is escaped and bounded before serial emission. Newlines,
+carriage returns, tabs, backslashes, brackets, non-ASCII bytes, and other
+control bytes cannot create forged diagnostic records or unbounded panic output.
+
 On x86_64, `crates/aesynx-arch-x86_64/src/registers.rs` captures `rsp`, `rbp`,
 `rflags`, and `cr3` for the panic path. Raw address-bearing values stay private
 and are not printed; serial output exposes only presence, stack alignment,

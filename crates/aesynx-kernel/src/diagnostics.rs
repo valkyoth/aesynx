@@ -8,6 +8,7 @@ static BOOT_PHASE: AtomicU8 = AtomicU8::new(BootPhase::Entry as u8);
 
 pub const EARLY_BOOT_CORE: CoreId = CoreId::new(0);
 pub const MAX_DIAGNOSTIC_COMPONENT_LEN: usize = 32;
+pub const MAX_PANIC_MESSAGE_OUTPUT_BYTES: usize = 256;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -176,6 +177,83 @@ pub const fn log_level_label(level: LogLevel) -> &'static str {
     }
 }
 
+pub fn write_panic_message(output: &mut impl fmt::Write, args: fmt::Arguments<'_>) -> fmt::Result {
+    output.write_str("panic message=")?;
+    let truncated = {
+        let mut message = EscapedPanicMessageWriter::new(output);
+        fmt::write(&mut message, args)?;
+        message.truncated()
+    };
+
+    if truncated {
+        output.write_str("...<truncated>")?;
+    }
+
+    output.write_char('\n')
+}
+
+struct EscapedPanicMessageWriter<'a, W: fmt::Write + ?Sized> {
+    output: &'a mut W,
+    remaining: usize,
+    truncated: bool,
+}
+
+impl<'a, W: fmt::Write + ?Sized> EscapedPanicMessageWriter<'a, W> {
+    fn new(output: &'a mut W) -> Self {
+        Self {
+            output,
+            remaining: MAX_PANIC_MESSAGE_OUTPUT_BYTES,
+            truncated: false,
+        }
+    }
+
+    fn truncated(&self) -> bool {
+        self.truncated
+    }
+
+    fn write_ascii_byte(&mut self, byte: u8) -> fmt::Result {
+        if self.remaining == 0 {
+            self.truncated = true;
+            return Ok(());
+        }
+
+        self.output.write_char(char::from(byte))?;
+        self.remaining -= 1;
+        Ok(())
+    }
+
+    fn write_fragment(&mut self, fragment: &str) -> fmt::Result {
+        if fragment.len() > self.remaining {
+            self.truncated = true;
+            self.remaining = 0;
+            return Ok(());
+        }
+
+        self.output.write_str(fragment)?;
+        self.remaining -= fragment.len();
+        Ok(())
+    }
+}
+
+impl<W: fmt::Write + ?Sized> fmt::Write for EscapedPanicMessageWriter<'_, W> {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        for byte in value.bytes() {
+            match byte {
+                b'\n' => self.write_fragment("\\n")?,
+                b'\r' => self.write_fragment("\\r")?,
+                b'\t' => self.write_fragment("\\t")?,
+                b'\\' => self.write_fragment("\\\\")?,
+                b'[' => self.write_fragment("\\[")?,
+                b']' => self.write_fragment("\\]")?,
+                0x20..=0x7e => self.write_ascii_byte(byte)?,
+                _non_ascii_or_control => self.write_fragment("?")?,
+            }
+        }
+
+        Ok(())
+    }
+}
+
 const fn contains_invalid_component_byte(value: &str) -> bool {
     let bytes = value.as_bytes();
     let mut index = 0;
@@ -204,7 +282,8 @@ mod tests {
 
     use super::{
         BootPhase, DiagnosticComponent, DiagnosticError, DiagnosticRecord, EARLY_BOOT_CORE,
-        current_boot_phase, log_level_label, panic_snapshot, set_boot_phase,
+        MAX_PANIC_MESSAGE_OUTPUT_BYTES, current_boot_phase, log_level_label, panic_snapshot,
+        set_boot_phase, write_panic_message,
     };
 
     #[test]
@@ -303,15 +382,60 @@ mod tests {
         );
     }
 
+    #[test]
+    fn panic_message_writer_escapes_record_injection() {
+        let mut output = FixedBuf::default();
+
+        assert_eq!(
+            write_panic_message(
+                &mut output,
+                format_args!("fatal\n[core=7][phase=panic][kernel][FATAL]")
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            output.as_str(),
+            "panic message=fatal\\n\\[core=7\\]\\[phase=panic\\]\\[kernel\\]\\[FATAL\\]\n"
+        );
+    }
+
+    #[test]
+    fn panic_message_writer_bounds_output() {
+        let mut output = FixedBuf::default();
+        let expected = FixedBuf::repeat('a', MAX_PANIC_MESSAGE_OUTPUT_BYTES);
+
+        assert_eq!(
+            write_panic_message(
+                &mut output,
+                format_args!(
+                    "{}{}",
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\
+                     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\
+                     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\
+                     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                )
+            ),
+            Ok(())
+        );
+        let output = output.as_str();
+        let payload_start = "panic message=".len();
+        let payload_end = payload_start + MAX_PANIC_MESSAGE_OUTPUT_BYTES;
+
+        assert!(output.starts_with("panic message="));
+        assert_eq!(&output[payload_start..payload_end], expected.as_str());
+        assert_eq!(&output[payload_end..], "...<truncated>\n");
+    }
+
     struct FixedBuf {
-        bytes: [u8; 128],
+        bytes: [u8; 512],
         len: usize,
     }
 
     impl Default for FixedBuf {
         fn default() -> Self {
             Self {
-                bytes: [0; 128],
+                bytes: [0; 512],
                 len: 0,
             }
         }
@@ -320,6 +444,14 @@ mod tests {
     impl FixedBuf {
         fn as_str(&self) -> &str {
             core::str::from_utf8(&self.bytes[..self.len]).unwrap_or_default()
+        }
+
+        fn repeat(value: char, count: usize) -> Self {
+            let mut output = Self::default();
+            for _index in 0..count {
+                let _ = output.write_char(value);
+            }
+            output
         }
     }
 
