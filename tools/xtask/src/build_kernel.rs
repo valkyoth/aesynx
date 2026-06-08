@@ -1,3 +1,4 @@
+use crate::kernel_flags::apply_kernel_rustflags;
 use crate::process::run_command;
 use crate::workspace;
 
@@ -102,6 +103,7 @@ fn stable_validation(root: &Path) -> ExitCode {
         "--release",
     ]);
     command.current_dir(root);
+    apply_kernel_rustflags(&mut command, root);
     let kernel_build = run_command(
         &mut command,
         "cargo build --target x86_64-unknown-none -p aesynx-kernel --bin aesynx-kernel --release",
@@ -142,6 +144,7 @@ fn custom_target_probe(root: &Path) -> ExitCode {
         "aesynx-kernel",
     ]);
     command.current_dir(root);
+    apply_kernel_rustflags(&mut command, root);
     run_command(
         &mut command,
         "cargo +nightly build -Z build-std=core --target targets/x86_64-unknown-aesynx.json -p aesynx-kernel",

@@ -1,5 +1,6 @@
 mod build_kernel;
 mod image;
+mod kernel_flags;
 mod process;
 mod workspace;
 

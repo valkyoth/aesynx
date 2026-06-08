@@ -62,6 +62,10 @@ output, and expects `[TEST] bootinfo=ok` and `[TEST] boot=ok`.
 `build/qemu/aesynx-v0.6.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] panic=ok`.
 
+Xtask kernel builds pass `--remap-path-prefix <workspace>=.` through encoded
+Rust flags so embedded panic source paths do not expose the local workspace
+root. The panic handler still emits only an escaped filename basename.
+
 The v0.6 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 provide handoff metadata that normalizes into Aesynx `BootInfo`, and produce
 readable early panic diagnostics. It does not claim page-table ownership,

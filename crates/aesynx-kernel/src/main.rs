@@ -100,17 +100,17 @@ fn panic(info: &PanicInfo<'_>) -> ! {
         snapshot.core.get(),
         snapshot.phase.label()
     );
+    let mut serial = aesynx_arch_x86_64::serial::Com1::new();
     if let Some(location) = info.location() {
-        aesynx_arch_x86_64::serial_println!(
-            "panic location={} line={} column={}",
+        let _ = diagnostics::write_panic_location(
+            &mut serial,
             location.file(),
             location.line(),
-            location.column()
+            location.column(),
         );
     } else {
         aesynx_arch_x86_64::serial::write_str("panic location=unknown\n");
     }
-    let mut serial = aesynx_arch_x86_64::serial::Com1::new();
     let _ = diagnostics::write_panic_message(&mut serial, format_args!("{}", info.message()));
     aesynx_arch_x86_64::serial_println!(
         "panic registers=rsp_present={} rbp_present={} rsp_align={} rbp_align={} rflags=0x{:x} cr3_offset=0x{:x}",

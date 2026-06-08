@@ -4,7 +4,6 @@
 pub mod diagnostics;
 
 use aesynx_boot::BootInfo;
-use aesynx_log::{LogLevel, LogMessage, LogSink};
 
 pub const BOOT_BANNER: &str = "Aesynx: booting";
 
@@ -33,18 +32,6 @@ pub fn boot_summary(info: &BootInfo<'_>) -> BootSummary {
         framebuffer_present: info.framebuffer_present(),
         hhdm_present: info.hhdm_present(),
     }
-}
-
-pub fn describe_boot(info: &BootInfo<'_>, log: &impl LogSink) {
-    let summary = boot_summary(info);
-    write_boot_log(log, BOOT_BANNER);
-    write_boot_log(log, summary.arch_label);
-    write_boot_log(log, summary.platform_label);
-}
-
-fn write_boot_log(log: &impl LogSink, message: &'static str) {
-    let message = LogMessage::new(message).unwrap_or(LogMessage::REJECTED);
-    log.write_str(LogLevel::Info, "kernel", message);
 }
 
 fn arch_label(info: &BootInfo<'_>) -> &'static str {

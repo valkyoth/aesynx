@@ -1,5 +1,6 @@
 mod host_tools;
 
+use crate::kernel_flags::apply_kernel_rustflags;
 use crate::workspace;
 use host_tools::{HostToolVersions, MIN_LIMINE_VERSION_TEXT, validate_host_tools};
 
@@ -234,6 +235,7 @@ fn build_kernel_elf(root: &Path, smoke: SmokeKind) -> Result<PathBuf, String> {
         command.args(["--features", "panic-smoke"]);
     }
     command.current_dir(root);
+    apply_kernel_rustflags(&mut command, root);
     run_status(
         &mut command,
         "cargo build --target x86_64-unknown-none -p aesynx-kernel --bin aesynx-kernel --release",
