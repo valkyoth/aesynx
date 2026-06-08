@@ -92,7 +92,7 @@ fn validate_kernel_image(arch: ArchKind, image: KernelImageInfo) -> Result<(), B
         return Err(BootInfoError::KernelImageEmpty);
     }
 
-    if arch == ArchKind::X86_64 && (virt_start < X86_64_KERNEL_VMA_MIN || virt_end < virt_start) {
+    if arch == ArchKind::X86_64 && virt_start < X86_64_KERNEL_VMA_MIN {
         return Err(BootInfoError::KernelImageEmpty);
     }
 

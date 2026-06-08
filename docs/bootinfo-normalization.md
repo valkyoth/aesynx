@@ -22,6 +22,10 @@ The parser copies Limine memory-map entries into a fixed early stack buffer and
 then calls `BootInfo::normalize` from `crates/aesynx-boot`. The public boot
 crate remains `no_std`, dependency-free, and safe Rust.
 
+The linker places `.limine_requests*` inside the writable data segment because
+Limine writes response pointers into those statics before `_start`. Aesynx
+treats the request statics as read-only after handoff.
+
 After normalization, `_start` uses the generic `aesynx-kernel::boot_summary`
 API for serial output. The generic kernel therefore consumes only Aesynx
 BootInfo, not Limine response structures.

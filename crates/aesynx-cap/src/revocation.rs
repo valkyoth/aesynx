@@ -3,6 +3,11 @@ use aesynx_abi::ObjectId;
 use crate::{CapPerms, Capability};
 
 pub trait RevocationEpochStore {
+    /// Increments and returns the object's revocation epoch.
+    ///
+    /// Implementations must return `Err(RevocationError::StoreUnavailable)`
+    /// instead of wrapping if incrementing the epoch would overflow `u64::MAX`.
+    /// Wrapped epochs can make revoked capabilities spuriously validate again.
     fn increment_epoch(&mut self, object_id: ObjectId) -> Result<u64, RevocationError>;
 
     fn revoke_object(
@@ -53,7 +58,10 @@ mod tests {
 
     impl RevocationEpochStore for TestEpochStore {
         fn increment_epoch(&mut self, _object_id: ObjectId) -> Result<u64, RevocationError> {
-            self.epoch += 1;
+            self.epoch = self
+                .epoch
+                .checked_add(1)
+                .ok_or(RevocationError::StoreUnavailable)?;
             Ok(self.epoch)
         }
     }
@@ -94,5 +102,17 @@ mod tests {
             store.revoke_object(&cap(object_id, CapPerms::REVOKE), object_id),
             Ok(1)
         );
+    }
+
+    #[test]
+    fn revoke_epoch_increment_rejects_overflow() {
+        let object_id = ObjectId::new(7);
+        let mut store = TestEpochStore { epoch: u64::MAX };
+
+        assert_eq!(
+            store.revoke_object(&cap(object_id, CapPerms::REVOKE), object_id),
+            Err(RevocationError::StoreUnavailable)
+        );
+        assert_eq!(store.epoch, u64::MAX);
     }
 }

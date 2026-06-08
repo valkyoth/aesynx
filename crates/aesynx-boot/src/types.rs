@@ -280,6 +280,13 @@ pub struct KernelImageInfo {
 }
 
 impl KernelImageInfo {
+    /// Constructs a kernel image descriptor from bootloader-provided addresses.
+    ///
+    /// # Security note
+    ///
+    /// The address fields are intentionally opaque outside this crate. Widening
+    /// the visibility of `virt_start`, `virt_end`, or `phys_start` would weaken
+    /// the KASLR protection used by `BootInfo` and boot metadata redaction.
     #[must_use]
     pub const fn new(virt_start: VirtAddr, virt_end: VirtAddr, phys_start: PhysAddr) -> Self {
         Self {
