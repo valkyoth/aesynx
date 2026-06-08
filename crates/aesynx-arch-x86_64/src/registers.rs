@@ -1,7 +1,7 @@
 use core::fmt;
 
 const PAGE_OFFSET_MASK: u64 = 0xfff;
-const RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_003f_ffff;
+const RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_0000_0cd5;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct EarlyRegisterSnapshot {
@@ -120,7 +120,7 @@ mod tests {
         let snapshot = EarlyRegisterSnapshot {
             stack_pointer: 0xffff_ffff_8000_1008,
             frame_pointer: 0xffff_ffff_8000_2000,
-            rflags: 0xffff_ffff_0000_0246,
+            rflags: 0xffff_ffff_0000_0ed7,
             cr3: 0x1234_5abc,
         };
 
@@ -128,8 +128,21 @@ mod tests {
         assert!(snapshot.frame_pointer_present());
         assert_eq!(snapshot.stack_pointer_alignment(), 8);
         assert_eq!(snapshot.frame_pointer_alignment(), 0);
-        assert_eq!(snapshot.public_rflags(), 0x3f_ffff & 0x246);
+        assert_eq!(snapshot.public_rflags(), 0x0cd5);
         assert_eq!(snapshot.cr3_page_offset(), 0xabc);
+    }
+
+    #[test]
+    fn public_rflags_excludes_debug_interrupt_and_privilege_state() {
+        const TF_IF_IOPL_AC: u64 = (1 << 8) | (1 << 9) | (3 << 12) | (1 << 18);
+        let snapshot = EarlyRegisterSnapshot {
+            stack_pointer: 0,
+            frame_pointer: 0,
+            rflags: TF_IF_IOPL_AC,
+            cr3: 0,
+        };
+
+        assert_eq!(snapshot.public_rflags(), 0);
     }
 
     struct FixedBuf {

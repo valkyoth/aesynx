@@ -49,8 +49,12 @@ control bytes cannot create forged diagnostic records or unbounded panic output.
 On x86_64, `crates/aesynx-arch-x86_64/src/registers.rs` captures `rsp`, `rbp`,
 `rflags`, and `cr3` for the panic path. Raw address-bearing values stay private
 and are not printed; serial output exposes only presence, stack alignment,
-public RFLAGS bits, and CR3 low flag/PCID bits. Full register and fault decoding
-starts after descriptor tables and exception handlers land.
+arithmetic/status RFLAGS bits, and CR3 low flag/PCID bits. Full register and
+fault decoding starts after descriptor tables and exception handlers land.
+
+The public RFLAGS summary is limited to arithmetic/status flags only. It
+intentionally excludes trap/debug, interrupt-enable, I/O privilege, alignment,
+virtual-interrupt, and CPU-identification state.
 
 ## Serial Contract
 

@@ -173,11 +173,10 @@ mod tests {
 
     #[test]
     fn bootinfo_debug_redacts_handoff_addresses() -> Result<(), BootInfoError> {
-        let regions = [MemoryRegion::new(
-            PhysAddr::new(0x1000),
-            0x9000,
-            MemoryRegionKind::Usable,
-        )];
+        let regions = [
+            MemoryRegion::new(PhysAddr::new(0x1000), 0x9000, MemoryRegionKind::Usable),
+            MemoryRegion::new(PhysAddr::new(0x200000), 0x2000, MemoryRegionKind::Kernel),
+        ];
         let metadata = BootMetadata {
             arch: ArchKind::X86_64,
             platform: PlatformKind::Qemu,
@@ -207,7 +206,21 @@ mod tests {
         assert!(debug.contains("rsdp_present: true"));
         assert!(debug.contains("hhdm_present: true"));
         assert!(!debug.contains("ffff"));
+        assert!(!debug.contains("200000"));
         Ok(())
+    }
+
+    #[test]
+    fn memory_region_debug_redacts_physical_start() {
+        let region = MemoryRegion::new(PhysAddr::new(0x200000), 0x2000, MemoryRegionKind::Kernel);
+        let mut output = FixedBuf::default();
+
+        assert_eq!(fmt::write(&mut output, format_args!("{region:?}")), Ok(()));
+
+        let debug = output.as_str();
+        assert!(debug.contains("start_present: true"));
+        assert!(debug.contains("kind: Kernel"));
+        assert!(!debug.contains("200000"));
     }
 
     #[test]

@@ -34,7 +34,9 @@ Limine base revision 6 returns pointer-style handoff data through HHDM virtual
 addresses. Aesynx records RSDP, HHDM, device-tree, and framebuffer addresses in
 private BootInfo fields, exposes only presence checks to generic kernel code,
 and uses redacted Debug implementations for handoff metadata. Memory-map region
-starts remain physical addresses.
+starts and computed ends remain crate-private to `aesynx-boot`; external code
+can inspect kind, length, and presence-only start metadata without recovering
+kernel-image placement from the public memory map.
 
 The Limine boundary rejects null and misaligned response pointers before
 creating Rust references, pins the transcribed framebuffer ABI with compile-time

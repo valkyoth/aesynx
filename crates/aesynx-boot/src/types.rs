@@ -149,9 +149,9 @@ pub struct MemorySummary {
     pub usable_bytes: u64,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct MemoryRegion {
-    pub start: PhysAddr,
+    pub(crate) start: PhysAddr,
     pub len: u64,
     pub kind: MemoryRegionKind,
 }
@@ -169,11 +169,26 @@ impl MemoryRegion {
     }
 
     #[must_use]
-    pub const fn end(self) -> Option<PhysAddr> {
+    pub const fn start_present(self) -> bool {
+        self.start.get() != 0
+    }
+
+    #[must_use]
+    pub(crate) const fn end(self) -> Option<PhysAddr> {
         match self.start.get().checked_add(self.len) {
             Some(end) => Some(PhysAddr::new(end)),
             None => None,
         }
+    }
+}
+
+impl fmt::Debug for MemoryRegion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MemoryRegion")
+            .field("start_present", &self.start_present())
+            .field("len", &self.len)
+            .field("kind", &self.kind)
+            .finish()
     }
 }
 
