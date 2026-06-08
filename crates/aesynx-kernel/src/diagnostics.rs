@@ -7,6 +7,7 @@ use aesynx_log::{LogLevel, LogMessage};
 static BOOT_PHASE: AtomicU8 = AtomicU8::new(BootPhase::Entry as u8);
 
 pub const EARLY_BOOT_CORE: CoreId = CoreId::new(0);
+pub const MAX_DIAGNOSTIC_COMPONENT_LEN: usize = 32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -76,7 +77,7 @@ pub struct DiagnosticRecord<'a> {
     pub core: CoreId,
     pub phase: BootPhase,
     pub level: LogLevel,
-    pub component: &'static str,
+    pub component: DiagnosticComponent,
     pub message: LogMessage<'a>,
 }
 
@@ -86,7 +87,7 @@ impl<'a> DiagnosticRecord<'a> {
         core: CoreId,
         phase: BootPhase,
         level: LogLevel,
-        component: &'static str,
+        component: DiagnosticComponent,
         message: LogMessage<'a>,
     ) -> Self {
         Self {
@@ -99,7 +100,11 @@ impl<'a> DiagnosticRecord<'a> {
     }
 
     #[must_use]
-    pub fn current(level: LogLevel, component: &'static str, message: LogMessage<'a>) -> Self {
+    pub fn current(
+        level: LogLevel,
+        component: DiagnosticComponent,
+        message: LogMessage<'a>,
+    ) -> Self {
         Self::new(
             EARLY_BOOT_CORE,
             current_boot_phase(),
@@ -115,11 +120,48 @@ impl<'a> DiagnosticRecord<'a> {
             "[core={}][phase={}][{}][{}] {}",
             self.core.get(),
             self.phase.label(),
-            self.component,
+            self.component.as_str(),
             log_level_label(self.level),
             self.message.as_str()
         )
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DiagnosticComponent {
+    value: &'static str,
+}
+
+impl DiagnosticComponent {
+    pub const KERNEL: Self = Self { value: "kernel" };
+
+    pub const fn new(value: &'static str) -> Result<Self, DiagnosticError> {
+        if value.is_empty() {
+            return Err(DiagnosticError::EmptyComponent);
+        }
+
+        if value.len() > MAX_DIAGNOSTIC_COMPONENT_LEN {
+            return Err(DiagnosticError::ComponentTooLong);
+        }
+
+        if contains_invalid_component_byte(value) {
+            return Err(DiagnosticError::InvalidComponentByte);
+        }
+
+        Ok(Self { value })
+    }
+
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.value
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DiagnosticError {
+    EmptyComponent,
+    ComponentTooLong,
+    InvalidComponentByte,
 }
 
 #[must_use]
@@ -134,6 +176,26 @@ pub const fn log_level_label(level: LogLevel) -> &'static str {
     }
 }
 
+const fn contains_invalid_component_byte(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+        let is_digit = byte >= b'0' && byte <= b'9';
+        let is_lower = byte >= b'a' && byte <= b'z';
+        let is_separator = byte == b'-' || byte == b'_';
+
+        if !(is_digit || is_lower || is_separator) {
+            return true;
+        }
+
+        index += 1;
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use core::fmt::{self, Write};
@@ -141,8 +203,8 @@ mod tests {
     use aesynx_log::{LogLevel, LogMessage};
 
     use super::{
-        BootPhase, DiagnosticRecord, EARLY_BOOT_CORE, current_boot_phase, log_level_label,
-        panic_snapshot, set_boot_phase,
+        BootPhase, DiagnosticComponent, DiagnosticError, DiagnosticRecord, EARLY_BOOT_CORE,
+        current_boot_phase, log_level_label, panic_snapshot, set_boot_phase,
     };
 
     #[test]
@@ -193,7 +255,7 @@ mod tests {
             EARLY_BOOT_CORE,
             BootPhase::BootInfoNormalized,
             LogLevel::Info,
-            "kernel",
+            DiagnosticComponent::KERNEL,
             LogMessage::new("bootinfo normalized").unwrap_or(LogMessage::REJECTED),
         );
         let mut output = FixedBuf::default();
@@ -202,6 +264,42 @@ mod tests {
         assert_eq!(
             output.as_str(),
             "[core=0][phase=bootinfo-normalized][kernel][INFO] bootinfo normalized\n"
+        );
+    }
+
+    #[test]
+    fn diagnostic_component_accepts_safe_names() {
+        assert_eq!(
+            DiagnosticComponent::new("kernel-core").map(DiagnosticComponent::as_str),
+            Ok("kernel-core")
+        );
+        assert_eq!(
+            DiagnosticComponent::new("driver_0").map(DiagnosticComponent::as_str),
+            Ok("driver_0")
+        );
+    }
+
+    #[test]
+    fn diagnostic_component_rejects_injection_characters() {
+        assert_eq!(
+            DiagnosticComponent::new(""),
+            Err(DiagnosticError::EmptyComponent)
+        );
+        assert_eq!(
+            DiagnosticComponent::new("kernel][FATAL"),
+            Err(DiagnosticError::InvalidComponentByte)
+        );
+        assert_eq!(
+            DiagnosticComponent::new("kernel\nfatal"),
+            Err(DiagnosticError::InvalidComponentByte)
+        );
+        assert_eq!(
+            DiagnosticComponent::new("Kernel"),
+            Err(DiagnosticError::InvalidComponentByte)
+        );
+        assert_eq!(
+            DiagnosticComponent::new("component-name-that-is-far-too-long"),
+            Err(DiagnosticError::ComponentTooLong)
         );
     }
 

@@ -9,7 +9,7 @@ use core::panic::PanicInfo;
 use aesynx_arch::ArchCpu;
 
 #[cfg(target_os = "none")]
-use aesynx_kernel::diagnostics::{self, BootPhase};
+use aesynx_kernel::diagnostics::{self, BootPhase, DiagnosticComponent};
 
 #[cfg(target_os = "none")]
 use aesynx_log::{LogLevel, LogMessage};
@@ -129,7 +129,8 @@ fn panic(info: &PanicInfo<'_>) -> ! {
 #[cfg(target_os = "none")]
 fn write_diagnostic(level: LogLevel, message: &'static str) {
     let message = LogMessage::new(message).unwrap_or(LogMessage::REJECTED);
-    let record = diagnostics::DiagnosticRecord::current(level, "kernel", message);
+    let record =
+        diagnostics::DiagnosticRecord::current(level, DiagnosticComponent::KERNEL, message);
     let mut serial = aesynx_arch_x86_64::serial::Com1::new();
     let _ = record.write_to(&mut serial);
 }

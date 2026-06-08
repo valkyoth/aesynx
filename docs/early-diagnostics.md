@@ -14,6 +14,8 @@ exceptions, page tables, or an allocator exist.
 - `panic_snapshot` captures the early core and current phase for panic output.
 - `DiagnosticRecord` formats no-alloc structured records with core, phase,
   component, log level, and bounded single-record messages.
+- `DiagnosticComponent` validates component names before formatting, allowing
+  only lowercase ASCII letters, digits, `-`, and `_` up to 32 bytes.
 
 The target-specific serial emission remains in `crates/aesynx-kernel/src/main.rs`
 so the diagnostics library stays `no_std`, safe Rust, and host-testable.
@@ -23,6 +25,9 @@ Structured records use this shape:
 ```text
 [core=0][phase=bootinfo-normalized][kernel][INFO] bootinfo normalized
 ```
+
+Messages use `LogMessage`, which rejects record separators. Components are also
+validated so a component name cannot forge bracketed fields or extra records.
 
 ## Panic Output
 
