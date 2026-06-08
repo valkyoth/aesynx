@@ -18,11 +18,13 @@ pub const MAX_DIAGNOSTIC_COMPONENT_LEN: usize = 32;
 pub enum BootPhase {
     Entry = 0,
     CpuSetup = 1,
-    BootloaderHandoff = 2,
-    BootInfoNormalized = 3,
-    Running = 4,
-    PanicSmoke = 5,
-    Panic = 6,
+    ExceptionSetup = 2,
+    BootloaderHandoff = 3,
+    BootInfoNormalized = 4,
+    Running = 5,
+    PanicSmoke = 6,
+    ExceptionSmoke = 7,
+    Panic = 8,
     Unknown = u8::MAX,
 }
 
@@ -32,10 +34,12 @@ impl BootPhase {
         match self {
             Self::Entry => "entry",
             Self::CpuSetup => "cpu-setup",
+            Self::ExceptionSetup => "exception-setup",
             Self::BootloaderHandoff => "bootloader-handoff",
             Self::BootInfoNormalized => "bootinfo-normalized",
             Self::Running => "running",
             Self::PanicSmoke => "panic-smoke",
+            Self::ExceptionSmoke => "exception-smoke",
             Self::Panic => "panic",
             Self::Unknown => "unknown",
         }
@@ -46,11 +50,13 @@ impl BootPhase {
         match value {
             0 => Self::Entry,
             1 => Self::CpuSetup,
-            2 => Self::BootloaderHandoff,
-            3 => Self::BootInfoNormalized,
-            4 => Self::Running,
-            5 => Self::PanicSmoke,
-            6 => Self::Panic,
+            2 => Self::ExceptionSetup,
+            3 => Self::BootloaderHandoff,
+            4 => Self::BootInfoNormalized,
+            5 => Self::Running,
+            6 => Self::PanicSmoke,
+            7 => Self::ExceptionSmoke,
+            8 => Self::Panic,
             _unknown => Self::Unknown,
         }
     }
@@ -218,10 +224,12 @@ mod tests {
     fn boot_phase_labels_are_stable() {
         assert_eq!(BootPhase::Entry.label(), "entry");
         assert_eq!(BootPhase::CpuSetup.label(), "cpu-setup");
+        assert_eq!(BootPhase::ExceptionSetup.label(), "exception-setup");
         assert_eq!(BootPhase::BootloaderHandoff.label(), "bootloader-handoff");
         assert_eq!(BootPhase::BootInfoNormalized.label(), "bootinfo-normalized");
         assert_eq!(BootPhase::Running.label(), "running");
         assert_eq!(BootPhase::PanicSmoke.label(), "panic-smoke");
+        assert_eq!(BootPhase::ExceptionSmoke.label(), "exception-smoke");
         assert_eq!(BootPhase::Panic.label(), "panic");
         assert_eq!(BootPhase::Unknown.label(), "unknown");
     }

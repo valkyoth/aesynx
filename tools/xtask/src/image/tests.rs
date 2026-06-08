@@ -1,15 +1,19 @@
 use super::{
     BOOT_CONFIG_MARKERS, BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER,
-    CPU_SETUP_MARKER, KERNEL_PROFILE, KERNEL_TARGET, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER,
-    PANIC_REGISTERS_MARKER, SERIAL_MARKER, SmokeKind, parse_qemu_args,
+    CPU_SETUP_MARKER, EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, KERNEL_PROFILE, KERNEL_TARGET,
+    PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER, PANIC_REGISTERS_MARKER,
+    SERIAL_MARKER, SmokeKind, parse_qemu_args,
 };
 
 #[test]
-fn qemu_markers_track_v0_7_contracts() {
+fn qemu_markers_track_v0_8_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
     assert_eq!(CPU_SETUP_MARKER, "[TEST] gdt=ok");
+    assert_eq!(EXCEPTION_SETUP_MARKER, "[TEST] idt=ok");
+    assert_eq!(EXCEPTION_MARKER, "[TEST] exception=ok");
+    assert_eq!(PAGE_FAULT_MARKER, "[TEST] pagefault=ok");
     assert_eq!(
         PANIC_DIAGNOSTIC_MARKER,
         "[kernel][FATAL] panic handler entered"
@@ -27,8 +31,12 @@ fn qemu_args_select_smoke_kind() {
         Ok(SmokeKind::Panic)
     );
     assert_eq!(
+        parse_qemu_args(&[String::from("--exception-smoke")]),
+        Ok(SmokeKind::Exception)
+    );
+    assert_eq!(
         parse_qemu_args(&[String::from("--unknown")]),
-        Err("qemu accepts no arguments except --panic-smoke")
+        Err("qemu accepts no arguments except --panic-smoke or --exception-smoke")
     );
 }
 

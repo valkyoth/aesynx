@@ -100,7 +100,18 @@ Preconditions: called during early single-core kernel execution after Limine tra
 Unsafe operation: writes private static descriptor/TSS tables, executes lgdt, reloads CS through a far return, reloads SS/DS/ES, resets FS/GS selectors to null, executes ltr, and exposes an unsafe set_ring0_stack API for future privilege-transition setup
 Safety argument: descriptor and TSS statics are private to the architecture module, initialized once, and then treated as read-only CPU tables; the double-fault stack is a private aligned static byte array and the TSS records its one-past-end stack pointer as required by x86_64; lgdt, segment reloads, FS/GS nulling, and ltr load CPU state from initialized static data and do not create Rust references or access untrusted pointers; FS/GS bases are not configured here and must be set separately by future per-CPU/TLS setup; set_ring0_stack is unsafe because callers must provide a valid per-core kernel stack before ring 3 execution is enabled
 Tests/evidence: descriptor unit tests verify selector layout, TSS size, complete TSS descriptor base/limit encoding, and double-fault IST slot properties; cargo xtask qemu observes [TEST] gdt=ok
-Limitations: early single-core setup only; no IDT, exception handlers, privilege transitions, syscall/sysret, or per-core TSS state yet; TSS.rsp0 intentionally remains zero until future ring 3 enablement installs a real per-core kernel stack
+Limitations: early single-core setup only; no privilege transitions, syscall/sysret, or per-core TSS state yet; TSS.rsp0 intentionally remains zero until future ring 3 enablement installs a real per-core kernel stack
+```
+
+```text
+Location: crates/aesynx-arch-x86_64/src/exceptions.rs
+Status: active in v0.8
+Purpose: install early x86_64 IDT entries and minimal breakpoint, page-fault, and double-fault handlers
+Preconditions: called during early single-core kernel execution after GDT/TSS setup and before Aesynx enables external interrupts
+Unsafe operation: defines global assembly exception stubs, executes lidt, writes a private static IDT, reads a raw exception-frame pointer passed by the stubs, executes int3 for the returning breakpoint smoke, and deliberately dereferences null in the opt-in exception-smoke feature
+Safety argument: IDT statics are private to the architecture module and initialized once before loading; handler symbols are fixed assembly stubs in kernel text; the breakpoint stub preserves general-purpose registers, removes the synthetic vector/error frame, and returns with iretq; page-fault and double-fault stubs align the stack, print bounded diagnostics, and halt instead of returning to faulting instructions; the raw exception-frame read copies only value fields used for bounded diagnostics and rejects null/misaligned pointers; the null read is reachable only through the explicit exception-smoke path after the page-fault handler is installed
+Tests/evidence: IDT unit tests verify gate encoding, descriptor sizes, vector constants, and invalid frame-pointer rejection; cargo clippy --target x86_64-unknown-none -p aesynx-kernel --features exception-smoke -- -D warnings passes; cargo xtask qemu observes [TEST] exception=ok; cargo xtask qemu --exception-smoke observes [TEST] pagefault=ok
+Limitations: early single-core setup only; no CR2 output, page-fault error-code decoding, external IRQ controller, syscall/sysret, userspace transitions, SMP/per-core IDT state, or comprehensive unhandled-vector diagnostics yet
 ```
 
 ```text

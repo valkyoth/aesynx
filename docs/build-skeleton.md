@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.7 GDT/TSS implementation candidate
+Status: v0.8 IDT/exceptions implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -51,16 +51,23 @@ explicit probe for the future kernel-object path, not a stable requirement.
 cargo xtask image
 cargo xtask qemu
 cargo xtask qemu --panic-smoke
+cargo xtask qemu --exception-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.7.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.8.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
-output, and expects `[TEST] gdt=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
+output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
+`[TEST] exception=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.7.0-panic.iso`, enables the kernel `panic-smoke` feature,
-and expects `[TEST] gdt=ok` and `[TEST] panic=ok`.
+`build/qemu/aesynx-v0.8.0-panic.iso`, enables the kernel `panic-smoke` feature,
+and expects `[TEST] idt=ok`, `[TEST] exception=ok`, and `[TEST] panic=ok`.
+
+`cargo xtask qemu --exception-smoke` creates a separate
+`build/qemu/aesynx-v0.8.0-exception.iso`, enables the kernel
+`exception-smoke` feature, and expects `[TEST] pagefault=ok` and
+`[TEST] exception=ok`.
 
 The tracked `.cargo/config.toml` target flags include a workspace-root
 `--remap-path-prefix` for direct kernel builds in this checkout. Xtask kernel
@@ -68,11 +75,12 @@ builds also pass `--remap-path-prefix <workspace>=.` through encoded Rust flags
 as portable defense-in-depth for the release image path. The panic handler
 still emits only an escaped filename basename.
 
-The v0.7 image proves that Limine can load the Rust kernel ELF, reach `_start`,
-install basic x86_64 GDT/TSS state, provide handoff metadata that normalizes
+The v0.8 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+install basic x86_64 GDT/TSS/IDT state, handle a returning breakpoint
+exception, catch an opt-in page fault, provide handoff metadata that normalizes
 into Aesynx `BootInfo`, and produce readable early panic diagnostics. It does
-not claim page-table ownership, interrupts, memory allocation, exception
-handling, IDT installation, or bootloader memory reclamation.
+not claim page-table ownership, interrupt-controller setup, memory allocation,
+full fault decoding, or bootloader memory reclamation.
 
 ## Target Shape
 

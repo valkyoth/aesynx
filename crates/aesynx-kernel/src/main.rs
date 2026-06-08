@@ -14,7 +14,11 @@ use aesynx_kernel::diagnostics::{self, BootPhase, DiagnosticComponent};
 #[cfg(target_os = "none")]
 use aesynx_log::{LogLevel, LogMessage};
 
-#[cfg(all(target_os = "none", not(feature = "panic-smoke")))]
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke")
+))]
 mod limine;
 
 #[cfg(target_os = "none")]
@@ -34,6 +38,19 @@ pub extern "C" fn _start() -> ! {
         descriptor_status.double_fault_stack_bytes
     );
     aesynx_arch_x86_64::serial::write_str("[TEST] gdt=ok\n");
+    let exception_status = aesynx_arch_x86_64::exceptions::init(descriptor_status.double_fault_ist);
+    diagnostics::set_boot_phase(BootPhase::ExceptionSetup);
+    write_diagnostic(LogLevel::Info, "idt initialized");
+    aesynx_arch_x86_64::serial_println!(
+        "exception setup=idt entries={} breakpoint={} page_fault={} double_fault={} df_ist={}",
+        exception_status.idt_entries,
+        exception_status.breakpoint_vector,
+        exception_status.page_fault_vector,
+        exception_status.double_fault_vector,
+        exception_status.double_fault_ist.get()
+    );
+    aesynx_arch_x86_64::serial::write_str("[TEST] idt=ok\n");
+    aesynx_arch_x86_64::exceptions::trigger_breakpoint_smoke();
     kernel_entry()
 }
 
@@ -42,7 +59,20 @@ fn kernel_entry() -> ! {
     panic_smoke_entry()
 }
 
-#[cfg(all(target_os = "none", not(feature = "panic-smoke")))]
+#[cfg(all(
+    target_os = "none",
+    feature = "exception-smoke",
+    not(feature = "panic-smoke")
+))]
+fn kernel_entry() -> ! {
+    exception_smoke_entry()
+}
+
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke")
+))]
 fn kernel_entry() -> ! {
     boot_entry()
 }
@@ -53,7 +83,22 @@ fn panic_smoke_entry() -> ! {
     trigger_panic_smoke();
 }
 
-#[cfg(all(target_os = "none", not(feature = "panic-smoke")))]
+#[cfg(all(
+    target_os = "none",
+    feature = "exception-smoke",
+    not(feature = "panic-smoke")
+))]
+fn exception_smoke_entry() -> ! {
+    diagnostics::set_boot_phase(BootPhase::ExceptionSmoke);
+    write_diagnostic(LogLevel::Info, "exception smoke starting");
+    aesynx_arch_x86_64::exceptions::trigger_page_fault_smoke()
+}
+
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke")
+))]
 fn boot_entry() -> ! {
     let mut scratch = limine::EarlyBootScratch::new();
     diagnostics::set_boot_phase(BootPhase::BootloaderHandoff);
@@ -95,7 +140,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.7.0 panic smoke");
+    panic!("intentional v0.8.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

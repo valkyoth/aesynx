@@ -36,13 +36,14 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.6.0` is the tagged early-diagnostics line. `main` is currently carrying the
-`v0.7.0` GDT/TSS implementation candidate. It builds a
+`v0.7.0` is the tagged GDT/TSS line. `main` is currently carrying the
+`v0.8.0` IDT and exceptions implementation candidate. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
-kernel-owned serial markers, installs basic x86_64 descriptor tables, and can
-run an opt-in deliberate panic smoke test.
+kernel-owned serial markers, installs basic x86_64 descriptor and interrupt
+tables, handles a returning breakpoint exception, and can run opt-in deliberate
+panic and page-fault smoke tests.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -55,10 +56,11 @@ run an opt-in deliberate panic smoke test.
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] bootinfo=ok` and `[TEST] boot=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] exception=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
-| GDT and TSS | Active candidate | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
+| GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
+| IDT and exceptions | Active candidate | Early x86_64 boot installs an IDT, handles breakpoint, page-fault, and double-fault vectors, and verifies `[TEST] exception=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -70,7 +72,7 @@ run an opt-in deliberate panic smoke test.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| GDT and TSS | Active | `v0.7.0`; install descriptor tables, add serial marker, docs, release notes, and pentest follow-up. |
+| IDT and exceptions | Active | `v0.8.0`; install IDT, add breakpoint/page-fault/double-fault handlers, docs, release notes, and pentest follow-up. |
 | Real arch mechanisms | Planned | Interrupt control, core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -97,7 +99,7 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.7 Limine QEMU image:
+Create and smoke-test the v0.8 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -108,6 +110,12 @@ Run the deliberate panic diagnostics smoke:
 
 ```bash
 cargo xtask qemu --panic-smoke
+```
+
+Run the deliberate exception smoke:
+
+```bash
+cargo xtask qemu --exception-smoke
 ```
 
 These commands require Limine 12.3.2 or newer, xorriso, and
@@ -124,7 +132,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.7.0
+cargo xtask release-ready v0.8.0
 ```
 
 ## Security Posture
@@ -151,6 +159,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [v0.7.0 Release Candidate Notes](docs/releases/v0.7.0-rc.md)
+- [v0.8.0 Release Candidate Notes](docs/releases/v0.8.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

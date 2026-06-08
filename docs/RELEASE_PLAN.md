@@ -323,8 +323,10 @@ Expected serial:
 
 Verification:
 
-- Trigger breakpoint.
-- Trigger page fault.
+- `cargo xtask qemu` triggers a returning breakpoint and prints
+  `[TEST] exception=ok`.
+- `cargo xtask qemu --exception-smoke` triggers a page fault and prints
+  `[TEST] pagefault=ok`.
 - No triple fault.
 
 Exit criteria:

@@ -57,7 +57,8 @@ On x86_64, `crates/aesynx-arch-x86_64/src/registers.rs` captures `rsp`, `rbp`,
 `rflags`, and `cr3` for the panic path. Raw address-bearing values stay private
 and are not printed; serial output exposes only presence, stack alignment,
 arithmetic/status RFLAGS bits, and CR3 low flag/PCID bits. Full register and
-fault decoding starts after exception handlers land.
+fault decoding starts after the v0.8 exception skeleton grows CR2 and
+error-code decoding.
 
 The public RFLAGS summary is limited to arithmetic/status flags only. It
 intentionally excludes trap/debug, interrupt-enable, I/O privilege, alignment,
@@ -69,6 +70,8 @@ Normal boot smoke still requires:
 
 ```text
 [TEST] gdt=ok
+[TEST] idt=ok
+[TEST] exception=ok
 [TEST] bootinfo=ok
 [TEST] boot=ok
 ```
@@ -84,6 +87,8 @@ enabled and expects both the structured fatal record and the panic marker:
 
 ```text
 [TEST] gdt=ok
+[TEST] idt=ok
+[TEST] exception=ok
 [kernel][FATAL] panic handler entered
 [TEST] panic=ok
 ```
@@ -100,8 +105,8 @@ This milestone proves:
 
 This milestone does not prove:
 
-- Interrupt or exception handling.
-- Page-fault diagnostics.
+- Full interrupt or exception decoding.
+- Page-fault address and error-code decoding.
 - Raw register dumps.
 - SMP-safe diagnostics.
 - Persistent telemetry buffers.
