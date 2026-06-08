@@ -9,6 +9,23 @@ xtask = "run -p xtask --"
 linker = "rust-lld"
 rustflags = [
     "-C",
+    "code-model=kernel",
+    "-C",
+    "relocation-model=static",
+    "-C",
+    "link-arg=-Tlinker/kernel-x86_64.ld",
+    "-C",
+    "panic=abort",
+]
+
+[target.x86_64-unknown-none]
+linker = "rust-lld"
+rustflags = [
+    "-C",
+    "code-model=kernel",
+    "-C",
+    "relocation-model=static",
+    "-C",
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "-C",
     "panic=abort",

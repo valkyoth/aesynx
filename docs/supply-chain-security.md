@@ -28,14 +28,14 @@ cargo audit
 scripts/generate-sbom.sh
 ```
 
-Future release gates:
+Active and future release gates:
 
 - Reproducible kernel/image build check.
 - QEMU boot smoke with serial markers.
 - SBOM for source workspace and generated release artifacts.
 - Release notes with artifact checksums.
 - Signed tag verification.
-- Toolchain and bootloader version capture.
+- Toolchain, Limine, xorriso, and QEMU version capture.
 
 ## Review Triggers
 
@@ -52,7 +52,6 @@ Require security review for:
 
 ## Non-Claims
 
-The current repository has planning docs and security scaffolding. It does not
-yet provide a reproducible kernel image, signed release artifacts, or verified
-dependency closure.
-
+The current repository has a QEMU smoke-tested research boot image. It does not
+yet provide reproducible release artifacts, measured boot, signed images, or a
+verified dependency closure.

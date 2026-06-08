@@ -178,10 +178,14 @@ Boot x86_64 QEMU and print over serial.
 
 Deliverables:
 
+- Stable `x86_64-unknown-none` kernel ELF build.
+- Limine ISO image path.
+- Boot config in `boot/qemu/limine.conf`.
 - `_start` entry.
 - Minimal panic handler.
 - UART 16550 write path.
 - Early `serial_println!`.
+- Documented unsafe boundary for x86_64 port I/O.
 
 Expected serial:
 
@@ -193,7 +197,9 @@ arch=x86_64 platform=qemu
 
 Verification:
 
-- QEMU serial-expect test passes.
+- `cargo xtask build-kernel` builds the freestanding kernel ELF.
+- `cargo xtask image` creates the Limine ISO.
+- `cargo xtask qemu` observes `[TEST] boot=ok` over serial.
 
 Exit criteria:
 

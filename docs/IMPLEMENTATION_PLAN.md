@@ -481,7 +481,7 @@ No-IOMMU policy:
 The first boot target is:
 
 ```text
-cargo xtask qemu-x86_64
+cargo xtask qemu
 ```
 
 Expected serial output:
@@ -489,7 +489,7 @@ Expected serial output:
 ```text
 Aesynx: booting
 arch=x86_64 platform=qemu
-core=0 phase=early
+[TEST] boot=ok
 ```
 
 ### 6.2 BootInfo

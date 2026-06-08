@@ -1,6 +1,6 @@
 # Aesynx QEMU Image Skeleton
 
-Status: v0.3 implementation complete; tag pending release gates
+Status: historical v0.3 implementation
 
 `v0.3.0` introduces the first generated QEMU boot image. The image is a raw
 1.44 MiB BIOS-bootable disk containing a temporary Aesynx stage-0 serial probe.
@@ -64,4 +64,5 @@ This milestone does not prove:
 - Page-table setup.
 - Kernel panic handling.
 
-Those begin in later milestones.
+Those begin in later milestones. The active `main` image path has moved to the
+v0.4 Limine ISO and Rust `_start` boot marker.

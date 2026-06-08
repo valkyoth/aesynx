@@ -53,11 +53,11 @@ fn print_status() {
 
 fn print_help() {
     println!("xtask commands:");
-    println!("  build-kernel                         validate kernel build skeleton");
+    println!("  build-kernel                         build and validate kernel boot path");
     println!("  build-kernel --custom-target-probe   try nightly build-std custom target probe");
     println!("  check                                run local repository checks");
-    println!("  image                                create v0.3 QEMU boot image skeleton");
-    println!("  qemu                                 run v0.3 QEMU boot smoke");
+    println!("  image                                create v0.4 Limine QEMU boot image");
+    println!("  qemu                                 run v0.4 QEMU boot smoke");
     println!("  release-ready TAG                    validate release pentest gate for TAG");
     println!("  status                               print workspace status");
     println!("  help                                 print this help");

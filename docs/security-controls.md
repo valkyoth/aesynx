@@ -10,7 +10,7 @@ claim that the controls are implemented today.
 | Project naming | Single project name, no retired names | Active | `scripts/validate-security-policy.sh` |
 | Dependency policy | License, source, advisory, and duplicate-version checks | Configured | `deny.toml` |
 | Security reporting | Private-first vulnerability process | Configured | `SECURITY.md` |
-| Unsafe code | Unsafe confined to documented boundaries | Policy only | `docs/unsafe-policy.md` |
+| Unsafe code | Unsafe confined to documented boundaries | First boundary active | `docs/unsafe-policy.md`, `crates/aesynx-arch-x86_64/src/port.rs` |
 | Kernel engineering | `no_std`, internal primitives, minimal unsafe, external dependency exceptions | Configured | `docs/kernel-engineering-policy.md`, `scripts/validate-kernel-policy.sh` |
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
 | Supply chain | Executable dependency and workflow changes require review | Policy only | `docs/supply-chain-security.md` |
@@ -27,7 +27,7 @@ claim that the controls are implemented today.
 | Drivers | MMIO/IRQ/DMA caps and revocation lifecycle | Planned | `docs/IMPLEMENTATION_PLAN.md` |
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |
 | AI | Bounded assistant and policy fallback | Planned | `docs/IMPLEMENTATION_PLAN.md`, `docs/userspace-vision.md` |
-| QEMU testing | Boot/fault/security smoke tests | Planned | `docs/RELEASE_PLAN.md` |
+| QEMU testing | Boot smoke validates first Rust serial marker | Active for boot | `cargo xtask qemu`, `docs/RELEASE_PLAN.md` |
 
 ## Admission Rule
 

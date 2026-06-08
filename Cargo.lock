@@ -76,6 +76,8 @@ dependencies = [
 name = "aesynx-kernel"
 version = "0.1.0"
 dependencies = [
+ "aesynx-arch",
+ "aesynx-arch-x86_64",
  "aesynx-boot",
  "aesynx-log",
 ]

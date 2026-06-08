@@ -8,9 +8,13 @@ use std::process::{Command, ExitCode};
 const CARGO_CONFIG: &str = ".cargo/config.toml";
 const KERNEL_TARGET: &str = "targets/x86_64-unknown-aesynx.json";
 const KERNEL_LINKER: &str = "linker/kernel-x86_64.ld";
+const STABLE_BOOT_TARGET: &str = "x86_64-unknown-none";
 
 const CARGO_CONFIG_MARKERS: &[&str] = &[
     "linker = \"rust-lld\"",
+    "[target.x86_64-unknown-none]",
+    "code-model=kernel",
+    "relocation-model=static",
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "panic=abort",
 ];
@@ -86,10 +90,30 @@ fn stable_validation(root: &Path) -> ExitCode {
         return host_check;
     }
 
+    let mut command = Command::new("cargo");
+    command.args([
+        "build",
+        "--target",
+        STABLE_BOOT_TARGET,
+        "-p",
+        "aesynx-kernel",
+        "--bin",
+        "aesynx-kernel",
+    ]);
+    command.current_dir(root);
+    let kernel_build = run_command(
+        &mut command,
+        "cargo build --target x86_64-unknown-none -p aesynx-kernel --bin aesynx-kernel",
+    );
+    if kernel_build != ExitCode::SUCCESS {
+        return kernel_build;
+    }
+
     println!("xtask: kernel host check passed");
+    println!("xtask: stable freestanding kernel ELF built for {STABLE_BOOT_TARGET}");
     println!("xtask: custom target metadata validated at {KERNEL_TARGET}");
     println!("xtask: linker script validated at {KERNEL_LINKER}");
-    println!("xtask: stable kernel build skeleton is ready");
+    println!("xtask: stable kernel build path is ready");
     println!(
         "xtask: optional custom target probe is available with: cargo xtask build-kernel --custom-target-probe"
     );

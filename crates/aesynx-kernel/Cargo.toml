@@ -7,6 +7,8 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+aesynx-arch.workspace = true
+aesynx-arch-x86_64 = { path = "../aesynx-arch-x86_64", version = "0.1.0" }
 aesynx-boot.workspace = true
 aesynx-log.workspace = true
 

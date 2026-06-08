@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.3 image-skeleton implementation complete
+Status: v0.4 first serial boot implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -9,6 +9,7 @@ The repository contains the first x86_64 kernel build shape:
 - `.cargo/config.toml`
 - `cargo xtask build-kernel`
 - `cargo xtask build-kernel --custom-target-probe`
+- `x86_64-unknown-none` stable boot target
 - `cargo xtask image`
 - `cargo xtask qemu`
 
@@ -36,7 +37,8 @@ the v0.2 release gate.
 cargo xtask build-kernel
 ```
 
-Validates the kernel crate and build skeleton.
+Validates the kernel crate and build skeleton, then builds the freestanding
+`x86_64-unknown-none` kernel ELF used by the QEMU image.
 
 ```bash
 cargo xtask build-kernel --custom-target-probe
@@ -50,12 +52,13 @@ cargo xtask image
 cargo xtask qemu
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.3.0.raw` with a temporary
-stage-0 boot probe. `cargo xtask qemu` starts QEMU, captures serial output, and
-expects `[TEST] bootloader=skeleton`.
+`cargo xtask image` creates `build/qemu/aesynx-v0.4.0.iso` with Limine and the
+Rust kernel ELF. `cargo xtask qemu` starts QEMU, captures serial output, and
+expects `[TEST] boot=ok`.
 
-The v0.3 image proves that image generation and QEMU launch work. It does not
-claim a Rust kernel entry point; that starts in `v0.4.0`.
+The v0.4 image proves that Limine can load the Rust kernel ELF and reach
+`_start`. It does not claim BootInfo parsing, page-table ownership, interrupts,
+or allocator setup.
 
 ## Target Shape
 
@@ -67,6 +70,7 @@ The first target is x86_64 QEMU with:
 - Kernel code model.
 - Abort panics.
 - `rust-lld` as linker.
+- Limine page-permission-compatible ELF load segments.
 
 The target file is version-controlled so future linker, bootloader, and QEMU
 changes are reviewable.

@@ -59,9 +59,29 @@ Every unsafe module must be documented here before release.
 
 ## Current Unsafe Inventory
 
-No implementation unsafe sites exist yet.
+```text
+Location: crates/aesynx-arch-x86_64/src/port.rs
+Status: active in v0.4
+Purpose: early x86_64 COM1 port I/O for serial boot diagnostics
+Preconditions: QEMU legacy COM1 UART is present; used during early single-core boot only
+Unsafe operation: core::arch::asm! in/out instructions
+Safety argument: the instructions access fixed I/O ports and do not dereference Rust pointers, alias Rust memory, or depend on Rust lifetimes; callers only expose safe byte-oriented serial operations
+Tests/evidence: cargo xtask qemu observes the Rust _start serial marker
+Limitations: not synchronized for SMP, not a general serial driver, and not suitable for untrusted device probing
+```
 
-When implementation starts, add entries in this format:
+```text
+Location: crates/aesynx-kernel/src/main.rs
+Status: active in v0.4
+Purpose: export the architecture entry symbol consumed by the bootloader
+Preconditions: Limine loads the x86_64 kernel ELF and transfers control to _start
+Unsafe operation: Rust 2024 unsafe no_mangle attribute on _start
+Safety argument: the symbol name is fixed by the linker script and boot contract; the function never returns and does not expose a callable safe API to Rust code
+Tests/evidence: readelf shows _start as the ELF entry; cargo xtask qemu observes the Rust boot marker
+Limitations: no BootInfo argument is consumed yet; bootloader metadata normalization starts in v0.5
+```
+
+New entries should use this format:
 
 ```text
 Location:

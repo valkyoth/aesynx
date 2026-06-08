@@ -1,8 +1,13 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+pub mod serial;
+
 use aesynx_abi::CoreId;
 use aesynx_arch::{ArchCpu, ArchError};
+
+#[allow(unsafe_code)]
+mod port;
 
 pub struct X86_64;
 

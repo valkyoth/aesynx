@@ -34,24 +34,23 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.2.0` is the tagged build-skeleton line. `main` is currently carrying the
-completed `v0.3.0` QEMU image-skeleton implementation, pending pushed GitHub
-checks and final tag evidence. It does not boot the Rust kernel yet, but the
-project structure, security baseline, kernel build-shape checks, and QEMU
-stage-0 boot smoke are active.
+`v0.3.0` is the tagged QEMU image-skeleton line. `main` is currently carrying
+the `v0.4.0` first Rust kernel serial-boot implementation candidate. It builds
+a freestanding `x86_64-unknown-none` kernel ELF, packages it into a Limine ISO,
+boots it in QEMU, and verifies the kernel-owned serial marker.
 
 | Area | Status | Notes |
 | --- | --- | --- |
 | Rust workspace | Active | Modular crate layout with no root `src/` implementation pile. |
-| Toolchain | Active | Stable Rust `1.96.0`, edition 2024, resolver `3`. |
+| Toolchain | Active | Stable Rust `1.96.0`, edition 2024, resolver `3`, and `x86_64-unknown-none` for the first boot ELF. |
 | Kernel crate policy | Active | Crates under `crates/` must be `no_std`, deny unsafe by default, and avoid external dependencies without exceptions. |
 | Capability model | Model active | Private non-copy authority values, permission validation, audited derive/grant paths, generation/epoch validation, and revoke authority checks. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
-| Build skeleton | Active | x86_64 target metadata, linker script, Cargo config validation, `cargo xtask build-kernel`, and an optional nightly custom-target probe. |
-| QEMU image skeleton | Active | `cargo xtask image` creates a raw image and `cargo xtask qemu` verifies a serial marker from the v0.3 stage-0 boot probe. |
+| Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
+| QEMU first boot | Active | `cargo xtask image` creates a Limine ISO and `cargo xtask qemu` verifies `[TEST] boot=ok` from Rust `_start`. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
 | Release gate | Active | Tags require local checks, SBOM, CodeQL on GitHub, and a passing pentest report for the exact commit. |
 
@@ -59,7 +58,7 @@ stage-0 boot smoke are active.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| First Rust kernel serial boot | Planned | `v0.4.0`; replace the v0.3 stage-0 probe with a kernel entry and Aesynx boot marker. |
+| BootInfo normalization | Planned | `v0.5.0`; normalize Limine/bootloader metadata into generic Aesynx `BootInfo`. |
 | Real arch mechanisms | Planned | Interrupt control, core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -78,13 +77,13 @@ Generate the source SBOM:
 scripts/generate-sbom.sh
 ```
 
-Validate the current kernel build skeleton:
+Validate the current kernel build path:
 
 ```bash
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.3 QEMU image skeleton:
+Create and smoke-test the v0.4 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -101,7 +100,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.3.0
+cargo xtask release-ready v0.4.0
 ```
 
 ## Security Posture
@@ -123,6 +122,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
 - [Build Skeleton](docs/build-skeleton.md)
 - [QEMU Image Skeleton](docs/qemu-image-skeleton.md)
+- [First Serial Boot](docs/first-serial-boot.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)
 - [Security Policy](SECURITY.md)
