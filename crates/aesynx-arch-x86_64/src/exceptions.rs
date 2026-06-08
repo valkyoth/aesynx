@@ -36,7 +36,6 @@ aesynx_exception_double_fault_stub:
     jmp aesynx_exception_common_halt
 
 aesynx_exception_common_return:
-    mov rdi, rsp
     push rax
     push rbx
     push rcx
@@ -52,7 +51,11 @@ aesynx_exception_common_return:
     push r13
     push r14
     push r15
+    lea rdi, [rsp + 120]
+    mov rbp, rsp
+    and rsp, -16
     call aesynx_x86_64_exception_dispatch
+    mov rsp, rbp
     pop r15
     pop r14
     pop r13
