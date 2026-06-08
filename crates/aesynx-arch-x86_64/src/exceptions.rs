@@ -133,11 +133,18 @@ pub fn trigger_breakpoint_smoke() {
 
 #[allow(clippy::empty_loop)]
 pub fn trigger_page_fault_smoke() -> ! {
-    // SAFETY: This deliberately reads an unmapped null pointer only in the
-    // opt-in exception smoke path. The installed page-fault handler prints the
-    // marker and halts instead of returning to this faulting instruction.
+    // SAFETY: This deliberately issues an assembly load from virtual address
+    // zero only in the opt-in exception smoke path. The installed page-fault
+    // handler prints the marker and halts instead of returning to this faulting
+    // instruction. The fault is produced by the CPU load instruction rather
+    // than by constructing an invalid Rust pointer.
     unsafe {
-        let _ = core::ptr::read_volatile(core::ptr::null::<u64>());
+        core::arch::asm!(
+            "mov {scratch}, qword ptr [{address}]",
+            address = in(reg) 0usize,
+            scratch = lateout(reg) _,
+            options(nostack, readonly)
+        );
     }
 
     loop {}
