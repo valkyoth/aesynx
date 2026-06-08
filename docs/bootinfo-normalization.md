@@ -22,6 +22,10 @@ The parser copies Limine memory-map entries into a fixed early stack buffer and
 then calls `BootInfo::normalize` from `crates/aesynx-boot`. The public boot
 crate remains `no_std`, dependency-free, and safe Rust.
 
+After normalization, `_start` uses the generic `aesynx-kernel::boot_summary`
+API for serial output. The generic kernel therefore consumes only Aesynx
+BootInfo, not Limine response structures.
+
 Limine base revision 6 returns pointer-style handoff data through HHDM virtual
 addresses. Aesynx therefore records RSDP and framebuffer addresses as
 `VirtAddr` values in normalized BootInfo, while memory-map region starts remain

@@ -19,16 +19,19 @@ pub extern "C" fn _start() -> ! {
     let mut scratch = limine::EarlyBootScratch::new();
     match limine::normalize(&mut scratch) {
         Ok(info) => {
-            let summary = info.memory_map.summary();
+            let summary = aesynx_kernel::boot_summary(&info);
             aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
-            aesynx_arch_x86_64::serial::write_str("arch=x86_64 platform=qemu\n");
+            aesynx_arch_x86_64::serial::write_str(summary.arch_label);
+            aesynx_arch_x86_64::serial::write_str(" ");
+            aesynx_arch_x86_64::serial::write_str(summary.platform_label);
+            aesynx_arch_x86_64::serial::write_str("\n");
             aesynx_arch_x86_64::serial_println!(
                 "memmap regions={} usable={} usable_bytes={}",
-                summary.region_count,
+                summary.memory_regions,
                 summary.usable_regions,
                 summary.usable_bytes
             );
-            if info.rsdp.is_some() {
+            if summary.rsdp_present {
                 aesynx_arch_x86_64::serial::write_str("rsdp=present\n");
             } else {
                 aesynx_arch_x86_64::serial::write_str("rsdp=absent\n");

@@ -19,6 +19,7 @@ const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
 const KERNEL_PROFILE: &str = "release";
+const BOOTINFO_FAIL_MARKER: &str = "[TEST] bootinfo=fail";
 const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
 const SERIAL_MARKER: &str = "[TEST] boot=ok";
 const QEMU_TIMEOUT: Duration = Duration::from_secs(5);
@@ -360,7 +361,9 @@ fn run_qemu(paths: &ImagePaths) -> Result<(), String> {
 
 fn serial_log_contains_marker(path: &Path) -> bool {
     fs::read_to_string(path).is_ok_and(|contents| {
-        contents.contains(BOOTINFO_MARKER) && contents.contains(SERIAL_MARKER)
+        !contents.contains(BOOTINFO_FAIL_MARKER)
+            && contents.contains(BOOTINFO_MARKER)
+            && contents.contains(SERIAL_MARKER)
     })
 }
 
@@ -398,11 +401,13 @@ fn command_error(description: &str, output: std::process::Output) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        BOOT_CONFIG_MARKERS, BOOTINFO_MARKER, KERNEL_PROFILE, KERNEL_TARGET, SERIAL_MARKER,
+        BOOT_CONFIG_MARKERS, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, KERNEL_PROFILE, KERNEL_TARGET,
+        SERIAL_MARKER,
     };
 
     #[test]
     fn qemu_markers_track_v0_5_boot_contract() {
+        assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
         assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
         assert_eq!(SERIAL_MARKER, "[TEST] boot=ok");
     }
