@@ -17,6 +17,25 @@ Aesynx must never grow around a huge one-file implementation.
 Every major subsystem gets an explicit crate or module boundary. Every large
 module must be split by responsibility before it becomes hard to review.
 
+Aesynx must also never become a "one huge binary OS." A boot image or signed
+boot bundle may package many components for delivery, but the system design
+must preserve independently versioned and replaceable components:
+
+- The kernel stays small and focused on core authority, memory, scheduling,
+  IPC, and boot orchestration.
+- Drivers move toward isolated services rather than permanently linked kernel
+  blobs.
+- Userspace commands, services, runtime components, models, and policies have
+  their own manifests and version identities.
+- Updates can replace a component or object root without relinking the whole
+  OS.
+- Rollback can target a component root or system root through the object graph.
+- Stable ABI/service contracts matter more than sharing one implementation
+  binary.
+
+The release gate should treat monolithic growth as a security regression, not
+as a simplification.
+
 ## Workspace Shape
 
 Use focused crates:
@@ -127,4 +146,3 @@ Before merging code:
 - Can this file be split before it reaches 500 lines?
 - Are tests close enough to behavior but not bloating production files?
 - Are security-sensitive invariants documented near the type or module?
-

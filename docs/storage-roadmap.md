@@ -21,6 +21,37 @@ The native persistent format should be a content-addressed object store:
 This makes integrity verification, rollback, provenance, and deduplication
 properties of the storage design rather than later bolt-ons.
 
+## Snapshot And Rollback Model
+
+Aesynx snapshotting should be native to the object layer rather than copied
+from a traditional filesystem design. The kernel/storage layer provides safe
+primitive operations; userspace provides policy, retention, presentation, and
+operator workflow.
+
+Kernel/object-layer responsibilities:
+
+- Retain immutable object roots as snapshots.
+- Atomically publish a new named root reference.
+- Atomically roll a named root reference back to a retained object root.
+- Verify content hashes before exposing persisted objects.
+- Enforce capabilities on object IDs, root references, and name-index objects.
+- Preserve provenance and parent/root metadata for audit.
+- Refuse rollback across policy boundaries unless the caller has explicit
+  authority.
+
+Userspace responsibilities:
+
+- Commands such as `snapshot`, `rollback`, `diff`, `roots`, and `gc`.
+- Retention policy.
+- Human-readable names and descriptions.
+- Confirmation flows for destructive rollbacks.
+- Visualization of object graph differences.
+- AI-assisted explanations only as advisory summaries of deterministic object
+  metadata.
+
+This gives Aesynx Btrfs-like operator value without making Btrfs or POSIX
+filesystem semantics the native storage model.
+
 ## Object Identity
 
 `ObjectId(u128)` remains the primary OS-facing object identity. For early RAM
@@ -62,10 +93,11 @@ That is a compatibility shim. It must not define the native storage model.
 4. Add object-store APIs that are independent of the backing store.
 5. Add a persistent append-log backend.
 6. Add checkpoints and root references.
-7. Add crash recovery and integrity verification.
-8. Add garbage collection for unreachable immutable objects.
-9. Add virtio-block as the first QEMU persistence backend.
-10. Add NVMe as the first serious modern hardware storage target.
+7. Add snapshot retention and atomic rollback of named roots.
+8. Add crash recovery and integrity verification.
+9. Add garbage collection for unreachable immutable objects.
+10. Add virtio-block as the first QEMU persistence backend.
+11. Add NVMe as the first serious modern hardware storage target.
 
 This keeps filesystem persistence out of the critical boot path while the OS
 model is still forming.

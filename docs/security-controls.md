@@ -13,6 +13,7 @@ claim that the controls are implemented today.
 | Unsafe code | Unsafe confined to documented boundaries | First boundary active | `docs/unsafe-policy.md`, `crates/aesynx-arch-x86_64/src/port.rs` |
 | Kernel engineering | `no_std`, internal primitives, minimal unsafe, external dependency exceptions | Configured | `docs/kernel-engineering-policy.md`, `scripts/validate-kernel-policy.sh` |
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
+| Componentization | System must not collapse into one huge OS binary; components remain independently versioned and rollback-capable | Policy active | `docs/modularity-policy.md`, `docs/ARCHITECTURE_DECISIONS.md` |
 | Supply chain | Executable dependency and workflow changes require review | Policy only | `docs/supply-chain-security.md` |
 | Static analysis | GitHub CodeQL default setup for Rust | Configured externally | GitHub code scanning default setup |
 | Release pentest | Passing pentest report required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
@@ -29,6 +30,7 @@ claim that the controls are implemented today.
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |
 | AI | Bounded assistant and policy fallback | Planned | `docs/IMPLEMENTATION_PLAN.md`, `docs/userspace-vision.md` |
 | QEMU testing | Boot smoke validates first Rust serial marker | Active for boot | `cargo xtask qemu`, `docs/RELEASE_PLAN.md` |
+| Future bootloader | Rust UEFI bootloader must stay a minimal signed/measured security gateway | Planned | `docs/bootloader-roadmap.md` |
 
 ## Admission Rule
 

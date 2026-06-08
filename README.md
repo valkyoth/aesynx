@@ -24,6 +24,8 @@
 Aesynx is a Rust `no_std` operating-system research project built around
 explicit capabilities, per-core ownership, service queues, driver isolation, an
 immutable object graph, native userspace, and AI-ready telemetry from day one.
+It is explicitly not planned as one huge OS binary: components should remain
+separately identified, signed, versioned, updateable, and rollback-capable.
 
 The first major goal is not a desktop OS and not a Unix clone. The first major
 goal is a serious x86_64 QEMU research release with a coherent security model,
@@ -51,6 +53,8 @@ boots it in QEMU, and verifies the kernel-owned serial marker.
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
 | QEMU first boot | Active | `cargo xtask image` creates a Limine ISO and `cargo xtask qemu` verifies `[TEST] boot=ok` from Rust `_start`. |
+| Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
+| Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
 | Release gate | Active | Tags require local checks, SBOM, CodeQL on GitHub, and a passing pentest report for the exact commit. |
 
@@ -123,6 +127,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Build Skeleton](docs/build-skeleton.md)
 - [QEMU Image Skeleton](docs/qemu-image-skeleton.md)
 - [First Serial Boot](docs/first-serial-boot.md)
+- [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)
 - [Security Policy](SECURITY.md)

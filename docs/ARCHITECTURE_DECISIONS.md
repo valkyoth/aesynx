@@ -148,10 +148,36 @@ Implications:
 - POSIX path semantics are not a kernel requirement.
 - Persistent storage should be content-addressed immutable objects with
   versioned root/name-index references.
+- Snapshots are retained object roots. Rollback is an atomic root-reference
+  change authorized by capabilities, not a path-first filesystem operation.
 - FAT32 may be used as a read-only EFI boot shim, but it is not the native
   storage model.
 
-## ADR-009: Per-Core Ownership Is The Scalability Model
+## ADR-009: Componentized System, Not One Huge Binary
+
+Decision:
+
+Aesynx must preserve independently versioned components. A signed boot capsule
+or image may package many objects together, but the running design must not
+collapse kernel, drivers, services, commands, policies, and models into one
+monolithic binary.
+
+Rationale:
+
+Independent update and rollback are security features. A monolithic binary
+makes driver replacement, service restart, component attestation, object-root
+rollback, and audit harder.
+
+Implications:
+
+- Kernel internals can evolve behind stable service/ABI contracts.
+- Drivers move toward isolated services.
+- Commands and services carry manifests.
+- Object roots can be snapshotted and rolled back.
+- Boot bundles preserve internal component identity.
+- Release tooling should treat monolithic growth as a regression.
+
+## ADR-010: Per-Core Ownership Is The Scalability Model
 
 Decision:
 
@@ -168,7 +194,31 @@ Implications:
 - No global allocator lock as final design.
 - Early global bootstrap state must be explicitly temporary.
 
-## ADR-010: Capsules Instead Of Linux-Style Containers As The Native Model
+## ADR-011: Future Bootloader As Minimal Security Gateway
+
+Decision:
+
+Aesynx may eventually replace Limine with a Rust `no_std`, UEFI-first
+bootloader, but only as a small security gateway.
+
+Rationale:
+
+GRUB-style feature breadth creates a large pre-boot attack surface. Aesynx
+should avoid filesystem-driver collections, scripting languages, shells, and
+complex UI in the bootloader.
+
+Implications:
+
+- Current milestones may use Limine.
+- Future Aesynx bootloader reads a signed boot capsule from the ESP through
+  UEFI services.
+- It verifies signatures, measures boot state into TPM PCRs where available,
+  and hands off quickly.
+- Rich recovery UI belongs in a verified Aesynx recovery capsule, not the
+  bootloader itself.
+- Bootloader configuration is declarative state, not executable code.
+
+## ADR-012: Capsules Instead Of Linux-Style Containers As The Native Model
 
 Decision:
 

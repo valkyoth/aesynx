@@ -46,6 +46,8 @@ Require security review for:
 - New CI actions.
 - New release scripts.
 - New bootloader/image-generation tools.
+- New boot capsule, signing, verification, TPM measurement, or Secure Boot
+  integration code.
 - New WASM runtime dependencies.
 - New cryptography, random number, or signature dependencies.
 - New AI model loading or inference dependencies.

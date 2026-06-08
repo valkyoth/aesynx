@@ -1925,6 +1925,7 @@ Required deliverables:
 - Text fallback `view` renderer.
 - RAM object graph.
 - Boot object bundle.
+- Component manifests and object roots remain distinct inside boot bundles.
 - Driver model and bootstrap drivers.
 - QEMU smoke suite.
 - Documentation set.
@@ -1949,6 +1950,7 @@ Explicit non-goals:
 - POSIX compatibility.
 - Bash.
 - Linux binary compatibility.
+- One huge monolithic OS binary.
 - Unix shell semantics.
 - Text-only pipeline model as the native design.
 - Desktop UI.
@@ -1998,6 +2000,9 @@ commands:
 - Append-log persistence.
 - Versioned root references.
 - Versioned name-index objects.
+- Native snapshots as retained object roots.
+- Atomic rollback of named roots.
+- Snapshot/diff/rollback userspace commands.
 - Integrity verification on reads.
 - Deduplication by content hash.
 - Checkpoints.
@@ -2053,6 +2058,17 @@ commands:
 - Capability-scoped guest storage and networking.
 - Explicit non-goal: unchanged OCI/Linux containers before the native capsule
   model is mature.
+
+### v1.8 - Minimal Rust Bootloader Research
+
+- UEFI-first Rust `no_std` bootloader prototype.
+- Aesynx boot capsule manifest.
+- Signature verification before handoff.
+- TPM measurement plan and QEMU swtpm experiment where practical.
+- Declarative config only.
+- No bootloader shell or scripting.
+- No broad filesystem driver set.
+- Limine remains the fallback boot path until the Aesynx bootloader is proven.
 
 ### v2.0 - Multi-Architecture Research Release
 

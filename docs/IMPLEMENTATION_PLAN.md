@@ -28,6 +28,8 @@ The 1.0 target is a working QEMU version with:
 - Object graph storage in RAM, with persistence planned but not required for 1.0 unless release capacity allows.
 - Telemetry and AI-readiness from day one, with deterministic non-AI policies as the boot and safety baseline.
 - A modular workspace structure from day one: focused crates, focused modules, no giant source files.
+- A componentized system shape from day one: no one huge OS binary, even when
+  a signed boot bundle packages many components together.
 
 Unix/POSIX/Linux compatibility is not part of this plan. Native Aesynx userspace is part of this plan.
 
@@ -102,12 +104,22 @@ Every crate that contains non-trivial unsafe code gets an `unsafe.md` or crate-l
 
 Aesynx must never be implemented as huge one-file crates.
 
+Aesynx must also never be implemented as one huge binary OS. A boot image,
+capsule, or release artifact may package multiple components for atomic
+delivery and verification, but the kernel, drivers, userspace services,
+commands, policies, models, and object roots must remain independently
+identified, versioned, replaceable, and rollback-capable.
+
 Core rules:
 
 - Use focused workspace crates for subsystems.
 - Keep `lib.rs` as module wiring, not implementation dumping ground.
 - Keep `main.rs` or kernel entry files as orchestration only.
 - Split parsing, validation, policy, state, I/O, and tests into separate modules.
+- Preserve stable ABI/service boundaries between kernel, driver services,
+  userspace runtime, commands, and policy/model objects.
+- Prefer signed component manifests and object roots over relinking the whole
+  OS for every update.
 - Put pure logic into host model crates when it benefits from fuzzing, Miri, Kani, or property tests.
 - Keep normal implementation files under 300 lines where practical.
 - Split non-generated `.rs` files before they exceed 500 lines unless a temporary exception is documented in [modularity-policy.md](modularity-policy.md).
@@ -354,6 +366,17 @@ Primary 1.0 backend:
 - x86_64 page tables.
 - Ring 3 user mode.
 - Virtio PCI or virtio MMIO depending on chosen QEMU configuration.
+
+Future bootloader direction:
+
+- Limine remains the pragmatic boot path while the OS matures.
+- Aesynx should later grow a minimal Rust UEFI bootloader as a separate
+  milestone.
+- The future bootloader is a security gateway, not a mini-OS: verify and
+  measure an Aesynx boot capsule, then hand off quickly.
+- No bootloader shell, scripting language, network stack, broad filesystem
+  driver set, or GRUB-style feature creep.
+- See [Bootloader Roadmap](bootloader-roadmap.md).
 
 Prepared backend:
 
