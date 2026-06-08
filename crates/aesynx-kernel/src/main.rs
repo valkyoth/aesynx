@@ -23,6 +23,17 @@ pub extern "C" fn _start() -> ! {
     aesynx_arch_x86_64::serial::init();
     diagnostics::set_boot_phase(BootPhase::Entry);
     write_diagnostic(LogLevel::Info, "serial initialized");
+    let descriptor_status = aesynx_arch_x86_64::descriptors::init();
+    diagnostics::set_boot_phase(BootPhase::CpuSetup);
+    write_diagnostic(LogLevel::Info, "gdt and tss initialized");
+    aesynx_arch_x86_64::serial_println!(
+        "cpu setup=gdt_tss entries={} tss=0x{:x} df_ist={} df_stack_bytes={}",
+        descriptor_status.gdt_entries,
+        descriptor_status.tss_selector.bits(),
+        descriptor_status.double_fault_ist.get(),
+        descriptor_status.double_fault_stack_bytes
+    );
+    aesynx_arch_x86_64::serial::write_str("[TEST] gdt=ok\n");
     kernel_entry()
 }
 
@@ -84,7 +95,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.6.0 panic smoke");
+    panic!("intentional v0.7.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

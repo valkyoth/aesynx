@@ -295,7 +295,7 @@ Deliverables:
 Verification:
 
 - Boot still succeeds.
-- Serial prints GDT/TSS initialized.
+- Serial prints GDT/TSS initialized and `[TEST] gdt=ok`.
 
 Exit criteria:
 

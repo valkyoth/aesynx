@@ -7,6 +7,8 @@ use aesynx_abi::CoreId;
 use aesynx_arch::{ArchCpu, ArchError};
 
 #[allow(unsafe_code)]
+pub mod descriptors;
+#[allow(unsafe_code)]
 mod port;
 #[allow(unsafe_code)]
 pub mod registers;

@@ -23,6 +23,7 @@ so the diagnostics library stays `no_std`, safe Rust, and host-testable.
 Structured records use this shape:
 
 ```text
+[core=0][phase=cpu-setup][kernel][INFO] gdt and tss initialized
 [core=0][phase=bootinfo-normalized][kernel][INFO] bootinfo normalized
 ```
 
@@ -54,7 +55,7 @@ On x86_64, `crates/aesynx-arch-x86_64/src/registers.rs` captures `rsp`, `rbp`,
 `rflags`, and `cr3` for the panic path. Raw address-bearing values stay private
 and are not printed; serial output exposes only presence, stack alignment,
 arithmetic/status RFLAGS bits, and CR3 low flag/PCID bits. Full register and
-fault decoding starts after descriptor tables and exception handlers land.
+fault decoding starts after exception handlers land.
 
 The public RFLAGS summary is limited to arithmetic/status flags only. It
 intentionally excludes trap/debug, interrupt-enable, I/O privilege, alignment,
@@ -65,6 +66,7 @@ virtual-interrupt, and CPU-identification state.
 Normal boot smoke still requires:
 
 ```text
+[TEST] gdt=ok
 [TEST] bootinfo=ok
 [TEST] boot=ok
 ```
@@ -79,6 +81,7 @@ It builds a separate release-profile QEMU image with the `panic-smoke` feature
 enabled and expects both the structured fatal record and the panic marker:
 
 ```text
+[TEST] gdt=ok
 [kernel][FATAL] panic handler entered
 [TEST] panic=ok
 ```

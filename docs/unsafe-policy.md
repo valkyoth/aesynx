@@ -93,6 +93,17 @@ Limitations: not a full interrupt-frame dump, does not capture fault address, do
 ```
 
 ```text
+Location: crates/aesynx-arch-x86_64/src/descriptors.rs
+Status: active in v0.7
+Purpose: install early x86_64 GDT, TSS, and dedicated double-fault IST stack
+Preconditions: called during early single-core kernel execution after Limine transfers control and before Aesynx enables interrupts
+Unsafe operation: writes private static descriptor/TSS tables, executes lgdt, and executes ltr
+Safety argument: descriptor and TSS statics are private to the architecture module, initialized once, and then treated as read-only CPU tables; the double-fault stack is a private aligned static byte array and the TSS records its one-past-end stack pointer as required by x86_64; lgdt and ltr load CPU registers from initialized static data and do not create Rust references or access untrusted pointers
+Tests/evidence: descriptor unit tests verify selector layout, TSS size, TSS descriptor encoding, and double-fault stack properties; cargo xtask qemu observes [TEST] gdt=ok
+Limitations: early single-core setup only; no IDT, exception handlers, privilege transitions, syscall/sysret, or per-core TSS state yet
+```
+
+```text
 Location: crates/aesynx-arch-aarch64/src/lib.rs
 Status: admitted for future AArch64 target builds in v0.5
 Purpose: terminal AArch64 CPU halt path

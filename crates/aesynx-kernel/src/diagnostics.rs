@@ -17,11 +17,12 @@ pub const MAX_DIAGNOSTIC_COMPONENT_LEN: usize = 32;
 #[repr(u8)]
 pub enum BootPhase {
     Entry = 0,
-    BootloaderHandoff = 1,
-    BootInfoNormalized = 2,
-    Running = 3,
-    PanicSmoke = 4,
-    Panic = 5,
+    CpuSetup = 1,
+    BootloaderHandoff = 2,
+    BootInfoNormalized = 3,
+    Running = 4,
+    PanicSmoke = 5,
+    Panic = 6,
     Unknown = u8::MAX,
 }
 
@@ -30,6 +31,7 @@ impl BootPhase {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Entry => "entry",
+            Self::CpuSetup => "cpu-setup",
             Self::BootloaderHandoff => "bootloader-handoff",
             Self::BootInfoNormalized => "bootinfo-normalized",
             Self::Running => "running",
@@ -43,11 +45,12 @@ impl BootPhase {
     pub const fn from_raw(value: u8) -> Self {
         match value {
             0 => Self::Entry,
-            1 => Self::BootloaderHandoff,
-            2 => Self::BootInfoNormalized,
-            3 => Self::Running,
-            4 => Self::PanicSmoke,
-            5 => Self::Panic,
+            1 => Self::CpuSetup,
+            2 => Self::BootloaderHandoff,
+            3 => Self::BootInfoNormalized,
+            4 => Self::Running,
+            5 => Self::PanicSmoke,
+            6 => Self::Panic,
             _unknown => Self::Unknown,
         }
     }
@@ -214,6 +217,7 @@ mod tests {
     #[test]
     fn boot_phase_labels_are_stable() {
         assert_eq!(BootPhase::Entry.label(), "entry");
+        assert_eq!(BootPhase::CpuSetup.label(), "cpu-setup");
         assert_eq!(BootPhase::BootloaderHandoff.label(), "bootloader-handoff");
         assert_eq!(BootPhase::BootInfoNormalized.label(), "bootinfo-normalized");
         assert_eq!(BootPhase::Running.label(), "running");

@@ -12,14 +12,14 @@ use std::time::{Duration, Instant};
 
 const BOOT_CONFIG: &str = "boot/qemu/limine.conf";
 const BUILD_DIR: &str = "build/qemu";
-const STAGING_DIR_NAME: &str = "aesynx-v0.6.0-iso";
-const IMAGE_NAME: &str = "aesynx-v0.6.0.iso";
-const MANIFEST_NAME: &str = "aesynx-v0.6.0.manifest";
-const SERIAL_LOG_NAME: &str = "aesynx-v0.6.0.serial.log";
-const PANIC_STAGING_DIR_NAME: &str = "aesynx-v0.6.0-panic-iso";
-const PANIC_IMAGE_NAME: &str = "aesynx-v0.6.0-panic.iso";
-const PANIC_MANIFEST_NAME: &str = "aesynx-v0.6.0-panic.manifest";
-const PANIC_SERIAL_LOG_NAME: &str = "aesynx-v0.6.0-panic.serial.log";
+const STAGING_DIR_NAME: &str = "aesynx-v0.7.0-iso";
+const IMAGE_NAME: &str = "aesynx-v0.7.0.iso";
+const MANIFEST_NAME: &str = "aesynx-v0.7.0.manifest";
+const SERIAL_LOG_NAME: &str = "aesynx-v0.7.0.serial.log";
+const PANIC_STAGING_DIR_NAME: &str = "aesynx-v0.7.0-panic-iso";
+const PANIC_IMAGE_NAME: &str = "aesynx-v0.7.0-panic.iso";
+const PANIC_MANIFEST_NAME: &str = "aesynx-v0.7.0-panic.manifest";
+const PANIC_SERIAL_LOG_NAME: &str = "aesynx-v0.7.0-panic.serial.log";
 const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
@@ -27,6 +27,7 @@ const KERNEL_PROFILE: &str = "release";
 const BOOTINFO_FAIL_MARKER: &str = "[TEST] bootinfo=fail";
 const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
 const BOOT_DIAGNOSTIC_MARKER: &str = "[kernel][INFO] bootinfo normalized";
+const CPU_SETUP_MARKER: &str = "[TEST] gdt=ok";
 const PANIC_DIAGNOSTIC_MARKER: &str = "[kernel][FATAL] panic handler entered";
 const PANIC_MARKER: &str = "[TEST] panic=ok";
 const PANIC_REGISTERS_MARKER: &str = "panic registers=";
@@ -126,9 +127,11 @@ impl SmokeKind {
 
     fn markers(self) -> &'static str {
         match self {
-            Self::Boot => "[kernel][INFO] bootinfo normalized, [TEST] bootinfo=ok, [TEST] boot=ok",
+            Self::Boot => {
+                "[TEST] gdt=ok, [kernel][INFO] bootinfo normalized, [TEST] bootinfo=ok, [TEST] boot=ok"
+            }
             Self::Panic => {
-                "[kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
+                "[TEST] gdt=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
             }
         }
     }
@@ -360,7 +363,7 @@ fn write_manifest(
     smoke: SmokeKind,
 ) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.6.0 Early diagnostics\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        "name=Aesynx v0.7.0 GDT and TSS\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
         smoke.name(),
         image.display(),
         kernel_elf.display(),
@@ -442,12 +445,14 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
     fs::read_to_string(path).is_ok_and(|contents| match smoke {
         SmokeKind::Boot => {
             !contents.contains(BOOTINFO_FAIL_MARKER)
+                && contents.contains(CPU_SETUP_MARKER)
                 && contents.contains(BOOT_DIAGNOSTIC_MARKER)
                 && contents.contains(BOOTINFO_MARKER)
                 && contents.contains(SERIAL_MARKER)
         }
         SmokeKind::Panic => {
-            contents.contains(PANIC_DIAGNOSTIC_MARKER)
+            contents.contains(CPU_SETUP_MARKER)
+                && contents.contains(PANIC_DIAGNOSTIC_MARKER)
                 && contents.contains(PANIC_MARKER)
                 && contents.contains(PANIC_REGISTERS_MARKER)
         }
