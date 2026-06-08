@@ -36,15 +36,14 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.8.0` is the tagged IDT/exceptions line. `main` is currently carrying the
-`v0.9.0` register and fault decoding implementation candidate. It builds a
+`v0.9.0` is the current register and fault decoding release. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
 kernel-owned serial markers, installs basic x86_64 descriptor and interrupt
 tables, handles a returning breakpoint exception, and can run opt-in deliberate
-panic and page-fault smoke tests with CR2, CR3 low-bit, RFLAGS, interrupt-state,
-and decoded page-fault diagnostics.
+panic and page-fault smoke tests with redacted CR2 presence/page-offset, CR3
+low-bit, RFLAGS, interrupt-state, and decoded page-fault diagnostics.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -62,7 +61,7 @@ and decoded page-fault diagnostics.
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
 | GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
 | IDT and exceptions | Tagged | Early x86_64 boot installs an IDT, handles breakpoint, page-fault, and double-fault vectors, and verifies `[TEST] exception=ok`. |
-| Fault decoding | Active candidate | `v0.9.0`; page-fault smoke prints CR2, CR3 low bits, public RFLAGS, interrupt state, and decoded error bits. |
+| Fault decoding | Tagged | `v0.9.0`; page-fault smoke prints redacted CR2 presence/page offset, CR3 low bits, public RFLAGS, interrupt state, and decoded error bits. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -74,7 +73,7 @@ and decoded page-fault diagnostics.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Register and fault decoding | Active | `v0.9.0`; expand exception frame diagnostics, decode page-fault error bits, and gate CR2/CR3/RFLAGS output in QEMU. |
+| Register and fault decoding | Tagged | `v0.9.0`; expand exception frame diagnostics, decode page-fault error bits, and gate redacted CR2/CR3/RFLAGS output in QEMU. |
 | Real arch mechanisms | Planned | Interrupt control, core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
