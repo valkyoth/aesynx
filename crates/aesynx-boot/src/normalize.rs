@@ -1,9 +1,12 @@
 use crate::{
     ArchKind, BootInfo, CpuInfo, CpuTopology, FramebufferInfo, HhdmInfo, KernelImageInfo,
-    MemoryMap, MemoryRegion, PlatformKind,
+    MemoryMap, MemoryRegion, PlatformKind, types::BootInfoParts,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+const PAGE_SIZE: u64 = 4096;
+const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
+
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct BootMetadata<'a> {
     pub arch: ArchKind,
     pub platform: PlatformKind,
@@ -19,9 +22,9 @@ pub struct BootMetadata<'a> {
 impl<'a> BootInfo<'a> {
     pub fn normalize(metadata: BootMetadata<'a>) -> Result<Self, BootInfoError> {
         validate_memory_regions(metadata.memory_regions)?;
-        validate_kernel_image(metadata.kernel_image)?;
+        validate_kernel_image(metadata.arch, metadata.kernel_image)?;
 
-        Ok(Self {
+        Ok(Self::new(BootInfoParts {
             arch: metadata.arch,
             platform: metadata.platform,
             memory_map: MemoryMap::new(metadata.memory_regions),
@@ -31,7 +34,23 @@ impl<'a> BootInfo<'a> {
             cpu_topology: CpuTopology::new(metadata.cpu_topology),
             kernel_image: metadata.kernel_image,
             hhdm: metadata.hhdm,
-        })
+        }))
+    }
+}
+
+impl core::fmt::Debug for BootMetadata<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BootMetadata")
+            .field("arch", &self.arch)
+            .field("platform", &self.platform)
+            .field("memory_regions.len", &self.memory_regions.len())
+            .field("framebuffer_present", &self.framebuffer.is_some())
+            .field("rsdp_present", &self.rsdp.is_some())
+            .field("device_tree_present", &self.device_tree.is_some())
+            .field("cpu_topology.len", &self.cpu_topology.len())
+            .field("kernel_image", &self.kernel_image)
+            .field("hhdm_present", &self.hhdm.is_some())
+            .finish()
     }
 }
 
@@ -56,8 +75,24 @@ fn validate_memory_regions(regions: &[MemoryRegion]) -> Result<(), BootInfoError
     Ok(())
 }
 
-fn validate_kernel_image(image: KernelImageInfo) -> Result<(), BootInfoError> {
-    if image.virt_end().get() <= image.virt_start().get() || image.phys_start().get() == 0 {
+fn validate_kernel_image(arch: ArchKind, image: KernelImageInfo) -> Result<(), BootInfoError> {
+    let virt_start = image.virt_start().get();
+    let virt_end = image.virt_end().get();
+    let phys_start = image.phys_start().get();
+
+    if virt_end <= virt_start {
+        return Err(BootInfoError::KernelImageEmpty);
+    }
+
+    if phys_start == 0 || !phys_start.is_multiple_of(PAGE_SIZE) {
+        return Err(BootInfoError::KernelImageEmpty);
+    }
+
+    if !virt_start.is_multiple_of(PAGE_SIZE) {
+        return Err(BootInfoError::KernelImageEmpty);
+    }
+
+    if arch == ArchKind::X86_64 && (virt_start < X86_64_KERNEL_VMA_MIN || virt_end < virt_start) {
         return Err(BootInfoError::KernelImageEmpty);
     }
 
@@ -71,8 +106,8 @@ mod tests {
     use aesynx_abi::{PhysAddr, VirtAddr};
 
     use crate::{
-        ArchKind, BootInfo, BootInfoError, BootMetadata, KernelImageInfo, MemoryRegion,
-        MemoryRegionKind, PlatformKind,
+        ArchKind, BootInfo, BootInfoError, BootMetadata, FramebufferInfo, HhdmInfo,
+        KernelImageInfo, MemoryRegion, MemoryRegionKind, PlatformKind,
     };
 
     #[test]
@@ -102,7 +137,7 @@ mod tests {
         assert_eq!(summary.region_count, 2);
         assert_eq!(summary.usable_regions, 1);
         assert_eq!(summary.usable_bytes, 0x9000);
-        assert_eq!(info.rsdp, Some(VirtAddr::new(0xffff800000007000)));
+        assert!(info.rsdp_present());
         Ok(())
     }
 
@@ -136,10 +171,149 @@ mod tests {
         assert_eq!(output.as_str(), "KernelImageInfo(redacted)");
     }
 
-    #[derive(Default)]
+    #[test]
+    fn bootinfo_debug_redacts_handoff_addresses() -> Result<(), BootInfoError> {
+        let regions = [MemoryRegion::new(
+            PhysAddr::new(0x1000),
+            0x9000,
+            MemoryRegionKind::Usable,
+        )];
+        let metadata = BootMetadata {
+            arch: ArchKind::X86_64,
+            platform: PlatformKind::Qemu,
+            memory_regions: &regions,
+            framebuffer: Some(FramebufferInfo::new(
+                VirtAddr::new(0xffff80000000b800),
+                80,
+                25,
+                80,
+            )),
+            rsdp: Some(VirtAddr::new(0xffff800000007000)),
+            device_tree: Some(VirtAddr::new(0xffff800000008000)),
+            cpu_topology: &[],
+            kernel_image: KernelImageInfo::new(
+                VirtAddr::new(0xffffffff80000000),
+                VirtAddr::new(0xffffffff80002000),
+                PhysAddr::new(0x200000),
+            ),
+            hhdm: Some(HhdmInfo::new(VirtAddr::new(0xffff800000000000))),
+        };
+        let info = BootInfo::normalize(metadata)?;
+        let mut output = FixedBuf::default();
+
+        assert_eq!(fmt::write(&mut output, format_args!("{info:?}")), Ok(()));
+
+        let debug = output.as_str();
+        assert!(debug.contains("rsdp_present: true"));
+        assert!(debug.contains("hhdm_present: true"));
+        assert!(!debug.contains("ffff"));
+        Ok(())
+    }
+
+    #[test]
+    fn bootmetadata_debug_redacts_handoff_addresses() {
+        let regions = [MemoryRegion::new(
+            PhysAddr::new(0x1000),
+            0x9000,
+            MemoryRegionKind::Usable,
+        )];
+        let metadata = BootMetadata {
+            arch: ArchKind::X86_64,
+            platform: PlatformKind::Qemu,
+            memory_regions: &regions,
+            framebuffer: Some(FramebufferInfo::new(
+                VirtAddr::new(0xffff80000000b800),
+                80,
+                25,
+                80,
+            )),
+            rsdp: Some(VirtAddr::new(0xffff800000007000)),
+            device_tree: None,
+            cpu_topology: &[],
+            kernel_image: KernelImageInfo::new(
+                VirtAddr::new(0xffffffff80000000),
+                VirtAddr::new(0xffffffff80002000),
+                PhysAddr::new(0x200000),
+            ),
+            hhdm: Some(HhdmInfo::new(VirtAddr::new(0xffff800000000000))),
+        };
+        let mut output = FixedBuf::default();
+
+        assert_eq!(
+            fmt::write(&mut output, format_args!("{metadata:?}")),
+            Ok(())
+        );
+
+        let debug = output.as_str();
+        assert!(debug.contains("rsdp_present: true"));
+        assert!(debug.contains("KernelImageInfo(redacted)"));
+        assert!(!debug.contains("ffff"));
+    }
+
+    #[test]
+    fn bootinfo_rejects_misaligned_kernel_image() {
+        let regions = [MemoryRegion::new(
+            PhysAddr::new(0x1000),
+            0x9000,
+            MemoryRegionKind::Usable,
+        )];
+        let result = BootInfo::normalize(BootMetadata {
+            arch: ArchKind::X86_64,
+            platform: PlatformKind::Qemu,
+            memory_regions: &regions,
+            framebuffer: None,
+            rsdp: None,
+            device_tree: None,
+            cpu_topology: &[],
+            kernel_image: KernelImageInfo::new(
+                VirtAddr::new(0xffffffff80000001),
+                VirtAddr::new(0xffffffff80002000),
+                PhysAddr::new(0x200000),
+            ),
+            hhdm: None,
+        });
+
+        assert_eq!(result, Err(BootInfoError::KernelImageEmpty));
+    }
+
+    #[test]
+    fn bootinfo_rejects_user_half_x86_64_kernel_image() {
+        let regions = [MemoryRegion::new(
+            PhysAddr::new(0x1000),
+            0x9000,
+            MemoryRegionKind::Usable,
+        )];
+        let result = BootInfo::normalize(BootMetadata {
+            arch: ArchKind::X86_64,
+            platform: PlatformKind::Qemu,
+            memory_regions: &regions,
+            framebuffer: None,
+            rsdp: None,
+            device_tree: None,
+            cpu_topology: &[],
+            kernel_image: KernelImageInfo::new(
+                VirtAddr::new(0x400000),
+                VirtAddr::new(0x402000),
+                PhysAddr::new(0x200000),
+            ),
+            hhdm: None,
+        });
+
+        assert_eq!(result, Err(BootInfoError::KernelImageEmpty));
+    }
+
     struct FixedBuf {
-        bytes: [u8; 32],
+        bytes: [u8; 512],
         len: usize,
+    }
+
+    impl Default for FixedBuf {
+        fn default() -> Self {
+            Self {
+                bytes: [0; 512],
+                len: 0,
+            }
+        }
     }
 
     impl FixedBuf {

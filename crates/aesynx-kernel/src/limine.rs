@@ -53,7 +53,12 @@ fn base_revision_supported() -> bool {
     // SAFETY: `BASE_REVISION` is a Limine-owned static tag. The bootloader writes
     // the third field before entering `_start`; reading it by raw pointer avoids
     // creating a reference to mutable bootloader-owned storage.
-    let supported = unsafe { core::ptr::addr_of!(BASE_REVISION[2]).read_volatile() };
+    let supported = unsafe {
+        core::ptr::addr_of_mut!(BASE_REVISION)
+            .cast::<u64>()
+            .add(2)
+            .read_volatile()
+    };
     supported == 0
 }
 
@@ -74,7 +79,7 @@ fn read_memory_regions(
     }
 
     let entries = response.entries as *const *const LimineMemmapEntry;
-    if entries.is_null() {
+    if entries.is_null() || !entries.is_aligned() {
         return Err(LimineError::MissingMemoryMap);
     }
 
@@ -84,7 +89,7 @@ fn read_memory_regions(
         // Each pointer is expected to reference a valid memmap entry in
         // bootloader-reclaimable memory for the duration of early boot.
         let entry_ptr = unsafe { entries.add(index).read() };
-        let entry = if let Some(entry) = unsafe { entry_ptr.as_ref() } {
+        let entry = if let Some(entry) = unsafe { limine_ref(entry_ptr) } {
             entry
         } else {
             return Err(LimineError::NullMemoryRegion);
@@ -123,9 +128,7 @@ fn read_hhdm() -> Option<HhdmInfo> {
     // feature is available. A missing response is represented as null.
     let response =
         unsafe { request_response::<LimineHhdmResponse>(core::ptr::addr_of!(HHDM_REQUEST)) }?;
-    Some(HhdmInfo {
-        offset: VirtAddr::new(response.offset),
-    })
+    Some(HhdmInfo::new(VirtAddr::new(response.offset)))
 }
 
 fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
@@ -142,14 +145,14 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     }
 
     let framebuffers = response.framebuffers as *const *const LimineFramebuffer;
-    if framebuffers.is_null() {
+    if framebuffers.is_null() || !framebuffers.is_aligned() {
         return Err(LimineError::InvalidFramebuffer);
     }
 
     // SAFETY: Limine reports at least one framebuffer pointer. We only consume
     // the first one for v0.5 and validate lossy integer conversions below.
     let framebuffer_ptr = unsafe { framebuffers.read() };
-    let framebuffer = if let Some(framebuffer) = unsafe { framebuffer_ptr.as_ref() } {
+    let framebuffer = if let Some(framebuffer) = unsafe { limine_ref(framebuffer_ptr) } {
         framebuffer
     } else {
         return Err(LimineError::InvalidFramebuffer);
@@ -163,12 +166,12 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     let stride =
         u32::try_from(framebuffer.pitch).map_err(|_error| LimineError::InvalidFramebuffer)?;
 
-    Ok(Some(FramebufferInfo {
-        base: VirtAddr::new(base),
+    Ok(Some(FramebufferInfo::new(
+        VirtAddr::new(base),
         width,
         height,
         stride,
-    }))
+    )))
 }
 
 fn read_rsdp() -> Option<VirtAddr> {
@@ -198,9 +201,21 @@ unsafe fn request_response<T>(request: *const LimineRequest) -> Option<&'static 
     // outside Rust's aliasing model before transferring control to `_start`.
     let response = unsafe { core::ptr::addr_of!((*request).response).read_volatile() };
     let response = response as *const T;
-    // SAFETY: A non-null response pointer is owned by Limine and remains valid in
-    // bootloader-reclaimable memory during this early boot normalization phase.
-    unsafe { response.as_ref() }
+    // SAFETY: A non-null, aligned response pointer is owned by Limine and
+    // remains valid in bootloader-reclaimable memory during this early boot
+    // normalization phase.
+    unsafe { limine_ref(response) }
+}
+
+unsafe fn limine_ref<T>(ptr: *const T) -> Option<&'static T> {
+    if ptr.is_null() || !ptr.is_aligned() {
+        return None;
+    }
+
+    // SAFETY: The caller established that this pointer came from Limine response
+    // memory and remains live during early boot. This helper additionally guards
+    // against null and misaligned pointers before creating a reference.
+    Some(unsafe { &*ptr })
 }
 
 fn kernel_virt_end() -> u64 {
@@ -275,6 +290,15 @@ struct LimineFramebuffer {
     modes: u64,
 }
 
+const _: () = assert!(
+    core::mem::size_of::<LimineFramebuffer>() == 80,
+    "LimineFramebuffer size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineFramebuffer, edid_size) == 48,
+    "LimineFramebuffer.edid_size offset does not match Limine protocol ABI"
+);
+
 #[repr(C)]
 struct LimineRsdpResponse {
     revision: u64,
@@ -304,7 +328,7 @@ static REQUESTS_START: [u64; 4] = [
 
 #[used]
 #[unsafe(link_section = ".limine_requests")]
-static BASE_REVISION: [u64; 3] = [0xf9562b2d5c95a6c8, 0x6a7b384944536bdc, 6];
+static mut BASE_REVISION: [u64; 3] = [0xf9562b2d5c95a6c8, 0x6a7b384944536bdc, 6];
 
 #[used]
 #[unsafe(link_section = ".limine_requests")]

@@ -87,6 +87,10 @@ pub enum MessagePayload {
 }
 
 pub const MAX_INLINE_PAYLOAD_LEN: usize = 64;
+const _: () = assert!(
+    MAX_INLINE_PAYLOAD_LEN <= u8::MAX as usize,
+    "MAX_INLINE_PAYLOAD_LEN must fit in InlineBytes::len"
+);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct InlineBytes {

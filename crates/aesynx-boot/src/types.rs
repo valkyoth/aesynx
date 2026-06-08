@@ -1,18 +1,85 @@
+use core::fmt;
+
 use aesynx_abi::{CpuHardwareId, PhysAddr, VirtAddr};
 
 pub const MAX_EARLY_MEMORY_REGIONS: usize = 64;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct BootInfo<'a> {
     pub arch: ArchKind,
     pub platform: PlatformKind,
     pub memory_map: MemoryMap<'a>,
-    pub framebuffer: Option<FramebufferInfo>,
-    pub rsdp: Option<VirtAddr>,
-    pub device_tree: Option<VirtAddr>,
+    framebuffer: Option<FramebufferInfo>,
+    rsdp: Option<VirtAddr>,
+    device_tree: Option<VirtAddr>,
     pub cpu_topology: CpuTopology<'a>,
     pub kernel_image: KernelImageInfo,
-    pub hhdm: Option<HhdmInfo>,
+    hhdm: Option<HhdmInfo>,
+}
+
+impl<'a> BootInfo<'a> {
+    #[must_use]
+    pub(crate) const fn new(parts: BootInfoParts<'a>) -> Self {
+        Self {
+            arch: parts.arch,
+            platform: parts.platform,
+            memory_map: parts.memory_map,
+            framebuffer: parts.framebuffer,
+            rsdp: parts.rsdp,
+            device_tree: parts.device_tree,
+            cpu_topology: parts.cpu_topology,
+            kernel_image: parts.kernel_image,
+            hhdm: parts.hhdm,
+        }
+    }
+
+    #[must_use]
+    pub const fn framebuffer_present(self) -> bool {
+        self.framebuffer.is_some()
+    }
+
+    #[must_use]
+    pub const fn rsdp_present(self) -> bool {
+        self.rsdp.is_some()
+    }
+
+    #[must_use]
+    pub const fn device_tree_present(self) -> bool {
+        self.device_tree.is_some()
+    }
+
+    #[must_use]
+    pub const fn hhdm_present(self) -> bool {
+        self.hhdm.is_some()
+    }
+}
+
+pub(crate) struct BootInfoParts<'a> {
+    pub(crate) arch: ArchKind,
+    pub(crate) platform: PlatformKind,
+    pub(crate) memory_map: MemoryMap<'a>,
+    pub(crate) framebuffer: Option<FramebufferInfo>,
+    pub(crate) rsdp: Option<VirtAddr>,
+    pub(crate) device_tree: Option<VirtAddr>,
+    pub(crate) cpu_topology: CpuTopology<'a>,
+    pub(crate) kernel_image: KernelImageInfo,
+    pub(crate) hhdm: Option<HhdmInfo>,
+}
+
+impl fmt::Debug for BootInfo<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BootInfo")
+            .field("arch", &self.arch)
+            .field("platform", &self.platform)
+            .field("memory_map.len", &self.memory_map.len())
+            .field("framebuffer_present", &self.framebuffer_present())
+            .field("rsdp_present", &self.rsdp_present())
+            .field("device_tree_present", &self.device_tree_present())
+            .field("cpu_topology.len", &self.cpu_topology.len())
+            .field("kernel_image", &self.kernel_image)
+            .field("hhdm_present", &self.hhdm_present())
+            .finish()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -121,17 +188,55 @@ pub enum MemoryRegionKind {
     Bad,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct FramebufferInfo {
-    pub base: VirtAddr,
+    base: VirtAddr,
     pub width: u32,
     pub height: u32,
     pub stride: u32,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+impl FramebufferInfo {
+    #[must_use]
+    pub const fn new(base: VirtAddr, width: u32, height: u32, stride: u32) -> Self {
+        Self {
+            base,
+            width,
+            height,
+            stride,
+        }
+    }
+}
+
+impl fmt::Debug for FramebufferInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FramebufferInfo")
+            .field("base_present", &(self.base.get() != 0))
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("stride", &self.stride)
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct HhdmInfo {
-    pub offset: VirtAddr,
+    offset: VirtAddr,
+}
+
+impl HhdmInfo {
+    #[must_use]
+    pub const fn new(offset: VirtAddr) -> Self {
+        Self { offset }
+    }
+}
+
+impl fmt::Debug for HhdmInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HhdmInfo")
+            .field("offset_present", &(self.offset.get() != 0))
+            .finish()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -148,6 +253,16 @@ impl<'a> CpuTopology<'a> {
     #[must_use]
     pub const fn cpus(self) -> &'a [CpuInfo] {
         self.cpus
+    }
+
+    #[must_use]
+    pub const fn len(self) -> usize {
+        self.cpus.len()
+    }
+
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.cpus.is_empty()
     }
 }
 
@@ -190,8 +305,8 @@ impl KernelImageInfo {
     }
 }
 
-impl core::fmt::Debug for KernelImageInfo {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for KernelImageInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("KernelImageInfo(redacted)")
     }
 }

@@ -22,8 +22,8 @@ claim that the controls are implemented today.
 | Capability unforgeability | Capability fields are private and capability values are not `Copy` or `Clone` | Model active | `Capability` accessors |
 | CI action integrity | Workflow actions must be pinned to commit SHA | Active | `scripts/validate-security-policy.sh`, `.github/workflows/ci.yml` |
 | State transitions | Task and device state changes must use checked transition APIs | Model active | `Task::transition`, `DeviceObject::transition` |
-| Boot address secrecy | KASLR-sensitive kernel image addresses are private, debug-redacted, and populated from Limine executable-address metadata | Active candidate | `KernelImageInfo`, `cargo xtask qemu` |
-| BootInfo normalization | Bootloader-specific handoff data normalizes before generic kernel use | Active candidate | `aesynx-boot`, `crates/aesynx-kernel/src/limine.rs` |
+| Boot address secrecy | KASLR-sensitive kernel image, RSDP, HHDM, device-tree, and framebuffer addresses are private or debug-redacted | Active candidate | `KernelImageInfo`, `BootInfo`, `BootMetadata`, `cargo xtask qemu` |
+| BootInfo normalization | Bootloader-specific handoff data normalizes before generic kernel use; Limine response pointers are null/alignment checked | Active candidate | `aesynx-boot`, `crates/aesynx-kernel/src/limine.rs` |
 | Telemetry integrity | Task telemetry uses append-only counters; core telemetry snapshots are advisory per-counter samples | Model active | `TaskTelemetry`, `CoreTelemetry` |
 | Capability revocation | REVOKE authority check required before epoch mutation | Model active | `ensure_revoke_authority`, `RevocationEpochStore` |
 | Early serial safety | COM1 output uses admitted ports, bounded polling, and a single-core marker type | Active for boot | `crates/aesynx-arch-x86_64/src/serial.rs`, `crates/aesynx-arch-x86_64/src/port.rs` |

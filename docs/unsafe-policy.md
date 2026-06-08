@@ -71,6 +71,28 @@ Limitations: not synchronized for SMP, not a general serial driver, and not suit
 ```
 
 ```text
+Location: crates/aesynx-arch-x86_64/src/lib.rs
+Status: active in v0.5
+Purpose: terminal x86_64 CPU halt path
+Preconditions: called only for halt_forever states where the current core must stop executing normal work
+Unsafe operation: core::arch::asm! hlt instruction
+Safety argument: the instruction does not dereference Rust pointers, alias Rust memory, modify the stack, or access I/O ports; it is the architecture-defined idle instruction for a terminal halt loop
+Tests/evidence: workspace tests and cargo xtask qemu compile and exercise the x86_64 architecture crate; code review confirms the unsafe block is confined to halt_forever
+Limitations: interrupt-state control is still unsupported; early boot currently relies on the boot environment's interrupt state
+```
+
+```text
+Location: crates/aesynx-arch-aarch64/src/lib.rs
+Status: admitted for future AArch64 target builds in v0.5
+Purpose: terminal AArch64 CPU halt path
+Preconditions: called only for halt_forever states where the current core must stop executing normal work
+Unsafe operation: core::arch::asm! wfi instruction when compiled for target_arch = "aarch64"
+Safety argument: the instruction does not dereference Rust pointers, alias Rust memory, modify the stack, or access device registers; it is the architecture-defined wait-for-interrupt instruction for an idle halt loop
+Tests/evidence: workspace tests compile the non-AArch64 fallback; target AArch64 execution remains a future milestone
+Limitations: no AArch64 QEMU boot target exists yet; host builds use spin_loop as a compile-time fallback
+```
+
+```text
 Location: crates/aesynx-kernel/src/main.rs
 Status: active in v0.5
 Purpose: export the architecture entry symbol consumed by the bootloader
@@ -87,7 +109,7 @@ Status: active in v0.5
 Purpose: parse Limine bootloader handoff responses and normalize them into Aesynx BootInfo
 Preconditions: Limine v12.3.2-compatible bootloader loads the kernel, honours request sections, fills response pointers before _start, and keeps response data valid in bootloader-reclaimable memory during early boot
 Unsafe operation: raw reads of Limine response pointers, raw pointer traversal of memory-map and framebuffer arrays, linker-provided __kernel_end symbol address, and mutable Limine request statics written by the bootloader before Rust executes
-Safety argument: the unsafe code is confined to the boot handoff boundary; it checks for null responses, bounds memory-map copies to MAX_EARLY_MEMORY_REGIONS, validates lossy integer conversions, and passes only value-copied metadata into the safe aesynx-boot normalization API
+Safety argument: the unsafe code is confined to the boot handoff boundary; it checks response and array pointers for null and alignment before forming references, bounds memory-map copies to MAX_EARLY_MEMORY_REGIONS, validates lossy integer conversions, compile-time asserts the transcribed framebuffer ABI layout, and passes only value-copied metadata into the safe aesynx-boot normalization API
 Tests/evidence: cargo xtask qemu observes [TEST] bootinfo=ok and [TEST] boot=ok; aesynx-boot unit tests cover synthetic memory-map normalization and invalid empty-map rejection
 Limitations: no bootloader memory reclamation, page-table ownership, SMP topology parsing, module parsing, or framebuffer output yet
 ```

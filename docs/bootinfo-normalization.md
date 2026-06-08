@@ -27,9 +27,15 @@ API for serial output. The generic kernel therefore consumes only Aesynx
 BootInfo, not Limine response structures.
 
 Limine base revision 6 returns pointer-style handoff data through HHDM virtual
-addresses. Aesynx therefore records RSDP and framebuffer addresses as
-`VirtAddr` values in normalized BootInfo, while memory-map region starts remain
-physical addresses.
+addresses. Aesynx records RSDP, HHDM, device-tree, and framebuffer addresses in
+private BootInfo fields, exposes only presence checks to generic kernel code,
+and uses redacted Debug implementations for handoff metadata. Memory-map region
+starts remain physical addresses.
+
+The Limine boundary rejects null and misaligned response pointers before
+creating Rust references, pins the transcribed framebuffer ABI with compile-time
+layout assertions, and validates kernel-image base alignment plus the x86_64
+kernel-half virtual address invariant.
 
 ## Serial Contract
 
@@ -59,8 +65,8 @@ This milestone proves:
 - QEMU boots with `kaslr: yes`.
 - Limine handoff metadata is available at `_start`.
 - Memory-map and kernel-image metadata normalize into Aesynx `BootInfo`.
-- Synthetic BootInfo unit tests validate memory-map summaries and rejection of
-  empty maps.
+- Synthetic BootInfo unit tests validate memory-map summaries, KASLR-sensitive
+  Debug redaction, and rejection of empty maps or invalid kernel-image bases.
 
 This milestone does not prove:
 

@@ -15,8 +15,20 @@ impl ArchCpu for Aarch64 {
         core::hint::spin_loop();
     }
 
+    #[allow(unsafe_code)]
     fn halt_forever() -> ! {
         loop {
+            #[cfg(target_arch = "aarch64")]
+            {
+                // SAFETY: `wfi` is the AArch64 architectural idle instruction.
+                // This terminal halt path does not touch Rust memory, stack
+                // data, or device registers.
+                unsafe {
+                    core::arch::asm!("wfi", options(nomem, nostack, preserves_flags));
+                }
+            }
+
+            #[cfg(not(target_arch = "aarch64"))]
             core::hint::spin_loop();
         }
     }

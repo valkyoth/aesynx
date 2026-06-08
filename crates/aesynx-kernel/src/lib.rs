@@ -27,9 +27,9 @@ pub fn boot_summary(info: &BootInfo<'_>) -> BootSummary {
         memory_regions: memory.region_count,
         usable_regions: memory.usable_regions,
         usable_bytes: memory.usable_bytes,
-        rsdp_present: info.rsdp.is_some(),
-        framebuffer_present: info.framebuffer.is_some(),
-        hhdm_present: info.hhdm.is_some(),
+        rsdp_present: info.rsdp_present(),
+        framebuffer_present: info.framebuffer_present(),
+        hhdm_present: info.hhdm_present(),
     }
 }
 
@@ -91,9 +91,7 @@ mod tests {
                 VirtAddr::new(0xffffffff80002000),
                 PhysAddr::new(0x200000),
             ),
-            hhdm: Some(HhdmInfo {
-                offset: VirtAddr::new(0xffff800000000000),
-            }),
+            hhdm: Some(HhdmInfo::new(VirtAddr::new(0xffff800000000000))),
         })?;
 
         let summary = boot_summary(&info);

@@ -20,9 +20,15 @@ impl ArchCpu for X86_64 {
         core::hint::spin_loop();
     }
 
+    #[allow(unsafe_code)]
     fn halt_forever() -> ! {
         loop {
-            core::hint::spin_loop();
+            // SAFETY: `hlt` is the x86_64 architectural idle instruction. This
+            // path is used only for terminal halt states and does not access
+            // Rust memory, stack data, or I/O ports.
+            unsafe {
+                core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+            }
         }
     }
 
