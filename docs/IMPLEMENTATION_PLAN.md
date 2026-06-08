@@ -492,6 +492,10 @@ arch=x86_64 platform=qemu
 [TEST] boot=ok
 ```
 
+The v0.4 serial path is an early single-core diagnostic path. It must use only
+typed admitted UART ports, bounded transmit polling, and direct fixed-string
+boot output until a real synchronized logger exists.
+
 ### 6.2 BootInfo
 
 Bootloader-specific metadata is normalized into:

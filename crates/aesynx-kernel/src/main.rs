@@ -12,9 +12,9 @@ use aesynx_arch::ArchCpu;
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     aesynx_arch_x86_64::serial::init();
-    aesynx_arch_x86_64::serial_println!("Aesynx: booting");
-    aesynx_arch_x86_64::serial_println!("arch=x86_64 platform=qemu");
-    aesynx_arch_x86_64::serial_println!("[TEST] boot=ok");
+    aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
+    aesynx_arch_x86_64::serial::write_str("arch=x86_64 platform=qemu\n");
+    aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
     aesynx_arch_x86_64::X86_64::halt_forever()
 }
 
@@ -22,7 +22,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(_info: &PanicInfo<'_>) -> ! {
     aesynx_arch_x86_64::serial::init();
-    aesynx_arch_x86_64::serial_println!("Aesynx: panic during early boot");
+    aesynx_arch_x86_64::serial::write_str("Aesynx: panic during early boot\n");
     aesynx_arch_x86_64::X86_64::halt_forever()
 }
 

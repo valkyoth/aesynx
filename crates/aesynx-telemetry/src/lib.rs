@@ -69,8 +69,10 @@ impl CoreTelemetry {
     /// Returns an advisory snapshot.
     ///
     /// Each counter is sampled independently with relaxed ordering. The result
-    /// is suitable for telemetry and scheduling hints, but it is not a coherent
-    /// multi-counter transaction under concurrent updates.
+    /// is suitable for best-effort telemetry and scheduling hints, but it is
+    /// not a coherent multi-counter transaction under concurrent updates. Do
+    /// not use this snapshot for real-time security decisions or fault
+    /// admission on weakly ordered architectures.
     pub fn snapshot(&self) -> CoreTelemetrySnapshot {
         CoreTelemetrySnapshot {
             run_queue_len: self.run_queue_len.load(Ordering::Relaxed),

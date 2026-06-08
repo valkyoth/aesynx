@@ -38,6 +38,8 @@ arch=x86_64 platform=qemu
   boundary.
 - `linker/kernel-x86_64.ld` keeps load segments page-separated so Limine does
   not load mixed-permission program headers onto the same page.
+- The v0.4 boot entry writes fixed strings directly, so the boot ELF avoids a
+  writable `.got` section.
 
 ## Boundary
 
@@ -48,6 +50,8 @@ This milestone proves:
 - Rust `_start` runs.
 - COM1 serial output works.
 - The QEMU smoke test validates a kernel-owned marker.
+- Panic serial output is best-effort and bounded so execution still reaches the
+  halt path if the UART does not become ready.
 
 This milestone does not prove:
 
@@ -56,4 +60,5 @@ This milestone does not prove:
 - Page-table ownership.
 - Interrupts or exceptions.
 - Panic diagnostics beyond a minimal serial fallback.
+- SMP-safe serial logging.
 - Allocator setup.

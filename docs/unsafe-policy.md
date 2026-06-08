@@ -66,8 +66,8 @@ Purpose: early x86_64 COM1 port I/O for serial boot diagnostics
 Preconditions: QEMU legacy COM1 UART is present; used during early single-core boot only
 Unsafe operation: core::arch::asm! in/out instructions
 Safety argument: the instructions access fixed I/O ports and do not dereference Rust pointers, alias Rust memory, or depend on Rust lifetimes; callers only expose safe byte-oriented serial operations
-Tests/evidence: cargo xtask qemu observes the Rust _start serial marker
-Limitations: not synchronized for SMP, not a general serial driver, and not suitable for untrusted device probing
+Tests/evidence: cargo xtask qemu observes the Rust _start serial marker; port construction is limited to a typed COM1 admitted-port set
+Limitations: not synchronized for SMP, not a general serial driver, and not suitable for untrusted device probing; UART transmit polling is bounded and drops bytes on timeout
 ```
 
 ```text
