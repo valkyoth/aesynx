@@ -2,6 +2,7 @@ use core::arch::global_asm;
 use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use crate::RFLAGS_PUBLIC_MASK;
 use crate::descriptors::{InterruptStackTableIndex, SegmentSelector};
 use crate::registers::FaultRegisterSnapshot;
 
@@ -183,6 +184,8 @@ unsafe fn load_idt() {
 
 #[unsafe(no_mangle)]
 extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) {
+    let fault_address = FaultRegisterSnapshot::capture_fault_address();
+
     let Some(frame) = ExceptionFrame::from_raw(frame) else {
         crate::serial::write_str("exception frame=invalid\n");
         return;
@@ -195,15 +198,16 @@ extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) 
         }
         PAGE_FAULT_VECTOR_U8 => {
             let error = PageFaultErrorCode::new(frame.error_code);
-            let registers = FaultRegisterSnapshot::capture();
+            let registers = FaultRegisterSnapshot::capture_with_fault_address(fault_address);
             crate::serial_println!(
-                "exception vector=page-fault error=0x{:x} rip_present={} rip_offset=0x{:x} cs=0x{:x} frame_rflags=0x{:x} cr2=0x{:x} cr3_offset=0x{:x} rflags=0x{:x} interrupts_enabled={} present={} write={} user={} reserved={} instruction={} protection_key={} shadow_stack={} sgx={}",
+                "exception vector=page-fault error=0x{:x} rip_present={} rip_offset=0x{:x} cs=0x{:x} frame_rflags=0x{:x} cr2_present={} cr2_offset=0x{:x} cr3_offset=0x{:x} rflags=0x{:x} interrupts_enabled={} present={} write={} user={} reserved={} instruction={} protection_key={} shadow_stack={} sgx={}",
                 frame.error_code,
                 frame.instruction_pointer_present(),
                 frame.instruction_pointer_offset(),
                 frame.code_segment,
                 frame.public_rflags(),
-                registers.fault_address(),
+                registers.fault_address_present(),
+                registers.fault_address_page_offset(),
                 registers.cr3_page_offset(),
                 registers.public_rflags(),
                 registers.interrupts_enabled(),
@@ -267,7 +271,7 @@ impl ExceptionFrame {
     }
 
     const fn public_rflags(self) -> u64 {
-        self.rflags & FRAME_RFLAGS_PUBLIC_MASK
+        self.rflags & RFLAGS_PUBLIC_MASK
     }
 
     const fn instruction_pointer_present(self) -> bool {
@@ -280,7 +284,6 @@ impl ExceptionFrame {
 }
 
 const PAGE_OFFSET_MASK: u64 = 0xfff;
-const FRAME_RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_0000_0cd5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PageFaultErrorCode(u64);

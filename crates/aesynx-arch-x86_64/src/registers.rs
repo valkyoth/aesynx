@@ -1,7 +1,8 @@
 use core::fmt;
 
+use crate::RFLAGS_PUBLIC_MASK;
+
 const PAGE_OFFSET_MASK: u64 = 0xfff;
-const RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_0000_0cd5;
 const RFLAGS_INTERRUPT_ENABLE: u64 = 1 << 9;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -102,21 +103,41 @@ pub struct FaultRegisterSnapshot {
 impl FaultRegisterSnapshot {
     #[must_use]
     pub fn capture() -> Self {
+        let fault_address = Self::capture_fault_address();
+        Self::capture_with_fault_address(fault_address)
+    }
+
+    #[must_use]
+    pub(crate) fn capture_fault_address() -> u64 {
         let fault_address: u64;
+
+        // SAFETY: This copies CR2 into a general-purpose register. It does not
+        // dereference pointers or create Rust references.
+        unsafe {
+            core::arch::asm!(
+                "mov {fault_address}, cr2",
+                fault_address = lateout(reg) fault_address,
+                options(nomem, nostack, preserves_flags)
+            );
+        }
+
+        fault_address
+    }
+
+    #[must_use]
+    pub(crate) fn capture_with_fault_address(fault_address: u64) -> Self {
         let rflags: u64;
         let cr3: u64;
 
         // SAFETY: These instructions copy architectural register values into
-        // general-purpose outputs. CR2 is the x86_64 fault-address register and
-        // CR3 is copied only for a redacted low-bit summary. `pushfq; pop`
-        // temporarily uses the current aligned exception stack to read RFLAGS.
+        // general-purpose outputs. CR3 is copied only for a redacted low-bit
+        // summary. `pushfq; pop` temporarily uses the current aligned exception
+        // stack to read RFLAGS.
         unsafe {
             core::arch::asm!(
-                "mov {fault_address}, cr2",
                 "pushfq",
                 "pop {rflags}",
                 "mov {cr3}, cr3",
-                fault_address = lateout(reg) fault_address,
                 rflags = lateout(reg) rflags,
                 cr3 = lateout(reg) cr3,
                 options(preserves_flags)
@@ -131,8 +152,13 @@ impl FaultRegisterSnapshot {
     }
 
     #[must_use]
-    pub const fn fault_address(self) -> u64 {
-        self.fault_address
+    pub const fn fault_address_present(self) -> bool {
+        self.fault_address != 0
+    }
+
+    #[must_use]
+    pub const fn fault_address_page_offset(self) -> u16 {
+        (self.fault_address & PAGE_OFFSET_MASK) as u16
     }
 
     #[must_use]
@@ -154,7 +180,12 @@ impl FaultRegisterSnapshot {
 impl fmt::Debug for FaultRegisterSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FaultRegisterSnapshot")
-            .field("fault_address", &self.fault_address)
+            .field("fault_address", &"redacted")
+            .field("fault_address_present", &self.fault_address_present())
+            .field(
+                "fault_address_page_offset",
+                &self.fault_address_page_offset(),
+            )
             .field("rflags", &self.public_rflags())
             .field("interrupts_enabled", &self.interrupts_enabled())
             .field("cr3", &"redacted")
@@ -218,9 +249,9 @@ mod tests {
     }
 
     #[test]
-    fn fault_snapshot_exposes_fault_address_and_redacts_cr3() {
+    fn fault_snapshot_exposes_only_redacted_fault_address_summary() {
         let snapshot = FaultRegisterSnapshot {
-            fault_address: 0xdead_beef,
+            fault_address: 0xffff_ffff_8000_dead,
             rflags: 0xffff_ffff_0000_0ed7,
             cr3: 0x1234_5abc,
         };
@@ -230,10 +261,13 @@ mod tests {
             write!(&mut output, "{snapshot:?}").map(|()| output.contains("redacted")),
             Ok(true)
         );
-        assert_eq!(snapshot.fault_address(), 0xdead_beef);
+        assert!(snapshot.fault_address_present());
+        assert_eq!(snapshot.fault_address_page_offset(), 0xead);
         assert_eq!(snapshot.public_rflags(), 0x0cd5);
         assert!(snapshot.interrupts_enabled());
         assert_eq!(snapshot.cr3_page_offset(), 0xabc);
+        assert!(!output.contains("ffff"));
+        assert!(!output.contains("dead"));
         assert!(!output.contains("12345"));
     }
 

@@ -67,7 +67,7 @@ and expects `[TEST] idt=ok`, `[TEST] exception=ok`, and `[TEST] panic=ok`.
 `cargo xtask qemu --exception-smoke` creates a separate
 `build/qemu/aesynx-v0.9.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
-`[TEST] exception=ok`, `cr2=0x`, `cr3_offset=0x`, `rflags=0x`,
+`[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`, `cr3_offset=0x`, `rflags=0x`,
 `interrupts_enabled=`, and decoded page-fault error fields.
 
 The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that

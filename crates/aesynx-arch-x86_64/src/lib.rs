@@ -6,6 +6,8 @@ pub mod serial;
 use aesynx_abi::CoreId;
 use aesynx_arch::{ArchCpu, ArchError};
 
+pub(crate) const RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_0000_0cd5;
+
 #[allow(unsafe_code)]
 pub mod descriptors;
 #[allow(unsafe_code)]

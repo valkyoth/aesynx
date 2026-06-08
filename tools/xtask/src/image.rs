@@ -6,10 +6,10 @@ use crate::workspace;
 use host_tools::{HostToolVersions, MIN_LIMINE_VERSION_TEXT, validate_host_tools};
 use smoke::{
     BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_SETUP_MARKER,
-    EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_CR3_MARKER,
-    FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER, PAGE_FAULT_MARKER,
-    PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER, PANIC_REGISTERS_MARKER, SERIAL_MARKER, SmokeKind,
-    parse_qemu_args,
+    EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
+    FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
+    PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER, PANIC_REGISTERS_MARKER,
+    SERIAL_MARKER, SmokeKind, parse_qemu_args,
 };
 
 use std::fs;
@@ -339,7 +339,7 @@ fn write_manifest(
     smoke: SmokeKind,
 ) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.9.0 register and fault decoding\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        "name=Aesynx v0.9.0 register and fault decoding\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_present_marker={FAULT_ADDRESS_PRESENT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
         smoke.name(),
         image.display(),
         kernel_elf.display(),
@@ -440,6 +440,7 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
             contents.contains(CPU_SETUP_MARKER)
                 && contents.contains(EXCEPTION_SETUP_MARKER)
                 && contents.contains(EXCEPTION_MARKER)
+                && contents.contains(FAULT_ADDRESS_PRESENT_MARKER)
                 && contents.contains(FAULT_ADDRESS_MARKER)
                 && contents.contains(FAULT_CR3_MARKER)
                 && contents.contains(FAULT_RFLAGS_MARKER)
