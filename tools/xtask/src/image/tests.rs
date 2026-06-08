@@ -1,12 +1,18 @@
 use super::{
-    BOOT_CONFIG_MARKERS, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, KERNEL_PROFILE, KERNEL_TARGET,
-    PANIC_MARKER, PANIC_REGISTERS_MARKER, SERIAL_MARKER, SmokeKind, parse_qemu_args,
+    BOOT_CONFIG_MARKERS, BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER,
+    KERNEL_PROFILE, KERNEL_TARGET, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER, PANIC_REGISTERS_MARKER,
+    SERIAL_MARKER, SmokeKind, parse_qemu_args,
 };
 
 #[test]
 fn qemu_markers_track_v0_6_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
+    assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
+    assert_eq!(
+        PANIC_DIAGNOSTIC_MARKER,
+        "[kernel][FATAL] panic handler entered"
+    );
     assert_eq!(PANIC_MARKER, "[TEST] panic=ok");
     assert_eq!(PANIC_REGISTERS_MARKER, "panic registers=");
     assert_eq!(SERIAL_MARKER, "[TEST] boot=ok");

@@ -12,9 +12,17 @@ exceptions, page tables, or an allocator exist.
 - `BootPhase` records the current early boot phase.
 - `set_boot_phase` stores the phase in a single atomic byte.
 - `panic_snapshot` captures the early core and current phase for panic output.
+- `DiagnosticRecord` formats no-alloc structured records with core, phase,
+  component, log level, and bounded single-record messages.
 
 The target-specific serial emission remains in `crates/aesynx-kernel/src/main.rs`
 so the diagnostics library stays `no_std`, safe Rust, and host-testable.
+
+Structured records use this shape:
+
+```text
+[core=0][phase=bootinfo-normalized][kernel][INFO] bootinfo normalized
+```
 
 ## Panic Output
 
@@ -22,6 +30,7 @@ The panic handler prints:
 
 ```text
 Aesynx: panic during early boot
+[core=0][phase=panic-smoke][kernel][FATAL] panic handler entered
 panic core=0 phase=<phase>
 panic location=<file> line=<line> column=<column>
 panic message=<message>
@@ -50,9 +59,10 @@ cargo xtask qemu --panic-smoke
 ```
 
 It builds a separate release-profile QEMU image with the `panic-smoke` feature
-enabled and expects:
+enabled and expects both the structured fatal record and the panic marker:
 
 ```text
+[kernel][FATAL] panic handler entered
 [TEST] panic=ok
 ```
 
@@ -61,8 +71,9 @@ enabled and expects:
 This milestone proves:
 
 - Boot phase tracking works before allocator setup.
-- Panic output includes core, phase, file, line, column, message, and redacted
-  x86_64 register summary.
+- Structured log-level records can be emitted before allocator setup.
+- Panic output includes core, phase, file, line, column, message, fatal record,
+  and redacted x86_64 register summary.
 - QEMU can machine-check a deliberate panic path.
 
 This milestone does not prove:

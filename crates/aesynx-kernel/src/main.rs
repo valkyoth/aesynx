@@ -11,6 +11,9 @@ use aesynx_arch::ArchCpu;
 #[cfg(target_os = "none")]
 use aesynx_kernel::diagnostics::{self, BootPhase};
 
+#[cfg(target_os = "none")]
+use aesynx_log::{LogLevel, LogMessage};
+
 #[cfg(all(target_os = "none", not(feature = "panic-smoke")))]
 mod limine;
 
@@ -19,6 +22,7 @@ mod limine;
 pub extern "C" fn _start() -> ! {
     aesynx_arch_x86_64::serial::init();
     diagnostics::set_boot_phase(BootPhase::Entry);
+    write_diagnostic(LogLevel::Info, "serial initialized");
     kernel_entry()
 }
 
@@ -45,6 +49,7 @@ fn boot_entry() -> ! {
     match limine::normalize(&mut scratch) {
         Ok(info) => {
             diagnostics::set_boot_phase(BootPhase::BootInfoNormalized);
+            write_diagnostic(LogLevel::Info, "bootinfo normalized");
             let summary = aesynx_kernel::boot_summary(&info);
             aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
             aesynx_arch_x86_64::serial::write_str(summary.arch_label);
@@ -68,6 +73,7 @@ fn boot_entry() -> ! {
         }
         Err(_error) => {
             aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
+            write_diagnostic(LogLevel::Error, "bootinfo normalization failed");
             aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=fail\n");
         }
     }
@@ -88,6 +94,7 @@ fn panic(info: &PanicInfo<'_>) -> ! {
     let snapshot = diagnostics::panic_snapshot();
     let registers = aesynx_arch_x86_64::registers::EarlyRegisterSnapshot::capture();
     aesynx_arch_x86_64::serial::write_str("Aesynx: panic during early boot\n");
+    write_diagnostic(LogLevel::Fatal, "panic handler entered");
     aesynx_arch_x86_64::serial_println!(
         "panic core={} phase={}",
         snapshot.core.get(),
@@ -117,6 +124,14 @@ fn panic(info: &PanicInfo<'_>) -> ! {
     #[cfg(feature = "panic-smoke")]
     aesynx_arch_x86_64::serial::write_str("[TEST] panic=ok\n");
     aesynx_arch_x86_64::X86_64::halt_forever()
+}
+
+#[cfg(target_os = "none")]
+fn write_diagnostic(level: LogLevel, message: &'static str) {
+    let message = LogMessage::new(message).unwrap_or(LogMessage::REJECTED);
+    let record = diagnostics::DiagnosticRecord::current(level, "kernel", message);
+    let mut serial = aesynx_arch_x86_64::serial::Com1::new();
+    let _ = record.write_to(&mut serial);
 }
 
 #[cfg(not(target_os = "none"))]

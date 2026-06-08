@@ -25,6 +25,8 @@ const KERNEL_BINARY: &str = "aesynx-kernel";
 const KERNEL_PROFILE: &str = "release";
 const BOOTINFO_FAIL_MARKER: &str = "[TEST] bootinfo=fail";
 const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
+const BOOT_DIAGNOSTIC_MARKER: &str = "[kernel][INFO] bootinfo normalized";
+const PANIC_DIAGNOSTIC_MARKER: &str = "[kernel][FATAL] panic handler entered";
 const PANIC_MARKER: &str = "[TEST] panic=ok";
 const PANIC_REGISTERS_MARKER: &str = "panic registers=";
 const SERIAL_MARKER: &str = "[TEST] boot=ok";
@@ -123,8 +125,10 @@ impl SmokeKind {
 
     fn markers(self) -> &'static str {
         match self {
-            Self::Boot => "[TEST] bootinfo=ok, [TEST] boot=ok",
-            Self::Panic => "[TEST] panic=ok",
+            Self::Boot => "[kernel][INFO] bootinfo normalized, [TEST] bootinfo=ok, [TEST] boot=ok",
+            Self::Panic => {
+                "[kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
+            }
         }
     }
 }
@@ -436,11 +440,14 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
     fs::read_to_string(path).is_ok_and(|contents| match smoke {
         SmokeKind::Boot => {
             !contents.contains(BOOTINFO_FAIL_MARKER)
+                && contents.contains(BOOT_DIAGNOSTIC_MARKER)
                 && contents.contains(BOOTINFO_MARKER)
                 && contents.contains(SERIAL_MARKER)
         }
         SmokeKind::Panic => {
-            contents.contains(PANIC_MARKER) && contents.contains(PANIC_REGISTERS_MARKER)
+            contents.contains(PANIC_DIAGNOSTIC_MARKER)
+                && contents.contains(PANIC_MARKER)
+                && contents.contains(PANIC_REGISTERS_MARKER)
         }
     })
 }
