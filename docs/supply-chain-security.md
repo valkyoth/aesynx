@@ -50,6 +50,8 @@ Require security review for:
 - New boot capsule, signing, verification, TPM measurement, or Secure Boot
   integration code.
 - New WASM runtime dependencies.
+- New package manager, registry, package signing, transparency-log,
+  entitlement, or paid-marketplace code.
 - New cryptography, random number, or signature dependencies.
 - New AI model loading or inference dependencies.
 

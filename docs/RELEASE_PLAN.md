@@ -2089,6 +2089,21 @@ commands:
 - No broad filesystem driver set.
 - Limine remains the fallback boot path until the Aesynx bootloader is proven.
 
+### v1.9 - Native Package Manager Preview
+
+- `aesynx-pkg` host model crate.
+- Package manifest model.
+- Track model for core, official, community, market, sovereign, and vendor.
+- Local fixture registry.
+- Content-addressed in-memory package store.
+- Generation planning for install, remove, update, rollback, and garbage
+  collection.
+- Capability-manifest policy validation.
+- SBOM/provenance references.
+- `aepkg` host CLI prototype for search, show, list, and transaction planning.
+- Explicit non-goal: network registry fetching, paid marketplace, and GUI store
+  before the host model is proven.
+
 ### v2.0 - Multi-Architecture Research Release
 
 - x86_64 QEMU stable.

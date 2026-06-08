@@ -240,3 +240,31 @@ Implications:
   ABI rather than defining a POSIX ABI.
 - Micro-VM or Linux compatibility support is a later service layer, not a 1.0
   kernel goal.
+
+## ADR-013: Package Management Uses Immutable Object Generations
+
+Decision:
+
+Aesynx package management should use content-addressed immutable package
+objects, declarative profile generations, signed registry tracks, SBOM and
+provenance objects, and capability manifests. See
+[Aesynx Package Manager Roadmap](package-manager-roadmap.md).
+
+Rationale:
+
+Traditional package managers mutate shared global filesystem trees and often
+execute privileged install scripts. That conflicts with Aesynx's object-native,
+capability-native, rollback-capable design.
+
+Implications:
+
+- Installing, removing, updating, and rolling back packages publishes generation
+  roots instead of mutating shared directories.
+- Core, official, community, market, sovereign, and vendor packages are
+  separated by local track policy and trust roots.
+- Package manifests describe requested capabilities, but launch policy grants
+  actual authority.
+- The future store UI is a client of the package service, not a privileged disk
+  mutator.
+- Paid entitlements permit fetch/decryption only; they do not grant runtime
+  authority.

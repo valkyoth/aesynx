@@ -452,7 +452,24 @@ This lets the shell render useful messages and lets AI explain errors without gu
 9. WASM command requests a capability and is denied/granted explicitly.
 10. AI command explanation works with no authority escalation.
 
-## 18. 1.0 Userspace Target
+## 18. Package Management Direction
+
+Native userspace should eventually grow into the package-management model in
+[Aesynx Package Manager Roadmap](package-manager-roadmap.md).
+
+The important userspace connection is that package installation, removal,
+updates, health repair, and rollback should be ordinary capability-checked
+structured operations. `aesh` can expose them as `pkg` commands and typed
+pipelines, while future GUI or TUI store clients use the same package daemon
+API.
+
+Package lookup can also support lazy command execution: when a command is not
+present locally, `aesh` may ask the package service for signed command exports
+and present track, publisher, capability, price, and persistence choices before
+running or installing anything. This must be policy-controlled and disabled by
+default in high-security contexts.
+
+## 19. 1.0 Userspace Target
 
 Minimum 1.0:
 
@@ -486,7 +503,7 @@ Not required for 1.0:
 - Browser-grade GUI.
 - Cloud AI integration.
 
-## 19. Design Rule
+## 20. Design Rule
 
 The core userspace rule is:
 
@@ -494,4 +511,3 @@ The core userspace rule is:
 Aesynx is not Unix-compatible by default.
 Aesynx is capability-native, object-native, structured-data-native, WASM-extensible, and AI-assisted.
 ```
-

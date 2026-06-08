@@ -58,6 +58,7 @@ kernel-owned serial markers, and can run an opt-in deliberate panic smoke test.
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Active candidate | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
+| Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
 | Release gate | Active | Tags require local checks, SBOM, CodeQL on GitHub, and a passing pentest report for the exact commit. |
@@ -70,6 +71,7 @@ kernel-owned serial markers, and can run an opt-in deliberate panic smoke test.
 | Real arch mechanisms | Planned | Interrupt control, core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
+| Package manager | Planned | `aepkg`/`aepkgd` roadmap for search, install, update, rollback, repair, and future store UI. |
 
 ## Local Checks
 
@@ -136,6 +138,7 @@ pentest report in `security/pentest/<tag>.md`.
 
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Userspace Vision](docs/userspace-vision.md)
+- [Package Manager Roadmap](docs/package-manager-roadmap.md)
 - [Release Plan](docs/RELEASE_PLAN.md)
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
 - [Build Skeleton](docs/build-skeleton.md)

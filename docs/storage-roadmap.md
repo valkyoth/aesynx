@@ -52,6 +52,21 @@ Userspace responsibilities:
 This gives Aesynx Btrfs-like operator value without making Btrfs or POSIX
 filesystem semantics the native storage model.
 
+## Package Store Relationship
+
+The native package manager should be built on the same object-store model. See
+[Aesynx Package Manager Roadmap](package-manager-roadmap.md).
+
+Package payloads, manifests, SBOMs, provenance, cached AOT artifacts, and
+profile generations should be immutable objects. Installing or updating a
+package publishes a new generation root. Removing a package omits it from the
+next generation and lets garbage collection reclaim unreachable immutable
+objects after retention policy allows it.
+
+This means package rollback, system snapshotting, and self-healing are the same
+kind of operation: verify immutable objects, then atomically publish or restore
+a named root reference.
+
 ## Object Identity
 
 `ObjectId(u128)` remains the primary OS-facing object identity. For early RAM
