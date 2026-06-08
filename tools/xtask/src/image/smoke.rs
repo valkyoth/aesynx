@@ -4,6 +4,11 @@ pub const BOOT_DIAGNOSTIC_MARKER: &str = "[kernel][INFO] bootinfo normalized";
 pub const CPU_SETUP_MARKER: &str = "[TEST] gdt=ok";
 pub const EXCEPTION_SETUP_MARKER: &str = "[TEST] idt=ok";
 pub const EXCEPTION_MARKER: &str = "[TEST] exception=ok";
+pub const FAULT_ADDRESS_MARKER: &str = "cr2=0x";
+pub const FAULT_CR3_MARKER: &str = "cr3_offset=0x";
+pub const FAULT_ERROR_DECODE_MARKER: &str = "present=";
+pub const FAULT_INTERRUPTS_MARKER: &str = "interrupts_enabled=";
+pub const FAULT_RFLAGS_MARKER: &str = "rflags=0x";
 pub const PAGE_FAULT_MARKER: &str = "[TEST] pagefault=ok";
 pub const PANIC_DIAGNOSTIC_MARKER: &str = "[kernel][FATAL] panic handler entered";
 pub const PANIC_MARKER: &str = "[TEST] panic=ok";
@@ -35,7 +40,7 @@ impl SmokeKind {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
             }
             Self::Exception => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] exception=ok, [TEST] pagefault=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] exception=ok, cr2=0x, cr3_offset=0x, rflags=0x, interrupts_enabled=, present=, [TEST] pagefault=ok"
             }
         }
     }

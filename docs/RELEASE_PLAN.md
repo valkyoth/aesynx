@@ -346,6 +346,10 @@ Deliverables:
 - CR2 read.
 - CR3 read.
 - RFLAGS/interrupt-state output.
+- QEMU exception smoke must require CR2, CR3, RFLAGS, interrupt-state, and
+  decoded page-fault error markers.
+- CR3 output remains redacted to low flag/PCID bits; CR2 is printed only for
+  this early debug page-fault path.
 
 Verification:
 

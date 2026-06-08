@@ -2,6 +2,7 @@ use core::fmt;
 
 const PAGE_OFFSET_MASK: u64 = 0xfff;
 const RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_0000_0cd5;
+const RFLAGS_INTERRUPT_ENABLE: u64 = 1 << 9;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct EarlyRegisterSnapshot {
@@ -91,11 +92,82 @@ impl fmt::Debug for EarlyRegisterSnapshot {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct FaultRegisterSnapshot {
+    fault_address: u64,
+    rflags: u64,
+    cr3: u64,
+}
+
+impl FaultRegisterSnapshot {
+    #[must_use]
+    pub fn capture() -> Self {
+        let fault_address: u64;
+        let rflags: u64;
+        let cr3: u64;
+
+        // SAFETY: These instructions copy architectural register values into
+        // general-purpose outputs. CR2 is the x86_64 fault-address register and
+        // CR3 is copied only for a redacted low-bit summary. `pushfq; pop`
+        // temporarily uses the current aligned exception stack to read RFLAGS.
+        unsafe {
+            core::arch::asm!(
+                "mov {fault_address}, cr2",
+                "pushfq",
+                "pop {rflags}",
+                "mov {cr3}, cr3",
+                fault_address = lateout(reg) fault_address,
+                rflags = lateout(reg) rflags,
+                cr3 = lateout(reg) cr3,
+                options(preserves_flags)
+            );
+        }
+
+        Self {
+            fault_address,
+            rflags,
+            cr3,
+        }
+    }
+
+    #[must_use]
+    pub const fn fault_address(self) -> u64 {
+        self.fault_address
+    }
+
+    #[must_use]
+    pub const fn public_rflags(self) -> u64 {
+        self.rflags & RFLAGS_PUBLIC_MASK
+    }
+
+    #[must_use]
+    pub const fn interrupts_enabled(self) -> bool {
+        self.rflags & RFLAGS_INTERRUPT_ENABLE != 0
+    }
+
+    #[must_use]
+    pub const fn cr3_page_offset(self) -> u16 {
+        (self.cr3 & PAGE_OFFSET_MASK) as u16
+    }
+}
+
+impl fmt::Debug for FaultRegisterSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FaultRegisterSnapshot")
+            .field("fault_address", &self.fault_address)
+            .field("rflags", &self.public_rflags())
+            .field("interrupts_enabled", &self.interrupts_enabled())
+            .field("cr3", &"redacted")
+            .field("cr3_page_offset", &self.cr3_page_offset())
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::fmt::{self, Write};
 
-    use super::EarlyRegisterSnapshot;
+    use super::{EarlyRegisterSnapshot, FaultRegisterSnapshot};
 
     #[test]
     fn register_snapshot_debug_redacts_address_values() {
@@ -143,6 +215,26 @@ mod tests {
         };
 
         assert_eq!(snapshot.public_rflags(), 0);
+    }
+
+    #[test]
+    fn fault_snapshot_exposes_fault_address_and_redacts_cr3() {
+        let snapshot = FaultRegisterSnapshot {
+            fault_address: 0xdead_beef,
+            rflags: 0xffff_ffff_0000_0ed7,
+            cr3: 0x1234_5abc,
+        };
+        let mut output = FixedBuf::default();
+
+        assert_eq!(
+            write!(&mut output, "{snapshot:?}").map(|()| output.contains("redacted")),
+            Ok(true)
+        );
+        assert_eq!(snapshot.fault_address(), 0xdead_beef);
+        assert_eq!(snapshot.public_rflags(), 0x0cd5);
+        assert!(snapshot.interrupts_enabled());
+        assert_eq!(snapshot.cr3_page_offset(), 0xabc);
+        assert!(!output.contains("12345"));
     }
 
     struct FixedBuf {

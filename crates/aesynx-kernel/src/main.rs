@@ -141,7 +141,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.8.0 panic smoke");
+    panic!("intentional v0.9.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

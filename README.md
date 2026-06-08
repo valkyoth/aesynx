@@ -36,14 +36,15 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.7.0` is the tagged GDT/TSS line. `main` is currently carrying the
-`v0.8.0` IDT and exceptions implementation candidate. It builds a
+`v0.8.0` is the tagged IDT/exceptions line. `main` is currently carrying the
+`v0.9.0` register and fault decoding implementation candidate. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
 kernel-owned serial markers, installs basic x86_64 descriptor and interrupt
 tables, handles a returning breakpoint exception, and can run opt-in deliberate
-panic and page-fault smoke tests.
+panic and page-fault smoke tests with CR2, CR3 low-bit, RFLAGS, interrupt-state,
+and decoded page-fault diagnostics.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -60,7 +61,8 @@ panic and page-fault smoke tests.
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
 | GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
-| IDT and exceptions | Active candidate | Early x86_64 boot installs an IDT, handles breakpoint, page-fault, and double-fault vectors, and verifies `[TEST] exception=ok`. |
+| IDT and exceptions | Tagged | Early x86_64 boot installs an IDT, handles breakpoint, page-fault, and double-fault vectors, and verifies `[TEST] exception=ok`. |
+| Fault decoding | Active candidate | `v0.9.0`; page-fault smoke prints CR2, CR3 low bits, public RFLAGS, interrupt state, and decoded error bits. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -72,7 +74,7 @@ panic and page-fault smoke tests.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| IDT and exceptions | Active | `v0.8.0`; install IDT, add breakpoint/page-fault/double-fault handlers, docs, release notes, and pentest follow-up. |
+| Register and fault decoding | Active | `v0.9.0`; expand exception frame diagnostics, decode page-fault error bits, and gate CR2/CR3/RFLAGS output in QEMU. |
 | Real arch mechanisms | Planned | Interrupt control, core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -99,7 +101,7 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.8 Limine QEMU image:
+Create and smoke-test the v0.9 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -132,7 +134,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.8.0
+cargo xtask release-ready v0.9.0
 ```
 
 ## Security Posture
@@ -159,6 +161,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [v0.7.0 Release Candidate Notes](docs/releases/v0.7.0-rc.md)
+- [v0.9.0 Release Candidate Notes](docs/releases/v0.9.0-rc.md)
 - [v0.8.0 Release Candidate Notes](docs/releases/v0.8.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)

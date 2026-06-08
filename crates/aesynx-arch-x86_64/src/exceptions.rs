@@ -3,6 +3,7 @@ use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::descriptors::{InterruptStackTableIndex, SegmentSelector};
+use crate::registers::FaultRegisterSnapshot;
 
 const IDT_ENTRIES: usize = 256;
 const BREAKPOINT_VECTOR: usize = 3;
@@ -186,7 +187,28 @@ extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) 
             crate::serial::write_str("[TEST] exception=ok\n");
         }
         PAGE_FAULT_VECTOR_U8 => {
-            crate::serial_println!("exception vector=page-fault error=0x{:x}", frame.error_code);
+            let error = PageFaultErrorCode::new(frame.error_code);
+            let registers = FaultRegisterSnapshot::capture();
+            crate::serial_println!(
+                "exception vector=page-fault error=0x{:x} rip_present={} rip_offset=0x{:x} cs=0x{:x} frame_rflags=0x{:x} cr2=0x{:x} cr3_offset=0x{:x} rflags=0x{:x} interrupts_enabled={} present={} write={} user={} reserved={} instruction={} protection_key={} shadow_stack={} sgx={}",
+                frame.error_code,
+                frame.instruction_pointer_present(),
+                frame.instruction_pointer_offset(),
+                frame.code_segment,
+                frame.public_rflags(),
+                registers.fault_address(),
+                registers.cr3_page_offset(),
+                registers.public_rflags(),
+                registers.interrupts_enabled(),
+                error.present(),
+                error.write(),
+                error.user(),
+                error.reserved_bit(),
+                error.instruction_fetch(),
+                error.protection_key(),
+                error.shadow_stack(),
+                error.sgx()
+            );
             crate::serial::write_str("[TEST] pagefault=ok\n");
             crate::serial::write_str("[TEST] exception=ok\n");
         }
@@ -212,6 +234,9 @@ const DOUBLE_FAULT_VECTOR_U8: u8 = DOUBLE_FAULT_VECTOR as u8;
 struct ExceptionFrame {
     vector: u8,
     error_code: u64,
+    instruction_pointer: u64,
+    code_segment: u64,
+    rflags: u64,
 }
 
 impl ExceptionFrame {
@@ -228,7 +253,66 @@ impl ExceptionFrame {
         Some(Self {
             vector,
             error_code: raw.error_code,
+            instruction_pointer: raw.instruction_pointer,
+            code_segment: raw.code_segment,
+            rflags: raw.rflags,
         })
+    }
+
+    const fn public_rflags(self) -> u64 {
+        self.rflags & FRAME_RFLAGS_PUBLIC_MASK
+    }
+
+    const fn instruction_pointer_present(self) -> bool {
+        self.instruction_pointer != 0
+    }
+
+    const fn instruction_pointer_offset(self) -> u16 {
+        (self.instruction_pointer & PAGE_OFFSET_MASK) as u16
+    }
+}
+
+const PAGE_OFFSET_MASK: u64 = 0xfff;
+const FRAME_RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_0000_0cd5;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PageFaultErrorCode(u64);
+
+impl PageFaultErrorCode {
+    const fn new(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    const fn present(self) -> bool {
+        self.0 & (1 << 0) != 0
+    }
+
+    const fn write(self) -> bool {
+        self.0 & (1 << 1) != 0
+    }
+
+    const fn user(self) -> bool {
+        self.0 & (1 << 2) != 0
+    }
+
+    const fn reserved_bit(self) -> bool {
+        self.0 & (1 << 3) != 0
+    }
+
+    const fn instruction_fetch(self) -> bool {
+        self.0 & (1 << 4) != 0
+    }
+
+    const fn protection_key(self) -> bool {
+        self.0 & (1 << 5) != 0
+    }
+
+    const fn shadow_stack(self) -> bool {
+        self.0 & (1 << 6) != 0
+    }
+
+    const fn sgx(self) -> bool {
+        self.0 & (1 << 15) != 0
     }
 }
 
@@ -292,7 +376,7 @@ mod tests {
 
     use super::{
         DOUBLE_FAULT_VECTOR, ExceptionFrame, IDT_ENTRIES, INTERRUPT_GATE_PRESENT, IdtEntry,
-        PAGE_FAULT_VECTOR, RawExceptionFrame,
+        PAGE_FAULT_VECTOR, PageFaultErrorCode, RawExceptionFrame,
     };
     use crate::descriptors::{InterruptStackTableIndex, SegmentSelector};
 
@@ -327,5 +411,54 @@ mod tests {
     #[test]
     fn exception_frame_rejects_invalid_pointer() {
         assert_eq!(ExceptionFrame::from_raw(core::ptr::null()), None);
+    }
+
+    #[test]
+    fn exception_frame_copies_interrupt_frame_fields() {
+        let raw = RawExceptionFrame {
+            vector: 14,
+            error_code: 0b101,
+            instruction_pointer: 0xffff_ffff_8000_1234,
+            code_segment: SegmentSelector::KERNEL_CODE.bits() as u64,
+            rflags: 0xffff_ffff_0000_0ed7,
+        };
+
+        let frame = ExceptionFrame::from_raw(core::ptr::addr_of!(raw));
+
+        assert_eq!(
+            frame,
+            Some(ExceptionFrame {
+                vector: 14,
+                error_code: 0b101,
+                instruction_pointer: 0xffff_ffff_8000_1234,
+                code_segment: SegmentSelector::KERNEL_CODE.bits() as u64,
+                rflags: 0xffff_ffff_0000_0ed7,
+            })
+        );
+        assert_eq!(frame.map(ExceptionFrame::public_rflags), Some(0x0cd5));
+        assert_eq!(
+            frame.map(ExceptionFrame::instruction_pointer_present),
+            Some(true)
+        );
+        assert_eq!(
+            frame.map(ExceptionFrame::instruction_pointer_offset),
+            Some(0x234)
+        );
+    }
+
+    #[test]
+    fn page_fault_error_code_decodes_architectural_bits() {
+        let error = PageFaultErrorCode::new(
+            (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 15),
+        );
+
+        assert!(error.present());
+        assert!(error.write());
+        assert!(error.user());
+        assert!(error.reserved_bit());
+        assert!(error.instruction_fetch());
+        assert!(error.protection_key());
+        assert!(error.shadow_stack());
+        assert!(error.sgx());
     }
 }

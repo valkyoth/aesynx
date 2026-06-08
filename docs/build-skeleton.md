@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.8 IDT/exceptions implementation candidate
+Status: v0.9 register and fault decoding implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -54,20 +54,21 @@ cargo xtask qemu --panic-smoke
 cargo xtask qemu --exception-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.8.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.9.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] exception=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.8.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.9.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] exception=ok`, and `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.8.0-exception.iso`, enables the kernel
-`exception-smoke` feature, and expects `[TEST] pagefault=ok` and
-`[TEST] exception=ok`.
+`build/qemu/aesynx-v0.9.0-exception.iso`, enables the kernel
+`exception-smoke` feature, and expects `[TEST] pagefault=ok`,
+`[TEST] exception=ok`, `cr2=0x`, `cr3_offset=0x`, `rflags=0x`,
+`interrupts_enabled=`, and decoded page-fault error fields.
 
 The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that
 computes the workspace root dynamically and passes
@@ -76,12 +77,13 @@ builds also pass the same remap through encoded Rust flags as portable
 defense-in-depth for the release image path. The panic handler still emits only
 an escaped filename basename.
 
-The v0.8 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+The v0.9 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, handle a returning breakpoint
-exception, catch an opt-in page fault, provide handoff metadata that normalizes
-into Aesynx `BootInfo`, and produce readable early panic diagnostics. It does
-not claim page-table ownership, interrupt-controller setup, memory allocation,
-full fault decoding, or bootloader memory reclamation.
+exception, catch and decode an opt-in page fault, provide handoff metadata that
+normalizes into Aesynx `BootInfo`, and produce readable early panic
+diagnostics. It does not claim page-table ownership, interrupt-controller
+setup, memory allocation, page-fault recovery, or bootloader memory
+reclamation.
 
 ## Target Shape
 
