@@ -4,6 +4,7 @@ use crate::{
 };
 
 const PAGE_SIZE: u64 = 4096;
+const AARCH64_KERNEL_VMA_MIN: u64 = 0xffff_0000_0000_0000;
 const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -92,7 +93,13 @@ fn validate_kernel_image(arch: ArchKind, image: KernelImageInfo) -> Result<(), B
         return Err(BootInfoError::KernelImageEmpty);
     }
 
-    if arch == ArchKind::X86_64 && virt_start < X86_64_KERNEL_VMA_MIN {
+    let min_kernel_vma = match arch {
+        ArchKind::Aarch64 => AARCH64_KERNEL_VMA_MIN,
+        ArchKind::X86_64 => X86_64_KERNEL_VMA_MIN,
+        ArchKind::Unknown => return Err(BootInfoError::KernelImageEmpty),
+    };
+
+    if virt_start < min_kernel_vma {
         return Err(BootInfoError::KernelImageEmpty);
     }
 
@@ -298,6 +305,32 @@ mod tests {
         )];
         let result = BootInfo::normalize(BootMetadata {
             arch: ArchKind::X86_64,
+            platform: PlatformKind::Qemu,
+            memory_regions: &regions,
+            framebuffer: None,
+            rsdp: None,
+            device_tree: None,
+            cpu_topology: &[],
+            kernel_image: KernelImageInfo::new(
+                VirtAddr::new(0x400000),
+                VirtAddr::new(0x402000),
+                PhysAddr::new(0x200000),
+            ),
+            hhdm: None,
+        });
+
+        assert_eq!(result, Err(BootInfoError::KernelImageEmpty));
+    }
+
+    #[test]
+    fn bootinfo_rejects_user_half_aarch64_kernel_image() {
+        let regions = [MemoryRegion::new(
+            PhysAddr::new(0x1000),
+            0x9000,
+            MemoryRegionKind::Usable,
+        )];
+        let result = BootInfo::normalize(BootMetadata {
+            arch: ArchKind::Aarch64,
             platform: PlatformKind::Qemu,
             memory_regions: &regions,
             framebuffer: None,

@@ -127,9 +127,10 @@ fn boot_entry() -> ! {
             aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
             diagnostics::set_boot_phase(BootPhase::Running);
         }
-        Err(_error) => {
+        Err(error) => {
             aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
             write_diagnostic(LogLevel::Error, "bootinfo normalization failed");
+            aesynx_arch_x86_64::serial_println!("bootinfo error={:?}", error);
             aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=fail\n");
         }
     }

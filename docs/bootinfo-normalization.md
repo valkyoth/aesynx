@@ -39,9 +39,11 @@ can inspect kind, length, and presence-only start metadata without recovering
 kernel-image placement from the public memory map.
 
 The Limine boundary rejects null and misaligned response pointers before
-creating Rust references, pins the transcribed framebuffer ABI with compile-time
-layout assertions, and validates kernel-image base alignment plus the x86_64
-kernel-half virtual address invariant.
+creating Rust references, checks that every consumed response revision is
+compatible with the requested revision, accepts forward-compatible response
+prefixes, pins the transcribed framebuffer ABI with compile-time layout
+assertions, and validates kernel-image base alignment plus the x86_64 and
+AArch64 kernel-half virtual address invariants.
 
 ## Serial Contract
 

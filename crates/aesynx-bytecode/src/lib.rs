@@ -53,6 +53,16 @@ impl UncheckedTarget {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VerifiedTarget(u16);
+
+impl VerifiedTarget {
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct UncheckedOffset(u16);
 
 impl UncheckedOffset {
@@ -64,6 +74,48 @@ impl UncheckedOffset {
     #[must_use]
     pub const fn get(self) -> u16 {
         self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VerifiedOffset(u16);
+
+impl VerifiedOffset {
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VerifyError {
+    OffsetOutOfRange,
+    TargetOutOfRange,
+}
+
+pub struct Verifier;
+
+impl Verifier {
+    pub const fn verify_target(
+        target: UncheckedTarget,
+        instruction_count: u16,
+    ) -> Result<VerifiedTarget, VerifyError> {
+        if target.get() >= instruction_count {
+            return Err(VerifyError::TargetOutOfRange);
+        }
+
+        Ok(VerifiedTarget(target.get()))
+    }
+
+    pub const fn verify_offset(
+        offset: UncheckedOffset,
+        accessible_len: u64,
+    ) -> Result<VerifiedOffset, VerifyError> {
+        if offset.get() as u64 >= accessible_len {
+            return Err(VerifyError::OffsetOutOfRange);
+        }
+
+        Ok(VerifiedOffset(offset.get()))
     }
 }
 
@@ -105,7 +157,9 @@ pub enum FuelError {
 
 #[cfg(test)]
 mod tests {
-    use super::{Fuel, FuelError, MAX_FUEL};
+    use super::{
+        Fuel, FuelError, MAX_FUEL, UncheckedOffset, UncheckedTarget, Verifier, VerifyError,
+    };
 
     #[test]
     fn consume_decrements_fuel_until_exhausted() {
@@ -124,5 +178,29 @@ mod tests {
     #[test]
     fn fuel_rejects_values_above_limit() {
         assert_eq!(Fuel::new(MAX_FUEL + 1), Err(FuelError::ExceedsLimit));
+    }
+
+    #[test]
+    fn verifier_bounds_branch_targets_before_execution() {
+        assert_eq!(
+            Verifier::verify_target(UncheckedTarget::new(1), 2).map(|target| target.get()),
+            Ok(1)
+        );
+        assert_eq!(
+            Verifier::verify_target(UncheckedTarget::new(2), 2),
+            Err(VerifyError::TargetOutOfRange)
+        );
+    }
+
+    #[test]
+    fn verifier_bounds_offsets_before_execution() {
+        assert_eq!(
+            Verifier::verify_offset(UncheckedOffset::new(7), 8).map(|offset| offset.get()),
+            Ok(7)
+        );
+        assert_eq!(
+            Verifier::verify_offset(UncheckedOffset::new(8), 8),
+            Err(VerifyError::OffsetOutOfRange)
+        );
     }
 }

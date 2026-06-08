@@ -173,6 +173,10 @@ impl Capability {
             return Err(DeriveError::MissingDerivePermission);
         }
 
+        if matches!(request.len, Some(0)) {
+            return Err(DeriveError::RangeEscalates);
+        }
+
         if !self.perms.contains(request.perms) {
             return Err(DeriveError::PermissionsEscalate);
         }
@@ -199,6 +203,7 @@ impl Capability {
         }
 
         Ok(Self {
+            perms: self.perms.without(CapPerms::GRANT),
             owner: target_owner,
             ..self
         })
@@ -420,6 +425,22 @@ mod tests {
     }
 
     #[test]
+    fn derive_rejects_zero_length_range() {
+        let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
+        let request = DeriveRequest {
+            perms: CapPerms::READ,
+            owner: PrincipalId::new(2),
+            base: Some(VirtAddr::new(120)),
+            len: Some(0),
+        };
+
+        assert_eq!(
+            audited_derive(parent, request),
+            Err(DeriveError::RangeEscalates)
+        );
+    }
+
+    #[test]
     fn grant_requires_grant_permission() {
         let parent = parent_cap(CapPerms::READ);
 
@@ -430,13 +451,13 @@ mod tests {
     }
 
     #[test]
-    fn grant_preserves_authority_and_changes_owner() {
+    fn grant_transfers_authority_without_regrant_by_default() {
         let parent = parent_cap(CapPerms::READ.union(CapPerms::GRANT));
         let expected = Capability::new_for_test(TestCapabilitySpec {
             object_id: parent.object_id(),
             base: parent.base(),
             len: parent.range_len(),
-            perms: parent.perms(),
+            perms: CapPerms::READ,
             owner: PrincipalId::new(2),
             generation: parent.generation(),
             revocation_epoch: parent.revocation_epoch(),

@@ -128,6 +128,10 @@ pub enum SchedError {
 }
 
 const fn task_transition_allowed(current: TaskState, next: TaskState) -> bool {
+    if matches!(current, TaskState::Dead) {
+        return false;
+    }
+
     matches!(
         (current, next),
         (TaskState::Runnable, TaskState::Running)
@@ -208,6 +212,10 @@ mod tests {
         assert_eq!(task.transition(TaskState::WaitingOnMessage), Ok(()));
         assert_eq!(task.transition(TaskState::Runnable), Ok(()));
         assert_eq!(task.transition(TaskState::Dead), Ok(()));
+        assert_eq!(
+            task.transition(TaskState::Dead),
+            Err(SchedError::InvalidStateTransition)
+        );
     }
 
     #[test]

@@ -29,7 +29,7 @@ impl<'a> LogMessage<'a> {
         }
 
         if contains_invalid_log_byte(value) {
-            return Err(LogError::RecordSeparatorNotAllowed);
+            return Err(LogError::ForbiddenCharacter);
         }
 
         Ok(Self { value })
@@ -44,7 +44,7 @@ impl<'a> LogMessage<'a> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LogError {
     MessageTooLong,
-    RecordSeparatorNotAllowed,
+    ForbiddenCharacter,
 }
 
 pub trait LogSink {
@@ -71,18 +71,18 @@ mod tests {
     use super::{LogError, LogMessage};
 
     #[test]
-    fn log_message_rejects_record_separator() {
+    fn log_message_rejects_forbidden_record_separator() {
         assert_eq!(
             LogMessage::new("valid\nforged"),
-            Err(LogError::RecordSeparatorNotAllowed)
+            Err(LogError::ForbiddenCharacter)
         );
     }
 
     #[test]
-    fn log_message_rejects_record_delimiter_metacharacters() {
+    fn log_message_rejects_forbidden_record_delimiter_metacharacters() {
         assert_eq!(
             LogMessage::new("ok ][FATAL] injected"),
-            Err(LogError::RecordSeparatorNotAllowed)
+            Err(LogError::ForbiddenCharacter)
         );
     }
 

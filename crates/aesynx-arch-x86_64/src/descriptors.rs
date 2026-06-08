@@ -84,6 +84,9 @@ pub fn init() -> DescriptorTableStatus {
 /// This must be set to a valid per-core kernel stack before Aesynx enables
 /// ring 3 execution. v0.7.0 does not run userspace yet, so the field remains
 /// zero until the future privilege-transition setup can provide the real stack.
+/// The current boot descriptor tables are deliberately single-core only: SMP
+/// or ring 3 support must replace this global TSS/GDT storage with per-CPU
+/// tables before any secondary core or userspace transition can call this.
 ///
 /// # Safety
 ///
