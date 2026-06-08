@@ -149,6 +149,11 @@ builder = "did:aesynx:builder:community-ci"
 provenance = "slsa:sha256:..."
 transparency_entry = "rekor-like:..."
 
+[[signatures]]
+algorithm = "policy-selected"
+key_id = "did:aesynx:pub:example#key-1"
+value = "base64:..."
+
 [license]
 software = "EUPL-1.2"
 entitlement = "none"
@@ -157,6 +162,8 @@ entitlement = "none"
 Manifest rules:
 
 - The manifest is signed by the publisher.
+- Signatures are represented as versioned envelopes with algorithm identifiers,
+  not as one fixed signature type or fixed-size field.
 - The registry track signs or countersigns index inclusion.
 - SBOM and provenance are immutable dependencies of the package identity.
 - Capability declarations are requests, not grants.
@@ -206,13 +213,15 @@ Client verification order:
 1. Load local track policy.
 2. Fetch signed registry root/snapshot metadata.
 3. Verify signatures against the track trust root.
-4. Verify transparency inclusion when required by track policy.
-5. Resolve package names to immutable manifest hashes.
-6. Fetch Merkle blocks from any mirror or peer.
-7. Hash every block and the completed artifact.
-8. Verify publisher signature and SBOM/provenance references.
-9. Store the verified objects immutably.
-10. Publish a new generation root only after all verification succeeds.
+4. Apply track policy for accepted algorithms and hybrid-signature
+   requirements.
+5. Verify transparency inclusion when required by track policy.
+6. Resolve package names to immutable manifest hashes.
+7. Fetch Merkle blocks from any mirror or peer.
+8. Hash every block and the completed artifact.
+9. Verify publisher signature and SBOM/provenance references.
+10. Store the verified objects immutably.
+11. Publish a new generation root only after all verification succeeds.
 
 Mirror agnosticism is mandatory. A mirror is only a source of bytes. It is not a
 source of truth.
@@ -401,6 +410,8 @@ Garbage collection:
 - Every registry trust root is explicit local policy.
 - Track changes are auditable state changes.
 - Names are advisory; hashes and signatures are authoritative.
+- Signature and key formats are crypto-agile. See
+  [Post-Quantum Readiness Roadmap](post-quantum-readiness.md).
 - Capability manifests are upper bounds, not automatic grants.
 - Paid-license receipts do not override capability policy.
 - Package metadata is untrusted until signatures and transparency policy pass.

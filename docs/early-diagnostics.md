@@ -27,8 +27,9 @@ Structured records use this shape:
 [core=0][phase=bootinfo-normalized][kernel][INFO] bootinfo normalized
 ```
 
-Messages use `LogMessage`, which rejects record separators. Components are also
-validated so a component name cannot forge bracketed fields or extra records.
+Messages use `LogMessage`, which rejects record separators and bracket
+metacharacters. Components are also validated so a component name cannot forge
+bracketed fields or extra records.
 
 ## Panic Output
 
@@ -43,9 +44,10 @@ panic message=<message>
 panic registers=rsp_present=<bool> rbp_present=<bool> rsp_align=<n> rbp_align=<n> rflags=0x<n> cr3_offset=0x<n>
 ```
 
-The panic location emits only the escaped filename component, not the full source
-path. Xtask kernel builds also pass `--remap-path-prefix <workspace>=.` so
-embedded file paths do not disclose the local workspace root.
+The panic location emits only the escaped filename component, not the full
+source path. The tracked kernel target flags and xtask kernel builds both pass
+`--remap-path-prefix <workspace>=.`, so embedded file paths do not disclose the
+local workspace root in normal direct and release-image builds.
 
 The panic message line is escaped and bounded before serial emission. Newlines,
 carriage returns, tabs, backslashes, brackets, non-ASCII bytes, and other

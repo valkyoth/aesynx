@@ -78,6 +78,10 @@ pub enum TaskState {
     Dead,
 }
 
+/// Scheduling priority.
+///
+/// Higher values run first: `Priority(127)` has higher urgency than
+/// `Priority(0)`. Value 0 is minimum priority and `MAX_PRIORITY` is maximum.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Priority(u8);
 
@@ -168,6 +172,20 @@ mod tests {
     fn bounded_scheduler_values_expose_raw_values() {
         assert_eq!(Priority::new(1).map(Priority::get), Ok(1));
         assert_eq!(TimeBudget::new(10).map(TimeBudget::ticks), Ok(10));
+    }
+
+    #[test]
+    fn priority_ordering_uses_higher_values_for_higher_urgency() {
+        let background = match Priority::new(0) {
+            Ok(priority) => priority,
+            Err(error) => return assert_eq!(error, SchedError::PriorityOutOfRange),
+        };
+        let urgent = match Priority::new(MAX_PRIORITY) {
+            Ok(priority) => priority,
+            Err(error) => return assert_eq!(error, SchedError::PriorityOutOfRange),
+        };
+
+        assert!(urgent > background);
     }
 
     #[test]

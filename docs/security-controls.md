@@ -15,6 +15,7 @@ claim that the controls are implemented today.
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
 | Componentization | System must not collapse into one huge OS binary; components remain independently versioned and rollback-capable | Policy active | `docs/modularity-policy.md`, `docs/ARCHITECTURE_DECISIONS.md` |
 | Supply chain | Executable dependency and workflow changes require review | Policy only | `docs/supply-chain-security.md` |
+| Post-quantum readiness | Boot, package, update, entitlement, and identity metadata must stay crypto-agile and support future hybrid validation | Planned | `docs/post-quantum-readiness.md`, `docs/ARCHITECTURE_DECISIONS.md` |
 | Static analysis | GitHub CodeQL default setup for Rust | Configured externally | GitHub code scanning default setup |
 | Release pentest | Passing pentest report required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
 | Capabilities | No ambient authority as design center | Model active | `crates/aesynx-cap`, `docs/IMPLEMENTATION_PLAN.md` |
@@ -25,7 +26,7 @@ claim that the controls are implemented today.
 | Boot address secrecy | KASLR-sensitive kernel image, RSDP, HHDM, device-tree, framebuffer, and memory-region physical starts are private or debug-redacted | Active candidate | `KernelImageInfo`, `MemoryRegion`, `BootInfo`, `BootMetadata`, `cargo xtask qemu` |
 | BootInfo normalization | Bootloader-specific handoff data normalizes before generic kernel use; Limine response pointers are null/alignment checked and request statics live in the RW handoff segment | Active candidate | `aesynx-boot`, `crates/aesynx-kernel/src/limine.rs`, `linker/kernel-x86_64.ld` |
 | Early diagnostics | Structured log-level records with validated components, escaped and bounded panic output, basename-only source location, boot phase, early core, message, arithmetic-only RFLAGS, redacted register summary, and QEMU panic marker | Active candidate | `aesynx-kernel::diagnostics`, `aesynx-arch-x86_64::registers`, `cargo xtask qemu --panic-smoke` |
-| x86_64 descriptor tables | Early boot installs a private GDT, TSS, and dedicated double-fault IST stack before generic kernel work | Active candidate | `aesynx-arch-x86_64::descriptors`, `cargo xtask qemu` |
+| x86_64 descriptor tables | Early boot installs a private GDT, reloads CS/SS/DS/ES, nulls FS/GS selectors, loads TSS, and reserves a dedicated double-fault IST stack before generic kernel work | Active candidate | `aesynx-arch-x86_64::descriptors`, `cargo xtask qemu` |
 | Telemetry integrity | Task telemetry uses append-only counters; core telemetry snapshots are advisory per-counter samples | Model active | `TaskTelemetry`, `CoreTelemetry` |
 | Capability revocation | REVOKE authority check required before epoch mutation; epoch increment must fail rather than wrap | Model active | `ensure_revoke_authority`, `RevocationEpochStore` |
 | Early serial safety | COM1 output uses admitted ports, bounded polling, and a single-core marker type | Active for boot | `crates/aesynx-arch-x86_64/src/serial.rs`, `crates/aesynx-arch-x86_64/src/port.rs` |

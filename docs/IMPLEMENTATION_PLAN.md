@@ -30,6 +30,9 @@ The 1.0 target is a working QEMU version with:
 - A modular workspace structure from day one: focused crates, focused modules, no giant source files.
 - A componentized system shape from day one: no one huge OS binary, even when
   a signed boot bundle packages many components together.
+- Post-quantum readiness by design: cryptographic metadata, boot capsules,
+  package manifests, update policy, and identity formats must stay
+  algorithm-agile instead of baking in one permanent public-key scheme.
 
 Unix/POSIX/Linux compatibility is not part of this plan. Native Aesynx userspace is part of this plan.
 
@@ -176,7 +179,33 @@ The kernel must boot and make correct decisions with:
 
 AI may advise. The kernel enforces.
 
-### 2.5 Capability Authority
+### 2.5 Post-Quantum Readiness
+
+Aesynx must be crypto-agile before it becomes crypto-dependent. See
+[Post-Quantum Readiness Roadmap](post-quantum-readiness.md).
+
+Core rules:
+
+- Boot capsules, package manifests, update metadata, entitlement receipts,
+  secure-channel identities, and model/policy signatures must carry algorithm
+  identifiers and versioned signature envelopes.
+- Stable ABIs must not assume RSA, ECDSA, Ed25519, ML-DSA, SLH-DSA, or any
+  other single permanent algorithm.
+- Stable ABIs must not use tiny fixed-size buffers for public keys,
+  signatures, KEM ciphertexts, or certificate-like structures.
+- Critical trust paths should be able to require hybrid classical plus
+  post-quantum validation when the cryptographic provider layer exists.
+- Unknown algorithms are rejected by default unless local policy explicitly
+  admits them.
+- Cryptographic migration is a generation transition with audit evidence, not
+  in-place mutation of old objects.
+
+Quantum processors are future accelerators, not the main post-quantum design
+problem. If such hardware appears, Aesynx should support it through isolated
+driver services, explicit device capabilities, queue-based APIs, and userspace
+runtimes.
+
+### 2.6 Capability Authority
 
 Kernel subsystems should avoid accepting raw addresses or object IDs as authority. Where possible, APIs accept capabilities:
 
@@ -197,7 +226,7 @@ The capability system must defend against:
 - Use after revocation.
 - Permission escalation during derivation.
 
-### 2.6 No Global Mutable Kernel Registries
+### 2.7 No Global Mutable Kernel Registries
 
 The long-term rule:
 

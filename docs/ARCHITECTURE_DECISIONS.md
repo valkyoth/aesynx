@@ -268,3 +268,32 @@ Implications:
   mutator.
 - Paid entitlements permit fetch/decryption only; they do not grant runtime
   authority.
+
+## ADR-014: Post-Quantum Readiness Through Crypto Agility
+
+Decision:
+
+Aesynx must be post-quantum ready by design. Trust metadata should use
+versioned, algorithm-identified signature and key-establishment envelopes
+instead of assuming one permanent public-key algorithm. See
+[Post-Quantum Readiness Roadmap](post-quantum-readiness.md).
+
+Rationale:
+
+Quantum risk affects boot trust, package trust, updates, remote attestation,
+secure channels, paid entitlements, and signed model/policy objects before it
+affects direct operating-system support for quantum processors. A future
+quantum processor is an accelerator/driver problem; quantum-resistant security
+is a trust-format and migration problem.
+
+Implications:
+
+- Boot capsules and package manifests use signature envelopes, not single
+  signature fields.
+- Stable ABIs avoid fixed public-key, signature, KEM ciphertext, and
+  certificate-size assumptions.
+- Critical trust paths can require hybrid classical plus post-quantum
+  validation once crypto providers exist.
+- Unknown algorithms are rejected by default unless local policy admits them.
+- Cryptographic migration is represented as signed generation state with audit
+  evidence, not in-place mutation.

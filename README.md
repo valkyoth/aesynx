@@ -62,6 +62,7 @@ run an opt-in deliberate panic smoke test.
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
+| Post-quantum readiness | Planned | Crypto-agile boot, package, update, and identity metadata with room for hybrid classical plus post-quantum validation. |
 | Supply-chain checks | Active | `cargo deny`, `cargo audit`, SBOM generation, Dependabot, SHA-pinned GitHub Actions, and CodeQL default Rust workflow. |
 | Release gate | Active | Tags require local checks, SBOM, CodeQL on GitHub, and a passing pentest report for the exact commit. |
 
@@ -74,6 +75,7 @@ run an opt-in deliberate panic smoke test.
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
 | Package manager | Planned | `aepkg`/`aepkgd` roadmap for search, install, update, rollback, repair, and future store UI. |
+| Post-quantum readiness | Planned | Crypto-agile signature envelopes and trust policy before signed boot capsules, package registries, or update metadata. |
 
 ## Local Checks
 
@@ -152,6 +154,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)
+- [Post-Quantum Readiness](docs/post-quantum-readiness.md)
 - [Security Policy](SECURITY.md)
 - [Threat Model](docs/threat-model.md)
 - [Security Controls](docs/security-controls.md)

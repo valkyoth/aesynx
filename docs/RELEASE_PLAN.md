@@ -2082,7 +2082,10 @@ commands:
 
 - UEFI-first Rust `no_std` bootloader prototype.
 - Aesynx boot capsule manifest.
+- Crypto-agile signature envelope model for the boot capsule.
 - Signature verification before handoff.
+- Post-quantum readiness review for boot trust metadata; no hardcoded
+  permanent public-key algorithm in the capsule ABI.
 - TPM measurement plan and QEMU swtpm experiment where practical.
 - Declarative config only.
 - No bootloader shell or scripting.
@@ -2093,6 +2096,8 @@ commands:
 
 - `aesynx-pkg` host model crate.
 - Package manifest model.
+- Crypto-agile signature-envelope model and track policy for accepted
+  algorithms.
 - Track model for core, official, community, market, sovereign, and vendor.
 - Local fixture registry.
 - Content-addressed in-memory package store.

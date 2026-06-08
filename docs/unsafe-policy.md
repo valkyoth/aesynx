@@ -95,12 +95,12 @@ Limitations: not a full interrupt-frame dump, does not capture fault address, do
 ```text
 Location: crates/aesynx-arch-x86_64/src/descriptors.rs
 Status: active in v0.7
-Purpose: install early x86_64 GDT, TSS, and dedicated double-fault IST stack
+Purpose: install early x86_64 GDT, TSS, dedicated double-fault IST stack, and live segment-register state
 Preconditions: called during early single-core kernel execution after Limine transfers control and before Aesynx enables interrupts
-Unsafe operation: writes private static descriptor/TSS tables, executes lgdt, and executes ltr
-Safety argument: descriptor and TSS statics are private to the architecture module, initialized once, and then treated as read-only CPU tables; the double-fault stack is a private aligned static byte array and the TSS records its one-past-end stack pointer as required by x86_64; lgdt and ltr load CPU registers from initialized static data and do not create Rust references or access untrusted pointers
-Tests/evidence: descriptor unit tests verify selector layout, TSS size, TSS descriptor encoding, and double-fault stack properties; cargo xtask qemu observes [TEST] gdt=ok
-Limitations: early single-core setup only; no IDT, exception handlers, privilege transitions, syscall/sysret, or per-core TSS state yet
+Unsafe operation: writes private static descriptor/TSS tables, executes lgdt, reloads CS through a far return, reloads SS/DS/ES, resets FS/GS selectors to null, executes ltr, and exposes an unsafe set_ring0_stack API for future privilege-transition setup
+Safety argument: descriptor and TSS statics are private to the architecture module, initialized once, and then treated as read-only CPU tables; the double-fault stack is a private aligned static byte array and the TSS records its one-past-end stack pointer as required by x86_64; lgdt, segment reloads, FS/GS nulling, and ltr load CPU state from initialized static data and do not create Rust references or access untrusted pointers; FS/GS bases are not configured here and must be set separately by future per-CPU/TLS setup; set_ring0_stack is unsafe because callers must provide a valid per-core kernel stack before ring 3 execution is enabled
+Tests/evidence: descriptor unit tests verify selector layout, TSS size, complete TSS descriptor base/limit encoding, and double-fault IST slot properties; cargo xtask qemu observes [TEST] gdt=ok
+Limitations: early single-core setup only; no IDT, exception handlers, privilege transitions, syscall/sysret, or per-core TSS state yet; TSS.rsp0 intentionally remains zero until future ring 3 enablement installs a real per-core kernel stack
 ```
 
 ```text

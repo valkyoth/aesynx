@@ -42,6 +42,8 @@ Unified Kernel Image but shaped for Aesynx:
 - Signature metadata.
 - Version and rollback metadata.
 - Measurement metadata.
+- Algorithm-identified signature envelope prepared for hybrid classical plus
+  post-quantum validation.
 
 The capsule can be one signed delivery artifact while still preserving separate
 component identities inside it. It must not imply a monolithic OS binary.
@@ -51,6 +53,8 @@ component identities inside it. It must not imply a monolithic OS binary.
 The future bootloader should:
 
 - Verify signatures before executing any kernel code.
+- Use crypto-agile signature envelopes rather than a single hardcoded
+  signature algorithm.
 - Measure firmware state, bootloader state, capsule metadata, and loaded
   payload hashes into TPM PCRs where hardware supports it.
 - Support sealed-secret flows where disk/object-store keys are released only
@@ -92,6 +96,11 @@ The future Rust bootloader should become its own milestone only after:
 - Signed manifests exist.
 - QEMU boot smoke is stable.
 - The team can test UEFI behavior without risking daily-driver hardware.
+
+Post-quantum readiness for this work is tracked in
+[Post-Quantum Readiness Roadmap](post-quantum-readiness.md). The bootloader
+must not bake RSA, ECDSA, Ed25519, ML-DSA, SLH-DSA, or any other single
+algorithm into the boot-capsule ABI.
 
 ## Non-Goals
 

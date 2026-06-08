@@ -37,6 +37,8 @@ Active and future release gates:
 - Release notes with artifact checksums.
 - Signed tag verification.
 - Reproducible kernel/image build check.
+- Crypto-agility review for signed boot capsules, package metadata, update
+  metadata, entitlement receipts, and remote identity formats.
 
 ## Review Triggers
 
@@ -52,7 +54,10 @@ Require security review for:
 - New WASM runtime dependencies.
 - New package manager, registry, package signing, transparency-log,
   entitlement, or paid-marketplace code.
-- New cryptography, random number, or signature dependencies.
+- New cryptography, random number, signature, post-quantum, or hybrid
+  verification dependencies.
+- New stable metadata fields that store public keys, signatures, KEM outputs,
+  certificates, or algorithm identifiers.
 - New AI model loading or inference dependencies.
 
 ## Non-Claims

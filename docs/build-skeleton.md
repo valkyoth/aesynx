@@ -62,9 +62,11 @@ output, and expects `[TEST] gdt=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 `build/qemu/aesynx-v0.7.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] gdt=ok` and `[TEST] panic=ok`.
 
-Xtask kernel builds pass `--remap-path-prefix <workspace>=.` through encoded
-Rust flags so embedded panic source paths do not expose the local workspace
-root. The panic handler still emits only an escaped filename basename.
+The tracked `.cargo/config.toml` target flags include a workspace-root
+`--remap-path-prefix` for direct kernel builds in this checkout. Xtask kernel
+builds also pass `--remap-path-prefix <workspace>=.` through encoded Rust flags
+as portable defense-in-depth for the release image path. The panic handler
+still emits only an escaped filename basename.
 
 The v0.7 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS state, provide handoff metadata that normalizes

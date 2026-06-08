@@ -28,7 +28,7 @@ impl<'a> LogMessage<'a> {
             return Err(LogError::MessageTooLong);
         }
 
-        if contains_record_separator(value) {
+        if contains_invalid_log_byte(value) {
             return Err(LogError::RecordSeparatorNotAllowed);
         }
 
@@ -51,13 +51,14 @@ pub trait LogSink {
     fn write_str(&self, level: LogLevel, component: &'static str, message: LogMessage<'_>);
 }
 
-const fn contains_record_separator(value: &str) -> bool {
+const fn contains_invalid_log_byte(value: &str) -> bool {
     let bytes = value.as_bytes();
     let mut index = 0;
 
     while index < bytes.len() {
-        if bytes[index] == b'\n' || bytes[index] == b'\r' {
-            return true;
+        match bytes[index] {
+            b'\n' | b'\r' | b'[' | b']' => return true,
+            _ => {}
         }
         index += 1;
     }
@@ -73,6 +74,14 @@ mod tests {
     fn log_message_rejects_record_separator() {
         assert_eq!(
             LogMessage::new("valid\nforged"),
+            Err(LogError::RecordSeparatorNotAllowed)
+        );
+    }
+
+    #[test]
+    fn log_message_rejects_record_delimiter_metacharacters() {
+        assert_eq!(
+            LogMessage::new("ok ][FATAL] injected"),
             Err(LogError::RecordSeparatorNotAllowed)
         );
     }

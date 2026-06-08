@@ -2,7 +2,8 @@
 #![deny(unsafe_code)]
 
 macro_rules! id_type {
-    ($name:ident, $inner:ty) => {
+    ($(#[$meta:meta])* $name:ident, $inner:ty) => {
+        $(#[$meta])*
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         #[repr(transparent)]
         pub struct $name($inner);
@@ -23,8 +24,24 @@ macro_rules! id_type {
 
 id_type!(CoreId, u32);
 id_type!(CpuHardwareId, u64);
-id_type!(PhysAddr, u64);
-id_type!(VirtAddr, u64);
+id_type!(
+    /// Physical address value.
+    ///
+    /// This is a raw numeric address wrapper. Callers at privilege boundaries
+    /// must validate architecture-specific address-width and memory-map
+    /// constraints before using it for mapping, DMA, or device access.
+    PhysAddr,
+    u64
+);
+id_type!(
+    /// Virtual address value.
+    ///
+    /// This is a raw numeric address wrapper. On x86_64, callers at privilege
+    /// boundaries such as syscalls or untrusted IPC must validate canonical
+    /// form before the value is used as a pointer or mapping address.
+    VirtAddr,
+    u64
+);
 id_type!(PhysFrame, u64);
 id_type!(Page, u64);
 id_type!(ObjectId, u128);

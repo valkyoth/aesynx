@@ -42,7 +42,7 @@ pub struct IpiVector(u8);
 
 impl IpiVector {
     pub const fn new(value: u8) -> Result<Self, ArchError> {
-        if value < 0x20 {
+        if value < 0x20 || value == 0xff {
             return Err(ArchError::ReservedVector);
         }
 
@@ -85,6 +85,7 @@ mod tests {
     #[test]
     fn ipi_vector_rejects_reserved_exception_vectors() {
         assert_eq!(IpiVector::new(0x1f), Err(ArchError::ReservedVector));
+        assert_eq!(IpiVector::new(0xff), Err(ArchError::ReservedVector));
         assert_eq!(IpiVector::new(0x20).map(IpiVector::get), Ok(0x20));
     }
 }

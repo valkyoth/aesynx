@@ -3,6 +3,9 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 const GDT_ENTRIES: usize = 5;
 const DOUBLE_FAULT_STACK_BYTES: usize = 16 * 1024;
+/// 0-indexed position in `TSS.ist`. The architectural IST number for IDT gates
+/// is this value + 1 because IST field 0 means "no IST". Use
+/// [`InterruptStackTableIndex::DOUBLE_FAULT`] when writing IDT gate descriptors.
 const DOUBLE_FAULT_IST_SLOT: usize = 0;
 
 const KERNEL_CODE_DESCRIPTOR: u64 = 0x00af_9a00_0000_ffff;
@@ -42,6 +45,9 @@ impl SegmentSelector {
 pub struct InterruptStackTableIndex(u16);
 
 impl InterruptStackTableIndex {
+    /// Architectural IDT-gate IST value for the double-fault handler.
+    ///
+    /// This is 1-indexed by the CPU and maps to `TSS.ist[0]`.
     pub const DOUBLE_FAULT: Self = Self(1);
 
     #[must_use]
@@ -50,6 +56,7 @@ impl InterruptStackTableIndex {
     }
 }
 
+#[must_use]
 pub fn init() -> DescriptorTableStatus {
     if !INITIALIZED.swap(true, Ordering::AcqRel) {
         // SAFETY: Descriptor-table initialization runs during early single-core
@@ -59,6 +66,7 @@ pub fn init() -> DescriptorTableStatus {
         unsafe {
             init_tables();
             load_gdt();
+            reload_segment_registers();
             load_task_register(SegmentSelector::TSS);
         }
     }
@@ -68,6 +76,25 @@ pub fn init() -> DescriptorTableStatus {
         tss_selector: SegmentSelector::TSS,
         double_fault_ist: InterruptStackTableIndex::DOUBLE_FAULT,
         double_fault_stack_bytes: DOUBLE_FAULT_STACK_BYTES,
+    }
+}
+
+/// Sets the kernel stack pointer used on ring 3 to ring 0 transitions.
+///
+/// This must be set to a valid per-core kernel stack before Aesynx enables
+/// ring 3 execution. v0.7.0 does not run userspace yet, so the field remains
+/// zero until the future privilege-transition setup can provide the real stack.
+///
+/// # Safety
+///
+/// The caller must guarantee that `stack_top` is a canonical one-past-end
+/// pointer to a writable kernel stack that remains valid for the current CPU
+/// while ring 3 execution is enabled.
+pub unsafe fn set_ring0_stack(stack_top: u64) {
+    // SAFETY: The public unsafe contract above requires the caller to provide a
+    // valid current-CPU kernel stack pointer before privilege transitions use it.
+    unsafe {
+        TSS.rsp[0] = stack_top;
     }
 }
 
@@ -104,6 +131,36 @@ unsafe fn load_gdt() {
             "lgdt [{pointer}]",
             pointer = in(reg) &pointer,
             options(readonly, nostack, preserves_flags)
+        );
+    }
+}
+
+unsafe fn reload_segment_registers() {
+    const CODE_SELECTOR: u64 = SegmentSelector::KERNEL_CODE.bits() as u64;
+    const DATA_SELECTOR: u16 = SegmentSelector::KERNEL_DATA.bits();
+
+    // SAFETY: The selectors reference descriptors just installed in the
+    // private GDT. The far return reloads CS, the data selector refreshes
+    // SS/DS/ES, and FS/GS are reset to null selectors. Future per-CPU and TLS
+    // support must set FS/GS bases separately through model-specific registers.
+    unsafe {
+        core::arch::asm!(
+            "push {code_selector}",
+            "lea {return_address}, [rip + 2f]",
+            "push {return_address}",
+            "retfq",
+            "2:",
+            "mov ax, {data_selector}",
+            "mov ss, ax",
+            "mov ds, ax",
+            "mov es, ax",
+            "xor ax, ax",
+            "mov fs, ax",
+            "mov gs, ax",
+            code_selector = const CODE_SELECTOR,
+            data_selector = const DATA_SELECTOR,
+            return_address = lateout(reg) _,
+            options(preserves_flags)
         );
     }
 }
@@ -158,6 +215,8 @@ impl TaskStateSegment {
     const fn new() -> Self {
         Self {
             reserved_0: 0,
+            // RSP0 must be set with `set_ring0_stack()` before any ring 3 to
+            // ring 0 transition is permitted.
             rsp: [0; 3],
             reserved_1: 0,
             ist: [0; 7],
@@ -186,9 +245,9 @@ mod tests {
     use core::mem::{align_of, size_of};
 
     use super::{
-        AlignedStack, DOUBLE_FAULT_STACK_BYTES, DescriptorTablePointer, GDT_ENTRIES,
-        InterruptStackTableIndex, KERNEL_CODE_DESCRIPTOR, KERNEL_DATA_DESCRIPTOR, SegmentSelector,
-        TaskStateSegment, tss_descriptor,
+        AlignedStack, DOUBLE_FAULT_IST_SLOT, DOUBLE_FAULT_STACK_BYTES, DescriptorTablePointer,
+        GDT_ENTRIES, InterruptStackTableIndex, KERNEL_CODE_DESCRIPTOR, KERNEL_DATA_DESCRIPTOR,
+        SegmentSelector, TaskStateSegment, tss_descriptor,
     };
 
     #[test]
@@ -201,6 +260,7 @@ mod tests {
 
     #[test]
     fn double_fault_ist_uses_first_architectural_slot() {
+        assert_eq!(DOUBLE_FAULT_IST_SLOT, 0);
         assert_eq!(InterruptStackTableIndex::DOUBLE_FAULT.get(), 1);
         assert_eq!(DOUBLE_FAULT_STACK_BYTES, 16 * 1024);
         assert_eq!(align_of::<AlignedStack>(), 16);
@@ -214,12 +274,17 @@ mod tests {
 
     #[test]
     fn tss_descriptor_encodes_base_limit_type_and_present_bit() {
-        let descriptor = tss_descriptor(0x1234_5678_9abc_def0, size_of::<TaskStateSegment>() - 1);
+        let base = 0x1234_5678_9abc_def0;
+        let limit = size_of::<TaskStateSegment>() - 1;
+        let descriptor = tss_descriptor(base, limit);
 
-        assert_eq!(descriptor.low & 0xffff, 0x67);
+        assert_eq!(descriptor.low & 0xffff, limit as u64 & 0xffff);
+        assert_eq!((descriptor.low >> 16) & 0x00ff_ffff, base & 0x00ff_ffff);
         assert_eq!((descriptor.low >> 40) & 0x0f, 0x9);
         assert_eq!((descriptor.low >> 47) & 1, 1);
-        assert_eq!(descriptor.high, 0x1234_5678);
+        assert_eq!((descriptor.low >> 48) & 0x0f, (limit as u64 >> 16) & 0x0f);
+        assert_eq!((descriptor.low >> 56) & 0xff, (base >> 24) & 0xff);
+        assert_eq!(descriptor.high, base >> 32);
     }
 
     #[test]
