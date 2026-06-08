@@ -69,11 +69,12 @@ and expects `[TEST] idt=ok`, `[TEST] exception=ok`, and `[TEST] panic=ok`.
 `exception-smoke` feature, and expects `[TEST] pagefault=ok` and
 `[TEST] exception=ok`.
 
-The tracked `.cargo/config.toml` target flags include a workspace-root
-`--remap-path-prefix` for direct kernel builds in this checkout. Xtask kernel
-builds also pass `--remap-path-prefix <workspace>=.` through encoded Rust flags
-as portable defense-in-depth for the release image path. The panic handler
-still emits only an escaped filename basename.
+The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that
+computes the workspace root dynamically and passes
+`--remap-path-prefix <workspace>=.` for direct workspace builds. Xtask kernel
+builds also pass the same remap through encoded Rust flags as portable
+defense-in-depth for the release image path. The panic handler still emits only
+an escaped filename basename.
 
 The v0.8 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, handle a returning breakpoint

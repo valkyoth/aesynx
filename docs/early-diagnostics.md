@@ -45,9 +45,11 @@ panic registers=rsp_present=<bool> rbp_present=<bool> rsp_align=<n> rbp_align=<n
 ```
 
 The panic location emits only the escaped filename component, not the full
-source path. The tracked kernel target flags and xtask kernel builds both pass
-`--remap-path-prefix <workspace>=.`, so embedded file paths do not disclose the
-local workspace root in normal direct and release-image builds.
+source path. The tracked workspace config uses a repo-local Rust compiler
+wrapper that computes the workspace root dynamically and passes
+`--remap-path-prefix <workspace>=.` for direct builds. Xtask kernel builds also
+pass the same remap through encoded Rust flags, so embedded file paths do not
+disclose the local workspace root in normal direct and release-image builds.
 
 The panic message line is escaped and bounded before serial emission. Newlines,
 carriage returns, tabs, backslashes, brackets, non-ASCII bytes, and other

@@ -1,6 +1,7 @@
 [build]
 # Keep ordinary workspace commands on the host target. `xtask build-kernel`
 # validates the kernel crate while the custom target path matures.
+rustc-workspace-wrapper = "scripts/rustc-workspace-wrapper.sh"
 
 [alias]
 xtask = "run -p xtask --"
@@ -16,8 +17,6 @@ rustflags = [
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "-C",
     "panic=abort",
-    "--remap-path-prefix",
-    "/home/eldryoth/Work/codex-projects/aesynx=.",
 ]
 
 [target.x86_64-unknown-none]
@@ -31,6 +30,4 @@ rustflags = [
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "-C",
     "panic=abort",
-    "--remap-path-prefix",
-    "/home/eldryoth/Work/codex-projects/aesynx=.",
 ]
