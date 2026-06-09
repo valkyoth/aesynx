@@ -90,10 +90,9 @@ impl InterruptController for X86_64InterruptController {
 
 #[must_use]
 pub fn init() -> InterruptControllerStatus {
-    if !INITIALIZED.load(Ordering::Acquire) {
+    if !INITIALIZED.swap(true, Ordering::AcqRel) {
         reprogram_legacy_pic();
         mask_all_legacy_pic_irqs();
-        INITIALIZED.store(true, Ordering::Release);
     }
 
     let local_apic_present = local_apic_present();

@@ -84,8 +84,9 @@ The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that
 computes the workspace root dynamically and passes
 `--remap-path-prefix <workspace>=.` for direct workspace builds. Xtask kernel
 builds also pass the same remap through encoded Rust flags as portable
-defense-in-depth for the release image path. The panic handler still emits only
-an escaped filename basename.
+defense-in-depth for the release image path. Kernel rustflags also disable
+SSE/AVX code generation until Aesynx owns explicit FPU/SIMD context
+management. The panic handler still emits only an escaped filename basename.
 
 The v0.11 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, remap and mask legacy PIC IRQs, detect

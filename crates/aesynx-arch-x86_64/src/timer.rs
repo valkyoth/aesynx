@@ -72,13 +72,10 @@ pub struct TimerStatus {
 }
 
 pub fn init_smoke_timer() -> Result<TimerStatus, TimerError> {
-    if !INITIALIZED.load(Ordering::Acquire) {
-        crate::exceptions::install_interrupt_gate(TIMER_VECTOR, aesynx_timer_irq0_stub)
-            .map_err(|_| TimerError::IdtInstallFailed)?;
-        configure_pit_channel0();
-        X86_64InterruptController::enable_irq(IrqLine::new(TIMER_IRQ))
-            .map_err(TimerError::InterruptController)?;
-        INITIALIZED.store(true, Ordering::Release);
+    if !INITIALIZED.swap(true, Ordering::AcqRel) {
+        install_and_start_timer().inspect_err(|_error| {
+            INITIALIZED.store(false, Ordering::Release);
+        })?;
     }
 
     Ok(status())
@@ -108,6 +105,15 @@ fn configure_pit_channel0() {
     Port::new(AdmittedPort::PitCommand).write_u8(PIT_COMMAND_CHANNEL0_LO_HI_MODE2);
     Port::new(AdmittedPort::PitChannel0).write_u8(PIT_DIVISOR_100HZ as u8);
     Port::new(AdmittedPort::PitChannel0).write_u8((PIT_DIVISOR_100HZ >> 8) as u8);
+}
+
+fn install_and_start_timer() -> Result<(), TimerError> {
+    crate::exceptions::install_interrupt_gate(TIMER_VECTOR, aesynx_timer_irq0_stub)
+        .map_err(|_| TimerError::IdtInstallFailed)?;
+    configure_pit_channel0();
+    X86_64InterruptController::enable_irq(IrqLine::new(TIMER_IRQ))
+        .map_err(TimerError::InterruptController)?;
+    Ok(())
 }
 
 #[unsafe(no_mangle)]

@@ -16,6 +16,14 @@ use aesynx_log::{LogLevel, LogMessage};
 
 #[cfg(all(
     target_os = "none",
+    feature = "timer-smoke",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke")
+))]
+const TIMER_SMOKE_MAX_SPINS: u64 = 100_000_000;
+
+#[cfg(all(
+    target_os = "none",
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke"),
     not(feature = "timer-smoke")
@@ -136,8 +144,19 @@ fn timer_smoke_entry() -> ! {
                 status.target_ticks
             );
             let _ = aesynx_arch_x86_64::X86_64::enable_interrupts();
+            let mut spins = 0u64;
             while aesynx_arch_x86_64::timer::ticks() < aesynx_arch_x86_64::timer::target_ticks() {
                 core::hint::spin_loop();
+                spins = spins.saturating_add(1);
+                if spins >= TIMER_SMOKE_MAX_SPINS {
+                    aesynx_arch_x86_64::serial_println!(
+                        "timer timeout ticks={} target_ticks={} spins={}",
+                        aesynx_arch_x86_64::timer::ticks(),
+                        aesynx_arch_x86_64::timer::target_ticks(),
+                        spins
+                    );
+                    break;
+                }
             }
             let _ = aesynx_arch_x86_64::X86_64::disable_interrupts();
         }

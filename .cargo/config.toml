@@ -17,6 +17,8 @@ rustflags = [
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "-C",
     "panic=abort",
+    "-C",
+    "target-feature=-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2",
 ]
 
 [target.x86_64-unknown-none]
@@ -30,4 +32,6 @@ rustflags = [
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "-C",
     "panic=abort",
+    "-C",
+    "target-feature=-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2",
 ]

@@ -12,6 +12,8 @@ const KERNEL_RUSTFLAGS: &[&str] = &[
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "-C",
     "panic=abort",
+    "-C",
+    "target-feature=-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2",
 ];
 
 pub fn apply_kernel_rustflags(command: &mut Command, root: &Path) {
@@ -51,7 +53,7 @@ mod tests {
         assert_eq!(
             encoded_kernel_rustflags(Path::new("/work/aesynx"), None),
             format!(
-                "-C{RUSTFLAGS_SEPARATOR}code-model=kernel{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}relocation-model=static{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}link-arg=-Tlinker/kernel-x86_64.ld{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}panic=abort{RUSTFLAGS_SEPARATOR}--remap-path-prefix{RUSTFLAGS_SEPARATOR}/work/aesynx=."
+                "-C{RUSTFLAGS_SEPARATOR}code-model=kernel{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}relocation-model=static{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}link-arg=-Tlinker/kernel-x86_64.ld{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}panic=abort{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}target-feature=-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2{RUSTFLAGS_SEPARATOR}--remap-path-prefix{RUSTFLAGS_SEPARATOR}/work/aesynx=."
             )
         );
     }
@@ -64,8 +66,17 @@ mod tests {
                 Some("-C\x1fforce-frame-pointers=yes")
             ),
             format!(
-                "-C{RUSTFLAGS_SEPARATOR}force-frame-pointers=yes{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}code-model=kernel{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}relocation-model=static{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}link-arg=-Tlinker/kernel-x86_64.ld{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}panic=abort{RUSTFLAGS_SEPARATOR}--remap-path-prefix{RUSTFLAGS_SEPARATOR}/work/aesynx=."
+                "-C{RUSTFLAGS_SEPARATOR}force-frame-pointers=yes{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}code-model=kernel{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}relocation-model=static{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}link-arg=-Tlinker/kernel-x86_64.ld{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}panic=abort{RUSTFLAGS_SEPARATOR}-C{RUSTFLAGS_SEPARATOR}target-feature=-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2{RUSTFLAGS_SEPARATOR}--remap-path-prefix{RUSTFLAGS_SEPARATOR}/work/aesynx=."
             )
+        );
+    }
+
+    #[test]
+    fn kernel_rustflags_disable_simd_until_fpu_context_exists() {
+        let flags = encoded_kernel_rustflags(Path::new("/work/aesynx"), None);
+
+        assert!(
+            flags.contains("target-feature=-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2")
         );
     }
 }

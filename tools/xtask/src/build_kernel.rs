@@ -18,6 +18,7 @@ const CARGO_CONFIG_MARKERS: &[&str] = &[
     "relocation-model=static",
     "link-arg=-Tlinker/kernel-x86_64.ld",
     "panic=abort",
+    "target-feature=-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-avx,-avx2",
 ];
 
 const KERNEL_TARGET_MARKERS: &[&str] = &[

@@ -89,6 +89,10 @@ impl ArchCpu for X86_64 {
     fn read_timestamp() -> Result<u64, ArchError> {
         let low: u32;
         let high: u32;
+        // This is intentionally the cheap telemetry timestamp path. `rdtsc` is
+        // not serializing; callers that need precise security or expiry bounds
+        // must use a future fenced timestamp API or issue an `lfence` before
+        // reading the counter.
         // SAFETY: `rdtsc` reads the architectural timestamp counter into EDX:EAX
         // and does not touch Rust memory.
         unsafe {
