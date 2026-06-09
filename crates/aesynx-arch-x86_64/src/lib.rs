@@ -13,6 +13,8 @@ pub mod descriptors;
 #[allow(unsafe_code)]
 pub mod exceptions;
 #[allow(unsafe_code)]
+pub mod interrupts;
+#[allow(unsafe_code)]
 mod port;
 #[allow(unsafe_code)]
 pub mod registers;

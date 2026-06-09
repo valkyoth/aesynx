@@ -50,6 +50,18 @@ pub extern "C" fn _start() -> ! {
         exception_status.double_fault_ist.get()
     );
     aesynx_arch_x86_64::serial::write_str("[TEST] idt=ok\n");
+    let interrupt_status = aesynx_arch_x86_64::interrupts::init();
+    diagnostics::set_boot_phase(BootPhase::InterruptSetup);
+    write_diagnostic(LogLevel::Info, "interrupt controller baseline initialized");
+    aesynx_arch_x86_64::serial_println!(
+        "interrupt setup=baseline legacy_pic_masked={} local_apic_present={} local_apic_mode={:?} irq_vector_base=0x{:x} irq_vector_count={}",
+        interrupt_status.legacy_pic_masked,
+        interrupt_status.local_apic_present,
+        interrupt_status.local_apic_mode,
+        interrupt_status.irq_vector_base,
+        interrupt_status.irq_vector_count
+    );
+    aesynx_arch_x86_64::serial::write_str("[TEST] irq=ok\n");
     aesynx_arch_x86_64::exceptions::trigger_breakpoint_smoke();
     kernel_entry()
 }
@@ -141,7 +153,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.9.0 panic smoke");
+    panic!("intentional v0.10.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

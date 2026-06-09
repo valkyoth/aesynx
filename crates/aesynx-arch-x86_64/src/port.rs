@@ -8,6 +8,10 @@ pub(crate) enum AdmittedPort {
     LineControl,
     ModemControl,
     LineStatus,
+    PicMasterCommand,
+    PicMasterData,
+    PicSlaveCommand,
+    PicSlaveData,
 }
 
 impl AdmittedPort {
@@ -19,6 +23,10 @@ impl AdmittedPort {
             Self::LineControl => 0x3fb,
             Self::ModemControl => 0x3fc,
             Self::LineStatus => 0x3fd,
+            Self::PicMasterCommand => 0x20,
+            Self::PicMasterData => 0x21,
+            Self::PicSlaveCommand => 0xa0,
+            Self::PicSlaveData => 0xa1,
         }
     }
 }
@@ -37,9 +45,9 @@ impl Port {
         let value: u8;
         let address = self.admitted.address();
         // SAFETY: This is the admitted x86_64 port-I/O boundary. Callers can
-        // only construct ports from the fixed legacy COM1 UART port set during
-        // early single-core boot, and the instruction does not touch Rust
-        // memory.
+        // only construct ports from the fixed legacy COM1 UART and 8259 PIC
+        // controller port set during early single-core boot, and the
+        // instruction does not touch Rust memory.
         unsafe {
             asm!(
                 "in al, dx",
@@ -54,9 +62,9 @@ impl Port {
     pub(crate) fn write_u8(self, value: u8) {
         let address = self.admitted.address();
         // SAFETY: This is the admitted x86_64 port-I/O boundary. Callers can
-        // only construct ports from the fixed legacy COM1 UART port set during
-        // early single-core boot, and the instruction does not touch Rust
-        // memory.
+        // only construct ports from the fixed legacy COM1 UART and 8259 PIC
+        // controller port set during early single-core boot, and the
+        // instruction does not touch Rust memory.
         unsafe {
             asm!(
                 "out dx, al",
@@ -73,8 +81,8 @@ mod tests {
     use super::{AdmittedPort, Port};
 
     #[test]
-    fn admitted_ports_are_limited_to_legacy_com1() {
-        let ports = [
+    fn admitted_ports_are_limited_to_early_boot_devices() {
+        let serial_ports = [
             AdmittedPort::Data,
             AdmittedPort::InterruptEnable,
             AdmittedPort::FifoControl,
@@ -83,9 +91,21 @@ mod tests {
             AdmittedPort::LineStatus,
         ];
 
-        for port in ports {
+        for port in serial_ports {
             let address = Port::new(port).admitted.address();
             assert!((0x3f8..=0x3fd).contains(&address));
         }
+
+        let pic_ports = [
+            AdmittedPort::PicMasterCommand,
+            AdmittedPort::PicMasterData,
+            AdmittedPort::PicSlaveCommand,
+            AdmittedPort::PicSlaveData,
+        ];
+
+        assert_eq!(
+            pic_ports.map(|port| Port::new(port).admitted.address()),
+            [0x20, 0x21, 0xa0, 0xa1]
+        );
     }
 }

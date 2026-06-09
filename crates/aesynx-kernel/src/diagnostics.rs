@@ -19,12 +19,13 @@ pub enum BootPhase {
     Entry = 0,
     CpuSetup = 1,
     ExceptionSetup = 2,
-    BootloaderHandoff = 3,
-    BootInfoNormalized = 4,
-    Running = 5,
-    PanicSmoke = 6,
-    ExceptionSmoke = 7,
-    Panic = 8,
+    InterruptSetup = 3,
+    BootloaderHandoff = 4,
+    BootInfoNormalized = 5,
+    Running = 6,
+    PanicSmoke = 7,
+    ExceptionSmoke = 8,
+    Panic = 9,
     Unknown = u8::MAX,
 }
 
@@ -35,6 +36,7 @@ impl BootPhase {
             Self::Entry => "entry",
             Self::CpuSetup => "cpu-setup",
             Self::ExceptionSetup => "exception-setup",
+            Self::InterruptSetup => "interrupt-setup",
             Self::BootloaderHandoff => "bootloader-handoff",
             Self::BootInfoNormalized => "bootinfo-normalized",
             Self::Running => "running",
@@ -51,12 +53,13 @@ impl BootPhase {
             0 => Self::Entry,
             1 => Self::CpuSetup,
             2 => Self::ExceptionSetup,
-            3 => Self::BootloaderHandoff,
-            4 => Self::BootInfoNormalized,
-            5 => Self::Running,
-            6 => Self::PanicSmoke,
-            7 => Self::ExceptionSmoke,
-            8 => Self::Panic,
+            3 => Self::InterruptSetup,
+            4 => Self::BootloaderHandoff,
+            5 => Self::BootInfoNormalized,
+            6 => Self::Running,
+            7 => Self::PanicSmoke,
+            8 => Self::ExceptionSmoke,
+            9 => Self::Panic,
             _unknown => Self::Unknown,
         }
     }
@@ -225,6 +228,7 @@ mod tests {
         assert_eq!(BootPhase::Entry.label(), "entry");
         assert_eq!(BootPhase::CpuSetup.label(), "cpu-setup");
         assert_eq!(BootPhase::ExceptionSetup.label(), "exception-setup");
+        assert_eq!(BootPhase::InterruptSetup.label(), "interrupt-setup");
         assert_eq!(BootPhase::BootloaderHandoff.label(), "bootloader-handoff");
         assert_eq!(BootPhase::BootInfoNormalized.label(), "bootinfo-normalized");
         assert_eq!(BootPhase::Running.label(), "running");

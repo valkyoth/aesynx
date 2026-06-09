@@ -57,10 +57,10 @@ fn print_help() {
     println!("  build-kernel                         build and validate kernel boot path");
     println!("  build-kernel --custom-target-probe   try nightly build-std custom target probe");
     println!("  check                                run local repository checks");
-    println!("  image                                create v0.9 Limine QEMU boot image");
-    println!("  qemu                                 run v0.9 QEMU boot smoke");
-    println!("  qemu --panic-smoke                   run v0.9 QEMU panic diagnostics smoke");
-    println!("  qemu --exception-smoke               run v0.9 QEMU exception smoke");
+    println!("  image                                create v0.10 Limine QEMU boot image");
+    println!("  qemu                                 run v0.10 QEMU boot smoke");
+    println!("  qemu --panic-smoke                   run v0.10 QEMU panic diagnostics smoke");
+    println!("  qemu --exception-smoke               run v0.10 QEMU exception smoke");
     println!("  release-ready TAG                    validate release pentest gate for TAG");
     println!("  status                               print workspace status");
     println!("  help                                 print this help");

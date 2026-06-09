@@ -4,6 +4,7 @@ pub const BOOT_DIAGNOSTIC_MARKER: &str = "[kernel][INFO] bootinfo normalized";
 pub const CPU_SETUP_MARKER: &str = "[TEST] gdt=ok";
 pub const EXCEPTION_SETUP_MARKER: &str = "[TEST] idt=ok";
 pub const EXCEPTION_MARKER: &str = "[TEST] exception=ok";
+pub const IRQ_SETUP_MARKER: &str = "[TEST] irq=ok";
 pub const FAULT_ADDRESS_MARKER: &str = "cr2_offset=0x";
 pub const FAULT_ADDRESS_PRESENT_MARKER: &str = "cr2_present=";
 pub const FAULT_CR3_MARKER: &str = "cr3_offset=0x";
@@ -35,13 +36,13 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
             }
             Self::Exception => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] exception=ok, cr2_present=, cr2_offset=0x, cr3_offset=0x, rflags=0x, interrupts_enabled=, present=, [TEST] pagefault=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, cr2_present=, cr2_offset=0x, cr3_offset=0x, rflags=0x, interrupts_enabled=, present=, [TEST] pagefault=ok"
             }
         }
     }

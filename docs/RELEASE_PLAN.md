@@ -348,12 +348,12 @@ Deliverables:
 - RFLAGS/interrupt-state output.
 - QEMU exception smoke must require CR2, CR3, RFLAGS, interrupt-state, and
   decoded page-fault error markers.
-- CR3 output remains redacted to low flag/PCID bits; CR2 is printed only for
-  this early debug page-fault path.
+- CR3 output remains redacted to low flag/PCID bits; CR2 output is limited to
+  presence and page offset.
 
 Verification:
 
-- Intentional invalid access prints fault address and flags.
+- Intentional invalid access prints redacted fault-address summary and flags.
 
 Exit criteria:
 

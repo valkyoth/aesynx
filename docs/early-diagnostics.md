@@ -58,9 +58,10 @@ control bytes cannot create forged diagnostic records or unbounded panic output.
 On x86_64, `crates/aesynx-arch-x86_64/src/registers.rs` captures `rsp`, `rbp`,
 `rflags`, and `cr3` for the panic path. Raw address-bearing values stay private
 and are not printed; serial output exposes only presence, stack alignment,
-arithmetic/status RFLAGS bits, and CR3 low flag/PCID bits. The v0.9 page-fault
-path additionally captures CR2, CR3 low bits, public RFLAGS, and interrupt
-state for early exception diagnostics.
+arithmetic/status RFLAGS bits, and CR3 low flag/PCID bits. The page-fault path
+additionally captures CR2, CR3 low bits, public RFLAGS, and interrupt state for
+early exception diagnostics, but serial output exposes only CR2 presence and
+page offset.
 
 The public RFLAGS summary is limited to arithmetic/status flags only. It
 intentionally excludes trap/debug, interrupt-enable, I/O privilege, alignment,
@@ -108,7 +109,7 @@ This milestone proves:
 This milestone does not prove:
 
 - Full interrupt or exception decoding.
-- Page-fault address and error-code decoding.
+- Page-fault recovery.
 - Raw register dumps.
 - SMP-safe diagnostics.
 - Persistent telemetry buffers.
