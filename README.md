@@ -41,7 +41,7 @@ release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
 kernel-owned serial markers, installs basic x86_64 descriptor and interrupt
-tables, masks the legacy PIC, detects whether the local APIC is present,
+tables, remaps and masks the legacy PIC, detects whether the local APIC is present,
 publishes checked IRQ vector allocation, handles a returning breakpoint
 exception, and can run opt-in deliberate panic and page-fault smoke tests with
 redacted CR2 presence/page-offset, CR3 low-bit, RFLAGS, interrupt-state, and
@@ -64,7 +64,7 @@ decoded page-fault diagnostics.
 | GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
 | IDT and exceptions | Tagged | Early x86_64 boot installs an IDT, handles breakpoint, page-fault, and double-fault vectors, and verifies `[TEST] exception=ok`. |
 | Fault decoding | Tagged | `v0.9.0`; page-fault smoke prints redacted CR2 presence/page offset, CR3 low bits, public RFLAGS, interrupt state, and decoded error bits. |
-| Interrupt controller baseline | Active candidate | `v0.10.0`; masks legacy PIC IRQs, detects local APIC presence, defines checked IRQ vectors, and exposes an EOI path. |
+| Interrupt controller baseline | Active candidate | `v0.10.0`; remaps/masks legacy PIC IRQs, detects local APIC presence, defines checked IRQ vectors, and exposes an EOI path. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |

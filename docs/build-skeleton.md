@@ -81,8 +81,8 @@ defense-in-depth for the release image path. The panic handler still emits only
 an escaped filename basename.
 
 The v0.10 image proves that Limine can load the Rust kernel ELF, reach `_start`,
-install basic x86_64 GDT/TSS/IDT state, mask legacy PIC IRQs, detect local APIC
-availability for the deferred MMIO path, handle a returning breakpoint
+install basic x86_64 GDT/TSS/IDT state, remap and mask legacy PIC IRQs, detect
+local APIC availability for the deferred MMIO path, handle a returning breakpoint
 exception, catch and decode an opt-in page fault, provide handoff metadata that
 normalizes into Aesynx `BootInfo`, and produce readable early panic
 diagnostics. It does not claim page-table ownership, APIC MMIO activation,

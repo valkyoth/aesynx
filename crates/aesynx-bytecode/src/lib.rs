@@ -3,6 +3,8 @@
 
 use aesynx_cap::CapPerms;
 
+const U64_ACCESS_WIDTH: u64 = 8;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Instruction {
     LoadCap {
@@ -111,7 +113,10 @@ impl Verifier {
         offset: UncheckedOffset,
         accessible_len: u64,
     ) -> Result<VerifiedOffset, VerifyError> {
-        if offset.get() as u64 >= accessible_len {
+        let Some(end) = (offset.get() as u64).checked_add(U64_ACCESS_WIDTH) else {
+            return Err(VerifyError::OffsetOutOfRange);
+        };
+        if end > accessible_len {
             return Err(VerifyError::OffsetOutOfRange);
         }
 
@@ -195,11 +200,15 @@ mod tests {
     #[test]
     fn verifier_bounds_offsets_before_execution() {
         assert_eq!(
-            Verifier::verify_offset(UncheckedOffset::new(7), 8).map(|offset| offset.get()),
-            Ok(7)
+            Verifier::verify_offset(UncheckedOffset::new(0), 8).map(|offset| offset.get()),
+            Ok(0)
         );
         assert_eq!(
-            Verifier::verify_offset(UncheckedOffset::new(8), 8),
+            Verifier::verify_offset(UncheckedOffset::new(1), 8),
+            Err(VerifyError::OffsetOutOfRange)
+        );
+        assert_eq!(
+            Verifier::verify_offset(UncheckedOffset::new(u16::MAX), u16::MAX as u64),
             Err(VerifyError::OffsetOutOfRange)
         );
     }

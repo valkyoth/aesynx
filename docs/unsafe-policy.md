@@ -120,8 +120,8 @@ Status: active in v0.10
 Purpose: establish the early x86_64 interrupt-controller baseline
 Preconditions: called during early single-core kernel execution after IDT setup and before Aesynx enables external interrupts
 Unsafe operation: executes x86_64 in/out instructions for the admitted legacy 8259 PIC ports and existing COM1 ports
-Safety argument: the port boundary admits only the fixed COM1 UART ports and the four 8259 PIC command/data ports; v0.10 only masks the legacy PIC and exposes checked EOI plumbing for valid legacy IRQ lines; local APIC support is CPUID detection only and does not touch MMIO until future memory mapping owns the APIC window
-Tests/evidence: unit tests verify admitted port addresses, IRQ vector allocation range, and explicit APIC deferred mode; cargo xtask qemu observes [TEST] irq=ok
+Safety argument: the port boundary admits only the fixed COM1 UART ports and the four 8259 PIC command/data ports; v0.10 remaps the legacy PIC out of the CPU exception-vector range before masking it, exposes checked EOI plumbing for valid legacy IRQ lines, and handles spurious IRQ7/IRQ15 through ISR checks; local APIC support is CPUID detection only and does not touch MMIO until future memory mapping owns the APIC window
+Tests/evidence: unit tests verify admitted port addresses, IRQ vector allocation range, PIC remap constants, spurious IRQ constants, and explicit APIC deferred mode; cargo xtask qemu observes [TEST] irq=ok
 Limitations: no APIC MMIO activation, timer interrupt, external IRQ dispatch, IRQ-to-driver routing, SMP, or per-core interrupt-controller state yet
 ```
 

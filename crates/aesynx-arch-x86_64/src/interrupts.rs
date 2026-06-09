@@ -8,8 +8,17 @@ use crate::port::{AdmittedPort, Port};
 const LEGACY_PIC_IRQS: u32 = 16;
 const IRQ_VECTOR_BASE: u8 = 0x20;
 const IRQ_VECTOR_COUNT: u8 = LEGACY_PIC_IRQS as u8;
+const PIC_MASTER_VECTOR_BASE: u8 = IRQ_VECTOR_BASE;
+const PIC_SLAVE_VECTOR_BASE: u8 = IRQ_VECTOR_BASE + 8;
 const PIC_MASK_ALL: u8 = 0xff;
 const PIC_EOI: u8 = 0x20;
+const PIC_ICW1_INIT_WITH_ICW4: u8 = 0x11;
+const PIC_ICW3_MASTER_HAS_SLAVE_ON_IRQ2: u8 = 0x04;
+const PIC_ICW3_SLAVE_ID_2: u8 = 0x02;
+const PIC_ICW4_8086_MODE: u8 = 0x01;
+const PIC_OCW3_READ_ISR: u8 = 0x0b;
+const PIC_SPURIOUS_MASTER_IRQ: u32 = 7;
+const PIC_SPURIOUS_SLAVE_IRQ: u32 = 15;
 const CPUID_FEATURE_EDX_APIC: u32 = 1 << 9;
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -19,6 +28,7 @@ pub struct InterruptControllerStatus {
     pub legacy_pic_masked: bool,
     pub local_apic_present: bool,
     pub local_apic_mode: LocalApicMode,
+    pub legacy_pic_remapped: bool,
     pub irq_vector_base: u8,
     pub irq_vector_count: u8,
 }
@@ -76,14 +86,17 @@ impl InterruptController for X86_64InterruptController {
 
 #[must_use]
 pub fn init() -> InterruptControllerStatus {
-    if !INITIALIZED.swap(true, Ordering::AcqRel) {
+    if !INITIALIZED.load(Ordering::Acquire) {
+        reprogram_legacy_pic();
         mask_all_legacy_pic_irqs();
+        INITIALIZED.store(true, Ordering::Release);
     }
 
     let local_apic_present = local_apic_present();
     InterruptControllerStatus {
         legacy_pic_masked: true,
         local_apic_present,
+        legacy_pic_remapped: true,
         local_apic_mode: if local_apic_present {
             LocalApicMode::DeferredUntilMmioMapping
         } else {
@@ -96,6 +109,17 @@ pub fn init() -> InterruptControllerStatus {
 
 pub fn irq_vector(irq: IrqLine) -> Result<IrqVector, InterruptError> {
     IrqVector::from_irq(irq)
+}
+
+fn reprogram_legacy_pic() {
+    Port::new(AdmittedPort::PicMasterCommand).write_u8(PIC_ICW1_INIT_WITH_ICW4);
+    Port::new(AdmittedPort::PicSlaveCommand).write_u8(PIC_ICW1_INIT_WITH_ICW4);
+    Port::new(AdmittedPort::PicMasterData).write_u8(PIC_MASTER_VECTOR_BASE);
+    Port::new(AdmittedPort::PicSlaveData).write_u8(PIC_SLAVE_VECTOR_BASE);
+    Port::new(AdmittedPort::PicMasterData).write_u8(PIC_ICW3_MASTER_HAS_SLAVE_ON_IRQ2);
+    Port::new(AdmittedPort::PicSlaveData).write_u8(PIC_ICW3_SLAVE_ID_2);
+    Port::new(AdmittedPort::PicMasterData).write_u8(PIC_ICW4_8086_MODE);
+    Port::new(AdmittedPort::PicSlaveData).write_u8(PIC_ICW4_8086_MODE);
 }
 
 fn mask_all_legacy_pic_irqs() {
@@ -126,11 +150,31 @@ fn acknowledge_legacy_pic_irq(irq: IrqLine) -> Result<(), InterruptError> {
         return Err(InterruptError::InvalidIrq);
     }
 
+    if line == PIC_SPURIOUS_MASTER_IRQ && !legacy_pic_irq_in_service(false, PIC_SPURIOUS_MASTER_IRQ)
+    {
+        return Ok(());
+    }
+
+    if line == PIC_SPURIOUS_SLAVE_IRQ && !legacy_pic_irq_in_service(true, 7) {
+        Port::new(AdmittedPort::PicMasterCommand).write_u8(PIC_EOI);
+        return Ok(());
+    }
+
     if line >= 8 {
         Port::new(AdmittedPort::PicSlaveCommand).write_u8(PIC_EOI);
     }
     Port::new(AdmittedPort::PicMasterCommand).write_u8(PIC_EOI);
     Ok(())
+}
+
+fn legacy_pic_irq_in_service(slave: bool, irq_bit: u32) -> bool {
+    let command = if slave {
+        Port::new(AdmittedPort::PicSlaveCommand)
+    } else {
+        Port::new(AdmittedPort::PicMasterCommand)
+    };
+    command.write_u8(PIC_OCW3_READ_ISR);
+    command.read_u8() & (1u8 << irq_bit) != 0
 }
 
 fn local_apic_present() -> bool {
@@ -154,6 +198,9 @@ mod tests {
 
     use super::{
         CPUID_FEATURE_EDX_APIC, IRQ_VECTOR_BASE, IrqVector, LEGACY_PIC_IRQS, LocalApicMode,
+        PIC_ICW1_INIT_WITH_ICW4, PIC_ICW3_MASTER_HAS_SLAVE_ON_IRQ2, PIC_ICW3_SLAVE_ID_2,
+        PIC_ICW4_8086_MODE, PIC_MASTER_VECTOR_BASE, PIC_OCW3_READ_ISR, PIC_SLAVE_VECTOR_BASE,
+        PIC_SPURIOUS_MASTER_IRQ, PIC_SPURIOUS_SLAVE_IRQ,
     };
 
     #[test]
@@ -179,6 +226,19 @@ mod tests {
             LocalApicMode::DeferredUntilMmioMapping
         );
         assert_eq!(CPUID_FEATURE_EDX_APIC, 1 << 9);
+    }
+
+    #[test]
+    fn legacy_pic_is_remapped_out_of_exception_vector_range() {
+        assert_eq!(PIC_ICW1_INIT_WITH_ICW4, 0x11);
+        assert_eq!(PIC_MASTER_VECTOR_BASE, 0x20);
+        assert_eq!(PIC_SLAVE_VECTOR_BASE, 0x28);
+        assert_eq!(PIC_ICW3_MASTER_HAS_SLAVE_ON_IRQ2, 0x04);
+        assert_eq!(PIC_ICW3_SLAVE_ID_2, 0x02);
+        assert_eq!(PIC_ICW4_8086_MODE, 0x01);
+        assert_eq!(PIC_OCW3_READ_ISR, 0x0b);
+        assert_eq!(PIC_SPURIOUS_MASTER_IRQ, 7);
+        assert_eq!(PIC_SPURIOUS_SLAVE_IRQ, 15);
     }
 
     #[test]

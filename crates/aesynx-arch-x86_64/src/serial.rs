@@ -49,12 +49,19 @@ impl Com1 {
         Ok(())
     }
 
-    pub fn write_ascii(self, value: &str) {
+    pub fn write_ascii(self, value: &str) -> Result<(), SerialError> {
+        let mut timeout = false;
         for byte in value.bytes() {
             if byte == b'\n' {
-                let _ = self.write_byte(b'\r');
+                timeout |= self.write_byte(b'\r').is_err();
             }
-            let _ = self.write_byte(byte);
+            timeout |= self.write_byte(byte).is_err();
+        }
+
+        if timeout {
+            Err(SerialError::TransmitTimeout)
+        } else {
+            Ok(())
         }
     }
 }
@@ -67,8 +74,7 @@ impl Default for Com1 {
 
 impl Write for Com1 {
     fn write_str(&mut self, value: &str) -> fmt::Result {
-        (*self).write_ascii(value);
-        Ok(())
+        (*self).write_ascii(value).map_err(|_| fmt::Error)
     }
 }
 
@@ -81,13 +87,13 @@ pub fn init() {
     Com1::new().init();
 }
 
-pub fn write_str(value: &str) {
-    Com1::new().write_ascii(value);
+pub fn write_str(value: &str) -> bool {
+    Com1::new().write_ascii(value).is_ok()
 }
 
-pub fn write_fmt(args: fmt::Arguments<'_>) {
+pub fn write_fmt(args: fmt::Arguments<'_>) -> bool {
     let mut serial = Com1::new();
-    let _ = serial.write_fmt(args);
+    serial.write_fmt(args).is_ok()
 }
 
 #[macro_export]
@@ -122,5 +128,20 @@ mod tests {
     fn com1_is_single_core_marker_type() {
         let _serial = super::Com1::new();
         assert_eq!(core::mem::size_of::<super::Com1>(), 0);
+    }
+
+    #[test]
+    fn write_status_is_visible_to_callers() {
+        let write: fn(&str) -> bool = super::write_str;
+        let write_fmt: fn(core::fmt::Arguments<'_>) -> bool = super::write_fmt;
+
+        assert_eq!(
+            core::mem::size_of_val(&write),
+            core::mem::size_of::<fn(&str) -> bool>()
+        );
+        assert_eq!(
+            core::mem::size_of_val(&write_fmt),
+            core::mem::size_of::<fn(core::fmt::Arguments<'_>) -> bool>()
+        );
     }
 }
