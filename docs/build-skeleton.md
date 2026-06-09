@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.10 interrupt controller baseline implementation candidate
+Status: v0.10 interrupt controller baseline release
 
 The repository contains the first x86_64 kernel build shape:
 
