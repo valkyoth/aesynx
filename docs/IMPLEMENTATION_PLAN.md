@@ -25,6 +25,8 @@ The 1.0 target is a working QEMU version with:
 - Native service queues instead of Unix syscalls.
 - Native init, shell, runtime, and command utilities.
 - Driver architecture prepared for isolated, restartable driver services.
+- A top-level `drivers/` area for hardware-facing components so the core
+  kernel does not become a driver warehouse.
 - Object graph storage in RAM, with persistence planned but not required for 1.0 unless release capacity allows.
 - Telemetry and AI-readiness from day one, with deterministic non-AI policies as the boot and safety baseline.
 - A modular workspace structure from day one: focused crates, focused modules, no giant source files.
@@ -42,6 +44,9 @@ capability sets, resource budgets, and virtualized service endpoints. A hosted
 runtime can later run Aesynx userspace concepts on another host kernel for
 development and CI, but Linux container compatibility must not define the
 kernel ABI. See [Hosted Execution Roadmap](hosted-execution-roadmap.md).
+
+Driver structure, external driver packages, and vendor/community driver policy
+are tracked in [Aesynx Driver Roadmap](driver-roadmap.md).
 
 ## 1. Core Position
 
@@ -257,7 +262,7 @@ aesynx/
 |   |-- licensing.md
 |   |-- capability-model.md
 |   |-- ipc-protocol.md
-|   |-- driver-model.md
+|   |-- driver-roadmap.md
 |   |-- object-store.md
 |   |-- ai-telemetry-plane.md
 |   |-- native-userspace.md
@@ -279,17 +284,40 @@ aesynx/
 |   |-- aesynx-telemetry/
 |   |-- aesynx-ai-policy/
 |   |-- aesynx-device/
-|   |-- aesynx-driver-uart16550/
-|   |-- aesynx-driver-framebuffer/
-|   |-- aesynx-driver-virtio/
-|   |-- aesynx-driver-virtio-blk/
-|   |-- aesynx-driver-virtio-net/
-|   |-- aesynx-driver-virtio-rng/
 |   |-- aesynx-abi/
 |   |-- aesynx-rt/
 |   |-- aesynx-init/
 |   |-- aesynx-shell/
 |   `-- aesynx-bytecode/
+|-- drivers/
+|   |-- README.md
+|   |-- common/
+|   |   |-- aesynx-driver-api/
+|   |   `-- aesynx-driver-test/
+|   |-- bus/
+|   |   |-- pci/
+|   |   |-- usb/
+|   |   `-- virtio/
+|   |-- network/
+|   |   |-- virtio-net/
+|   |   |-- e1000/
+|   |   `-- rtl8139/
+|   |-- storage/
+|   |   |-- virtio-blk/
+|   |   |-- nvme/
+|   |   `-- ahci/
+|   |-- gpu/
+|   |   |-- framebuffer/
+|   |   |-- virtio-gpu/
+|   |   |-- amd/
+|   |   |-- intel/
+|   |   `-- nvidia/
+|   |-- input/
+|   |   |-- ps2/
+|   |   `-- usb-hid/
+|   `-- firmware/
+|       |-- acpi/
+|       `-- uefi/
 |-- models/
 |   |-- aesynx-cap-model/
 |   |-- aesynx-ipc-model/
@@ -1379,6 +1407,31 @@ Early bootstrap drivers can be in-kernel. Long-term drivers become:
 - Revocable.
 - Signed.
 - Optionally bytecode-verified.
+
+The long-term source-tree rule is:
+
+- `crates/` contains core kernel/system primitives and stable shared APIs.
+- `drivers/` contains hardware-facing drivers grouped by bus and class.
+- External community or vendor drivers are packages built against a stable
+  driver ABI, not patches to the kernel tree.
+
+The long-term user experience should be closer to an intentional driver
+installer than to Linux kernel-module maintenance:
+
+```text
+aepkg search driver realtek
+aepkg install driver:rtl8125
+aesh drivers
+aesh driver bind pci:10ec:8125 --driver driver:rtl8125
+```
+
+Those commands publish a new declarative system generation, verify the signed
+driver package, match supported hardware IDs, ask policy for approval, then
+start the driver as an isolated service with exact device capabilities.
+
+Closed-source vendor drivers may be supported only as signed external driver
+services. They must not link into the kernel and must not receive ambient
+authority.
 
 ### 15.2 Driver Layers
 

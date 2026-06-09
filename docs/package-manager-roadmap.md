@@ -108,6 +108,14 @@ The boot capsule or release image may package many objects together, but the
 installed system remains independently identifiable, signed, updateable, and
 rollback-capable.
 
+Driver packages are described in more detail in
+[Aesynx Driver Roadmap](driver-roadmap.md). The package manager should make
+external drivers easy to install, update, remove, and roll back without copying
+the Linux kernel-module model. Installing a driver publishes a new generation
+that makes a signed driver service selectable; binding the driver remains a
+driver-manager decision based on hardware IDs, requested capabilities, and local
+trust policy.
+
 ## Package Manifest
 
 Every package has a signed immutable manifest. A possible shape:
@@ -170,6 +178,9 @@ Manifest rules:
 - Package activation must be declarative. No root post-install scripts.
 - Migration logic, if ever needed, must be a constrained component with an
   explicit capability grant and audit record.
+- `driver-service` packages add driver metadata such as class ABI, hardware
+  IDs, restart policy, firmware objects, and MMIO/IRQ/DMA requests. That
+  metadata is optional for non-driver package kinds.
 
 ## Tracks
 

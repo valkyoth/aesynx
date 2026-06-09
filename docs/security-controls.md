@@ -33,7 +33,7 @@ claim that the controls are implemented today.
 | Telemetry integrity | Task telemetry uses append-only counters; core telemetry snapshots are advisory per-counter samples | Model active | `TaskTelemetry`, `CoreTelemetry` |
 | Capability revocation | REVOKE authority check required before epoch mutation; epoch increment must fail rather than wrap | Model active | `ensure_revoke_authority`, `RevocationEpochStore` |
 | Early serial safety | COM1 output uses admitted ports, bounded polling, and a single-core marker type | Active for boot | `crates/aesynx-arch-x86_64/src/serial.rs`, `crates/aesynx-arch-x86_64/src/port.rs` |
-| Drivers | MMIO/IRQ/DMA caps and revocation lifecycle | Planned | `docs/IMPLEMENTATION_PLAN.md` |
+| Drivers | Separate driver tree/packages, signed driver manifests, MMIO/IRQ/DMA caps, isolated driver services, and revocation lifecycle | Planned | `docs/driver-roadmap.md`, `docs/IMPLEMENTATION_PLAN.md` |
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |
 | AI | Bounded assistant and policy fallback | Planned | `docs/IMPLEMENTATION_PLAN.md`, `docs/userspace-vision.md` |
 | QEMU testing | Boot smoke validates GDT/TSS/IDT setup, breakpoint handling, BootInfo, and Rust serial markers; panic smoke validates early panic diagnostics; exception smoke validates page-fault decoding; timer smoke validates three controlled PIT IRQ0 ticks | Active for boot | `cargo xtask qemu`, `cargo xtask qemu --panic-smoke`, `cargo xtask qemu --exception-smoke`, `cargo xtask qemu --timer-smoke`, `docs/RELEASE_PLAN.md` |

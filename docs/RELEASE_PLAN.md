@@ -1090,6 +1090,8 @@ Deliverables:
 - DeviceState.
 - Driver manifest format.
 - Driver manager skeleton.
+- Documented `drivers/` source-tree/package boundary.
+- Driver package identity and trust-track rules.
 
 Verification:
 
@@ -1108,11 +1110,14 @@ Classify early drivers explicitly.
 
 Deliverables:
 
-- UART driver crate.
-- Framebuffer driver crate or boot framebuffer wrapper.
+- Initial top-level `drivers/` tree or documented placeholder layout.
+- UART driver crate or bootstrap serial classification.
+- Framebuffer driver crate or boot framebuffer wrapper classification.
 - Timer driver classification.
 - Interrupt controller classification.
 - Bootstrap-trusted driver policy.
+- Explicit statement that bootstrap drivers are exceptions, not the long-term
+  driver model.
 
 Verification:
 

@@ -130,6 +130,15 @@ Implications:
 - Driver lifecycle has quiesce/drain/revoke/reset stages.
 - No untrusted native kernel modules by default.
 - IOMMU/DMA isolation is a long-term requirement.
+- Driver code belongs in a top-level `drivers/` area or external signed driver
+  packages, not inside the core kernel crate.
+- Community and vendor drivers should install through the package/driver
+  manager as generation-published driver services.
+- Closed-source vendor drivers may exist only behind the same service ABI,
+  signed package policy, explicit capability grants, and visible trust/taint
+  state.
+
+Reference: [Aesynx Driver Roadmap](driver-roadmap.md).
 
 ## ADR-008: Object Graph Instead Of Files As Core Model
 

@@ -164,6 +164,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Userspace Vision](docs/userspace-vision.md)
 - [Package Manager Roadmap](docs/package-manager-roadmap.md)
+- [Driver Roadmap](docs/driver-roadmap.md)
 - [Release Plan](docs/RELEASE_PLAN.md)
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)
 - [Build Skeleton](docs/build-skeleton.md)
