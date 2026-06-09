@@ -1,15 +1,18 @@
 mod host_tools;
+mod names;
 mod smoke;
 
 use crate::kernel_flags::apply_kernel_rustflags;
 use crate::workspace;
 use host_tools::{HostToolVersions, MIN_LIMINE_VERSION_TEXT, validate_host_tools};
+use names::image_names;
 use smoke::{
     BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_SETUP_MARKER,
     EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
     FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
     IRQ_SETUP_MARKER, PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER,
-    PANIC_REGISTERS_MARKER, SERIAL_MARKER, SmokeKind, parse_qemu_args,
+    PANIC_REGISTERS_MARKER, SERIAL_MARKER, SmokeKind, TIMER_MARKER, TIMER_SETUP_MARKER,
+    TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER, parse_qemu_args,
 };
 
 use std::fs;
@@ -20,18 +23,6 @@ use std::time::{Duration, Instant};
 
 const BOOT_CONFIG: &str = "boot/qemu/limine.conf";
 const BUILD_DIR: &str = "build/qemu";
-const STAGING_DIR_NAME: &str = "aesynx-v0.10.0-iso";
-const IMAGE_NAME: &str = "aesynx-v0.10.0.iso";
-const MANIFEST_NAME: &str = "aesynx-v0.10.0.manifest";
-const SERIAL_LOG_NAME: &str = "aesynx-v0.10.0.serial.log";
-const PANIC_STAGING_DIR_NAME: &str = "aesynx-v0.10.0-panic-iso";
-const PANIC_IMAGE_NAME: &str = "aesynx-v0.10.0-panic.iso";
-const PANIC_MANIFEST_NAME: &str = "aesynx-v0.10.0-panic.manifest";
-const PANIC_SERIAL_LOG_NAME: &str = "aesynx-v0.10.0-panic.serial.log";
-const EXCEPTION_STAGING_DIR_NAME: &str = "aesynx-v0.10.0-exception-iso";
-const EXCEPTION_IMAGE_NAME: &str = "aesynx-v0.10.0-exception.iso";
-const EXCEPTION_MANIFEST_NAME: &str = "aesynx-v0.10.0-exception.manifest";
-const EXCEPTION_SERIAL_LOG_NAME: &str = "aesynx-v0.10.0-exception.serial.log";
 const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
@@ -150,36 +141,6 @@ fn build_image(root: &Path, smoke: SmokeKind) -> Result<ImagePaths, String> {
         staging_dir,
         kernel_elf,
     })
-}
-
-struct ImageNames {
-    image: &'static str,
-    manifest: &'static str,
-    serial_log: &'static str,
-    staging_dir: &'static str,
-}
-
-fn image_names(smoke: SmokeKind) -> ImageNames {
-    match smoke {
-        SmokeKind::Boot => ImageNames {
-            image: IMAGE_NAME,
-            manifest: MANIFEST_NAME,
-            serial_log: SERIAL_LOG_NAME,
-            staging_dir: STAGING_DIR_NAME,
-        },
-        SmokeKind::Panic => ImageNames {
-            image: PANIC_IMAGE_NAME,
-            manifest: PANIC_MANIFEST_NAME,
-            serial_log: PANIC_SERIAL_LOG_NAME,
-            staging_dir: PANIC_STAGING_DIR_NAME,
-        },
-        SmokeKind::Exception => ImageNames {
-            image: EXCEPTION_IMAGE_NAME,
-            manifest: EXCEPTION_MANIFEST_NAME,
-            serial_log: EXCEPTION_SERIAL_LOG_NAME,
-            staging_dir: EXCEPTION_STAGING_DIR_NAME,
-        },
-    }
 }
 
 fn validate_boot_config(root: &Path) -> Result<(), String> {
@@ -339,7 +300,7 @@ fn write_manifest(
     smoke: SmokeKind,
 ) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.10.0 interrupt controller baseline\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nirq_setup_marker={IRQ_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_present_marker={FAULT_ADDRESS_PRESENT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        "name=Aesynx v0.11.0 timer ticks\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nirq_setup_marker={IRQ_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_present_marker={FAULT_ADDRESS_PRESENT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\ntimer_setup_marker={TIMER_SETUP_MARKER}\ntimer_tick_1_marker={TIMER_TICK_1_MARKER}\ntimer_tick_2_marker={TIMER_TICK_2_MARKER}\ntimer_tick_3_marker={TIMER_TICK_3_MARKER}\ntimer_marker={TIMER_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
         smoke.name(),
         image.display(),
         kernel_elf.display(),
@@ -450,6 +411,17 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
                 && contents.contains(FAULT_INTERRUPTS_MARKER)
                 && contents.contains(FAULT_ERROR_DECODE_MARKER)
                 && contents.contains(PAGE_FAULT_MARKER)
+        }
+        SmokeKind::Timer => {
+            contents.contains(CPU_SETUP_MARKER)
+                && contents.contains(EXCEPTION_SETUP_MARKER)
+                && contents.contains(IRQ_SETUP_MARKER)
+                && contents.contains(EXCEPTION_MARKER)
+                && contents.contains(TIMER_SETUP_MARKER)
+                && contents.contains(TIMER_TICK_1_MARKER)
+                && contents.contains(TIMER_TICK_2_MARKER)
+                && contents.contains(TIMER_TICK_3_MARKER)
+                && contents.contains(TIMER_MARKER)
         }
     })
 }

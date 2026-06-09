@@ -96,6 +96,23 @@ enabled and expects both the structured fatal record and the panic marker:
 [TEST] panic=ok
 ```
 
+The timer smoke path is also opt-in:
+
+```bash
+cargo xtask qemu --timer-smoke
+```
+
+It uses the `timer-smoke` boot phase, enables interrupts only for the controlled
+PIT IRQ0 test, and expects three bounded tick markers plus the final timer
+marker:
+
+```text
+timer tick 1
+timer tick 2
+timer tick 3
+[TEST] timer=ok
+```
+
 ## Boundaries
 
 This milestone proves:

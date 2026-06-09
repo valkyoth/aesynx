@@ -12,6 +12,8 @@ pub(crate) enum AdmittedPort {
     PicMasterData,
     PicSlaveCommand,
     PicSlaveData,
+    PitChannel0,
+    PitCommand,
 }
 
 impl AdmittedPort {
@@ -27,6 +29,8 @@ impl AdmittedPort {
             Self::PicMasterData => 0x21,
             Self::PicSlaveCommand => 0xa0,
             Self::PicSlaveData => 0xa1,
+            Self::PitChannel0 => 0x40,
+            Self::PitCommand => 0x43,
         }
     }
 }
@@ -106,6 +110,13 @@ mod tests {
         assert_eq!(
             pic_ports.map(|port| Port::new(port).admitted.address()),
             [0x20, 0x21, 0xa0, 0xa1]
+        );
+
+        let pit_ports = [AdmittedPort::PitChannel0, AdmittedPort::PitCommand];
+
+        assert_eq!(
+            pit_ports.map(|port| Port::new(port).admitted.address()),
+            [0x40, 0x43]
         );
     }
 }

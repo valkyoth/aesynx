@@ -25,7 +25,8 @@ pub enum BootPhase {
     Running = 6,
     PanicSmoke = 7,
     ExceptionSmoke = 8,
-    Panic = 9,
+    TimerSmoke = 9,
+    Panic = 10,
     Unknown = u8::MAX,
 }
 
@@ -42,6 +43,7 @@ impl BootPhase {
             Self::Running => "running",
             Self::PanicSmoke => "panic-smoke",
             Self::ExceptionSmoke => "exception-smoke",
+            Self::TimerSmoke => "timer-smoke",
             Self::Panic => "panic",
             Self::Unknown => "unknown",
         }
@@ -59,7 +61,8 @@ impl BootPhase {
             6 => Self::Running,
             7 => Self::PanicSmoke,
             8 => Self::ExceptionSmoke,
-            9 => Self::Panic,
+            9 => Self::TimerSmoke,
+            10 => Self::Panic,
             _unknown => Self::Unknown,
         }
     }
@@ -234,6 +237,7 @@ mod tests {
         assert_eq!(BootPhase::Running.label(), "running");
         assert_eq!(BootPhase::PanicSmoke.label(), "panic-smoke");
         assert_eq!(BootPhase::ExceptionSmoke.label(), "exception-smoke");
+        assert_eq!(BootPhase::TimerSmoke.label(), "timer-smoke");
         assert_eq!(BootPhase::Panic.label(), "panic");
         assert_eq!(BootPhase::Unknown.label(), "unknown");
     }

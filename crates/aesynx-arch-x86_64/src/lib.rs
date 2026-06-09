@@ -18,6 +18,8 @@ pub mod interrupts;
 mod port;
 #[allow(unsafe_code)]
 pub mod registers;
+#[allow(unsafe_code)]
+pub mod timer;
 
 pub struct X86_64;
 
@@ -42,23 +44,61 @@ impl ArchCpu for X86_64 {
         }
     }
 
+    #[allow(unsafe_code)]
     fn enable_interrupts() -> Result<(), ArchError> {
-        Err(ArchError::Unsupported)
+        // SAFETY: `sti` enables maskable interrupts for the current CPU. Aesynx
+        // calls this only after installing IDT entries and configuring the
+        // interrupt controller for the active smoke path.
+        unsafe {
+            core::arch::asm!("sti", options(nomem, nostack, preserves_flags));
+        }
+        Ok(())
     }
 
+    #[allow(unsafe_code)]
     fn disable_interrupts() -> Result<(), ArchError> {
-        Err(ArchError::Unsupported)
+        // SAFETY: `cli` disables maskable interrupts for the current CPU and
+        // does not access Rust memory.
+        unsafe {
+            core::arch::asm!("cli", options(nomem, nostack, preserves_flags));
+        }
+        Ok(())
     }
 
+    #[allow(unsafe_code)]
     fn interrupts_enabled() -> Result<bool, ArchError> {
-        Err(ArchError::Unsupported)
+        let rflags: u64;
+        // SAFETY: `pushfq; pop` copies RFLAGS through the current stack without
+        // creating Rust references or dereferencing untrusted pointers.
+        unsafe {
+            core::arch::asm!(
+                "pushfq",
+                "pop {rflags}",
+                rflags = lateout(reg) rflags,
+                options(nomem, preserves_flags)
+            );
+        }
+        Ok(rflags & (1 << 9) != 0)
     }
 
     fn current_core_id() -> Result<CoreId, ArchError> {
         Err(ArchError::Unsupported)
     }
 
+    #[allow(unsafe_code)]
     fn read_timestamp() -> Result<u64, ArchError> {
-        Err(ArchError::Unsupported)
+        let low: u32;
+        let high: u32;
+        // SAFETY: `rdtsc` reads the architectural timestamp counter into EDX:EAX
+        // and does not touch Rust memory.
+        unsafe {
+            core::arch::asm!(
+                "rdtsc",
+                out("eax") low,
+                out("edx") high,
+                options(nomem, nostack, preserves_flags)
+            );
+        }
+        Ok((u64::from(high) << 32) | u64::from(low))
     }
 }

@@ -32,6 +32,9 @@ if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
     echo "checks: exception smoke feature clippy"
     cargo clippy -p aesynx-kernel --features exception-smoke --target x86_64-unknown-none -- -D warnings
 
+    echo "checks: timer smoke feature clippy"
+    cargo clippy -p aesynx-kernel --features timer-smoke --target x86_64-unknown-none -- -D warnings
+
     echo "checks: tests"
     cargo test --workspace
 

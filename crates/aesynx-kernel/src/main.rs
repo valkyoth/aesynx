@@ -17,7 +17,8 @@ use aesynx_log::{LogLevel, LogMessage};
 #[cfg(all(
     target_os = "none",
     not(feature = "panic-smoke"),
-    not(feature = "exception-smoke")
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
 ))]
 mod limine;
 
@@ -83,10 +84,21 @@ fn kernel_entry() -> ! {
 #[cfg(all(
     target_os = "none",
     not(feature = "panic-smoke"),
-    not(feature = "exception-smoke")
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
 ))]
 fn kernel_entry() -> ! {
     boot_entry()
+}
+
+#[cfg(all(
+    target_os = "none",
+    feature = "timer-smoke",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke")
+))]
+fn kernel_entry() -> ! {
+    timer_smoke_entry()
 }
 
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
@@ -108,8 +120,39 @@ fn exception_smoke_entry() -> ! {
 
 #[cfg(all(
     target_os = "none",
+    feature = "timer-smoke",
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke")
+))]
+fn timer_smoke_entry() -> ! {
+    diagnostics::set_boot_phase(BootPhase::TimerSmoke);
+    write_diagnostic(LogLevel::Info, "timer smoke starting");
+    match aesynx_arch_x86_64::timer::init_smoke_timer() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "timer setup=pit irq={} vector=0x{:x} target_ticks={}",
+                status.irq.get(),
+                status.vector,
+                status.target_ticks
+            );
+            let _ = aesynx_arch_x86_64::X86_64::enable_interrupts();
+            while aesynx_arch_x86_64::timer::ticks() < aesynx_arch_x86_64::timer::target_ticks() {
+                core::hint::spin_loop();
+            }
+            let _ = aesynx_arch_x86_64::X86_64::disable_interrupts();
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("timer setup=fail error={:?}", error);
+        }
+    }
+    aesynx_arch_x86_64::X86_64::halt_forever()
+}
+
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
 ))]
 fn boot_entry() -> ! {
     let mut scratch = limine::EarlyBootScratch::new();
@@ -153,7 +196,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.10.0 panic smoke");
+    panic!("intentional v0.11.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

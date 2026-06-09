@@ -36,7 +36,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.10.0` is the current interrupt controller baseline release. It builds a
+`v0.11.0` is the current timer-tick implementation candidate. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
@@ -45,7 +45,9 @@ tables, remaps and masks the legacy PIC, detects whether the local APIC is prese
 publishes checked IRQ vector allocation, handles a returning breakpoint
 exception, and can run opt-in deliberate panic and page-fault smoke tests with
 redacted CR2 presence/page-offset, CR3 low-bit, RFLAGS, interrupt-state, and
-decoded page-fault diagnostics.
+decoded page-fault diagnostics. The opt-in timer smoke path installs a checked
+IRQ0 handler, programs the legacy PIT for QEMU, observes three controlled timer
+ticks, acknowledges each interrupt, and then disables the smoke IRQ.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -65,6 +67,7 @@ decoded page-fault diagnostics.
 | IDT and exceptions | Tagged | Early x86_64 boot installs an IDT, handles breakpoint, page-fault, and double-fault vectors, and verifies `[TEST] exception=ok`. |
 | Fault decoding | Tagged | `v0.9.0`; page-fault smoke prints redacted CR2 presence/page offset, CR3 low bits, public RFLAGS, interrupt state, and decoded error bits. |
 | Interrupt controller baseline | Tagged | `v0.10.0`; remaps/masks legacy PIC IRQs, detects local APIC presence, defines checked IRQ vectors, and exposes an EOI path. |
+| Timer ticks | Active candidate | `v0.11.0`; opt-in QEMU timer smoke programs PIT IRQ0, records a tick counter, and verifies `timer tick 1..3` plus `[TEST] timer=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -76,7 +79,7 @@ decoded page-fault diagnostics.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Timer ticks | Planned | `v0.11.0`; add APIC timer or chosen QEMU timer, tick counter, and timer interrupt handler. |
+| Monotonic time and sleeps | Planned | `v0.12.0`; turn timer ticks into a monotonic clock surface and first bounded sleep queue. |
 | Real arch mechanisms | Planned | Core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -103,7 +106,7 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.10 Limine QEMU image:
+Create and smoke-test the v0.11 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -122,6 +125,12 @@ Run the deliberate exception smoke:
 cargo xtask qemu --exception-smoke
 ```
 
+Run the controlled timer smoke:
+
+```bash
+cargo xtask qemu --timer-smoke
+```
+
 These commands require Limine 12.3.2 or newer, xorriso, and
 `qemu-system-x86_64`. The generated manifest records the exact Rust, Limine,
 xorriso, and QEMU version banners.
@@ -136,7 +145,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.10.0
+cargo xtask release-ready v0.11.0
 ```
 
 ## Security Posture
@@ -166,6 +175,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [v0.8.0 Release Candidate Notes](docs/releases/v0.8.0-rc.md)
 - [v0.9.0 Release Candidate Notes](docs/releases/v0.9.0-rc.md)
 - [v0.10.0 Release Candidate Notes](docs/releases/v0.10.0-rc.md)
+- [v0.11.0 Release Candidate Notes](docs/releases/v0.11.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

@@ -20,6 +20,7 @@ const PIC_OCW3_READ_ISR: u8 = 0x0b;
 const PIC_SPURIOUS_MASTER_IRQ: u32 = 7;
 const PIC_SPURIOUS_SLAVE_IRQ: u32 = 15;
 const CPUID_FEATURE_EDX_APIC: u32 = 1 << 9;
+const SUPPORTED_TIMER_IRQ: u32 = 0;
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -67,8 +68,11 @@ impl InterruptController for X86_64InterruptController {
     }
 
     fn enable_irq(irq: IrqLine) -> Result<(), InterruptError> {
-        let _ = IrqVector::from_irq(irq)?;
-        Err(InterruptError::ControllerUnavailable)
+        if irq.get() != SUPPORTED_TIMER_IRQ {
+            let _ = IrqVector::from_irq(irq)?;
+            return Err(InterruptError::ControllerUnavailable);
+        }
+        unmask_legacy_pic_irq(irq)
     }
 
     fn disable_irq(irq: IrqLine) -> Result<(), InterruptError> {
@@ -144,6 +148,23 @@ fn mask_legacy_pic_irq(irq: IrqLine) -> Result<(), InterruptError> {
     Ok(())
 }
 
+fn unmask_legacy_pic_irq(irq: IrqLine) -> Result<(), InterruptError> {
+    let line = irq.get();
+    if line >= LEGACY_PIC_IRQS {
+        return Err(InterruptError::InvalidIrq);
+    }
+
+    let port = if line < 8 {
+        Port::new(AdmittedPort::PicMasterData)
+    } else {
+        Port::new(AdmittedPort::PicSlaveData)
+    };
+    let bit = 1u8 << (line % 8);
+    let mask = port.read_u8() & !bit;
+    port.write_u8(mask);
+    Ok(())
+}
+
 fn acknowledge_legacy_pic_irq(irq: IrqLine) -> Result<(), InterruptError> {
     let line = irq.get();
     if line >= LEGACY_PIC_IRQS {
@@ -200,7 +221,7 @@ mod tests {
         CPUID_FEATURE_EDX_APIC, IRQ_VECTOR_BASE, IrqVector, LEGACY_PIC_IRQS, LocalApicMode,
         PIC_ICW1_INIT_WITH_ICW4, PIC_ICW3_MASTER_HAS_SLAVE_ON_IRQ2, PIC_ICW3_SLAVE_ID_2,
         PIC_ICW4_8086_MODE, PIC_MASTER_VECTOR_BASE, PIC_OCW3_READ_ISR, PIC_SLAVE_VECTOR_BASE,
-        PIC_SPURIOUS_MASTER_IRQ, PIC_SPURIOUS_SLAVE_IRQ,
+        PIC_SPURIOUS_MASTER_IRQ, PIC_SPURIOUS_SLAVE_IRQ, SUPPORTED_TIMER_IRQ,
     };
 
     #[test]
@@ -242,14 +263,15 @@ mod tests {
     }
 
     #[test]
-    fn deferred_enable_still_validates_irq_line() {
+    fn legacy_enable_rejects_invalid_irq_line() {
         assert_eq!(
             super::X86_64InterruptController::enable_irq(IrqLine::new(LEGACY_PIC_IRQS)),
             Err(InterruptError::InvalidIrq)
         );
         assert_eq!(
-            super::X86_64InterruptController::enable_irq(IrqLine::new(0)),
+            super::X86_64InterruptController::enable_irq(IrqLine::new(1)),
             Err(InterruptError::ControllerUnavailable)
         );
+        assert_eq!(SUPPORTED_TIMER_IRQ, 0);
     }
 }

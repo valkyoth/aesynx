@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.10 interrupt controller baseline release
+Status: v0.11 timer-tick implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -52,9 +52,10 @@ cargo xtask image
 cargo xtask qemu
 cargo xtask qemu --panic-smoke
 cargo xtask qemu --exception-smoke
+cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.10.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.11.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -62,16 +63,22 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.10.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.11.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.10.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.11.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
+
+`cargo xtask qemu --timer-smoke` creates a separate
+`build/qemu/aesynx-v0.11.0-timer.iso`, enables the kernel `timer-smoke` feature,
+programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
+that controlled smoke path, and expects `timer tick 1`, `timer tick 2`,
+`timer tick 3`, and `[TEST] timer=ok`.
 
 The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that
 computes the workspace root dynamically and passes
@@ -80,14 +87,15 @@ builds also pass the same remap through encoded Rust flags as portable
 defense-in-depth for the release image path. The panic handler still emits only
 an escaped filename basename.
 
-The v0.10 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+The v0.11 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, remap and mask legacy PIC IRQs, detect
 local APIC availability for the deferred MMIO path, handle a returning breakpoint
-exception, catch and decode an opt-in page fault, provide handoff metadata that
-normalizes into Aesynx `BootInfo`, and produce readable early panic
-diagnostics. It does not claim page-table ownership, APIC MMIO activation,
-memory allocation, page-fault recovery, timer interrupts, or bootloader memory
-reclamation.
+exception, catch and decode an opt-in page fault, run a controlled PIT-backed
+timer IRQ0 smoke test, provide handoff metadata that normalizes into Aesynx
+`BootInfo`, and produce readable early panic diagnostics. It does not claim
+page-table ownership, APIC MMIO activation, memory allocation, page-fault
+recovery, a production monotonic clock, sleep queues, scheduler preemption, or
+bootloader memory reclamation.
 
 ## Target Shape
 

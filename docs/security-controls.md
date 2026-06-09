@@ -29,13 +29,14 @@ claim that the controls are implemented today.
 | x86_64 descriptor tables | Early boot installs a private GDT, reloads CS/SS/DS/ES, nulls FS/GS selectors, loads TSS, and reserves a dedicated double-fault IST stack before generic kernel work | Active candidate | `aesynx-arch-x86_64::descriptors`, `cargo xtask qemu` |
 | x86_64 exception tables | Early boot installs a private IDT and handlers for breakpoint, page fault, and double fault; page-fault smoke prints CR2 presence/page offset, CR3 low bits, RFLAGS summary, interrupt state, and decoded error bits | Active candidate | `aesynx-arch-x86_64::exceptions`, `cargo xtask qemu --exception-smoke` |
 | x86_64 interrupt baseline | Legacy PIC is remapped out of exception vectors before masking; local APIC is detection-only until MMIO mapping exists; IRQ vectors and EOI paths are checked | Active candidate | `aesynx-arch-x86_64::interrupts`, `cargo xtask qemu` |
+| x86_64 timer smoke | Opt-in PIT IRQ0 smoke installs a checked vector 0x20 handler, enables interrupts only for the controlled test, acknowledges each tick, and disables IRQ0 after the fixed three-tick target | Active candidate | `aesynx-arch-x86_64::timer`, `cargo xtask qemu --timer-smoke` |
 | Telemetry integrity | Task telemetry uses append-only counters; core telemetry snapshots are advisory per-counter samples | Model active | `TaskTelemetry`, `CoreTelemetry` |
 | Capability revocation | REVOKE authority check required before epoch mutation; epoch increment must fail rather than wrap | Model active | `ensure_revoke_authority`, `RevocationEpochStore` |
 | Early serial safety | COM1 output uses admitted ports, bounded polling, and a single-core marker type | Active for boot | `crates/aesynx-arch-x86_64/src/serial.rs`, `crates/aesynx-arch-x86_64/src/port.rs` |
 | Drivers | MMIO/IRQ/DMA caps and revocation lifecycle | Planned | `docs/IMPLEMENTATION_PLAN.md` |
 | WASM | Sandboxed extension model | Planned | `docs/userspace-vision.md` |
 | AI | Bounded assistant and policy fallback | Planned | `docs/IMPLEMENTATION_PLAN.md`, `docs/userspace-vision.md` |
-| QEMU testing | Boot smoke validates GDT/TSS/IDT setup, breakpoint handling, BootInfo, and Rust serial markers; panic smoke validates early panic diagnostics; exception smoke validates page-fault decoding | Active for boot | `cargo xtask qemu`, `cargo xtask qemu --panic-smoke`, `cargo xtask qemu --exception-smoke`, `docs/RELEASE_PLAN.md` |
+| QEMU testing | Boot smoke validates GDT/TSS/IDT setup, breakpoint handling, BootInfo, and Rust serial markers; panic smoke validates early panic diagnostics; exception smoke validates page-fault decoding; timer smoke validates three controlled PIT IRQ0 ticks | Active for boot | `cargo xtask qemu`, `cargo xtask qemu --panic-smoke`, `cargo xtask qemu --exception-smoke`, `cargo xtask qemu --timer-smoke`, `docs/RELEASE_PLAN.md` |
 | Future bootloader | Rust UEFI bootloader must stay a minimal signed/measured security gateway | Planned | `docs/bootloader-roadmap.md` |
 
 ## Admission Rule

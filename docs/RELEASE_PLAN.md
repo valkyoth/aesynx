@@ -390,7 +390,7 @@ Get reliable periodic ticks.
 
 Deliverables:
 
-- APIC timer or other chosen x86_64 QEMU timer.
+- PIT-backed x86_64 QEMU timer smoke as the first chosen timer path.
 - Tick counter.
 - Timer interrupt handler.
 - `aesynx-time` crate.

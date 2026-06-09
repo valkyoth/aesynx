@@ -16,12 +16,18 @@ pub const PANIC_DIAGNOSTIC_MARKER: &str = "[kernel][FATAL] panic handler entered
 pub const PANIC_MARKER: &str = "[TEST] panic=ok";
 pub const PANIC_REGISTERS_MARKER: &str = "panic registers=";
 pub const SERIAL_MARKER: &str = "[TEST] boot=ok";
+pub const TIMER_MARKER: &str = "[TEST] timer=ok";
+pub const TIMER_SETUP_MARKER: &str = "timer setup=pit";
+pub const TIMER_TICK_1_MARKER: &str = "timer tick 1";
+pub const TIMER_TICK_2_MARKER: &str = "timer tick 2";
+pub const TIMER_TICK_3_MARKER: &str = "timer tick 3";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SmokeKind {
     Boot,
     Panic,
     Exception,
+    Timer,
 }
 
 impl SmokeKind {
@@ -30,6 +36,7 @@ impl SmokeKind {
             Self::Boot => "boot",
             Self::Panic => "panic",
             Self::Exception => "exception",
+            Self::Timer => "timer",
         }
     }
 
@@ -44,6 +51,9 @@ impl SmokeKind {
             Self::Exception => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, cr2_present=, cr2_offset=0x, cr3_offset=0x, rflags=0x, interrupts_enabled=, present=, [TEST] pagefault=ok"
             }
+            Self::Timer => {
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, timer tick 1, timer tick 2, timer tick 3, [TEST] timer=ok"
+            }
         }
     }
 
@@ -52,6 +62,7 @@ impl SmokeKind {
             Self::Boot => None,
             Self::Panic => Some("panic-smoke"),
             Self::Exception => Some("exception-smoke"),
+            Self::Timer => Some("timer-smoke"),
         }
     }
 }
@@ -61,6 +72,9 @@ pub fn parse_qemu_args(args: &[String]) -> Result<SmokeKind, &'static str> {
         [] => Ok(SmokeKind::Boot),
         [flag] if flag == "--panic-smoke" => Ok(SmokeKind::Panic),
         [flag] if flag == "--exception-smoke" => Ok(SmokeKind::Exception),
-        _ => Err("qemu accepts no arguments except --panic-smoke or --exception-smoke"),
+        [flag] if flag == "--timer-smoke" => Ok(SmokeKind::Timer),
+        _ => Err(
+            "qemu accepts no arguments except --panic-smoke, --exception-smoke, or --timer-smoke",
+        ),
     }
 }

@@ -17,6 +17,7 @@ aesynx-log.workspace = true
 default = []
 exception-smoke = []
 panic-smoke = []
+timer-smoke = []
 
 [lints]
 workspace = true

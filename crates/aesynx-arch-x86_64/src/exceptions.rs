@@ -132,6 +132,21 @@ pub fn trigger_breakpoint_smoke() {
     }
 }
 
+pub fn install_interrupt_gate(vector: u8, handler: unsafe extern "C" fn()) -> Result<(), IdtError> {
+    let index = usize::from(vector);
+    if !(0x20..IDT_ENTRIES).contains(&index) {
+        return Err(IdtError::InvalidInterruptVector);
+    }
+
+    // SAFETY: The IDT is private static storage initialized during early boot.
+    // This installer is limited to non-exception interrupt vectors and is used
+    // before external interrupts are enabled.
+    unsafe {
+        IDT[index] = IdtEntry::interrupt_gate(handler, 0);
+    }
+    Ok(())
+}
+
 #[allow(clippy::empty_loop)]
 pub fn trigger_page_fault_smoke() -> ! {
     // SAFETY: This deliberately issues an assembly load from virtual address
@@ -240,6 +255,11 @@ extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) 
 const BREAKPOINT_VECTOR_U8: u8 = BREAKPOINT_VECTOR as u8;
 const PAGE_FAULT_VECTOR_U8: u8 = PAGE_FAULT_VECTOR as u8;
 const DOUBLE_FAULT_VECTOR_U8: u8 = DOUBLE_FAULT_VECTOR as u8;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IdtError {
+    InvalidInterruptVector,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ExceptionFrame {
