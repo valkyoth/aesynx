@@ -12,6 +12,7 @@ const KERNEL_CODE_DESCRIPTOR: u64 = 0x00af_9a00_0000_ffff;
 const KERNEL_DATA_DESCRIPTOR: u64 = 0x00af_9200_0000_ffff;
 const TSS_DESCRIPTOR_TYPE: u64 = 0x9;
 const PRESENT_BIT: u64 = 1 << 47;
+const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -94,11 +95,25 @@ pub fn init() -> DescriptorTableStatus {
 /// pointer to a writable kernel stack that remains valid for the current CPU
 /// while ring 3 execution is enabled.
 pub unsafe fn set_ring0_stack(stack_top: u64) {
+    debug_assert_ne!(stack_top, 0, "RSP0 cannot be null");
+    debug_assert!(
+        stack_top >= X86_64_KERNEL_VMA_MIN,
+        "RSP0 must be in the kernel VMA"
+    );
+    debug_assert_eq!(stack_top & 0xf, 0, "RSP0 must be 16-byte aligned");
+    debug_assert!(is_canonical_address(stack_top), "RSP0 must be canonical");
+
     // SAFETY: The public unsafe contract above requires the caller to provide a
     // valid current-CPU kernel stack pointer before privilege transitions use it.
     unsafe {
         TSS.rsp[0] = stack_top;
     }
+}
+
+const fn is_canonical_address(address: u64) -> bool {
+    let sign_bit = (address >> 47) & 1;
+    let upper = address >> 48;
+    (sign_bit == 0 && upper == 0) || (sign_bit == 1 && upper == 0xffff)
 }
 
 unsafe fn init_tables() {

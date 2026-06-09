@@ -8,6 +8,8 @@ pub struct EarlyBootScratch {
     memory_regions: [MemoryRegion; MAX_EARLY_MEMORY_REGIONS],
 }
 
+const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
+
 impl EarlyBootScratch {
     pub const fn new() -> Self {
         Self {
@@ -274,9 +276,14 @@ unsafe fn limine_ref<T>(ptr: *const T) -> Option<&'static T> {
         return None;
     }
 
+    if (ptr as usize as u64) < X86_64_KERNEL_VMA_MIN {
+        return None;
+    }
+
     // SAFETY: The caller established that this pointer came from Limine response
     // memory and remains live during early boot. This helper additionally guards
-    // against null and misaligned pointers before creating a reference.
+    // against null, misaligned, and lower-half pointers before creating a
+    // reference.
     Some(unsafe { &*ptr })
 }
 

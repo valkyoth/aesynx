@@ -1,5 +1,5 @@
 use core::arch::global_asm;
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 
 use aesynx_abi::IrqLine;
 use aesynx_arch::{InterruptController, InterruptError};
@@ -12,8 +12,12 @@ pub const TIMER_VECTOR: u8 = 0x20;
 const PIT_COMMAND_CHANNEL0_LO_HI_MODE2: u8 = 0x34;
 const PIT_DIVISOR_100HZ: u16 = 11_932;
 const TIMER_SMOKE_TARGET_TICKS: u64 = 3;
+const INIT_UNINITIALIZED: u8 = 0;
+const INIT_IN_PROGRESS: u8 = 1;
+const INIT_READY: u8 = 2;
+const INIT_FAILED: u8 = 3;
 
-static INITIALIZED: AtomicBool = AtomicBool::new(false);
+static INIT_STATE: AtomicU8 = AtomicU8::new(INIT_UNINITIALIZED);
 static TICKS: AtomicU64 = AtomicU64::new(0);
 
 global_asm!(
@@ -72,10 +76,23 @@ pub struct TimerStatus {
 }
 
 pub fn init_smoke_timer() -> Result<TimerStatus, TimerError> {
-    if !INITIALIZED.swap(true, Ordering::AcqRel) {
-        install_and_start_timer().inspect_err(|_error| {
-            INITIALIZED.store(false, Ordering::Release);
-        })?;
+    match INIT_STATE.compare_exchange(
+        INIT_UNINITIALIZED,
+        INIT_IN_PROGRESS,
+        Ordering::AcqRel,
+        Ordering::Acquire,
+    ) {
+        Ok(_previous) => match install_and_start_timer() {
+            Ok(()) => INIT_STATE.store(INIT_READY, Ordering::Release),
+            Err(error) => {
+                INIT_STATE.store(INIT_FAILED, Ordering::Release);
+                return Err(error);
+            }
+        },
+        Err(INIT_READY) => {}
+        Err(INIT_FAILED) => return Err(TimerError::InitializationFailed),
+        Err(INIT_IN_PROGRESS) => return Err(TimerError::InitializationInProgress),
+        Err(_unknown) => return Err(TimerError::InitializationFailed),
     }
 
     Ok(status())
@@ -133,11 +150,14 @@ extern "C" fn aesynx_x86_64_timer_dispatch() {
 pub enum TimerError {
     IdtInstallFailed,
     InterruptController(InterruptError),
+    InitializationFailed,
+    InitializationInProgress,
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
+        INIT_FAILED, INIT_IN_PROGRESS, INIT_READY, INIT_UNINITIALIZED,
         PIT_COMMAND_CHANNEL0_LO_HI_MODE2, PIT_DIVISOR_100HZ, TIMER_IRQ, TIMER_SMOKE_TARGET_TICKS,
         TIMER_VECTOR, status, target_ticks,
     };
@@ -162,5 +182,13 @@ mod tests {
         assert_eq!(status.vector, TIMER_VECTOR);
         assert_eq!(status.irq.get(), TIMER_IRQ);
         assert_eq!(status.target_ticks, TIMER_SMOKE_TARGET_TICKS);
+    }
+
+    #[test]
+    fn timer_init_states_are_explicit() {
+        assert_eq!(INIT_UNINITIALIZED, 0);
+        assert_eq!(INIT_IN_PROGRESS, 1);
+        assert_eq!(INIT_READY, 2);
+        assert_eq!(INIT_FAILED, 3);
     }
 }

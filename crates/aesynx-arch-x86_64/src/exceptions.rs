@@ -134,7 +134,10 @@ pub fn trigger_breakpoint_smoke() {
     }
 }
 
-pub fn install_interrupt_gate(vector: u8, handler: unsafe extern "C" fn()) -> Result<(), IdtError> {
+pub(crate) fn install_interrupt_gate(
+    vector: u8,
+    handler: unsafe extern "C" fn(),
+) -> Result<(), IdtError> {
     let index = usize::from(vector);
     if !(0x20..IDT_ENTRIES).contains(&index) {
         return Err(IdtError::InvalidInterruptVector);
@@ -142,6 +145,10 @@ pub fn install_interrupt_gate(vector: u8, handler: unsafe extern "C" fn()) -> Re
 
     let interrupts_were_enabled =
         crate::X86_64::interrupts_enabled().map_err(|_| IdtError::CpuStateUnavailable)?;
+    debug_assert!(
+        !interrupts_were_enabled,
+        "install_interrupt_gate called with interrupts enabled"
+    );
     if interrupts_were_enabled {
         crate::X86_64::disable_interrupts().map_err(|_| IdtError::CpuStateUnavailable)?;
     }

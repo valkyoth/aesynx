@@ -12,6 +12,13 @@ pub trait ArchCpu {
     fn disable_interrupts() -> Result<(), ArchError>;
     fn interrupts_enabled() -> Result<bool, ArchError>;
     fn current_core_id() -> Result<CoreId, ArchError>;
+    /// Returns a cheap architectural timestamp value.
+    ///
+    /// Non-serializing: the value may be captured before preceding
+    /// instructions retire. Callers that need precise ordering must use a
+    /// future fenced timestamp API or issue the architecture's serialization
+    /// instruction before this call. Do not use this value for expiry checks,
+    /// replay detection, or security decisions.
     fn read_timestamp() -> Result<u64, ArchError>;
 }
 
