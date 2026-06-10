@@ -4,8 +4,8 @@ use crate::{FRAME_SIZE, GenericPageFlags};
 
 use super::address::{validate_phys, validate_virt_page};
 use super::{
-    MapRangeOutcome, PageRangeMapping, PageTableError, PageTableMapper, ProtectRangeOutcome,
-    TlbFlush, UnmapRangeOutcome,
+    MapRangeOutcome, PageMapping, PageRangeMapping, PageTableError, PageTableMapper,
+    ProtectRangeOutcome, TlbFlush, UnmapRangeOutcome, X86_64PageTableEntry,
 };
 
 impl<const TABLES: usize> PageTableMapper<TABLES> {
@@ -18,6 +18,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<MapRangeOutcome, PageTableError> {
         validate_virt_range(virt, page_count)?;
         validate_phys_range(phys, page_count)?;
+        validate_flags(flags)?;
         validate_range_walk::<TABLES>(page_count)?;
 
         let mut candidate = *self;
@@ -90,6 +91,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         flags: GenericPageFlags,
     ) -> Result<(), PageTableError> {
         validate_virt_range(virt, page_count)?;
+        validate_flags(flags)?;
         validate_range_walk::<TABLES>(page_count)?;
 
         let mut offset = 0u64;
@@ -111,6 +113,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         flags: GenericPageFlags,
     ) -> Result<ProtectRangeOutcome, PageTableError> {
         validate_virt_range(virt, page_count)?;
+        validate_flags(flags)?;
         validate_range_walk::<TABLES>(page_count)?;
 
         let mut candidate = *self;
@@ -180,6 +183,11 @@ fn validate_phys_range(phys: PhysAddr, page_count: u64) -> Result<(), PageTableE
 
     let last = add_pages_to_phys(phys, page_count - 1)?;
     validate_phys(last)
+}
+
+fn validate_flags(flags: GenericPageFlags) -> Result<(), PageTableError> {
+    X86_64PageTableEntry::from_mapping(PageMapping::new(PhysAddr::new(0), flags))?;
+    Ok(())
 }
 
 fn validate_range_walk<const TABLES: usize>(page_count: u64) -> Result<(), PageTableError> {

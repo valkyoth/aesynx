@@ -101,6 +101,23 @@ fn mapper_contiguous_map_rejects_malformed_physical_ranges() -> Result<(), PageT
 }
 
 #[test]
+fn mapper_contiguous_map_rejects_invalid_flags_before_mutation() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
+    let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
+    invalid.device_memory = true;
+    invalid.cacheable = false;
+
+    assert_eq!(
+        mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, invalid),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+    assert_eq!(mapper, before);
+    assert_eq!(mapper.status().mapped_pages, 0);
+    Ok(())
+}
+
+#[test]
 fn mapper_contiguous_ranges_are_walk_bounded() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let before = mapper;
@@ -118,6 +135,10 @@ fn mapper_contiguous_ranges_are_walk_bounded() -> Result<(), PageTableError> {
     );
     assert_eq!(
         mapper.ensure_unmapped_contiguous(KERNEL_VIRT, too_many),
+        Err(PageTableError::RangeTooLarge)
+    );
+    assert_eq!(
+        mapper.ensure_contiguous_flags(KERNEL_VIRT, too_many, flags),
         Err(PageTableError::RangeTooLarge)
     );
     assert_eq!(
@@ -219,6 +240,24 @@ fn mapper_contiguous_flag_check_rejects_gaps_or_mismatches() -> Result<(), PageT
     assert_eq!(
         mapper.ensure_contiguous_flags(KERNEL_VIRT, 0, initial),
         Err(PageTableError::InvalidPageCount)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_contiguous_flag_check_rejects_invalid_expected_flags() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, initial)?;
+    let before = mapper;
+    let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
+    invalid.device_memory = true;
+    invalid.cacheable = false;
+
+    assert_eq!(
+        mapper.ensure_contiguous_flags(KERNEL_VIRT, 1, invalid),
+        Err(PageTableError::InvalidMappingFlags)
     );
     assert_eq!(mapper, before);
     Ok(())
@@ -329,6 +368,28 @@ fn mapper_contiguous_protect_failure_is_atomic() -> Result<(), PageTableError> {
 }
 
 #[test]
+fn mapper_contiguous_protect_rejects_invalid_flags_before_mutation() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, initial)?;
+    let before = mapper;
+    let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
+    invalid.device_memory = true;
+    invalid.cacheable = false;
+
+    assert_eq!(
+        mapper.protect_contiguous(KERNEL_VIRT, 2, invalid),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+    assert_eq!(mapper, before);
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Ok(crate::page_table::PageMapping::new(KERNEL_PHYS, initial))
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_unmaps_contiguous_range_atomically() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
@@ -392,6 +453,14 @@ fn mapper_contiguous_ranges_reject_zero_pages() -> Result<(), PageTableError> {
     );
     assert_eq!(
         mapper.ensure_unmapped_contiguous(KERNEL_VIRT, 0),
+        Err(PageTableError::InvalidPageCount)
+    );
+    assert_eq!(
+        mapper.ensure_contiguous_flags(
+            KERNEL_VIRT,
+            0,
+            GenericPageFlags::kernel(PageAccess::ReadOnly),
+        ),
         Err(PageTableError::InvalidPageCount)
     );
     assert_eq!(mapper.status().mapped_pages, 0);

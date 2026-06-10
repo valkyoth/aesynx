@@ -530,6 +530,7 @@ Deliverables:
 - Read-only mapping visitor for future policy checks.
 - Read-only virtual range permission verification without physical-contiguity
   assumptions.
+- Upfront flag validation for range map/protect/verification paths.
 - Empty intermediate table reclamation after unmap.
 - Read-only consistency audit for reachable tables and mapped-page accounting.
 - Generic page flags carried through mappings.
@@ -543,8 +544,8 @@ Verification:
 - Host tests for map, translate, mapping lookup, permission changes, unmap,
   empty-table reclamation, sibling preservation, double-map rejection, invalid
   address rejection, atomic capacity failure, mapping visitor behavior,
-  range permission verification, consistency audit failures, and x86_64 entry
-  flag encoding.
+  range permission verification, invalid range flag validation, consistency
+  audit failures, and x86_64 entry flag encoding.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:
