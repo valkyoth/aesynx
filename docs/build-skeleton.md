@@ -63,8 +63,9 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `memory usable_bytes=`, `memory reserved_bytes=`, `[TEST] memory-map=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
 `page-table total_tables=`, `mapping_lookup_ok=true`, `protect_ok=true`,
-`protect_range_ok=true`, `range_lookup_ok=true`, `reclaim_ok=true`, `range_ok=true`,
-`[TEST] page-table=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
+`protect_range_ok=true`, `range_lookup_ok=true`, `unmapped_range_ok=true`,
+`reclaim_ok=true`, `range_ok=true`, `[TEST] page-table=ok`,
+`[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
 `build/qemu/aesynx-v0.15.0-panic.iso`, enables the kernel `panic-smoke` feature,
@@ -105,7 +106,7 @@ from a usable memory-map window and verifies one-frame allocation/free,
 contiguous allocation/free, debug state, and double-free detection. It also
 exercises a bounded x86_64-shaped page-table mapper model with map, permission
 lookup, contiguous range lookup, permission change, translate, contiguous range map/protect/unmap,
-unmap, empty-table reclamation, and explicit TLB flush targets. It does not claim active CR3 replacement,
+unmapped range checks, unmap, empty-table reclamation, and explicit TLB flush targets. It does not claim active CR3 replacement,
 production page-table ownership, APIC MMIO activation, global physical-memory
 ownership, heap allocation, page-fault recovery, a calibrated production clock
 service, scheduler preemption, or bootloader memory reclamation.

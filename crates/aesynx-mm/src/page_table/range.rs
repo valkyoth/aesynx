@@ -58,6 +58,26 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Ok(PageRangeMapping::new(first.phys(), page_count, flags))
     }
 
+    pub fn ensure_unmapped_contiguous(
+        &self,
+        virt: VirtAddr,
+        page_count: u64,
+    ) -> Result<(), PageTableError> {
+        validate_page_count(page_count)?;
+
+        let mut offset = 0u64;
+        while offset < page_count {
+            match self.mapping_for_page(add_pages_to_virt(virt, offset)?) {
+                Ok(_mapping) => return Err(PageTableError::AlreadyMapped),
+                Err(PageTableError::NotMapped) => {}
+                Err(error) => return Err(error),
+            }
+            offset += 1;
+        }
+
+        Ok(())
+    }
+
     pub fn protect_contiguous(
         &mut self,
         virt: VirtAddr,

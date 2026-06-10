@@ -9,6 +9,7 @@ pub struct PageTableSmokeStatus {
     pub protect_ok: bool,
     pub protect_range_ok: bool,
     pub range_lookup_ok: bool,
+    pub unmapped_range_ok: bool,
     pub reclaim_ok: bool,
     pub range_ok: bool,
     pub flush_page: bool,
@@ -117,6 +118,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if mapper.translate(SMOKE_RANGE_VIRT).is_some() {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    mapper
+        .ensure_unmapped_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
     let after_range = mapper.status();
     if after_range.used_tables != 1 || after_range.mapped_pages != 0 {
         return Err(PageTableSmokeError::UnexpectedTranslation);
@@ -132,6 +136,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         protect_ok: true,
         protect_range_ok: true,
         range_lookup_ok: true,
+        unmapped_range_ok: true,
         reclaim_ok: true,
         range_ok: true,
         flush_page: true,

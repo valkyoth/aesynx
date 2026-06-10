@@ -29,6 +29,7 @@ pub const PAGE_TABLE_RANGE_LOOKUP_MARKER: &str = "range_lookup_ok=true";
 pub const PAGE_TABLE_RANGE_MARKER: &str = "range_ok=true";
 pub const PAGE_TABLE_RECLAIM_MARKER: &str = "reclaim_ok=true";
 pub const PAGE_TABLE_STATUS_MARKER: &str = "page-table total_tables=";
+pub const PAGE_TABLE_UNMAPPED_RANGE_MARKER: &str = "unmapped_range_ok=true";
 pub const PANIC_DIAGNOSTIC_MARKER: &str = "[kernel][FATAL] panic handler entered";
 pub const PANIC_MARKER: &str = "[TEST] panic=ok";
 pub const PANIC_REGISTERS_MARKER: &str = "panic registers=";
@@ -62,7 +63,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, mapping_lookup_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, mapping_lookup_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, unmapped_range_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
