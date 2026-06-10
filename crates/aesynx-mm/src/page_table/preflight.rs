@@ -5,9 +5,7 @@ use super::{PageTableAudit, PageTableError, PageTableMapper};
 impl<const TABLES: usize> PageTableMapper<TABLES> {
     pub fn verify_kernel_address_space_candidate(&self) -> Result<PageTableAudit, PageTableError> {
         let audit = self.checked_candidate_audit()?;
-        self.ensure_no_user_space_mappings()?;
-        self.ensure_no_user_mappings()?;
-        self.ensure_no_device_mappings()?;
+        self.ensure_kernel_candidate_shape()?;
         self.ensure_no_physical_aliases()?;
         Ok(audit)
     }
@@ -35,6 +33,31 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             return Err(PageTableError::EmptyAddressSpace);
         }
         Ok(audit)
+    }
+
+    fn ensure_kernel_candidate_shape(&self) -> Result<(), PageTableError> {
+        let mut has_user_space_mapping = false;
+        let mut has_user_mapping = false;
+        let mut has_device_mapping = false;
+        self.visit_mappings(|entry| {
+            if entry.virt().get() >> 47 == 0 {
+                has_user_space_mapping = true;
+            }
+            if matches!(entry.mapping().flags().privilege, PagePrivilege::User) {
+                has_user_mapping = true;
+            }
+            if entry.mapping().flags().is_device_memory() {
+                has_device_mapping = true;
+            }
+            Ok(())
+        })?;
+        if has_user_space_mapping {
+            return Err(PageTableError::UnexpectedVirtualAddressSpace);
+        }
+        if has_user_mapping || has_device_mapping {
+            return Err(PageTableError::UnexpectedMappingFlags);
+        }
+        Ok(())
     }
 
     fn ensure_user_candidate_shape(&self) -> Result<(), PageTableError> {

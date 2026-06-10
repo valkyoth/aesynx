@@ -74,6 +74,23 @@ fn mapper_kernel_candidate_preflight_rejects_low_half_mappings() -> Result<(), P
 }
 
 #[test]
+fn mapper_kernel_candidate_preflight_reports_low_half_before_user_flags()
+-> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        USER_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::user(PageAccess::ReadOnly),
+    )?;
+
+    assert_kernel_candidate_rejects_without_mutation(
+        &mapper,
+        PageTableError::UnexpectedVirtualAddressSpace,
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_kernel_candidate_preflight_rejects_physical_aliases() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     mapper.map_page(
