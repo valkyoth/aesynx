@@ -62,6 +62,7 @@ impl core::fmt::Debug for BootMetadata<'_> {
 pub enum BootInfoError {
     EmptyMemoryMap,
     InvalidMemoryRegion,
+    OverlappingMemoryRegion,
     MemoryAccounting(MemoryAccountingError),
     KernelImageEmpty,
 }
@@ -71,9 +72,17 @@ fn validate_memory_regions(regions: &[MemoryRegion]) -> Result<(), BootInfoError
         return Err(BootInfoError::EmptyMemoryMap);
     }
 
-    for region in regions {
+    for (index, region) in regions.iter().enumerate() {
         if region.len == 0 || region.end().is_none() {
             return Err(BootInfoError::InvalidMemoryRegion);
+        }
+        let end = region.end().ok_or(BootInfoError::InvalidMemoryRegion)?;
+
+        for other in &regions[index + 1..] {
+            let other_end = other.end().ok_or(BootInfoError::InvalidMemoryRegion)?;
+            if region.start.get() < other_end.get() && other.start.get() < end.get() {
+                return Err(BootInfoError::OverlappingMemoryRegion);
+            }
         }
     }
 
@@ -120,6 +129,24 @@ mod tests {
         ArchKind, BootInfo, BootInfoError, BootMetadata, FramebufferInfo, HhdmInfo,
         KernelImageInfo, MemoryAccountingError, MemoryRegion, MemoryRegionKind, PlatformKind,
     };
+
+    fn qemu_metadata<'a>(memory_regions: &'a [MemoryRegion]) -> BootMetadata<'a> {
+        BootMetadata {
+            arch: ArchKind::X86_64,
+            platform: PlatformKind::Qemu,
+            memory_regions,
+            framebuffer: None,
+            rsdp: None,
+            device_tree: None,
+            cpu_topology: &[],
+            kernel_image: KernelImageInfo::new(
+                VirtAddr::new(0xffffffff80000000),
+                VirtAddr::new(0xffffffff80002000),
+                PhysAddr::new(0x200000),
+            ),
+            hhdm: None,
+        }
+    }
 
     #[test]
     fn bootinfo_normalizes_synthetic_memory_map() -> Result<(), BootInfoError> {
@@ -202,21 +229,7 @@ mod tests {
 
     #[test]
     fn bootinfo_rejects_empty_memory_map() {
-        let result = BootInfo::normalize(BootMetadata {
-            arch: ArchKind::X86_64,
-            platform: PlatformKind::Qemu,
-            memory_regions: &[],
-            framebuffer: None,
-            rsdp: None,
-            device_tree: None,
-            cpu_topology: &[],
-            kernel_image: KernelImageInfo::new(
-                VirtAddr::new(0xffffffff80000000),
-                VirtAddr::new(0xffffffff80002000),
-                PhysAddr::new(0x200000),
-            ),
-            hhdm: None,
-        });
+        let result = BootInfo::normalize(qemu_metadata(&[]));
 
         assert_eq!(result, Err(BootInfoError::EmptyMemoryMap));
     }
@@ -225,23 +238,9 @@ mod tests {
     fn bootinfo_rejects_memory_accounting_overflow() {
         let regions = [
             MemoryRegion::new(PhysAddr::new(0), u64::MAX - 1, MemoryRegionKind::Usable),
-            MemoryRegion::new(PhysAddr::new(0), 2, MemoryRegionKind::Usable),
+            MemoryRegion::new(PhysAddr::new(u64::MAX - 1), 1, MemoryRegionKind::Usable),
         ];
-        let result = BootInfo::normalize(BootMetadata {
-            arch: ArchKind::X86_64,
-            platform: PlatformKind::Qemu,
-            memory_regions: &regions,
-            framebuffer: None,
-            rsdp: None,
-            device_tree: None,
-            cpu_topology: &[],
-            kernel_image: KernelImageInfo::new(
-                VirtAddr::new(0xffffffff80000000),
-                VirtAddr::new(0xffffffff80002000),
-                PhysAddr::new(0x200000),
-            ),
-            hhdm: None,
-        });
+        let result = BootInfo::normalize(qemu_metadata(&regions));
 
         assert_eq!(
             result,
@@ -249,6 +248,28 @@ mod tests {
                 MemoryAccountingError::Overflow
             ))
         );
+    }
+
+    #[test]
+    fn bootinfo_rejects_overlapping_memory_regions() {
+        let regions = [
+            MemoryRegion::new(PhysAddr::new(0x1000), 0x4000, MemoryRegionKind::Usable),
+            MemoryRegion::new(PhysAddr::new(0x3000), 0x2000, MemoryRegionKind::Kernel),
+        ];
+        let result = BootInfo::normalize(qemu_metadata(&regions));
+
+        assert_eq!(result, Err(BootInfoError::OverlappingMemoryRegion));
+    }
+
+    #[test]
+    fn bootinfo_accepts_adjacent_memory_regions() -> Result<(), BootInfoError> {
+        let regions = [
+            MemoryRegion::new(PhysAddr::new(0x1000), 0x4000, MemoryRegionKind::Usable),
+            MemoryRegion::new(PhysAddr::new(0x5000), 0x2000, MemoryRegionKind::Kernel),
+        ];
+        BootInfo::normalize(qemu_metadata(&regions))?;
+
+        Ok(())
     }
 
     #[test]

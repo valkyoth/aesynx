@@ -464,6 +464,7 @@ Deliverables:
 - Memory report.
 - Kernel/bootloader reserved ranges.
 - Frame accounting.
+- Fail-closed rejection of overlapping memory regions.
 
 Expected serial:
 
@@ -481,7 +482,7 @@ Verification:
 
 Exit criteria:
 
-- Allocator can trust map input.
+- Allocator can trust non-overlapping map input.
 
 ### v0.14.0 - Bitmap Frame Allocator
 
