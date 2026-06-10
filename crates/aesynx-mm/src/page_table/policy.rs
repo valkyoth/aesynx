@@ -42,4 +42,14 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         })?;
         Ok(())
     }
+
+    pub fn ensure_no_global_mappings(&self) -> Result<(), PageTableError> {
+        self.visit_mappings(|entry| {
+            if entry.mapping().flags().is_global() {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            Ok(())
+        })?;
+        Ok(())
+    }
 }
