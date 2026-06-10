@@ -544,8 +544,9 @@ Verification:
 - Host tests for map, translate, mapping lookup, permission changes, unmap,
   empty-table reclamation, sibling preservation, double-map rejection, invalid
   address rejection, atomic capacity failure, mapping visitor behavior,
-  range permission verification, invalid range flag validation, consistency
-  audit failures, and x86_64 entry flag encode/decode validation.
+  mapping visitor corruption rejection, range permission verification, invalid
+  range flag validation, consistency audit failures, and x86_64 entry flag
+  encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:

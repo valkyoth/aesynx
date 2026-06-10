@@ -14,20 +14,25 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             return Err(PageTableError::CorruptTable);
         }
 
+        let mut seen_tables = [false; TABLES];
+        seen_tables[0] = true;
         let mut count = 0u64;
         let mut l0 = 0usize;
         while l0 < PAGE_TABLE_ENTRIES {
-            let table_1 = match self.child_table_index(self.tables[0].slots[l0])? {
-                Some(index) => index,
-                None => {
-                    l0 += 1;
-                    continue;
-                }
-            };
+            let table_1 =
+                match self.child_table_index(self.tables[0].slots[l0], &mut seen_tables)? {
+                    Some(index) => index,
+                    None => {
+                        l0 += 1;
+                        continue;
+                    }
+                };
 
             let mut l1 = 0usize;
             while l1 < PAGE_TABLE_ENTRIES {
-                let table_2 = match self.child_table_index(self.tables[table_1].slots[l1])? {
+                let table_2 = match self
+                    .child_table_index(self.tables[table_1].slots[l1], &mut seen_tables)?
+                {
                     Some(index) => index,
                     None => {
                         l1 += 1;
@@ -37,7 +42,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
                 let mut l2 = 0usize;
                 while l2 < PAGE_TABLE_ENTRIES {
-                    let table_3 = match self.child_table_index(self.tables[table_2].slots[l2])? {
+                    let table_3 = match self
+                        .child_table_index(self.tables[table_2].slots[l2], &mut seen_tables)?
+                    {
                         Some(index) => index,
                         None => {
                             l2 += 1;
@@ -77,7 +84,11 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Ok(count)
     }
 
-    fn child_table_index(&self, slot: PageTableSlot) -> Result<Option<usize>, PageTableError> {
+    fn child_table_index(
+        &self,
+        slot: PageTableSlot,
+        seen_tables: &mut [bool; TABLES],
+    ) -> Result<Option<usize>, PageTableError> {
         if slot.is_empty() {
             return Ok(None);
         }
@@ -88,6 +99,10 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         if next >= TABLES || !self.used[next] {
             return Err(PageTableError::CorruptTable);
         }
+        if seen_tables[next] {
+            return Err(PageTableError::CorruptTable);
+        }
+        seen_tables[next] = true;
         Ok(Some(next))
     }
 }

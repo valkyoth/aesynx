@@ -108,3 +108,32 @@ fn mapper_mapping_visitor_rejects_intermediate_leaf_slots() -> Result<(), PageTa
     assert_eq!(mapper.audit(), Err(PageTableError::CorruptTable));
     Ok(())
 }
+
+#[test]
+fn mapper_mapping_visitor_rejects_table_cycles_without_leaf_mappings() -> Result<(), PageTableError>
+{
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.tables[0].slots[0] = PageTableSlot::next(0)?;
+
+    assert_eq!(
+        mapper.visit_mappings(|_entry| Ok(())),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper.audit(), Err(PageTableError::CorruptTable));
+    Ok(())
+}
+
+#[test]
+fn mapper_mapping_visitor_rejects_duplicate_empty_child_tables() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.used[1] = true;
+    mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
+    mapper.tables[0].slots[1] = PageTableSlot::next(1)?;
+
+    assert_eq!(
+        mapper.visit_mappings(|_entry| Ok(())),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper.audit(), Err(PageTableError::CorruptTable));
+    Ok(())
+}
