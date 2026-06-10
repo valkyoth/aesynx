@@ -518,13 +518,15 @@ pub struct GenericPageFlags {
     pub access: PageAccess,
     pub privilege: PagePrivilege,
     global: bool,
-    pub device_memory: bool,
-    pub cacheable: bool,
+    device_memory: bool,
+    cacheable: bool,
 }
 ```
 
 Global TLB mappings are exposed through a checked builder method and are only
-valid for kernel mappings.
+valid for kernel mappings. Device/cacheability state is also set through
+builders/read-only accessors so callers cannot accidentally create executable
+device mappings by mutating public fields.
 
 ### 5.3 Interrupt Controller
 

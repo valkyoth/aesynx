@@ -127,7 +127,7 @@ impl X86_64PageTableEntry {
 
     pub fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
         validate_phys(mapping.phys())?;
-        if mapping.flags().device_memory && mapping.flags().access.executable() {
+        if mapping.flags().is_device_memory() && mapping.flags().access.executable() {
             return Err(PageTableError::InvalidMappingFlags);
         }
         let mut raw = (mapping.phys().get() & Self::ADDRESS_MASK) | Self::PRESENT;
@@ -143,7 +143,7 @@ impl X86_64PageTableEntry {
         if !mapping.flags().access.executable() {
             raw |= Self::NO_EXECUTE;
         }
-        if mapping.flags().device_memory {
+        if mapping.flags().is_device_memory() {
             raw |= Self::WRITE_THROUGH | Self::CACHE_DISABLE;
         }
         Ok(Self { raw })

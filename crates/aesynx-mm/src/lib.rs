@@ -37,8 +37,8 @@ pub struct GenericPageFlags {
     pub access: PageAccess,
     pub privilege: PagePrivilege,
     global: bool,
-    pub device_memory: bool,
-    pub cacheable: bool,
+    device_memory: bool,
+    cacheable: bool,
 }
 
 impl GenericPageFlags {
@@ -86,6 +86,16 @@ impl GenericPageFlags {
     #[must_use]
     pub const fn is_global(self) -> bool {
         self.global
+    }
+
+    #[must_use]
+    pub const fn is_device_memory(self) -> bool {
+        self.device_memory
+    }
+
+    #[must_use]
+    pub const fn is_cacheable(self) -> bool {
+        self.cacheable
     }
 }
 
@@ -171,8 +181,8 @@ mod tests {
     fn device_mappings_are_cache_disabled_and_non_executable() {
         let flags = GenericPageFlags::kernel(PageAccess::ReadExecute).device();
 
-        assert!(flags.device_memory);
-        assert!(!flags.cacheable);
+        assert!(flags.is_device_memory());
+        assert!(!flags.is_cacheable());
         assert_eq!(flags.access, PageAccess::ReadOnly);
     }
 }
