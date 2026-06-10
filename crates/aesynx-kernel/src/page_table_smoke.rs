@@ -16,6 +16,7 @@ pub struct PageTableSmokeStatus {
     pub write_protected_range_ok: bool,
     pub non_executable_range_ok: bool,
     pub executable_range_ok: bool,
+    pub normal_memory_range_ok: bool,
     pub no_executable_ok: bool,
     pub no_writable_ok: bool,
     pub no_device_ok: bool,
@@ -172,6 +173,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .ensure_executable_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
     mapper
+        .ensure_normal_memory_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
+    mapper
         .ensure_no_user_mappings()
         .map_err(PageTableSmokeError::Mapper)?;
     let mut visited_range_pages = 0u64;
@@ -242,6 +246,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         write_protected_range_ok: true,
         non_executable_range_ok: true,
         executable_range_ok: true,
+        normal_memory_range_ok: true,
         no_executable_ok: true,
         no_writable_ok: true,
         no_device_ok: true,
