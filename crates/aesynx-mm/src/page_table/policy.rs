@@ -22,4 +22,14 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         })?;
         Ok(())
     }
+
+    pub fn ensure_no_writable_mappings(&self) -> Result<(), PageTableError> {
+        self.visit_mappings(|entry| {
+            if entry.mapping().flags().access.writable() {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            Ok(())
+        })?;
+        Ok(())
+    }
 }
