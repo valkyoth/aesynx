@@ -199,6 +199,9 @@ impl PageTableSlot {
         let phys = PhysAddr::new(self.raw & X86_64PageTableEntry::ADDRESS_MASK);
         let writable = self.raw & X86_64PageTableEntry::WRITABLE != 0;
         let executable = self.raw & X86_64PageTableEntry::NO_EXECUTE == 0;
+        if writable && executable {
+            return None;
+        }
         let access = if writable {
             crate::PageAccess::ReadWrite
         } else if executable {

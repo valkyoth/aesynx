@@ -3,7 +3,8 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{GenericPageFlags, PageAccess, PagePrivilege};
 
 use super::{
-    PAGE_TABLE_LEVELS, PageMapping, PageTableError, PageTableMapper, TlbFlush, X86_64PageTableEntry,
+    PAGE_TABLE_LEVELS, PageMapping, PageTableError, PageTableMapper, PageTableSlot, TlbFlush,
+    X86_64PageTableEntry,
 };
 
 const KERNEL_VIRT: VirtAddr = VirtAddr::new(0xffff_9000_0000_0000);
@@ -146,4 +147,22 @@ fn x86_64_entry_encodes_user_nx_device_mapping() -> Result<(), PageTableError> {
     assert_eq!(entry.raw() & (1 << 4), 1 << 4);
     assert_eq!(entry.raw() & (1 << 63), 1 << 63);
     Ok(())
+}
+
+#[test]
+fn raw_slot_decode_rejects_write_execute_corruption() {
+    let slot = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 1),
+    };
+
+    assert_eq!(slot.mapping(), None);
+}
+
+#[test]
+fn raw_slot_decode_rejects_user_global_corruption() {
+    let slot = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 2) | (1 << 8) | (1 << 63),
+    };
+
+    assert_eq!(slot.mapping(), None);
 }
