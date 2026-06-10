@@ -37,6 +37,33 @@ fn mapper_maps_and_translates_page() -> Result<(), PageTableError> {
 }
 
 #[test]
+fn tlb_flush_merge_is_conservative() {
+    let first = VirtAddr::new(0xffff_8000_0000_0000);
+    let second = VirtAddr::new(0xffff_8000_0000_1000);
+
+    assert_eq!(
+        TlbFlush::None.merge(TlbFlush::Page(first)),
+        TlbFlush::Page(first)
+    );
+    assert_eq!(
+        TlbFlush::Page(first).merge(TlbFlush::None),
+        TlbFlush::Page(first)
+    );
+    assert_eq!(
+        TlbFlush::Page(first).merge(TlbFlush::Page(first)),
+        TlbFlush::Page(first)
+    );
+    assert_eq!(
+        TlbFlush::Page(first).merge(TlbFlush::Page(second)),
+        TlbFlush::AddressSpace
+    );
+    assert_eq!(
+        TlbFlush::Page(first).merge(TlbFlush::AddressSpace),
+        TlbFlush::AddressSpace
+    );
+}
+
+#[test]
 fn mapper_unmaps_page_and_reports_flush() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);

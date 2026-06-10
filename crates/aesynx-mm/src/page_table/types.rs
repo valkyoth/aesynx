@@ -31,6 +31,18 @@ pub enum TlbFlush {
     AddressSpace,
 }
 
+impl TlbFlush {
+    #[must_use]
+    pub fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::AddressSpace, _) | (_, Self::AddressSpace) => Self::AddressSpace,
+            (Self::None, flush) | (flush, Self::None) => flush,
+            (Self::Page(left), Self::Page(right)) if left == right => Self::Page(left),
+            (Self::Page(_), Self::Page(_)) => Self::AddressSpace,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageMapping {
     phys: PhysAddr,

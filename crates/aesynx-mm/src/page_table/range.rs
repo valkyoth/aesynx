@@ -280,14 +280,7 @@ fn flush_for_range(virt: VirtAddr, page_count: u64) -> TlbFlush {
 }
 
 fn combine_flushes(left: TlbFlush, right: TlbFlush) -> TlbFlush {
-    match (left, right) {
-        (TlbFlush::AddressSpace, _) | (_, TlbFlush::AddressSpace) => TlbFlush::AddressSpace,
-        (TlbFlush::None, flush) | (flush, TlbFlush::None) => flush,
-        (TlbFlush::Page(left_page), TlbFlush::Page(right_page)) if left_page == right_page => {
-            TlbFlush::Page(left_page)
-        }
-        (TlbFlush::Page(_), TlbFlush::Page(_)) => TlbFlush::AddressSpace,
-    }
+    left.merge(right)
 }
 
 fn collapse_range_flush(virt: VirtAddr, page_count: u64, flush: TlbFlush) -> TlbFlush {

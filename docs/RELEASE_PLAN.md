@@ -559,7 +559,7 @@ Deliverables:
 - High-half kernel-space virtual range policy check.
 - Low-half user-space virtual range policy check.
 - Generic page flags carried through mappings.
-- Explicit TLB flush target shape.
+- Explicit TLB flush target shape with conservative merge semantics.
 - QEMU smoke for root-table identity, checked status, map, checked translation,
   checked byte-range translation, mapping lookup, page-presence checks,
   mapped-range checks, kernel-range policy
@@ -585,8 +585,8 @@ Verification:
   checks, no-executable policy checks, no-writable policy checks, no-device
   policy checks, no-global policy checks, no-alias policy checks, kernel-only
   policy checks, redacted mapping summaries, range permission verification,
-  invalid range flag validation, consistency audit failures, and x86_64 entry
-  flag encode/decode validation.
+  invalid range flag validation, consistency audit failures, conservative TLB
+  flush merging, and x86_64 entry flag encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:
