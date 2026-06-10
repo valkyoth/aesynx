@@ -20,6 +20,9 @@ The 1.0 target is a working QEMU version with:
 - A future-ready aarch64 backend skeleton from day one.
 - Serial/framebuffer diagnostics.
 - Interrupts, timers, paging, heap allocation, and memory ownership.
+- Object-native memory that grows toward purpose-tagged allocation,
+  capability-scoped mappings, revocation, secret memory, DMA isolation, and
+  snapshot-aware state. See [Memory Model Roadmap](memory-model-roadmap.md).
 - Software capabilities as the core authority model.
 - Per-core ownership and message-passing design, even before full SMP maturity.
 - Native service queues instead of Unix syscalls.
@@ -47,6 +50,11 @@ kernel ABI. See [Hosted Execution Roadmap](hosted-execution-roadmap.md).
 
 Driver structure, external driver packages, and vendor/community driver policy
 are tracked in [Aesynx Driver Roadmap](driver-roadmap.md).
+
+Long-term memory policy is tracked in
+[Aesynx Memory Model Roadmap](memory-model-roadmap.md). It should guide the
+frame allocator, mapper, address-space, IPC, WASM, DMA, and snapshot work so
+memory does not become an old process heap model with Aesynx names added later.
 
 ## 1. Core Position
 

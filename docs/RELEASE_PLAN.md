@@ -447,6 +447,11 @@ Exit criteria:
 
 ## Phase 4: Physical And Virtual Memory
 
+The long-term direction for this phase is object-native, purpose-tagged,
+capability-scoped memory with revocable mappings, secret-memory handling,
+IOMMU-scoped DMA, copy-free IPC transfers, and snapshot-aware state. See
+[Memory Model Roadmap](memory-model-roadmap.md).
+
 ### v0.13.0 - Physical Memory Map
 
 Goal:

@@ -69,7 +69,7 @@ interrupt, and then disables the smoke IRQ.
 | Toolchain | Active | Stable Rust `1.96.0`, edition 2024, resolver `3`, and `x86_64-unknown-none` for the first boot ELF. |
 | Kernel crate policy | Active | Crates under `crates/` must be `no_std`, deny unsafe by default, and avoid external dependencies without exceptions. |
 | Capability model | Model active | Private non-copy authority values, permission validation, audited derive/grant paths, generation/epoch validation, and revoke authority checks. |
-| Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable. |
+| Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
@@ -179,6 +179,7 @@ pentest report in `security/pentest/<tag>.md`.
 
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Userspace Vision](docs/userspace-vision.md)
+- [Memory Model Roadmap](docs/memory-model-roadmap.md)
 - [Package Manager Roadmap](docs/package-manager-roadmap.md)
 - [Driver Roadmap](docs/driver-roadmap.md)
 - [Release Plan](docs/RELEASE_PLAN.md)
