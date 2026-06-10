@@ -19,6 +19,8 @@ pub struct PageTableSmokeStatus {
     pub executable_range_ok: bool,
     pub normal_memory_range_ok: bool,
     pub local_range_ok: bool,
+    pub kernel_space_range_ok: bool,
+    pub user_space_range_ok: bool,
     pub no_executable_ok: bool,
     pub no_writable_ok: bool,
     pub no_device_ok: bool,
@@ -43,6 +45,8 @@ const SMOKE_VIRT: aesynx_abi::VirtAddr = aesynx_abi::VirtAddr::new(0xffff_9000_0
 const SMOKE_PHYS: aesynx_abi::PhysAddr = aesynx_abi::PhysAddr::new(0x0020_0000);
 const SMOKE_RANGE_VIRT: aesynx_abi::VirtAddr = aesynx_abi::VirtAddr::new(0xffff_9000_0000_4000);
 const SMOKE_RANGE_PHYS: aesynx_abi::PhysAddr = aesynx_abi::PhysAddr::new(0x0020_4000);
+const SMOKE_USER_RANGE_VIRT: aesynx_abi::VirtAddr =
+    aesynx_abi::VirtAddr::new(0x0000_0000_0040_0000);
 const SMOKE_OFFSET: u64 = 0x123;
 const SMOKE_PAGE_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 
@@ -181,6 +185,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .ensure_local_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
     mapper
+        .ensure_kernel_space_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
+    mapper
         .ensure_no_user_mappings()
         .map_err(PageTableSmokeError::Mapper)?;
     let mut visited_range_pages = 0u64;
@@ -236,16 +243,19 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
 
     let user_flags = aesynx_mm::GenericPageFlags::user(aesynx_mm::PageAccess::ReadOnly);
     let user_range_map = mapper
-        .map_contiguous(SMOKE_RANGE_VIRT, SMOKE_RANGE_PHYS, 2, user_flags)
+        .map_contiguous(SMOKE_USER_RANGE_VIRT, SMOKE_RANGE_PHYS, 2, user_flags)
         .map_err(PageTableSmokeError::Mapper)?;
     if user_range_map.pages() != 2 || user_range_map.flush() != aesynx_mm::TlbFlush::AddressSpace {
         return Err(PageTableSmokeError::FlushMismatch);
     }
     mapper
-        .ensure_user_mapped_contiguous(SMOKE_RANGE_VIRT, 2)
+        .ensure_user_mapped_contiguous(SMOKE_USER_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
+    mapper
+        .ensure_user_space_contiguous(SMOKE_USER_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
     let user_range_unmap = mapper
-        .unmap_contiguous(SMOKE_RANGE_VIRT, 2)
+        .unmap_contiguous(SMOKE_USER_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
     if user_range_unmap.pages() != 2
         || user_range_unmap.flush() != aesynx_mm::TlbFlush::AddressSpace
@@ -277,6 +287,8 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         executable_range_ok: true,
         normal_memory_range_ok: true,
         local_range_ok: true,
+        kernel_space_range_ok: true,
+        user_space_range_ok: true,
         no_executable_ok: true,
         no_writable_ok: true,
         no_device_ok: true,

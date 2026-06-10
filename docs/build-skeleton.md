@@ -68,6 +68,7 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `kernel_range_ok=true`, `user_range_ok=true`, `write_protected_range_ok=true`,
 `non_executable_range_ok=true`, `executable_range_ok=true`,
 `normal_memory_range_ok=true`, `local_range_ok=true`,
+`kernel_space_range_ok=true`, `user_space_range_ok=true`,
 `no_executable_ok=true`, `no_writable_ok=true`, `no_device_ok=true`,
 `no_global_ok=true`, `kernel_only_ok=true`, `visit_ok=true`, `flags_ok=true`,
 `reclaim_ok=true`, `range_ok=true`, `[TEST] page-table=ok`,
@@ -113,10 +114,12 @@ contiguous allocation/free, debug state, and double-free detection. It also
 exercises a bounded x86_64-shaped page-table mapper model with map, permission
 lookup, contiguous range lookup, permission change, translate, contiguous range
 map/protect/unmap, unmapped range checks, read-only mapping visit, virtual range
-permission verification, unmap, consistency audit, empty-table reclamation, and explicit TLB flush targets. It does not claim active CR3 replacement,
-production page-table ownership, APIC MMIO activation, global physical-memory
-ownership, heap allocation, page-fault recovery, a calibrated production clock
-service, scheduler preemption, or bootloader memory reclamation.
+permission verification, kernel-space and user-space virtual range policy,
+unmap, consistency audit, empty-table reclamation, and explicit TLB flush
+targets. It does not claim active CR3 replacement, production page-table
+ownership, APIC MMIO activation, global physical-memory ownership, heap
+allocation, page-fault recovery, a calibrated production clock service,
+scheduler preemption, or bootloader memory reclamation.
 
 ## Target Shape
 

@@ -15,6 +15,7 @@ pub enum PageTableError {
     NotMapped,
     NonContiguousRange,
     UnexpectedMappingFlags,
+    UnexpectedVirtualAddressSpace,
     RangeTooLarge,
     OutOfPageTables,
     CorruptTable,

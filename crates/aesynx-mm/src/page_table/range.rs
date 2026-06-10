@@ -265,6 +265,48 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Ok(())
     }
 
+    pub fn ensure_kernel_space_contiguous(
+        &self,
+        virt: VirtAddr,
+        page_count: u64,
+    ) -> Result<(), PageTableError> {
+        validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
+        validate_virtual_space(virt, page_count, VirtualSpace::Kernel)?;
+
+        let mut offset = 0u64;
+        while offset < page_count {
+            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
+            if !matches!(mapping.flags().privilege, PagePrivilege::Kernel) {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            offset += 1;
+        }
+
+        Ok(())
+    }
+
+    pub fn ensure_user_space_contiguous(
+        &self,
+        virt: VirtAddr,
+        page_count: u64,
+    ) -> Result<(), PageTableError> {
+        validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
+        validate_virtual_space(virt, page_count, VirtualSpace::User)?;
+
+        let mut offset = 0u64;
+        while offset < page_count {
+            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
+            if !matches!(mapping.flags().privilege, PagePrivilege::User) {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            offset += 1;
+        }
+
+        Ok(())
+    }
+
     pub fn protect_contiguous(
         &mut self,
         virt: VirtAddr,
@@ -349,6 +391,18 @@ fn validate_flags(flags: GenericPageFlags) -> Result<(), PageTableError> {
     Ok(())
 }
 
+fn validate_virtual_space(
+    virt: VirtAddr,
+    page_count: u64,
+    space: VirtualSpace,
+) -> Result<(), PageTableError> {
+    let last = add_pages_to_virt(virt, page_count - 1)?;
+    if virtual_space(virt) != space || virtual_space(last) != space {
+        return Err(PageTableError::UnexpectedVirtualAddressSpace);
+    }
+    Ok(())
+}
+
 fn validate_range_walk<const TABLES: usize>(page_count: u64) -> Result<(), PageTableError> {
     let max_pages = (TABLES as u64)
         .checked_mul(super::PAGE_TABLE_ENTRIES as u64)
@@ -361,6 +415,20 @@ fn validate_range_walk<const TABLES: usize>(page_count: u64) -> Result<(), PageT
 
 fn canonical_sign_bit(virt: VirtAddr) -> u64 {
     (virt.get() >> 47) & 1
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum VirtualSpace {
+    User,
+    Kernel,
+}
+
+fn virtual_space(virt: VirtAddr) -> VirtualSpace {
+    if canonical_sign_bit(virt) == 0 {
+        VirtualSpace::User
+    } else {
+        VirtualSpace::Kernel
+    }
 }
 
 fn add_pages_to_virt(virt: VirtAddr, pages: u64) -> Result<VirtAddr, PageTableError> {
