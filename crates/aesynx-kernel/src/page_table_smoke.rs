@@ -6,6 +6,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_pages_after_unmap: u64,
     pub translate_offset_ok: bool,
     pub mapping_lookup_ok: bool,
+    pub protect_ok: bool,
     pub flush_page: bool,
 }
 
@@ -25,6 +26,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     let mut mapper = aesynx_mm::PageTableMapper::<SMOKE_PAGE_TABLES>::new()
         .map_err(PageTableSmokeError::Mapper)?;
     let flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite);
+    let protected_flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadOnly);
     let map = mapper
         .map_page(SMOKE_VIRT, SMOKE_PHYS, flags)
         .map_err(PageTableSmokeError::Mapper)?;
@@ -44,6 +46,15 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if mapping.phys() != SMOKE_PHYS || mapping.flags() != flags {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    let protect = mapper
+        .protect_page(SMOKE_VIRT, protected_flags)
+        .map_err(PageTableSmokeError::Mapper)?;
+    if protect.previous().flags() != flags
+        || protect.current().flags() != protected_flags
+        || protect.flush() != aesynx_mm::TlbFlush::Page(SMOKE_VIRT)
+    {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
 
     let before_unmap = mapper.status();
     let unmap = mapper
@@ -52,7 +63,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if unmap.flush() != aesynx_mm::TlbFlush::Page(SMOKE_VIRT) {
         return Err(PageTableSmokeError::FlushMismatch);
     }
-    if unmap.mapping().phys() != SMOKE_PHYS || unmap.mapping().flags() != flags {
+    if unmap.mapping().phys() != SMOKE_PHYS || unmap.mapping().flags() != protected_flags {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     if mapper.translate(SMOKE_VIRT).is_some() {
@@ -67,6 +78,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_pages_after_unmap: after_unmap.mapped_pages,
         translate_offset_ok: true,
         mapping_lookup_ok: true,
+        protect_ok: true,
         flush_page: true,
     })
 }

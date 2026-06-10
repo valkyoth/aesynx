@@ -311,13 +311,14 @@ fn boot_entry() -> ! {
                     match page_table_smoke::run() {
                         Ok(status) => {
                             aesynx_arch_x86_64::serial_println!(
-                                "page-table total_tables={} used_tables={} mapped_before_unmap={} mapped_after_unmap={} translate_offset_ok={} mapping_lookup_ok={} flush_page={}",
+                                "page-table total_tables={} used_tables={} mapped_before_unmap={} mapped_after_unmap={} translate_offset_ok={} mapping_lookup_ok={} protect_ok={} flush_page={}",
                                 status.total_tables,
                                 status.used_tables,
                                 status.mapped_pages_before_unmap,
                                 status.mapped_pages_after_unmap,
                                 status.translate_offset_ok,
                                 status.mapping_lookup_ok,
+                                status.protect_ok,
                                 status.flush_page
                             );
                             aesynx_arch_x86_64::serial::write_str("[TEST] page-table=ok\n");

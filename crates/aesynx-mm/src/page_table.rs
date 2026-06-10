@@ -3,105 +3,18 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{FRAME_SIZE, GenericPageFlags};
 
 mod address;
+mod types;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
+pub use types::{
+    MapOutcome, PageMapping, PageTableError, PageTableStatus, ProtectOutcome, TlbFlush,
+    UnmapOutcome,
+};
 
 pub const PAGE_TABLE_ENTRIES: usize = 512;
 pub const PAGE_TABLE_LEVELS: usize = 4;
 
 const MAX_NEXT_TABLE_INDEX: u64 = X86_64PageTableEntry::ADDRESS_MASK >> 12;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PageTableError {
-    EmptyArena,
-    InvalidVirtualAddress,
-    InvalidPhysicalAddress,
-    UnalignedVirtualAddress,
-    UnalignedPhysicalAddress,
-    InvalidMappingFlags,
-    AlreadyMapped,
-    NotMapped,
-    OutOfPageTables,
-    CorruptTable,
-    AddressOverflow,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TlbFlush {
-    None,
-    Page(VirtAddr),
-    AddressSpace,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct PageMapping {
-    phys: PhysAddr,
-    flags: GenericPageFlags,
-}
-
-impl PageMapping {
-    #[must_use]
-    pub const fn new(phys: PhysAddr, flags: GenericPageFlags) -> Self {
-        Self { phys, flags }
-    }
-
-    #[must_use]
-    pub const fn phys(self) -> PhysAddr {
-        self.phys
-    }
-
-    #[must_use]
-    pub const fn flags(self) -> GenericPageFlags {
-        self.flags
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct MapOutcome {
-    flush: TlbFlush,
-}
-
-impl MapOutcome {
-    #[must_use]
-    pub const fn new(flush: TlbFlush) -> Self {
-        Self { flush }
-    }
-
-    #[must_use]
-    pub const fn flush(self) -> TlbFlush {
-        self.flush
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct UnmapOutcome {
-    mapping: PageMapping,
-    flush: TlbFlush,
-}
-
-impl UnmapOutcome {
-    #[must_use]
-    pub const fn new(mapping: PageMapping, flush: TlbFlush) -> Self {
-        Self { mapping, flush }
-    }
-
-    #[must_use]
-    pub const fn mapping(self) -> PageMapping {
-        self.mapping
-    }
-
-    #[must_use]
-    pub const fn flush(self) -> TlbFlush {
-        self.flush
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct PageTableStatus {
-    pub total_tables: u64,
-    pub used_tables: u64,
-    pub mapped_pages: u64,
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct X86_64PageTableEntry {
@@ -306,6 +219,22 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         *slot = PageTableSlot::EMPTY;
         self.mapped_pages -= 1;
         Ok(UnmapOutcome::new(mapping, TlbFlush::Page(virt)))
+    }
+
+    pub fn protect_page(
+        &mut self,
+        virt: VirtAddr,
+        flags: GenericPageFlags,
+    ) -> Result<ProtectOutcome, PageTableError> {
+        validate_virt_page(virt)?;
+        let indices = page_indices(virt);
+        let table_index = self.leaf_table_index(indices)?;
+        let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
+        let previous = slot.mapping().ok_or(PageTableError::NotMapped)?;
+        let current = PageMapping::new(previous.phys(), flags);
+        let replacement = PageTableSlot::leaf(current)?;
+        *slot = replacement;
+        Ok(ProtectOutcome::new(previous, current, TlbFlush::Page(virt)))
     }
 
     pub fn translate(&self, virt: VirtAddr) -> Option<PhysAddr> {

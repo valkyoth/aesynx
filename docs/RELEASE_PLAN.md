@@ -525,17 +525,18 @@ Control virtual memory.
 Deliverables:
 
 - Safe bounded x86_64-shaped page-table mapper model.
-- Map/unmap/translate plus read-only mapping lookup for 4 KiB pages.
+- Map/unmap/translate plus read-only mapping lookup and checked permission
+  changes for 4 KiB pages.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
-- QEMU smoke for map, mapping lookup, translated offset, unmap, and flush
-  target checks.
+- QEMU smoke for map, mapping lookup, permission change, translated offset,
+  unmap, and flush target checks.
 
 Verification:
 
-- Host tests for map, translate, mapping lookup, unmap, double-map rejection,
-  invalid address rejection, atomic capacity failure, and x86_64 entry flag
-  encoding.
+- Host tests for map, translate, mapping lookup, permission changes, unmap,
+  double-map rejection, invalid address rejection, atomic capacity failure, and
+  x86_64 entry flag encoding.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:

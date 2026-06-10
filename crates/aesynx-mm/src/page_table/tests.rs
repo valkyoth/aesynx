@@ -89,6 +89,57 @@ fn mapper_mapping_lookup_rejects_invalid_or_unmapped_pages() -> Result<(), PageT
 }
 
 #[test]
+fn mapper_protects_existing_page_permissions() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let initial = GenericPageFlags::kernel(PageAccess::ReadWrite);
+    let protected = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, initial)?;
+
+    let outcome = mapper.protect_page(KERNEL_VIRT, protected)?;
+
+    assert_eq!(outcome.previous(), PageMapping::new(KERNEL_PHYS, initial));
+    assert_eq!(outcome.current(), PageMapping::new(KERNEL_PHYS, protected));
+    assert_eq!(outcome.flush(), TlbFlush::Page(KERNEL_VIRT));
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Ok(PageMapping::new(KERNEL_PHYS, protected))
+    );
+    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    assert_eq!(mapper.status().mapped_pages, 1);
+    Ok(())
+}
+
+#[test]
+fn mapper_protect_failures_are_atomic() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, initial)?;
+    let before = mapper;
+    let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
+    invalid.device_memory = true;
+    invalid.cacheable = false;
+
+    assert_eq!(
+        mapper.protect_page(KERNEL_VIRT, invalid),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+    assert_eq!(
+        mapper.protect_page(VirtAddr::new(KERNEL_VIRT.get() + 1), initial),
+        Err(PageTableError::UnalignedVirtualAddress)
+    );
+    assert_eq!(
+        mapper.protect_page(VirtAddr::new(KERNEL_VIRT.get() + 0x1000), initial),
+        Err(PageTableError::NotMapped)
+    );
+    assert_eq!(mapper, before);
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Ok(PageMapping::new(KERNEL_PHYS, initial))
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_rejects_double_map_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
