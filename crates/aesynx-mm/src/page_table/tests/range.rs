@@ -52,6 +52,55 @@ fn mapper_contiguous_map_failure_is_atomic() -> Result<(), PageTableError> {
 }
 
 #[test]
+fn mapper_contiguous_ranges_reject_malformed_virtual_ranges() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+
+    assert_eq!(
+        mapper.map_contiguous(VirtAddr::new(0x0000_7fff_ffff_f000), KERNEL_PHYS, 2, flags),
+        Err(PageTableError::InvalidVirtualAddress)
+    );
+    assert_eq!(
+        mapper.ensure_unmapped_contiguous(VirtAddr::new(0xffff_ffff_ffff_f000), 2),
+        Err(PageTableError::AddressOverflow)
+    );
+    assert_eq!(
+        mapper.protect_contiguous(KERNEL_VIRT, u64::MAX, flags),
+        Err(PageTableError::AddressOverflow)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_contiguous_map_rejects_malformed_physical_ranges() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.map_contiguous(
+            KERNEL_VIRT,
+            PhysAddr::new(0x000f_ffff_ffff_f000),
+            2,
+            GenericPageFlags::kernel(PageAccess::ReadOnly),
+        ),
+        Err(PageTableError::InvalidPhysicalAddress)
+    );
+    assert_eq!(
+        mapper.map_contiguous(
+            KERNEL_VIRT,
+            KERNEL_PHYS,
+            u64::MAX,
+            GenericPageFlags::kernel(PageAccess::ReadOnly),
+        ),
+        Err(PageTableError::AddressOverflow)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
 fn mapper_reports_contiguous_range_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);

@@ -2,6 +2,7 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 
 use crate::{FRAME_SIZE, GenericPageFlags};
 
+use super::address::{validate_phys, validate_virt_page};
 use super::{
     MapRangeOutcome, PageRangeMapping, PageTableError, PageTableMapper, ProtectRangeOutcome,
     TlbFlush, UnmapRangeOutcome,
@@ -15,7 +16,8 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
         flags: GenericPageFlags,
     ) -> Result<MapRangeOutcome, PageTableError> {
-        validate_page_count(page_count)?;
+        validate_virt_range(virt, page_count)?;
+        validate_phys_range(phys, page_count)?;
 
         let mut candidate = *self;
         let mut offset = 0u64;
@@ -40,7 +42,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         virt: VirtAddr,
         page_count: u64,
     ) -> Result<PageRangeMapping, PageTableError> {
-        validate_page_count(page_count)?;
+        validate_virt_range(virt, page_count)?;
 
         let first = self.mapping_for_page(virt)?;
         let flags = first.flags();
@@ -63,7 +65,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         virt: VirtAddr,
         page_count: u64,
     ) -> Result<(), PageTableError> {
-        validate_page_count(page_count)?;
+        validate_virt_range(virt, page_count)?;
 
         let mut offset = 0u64;
         while offset < page_count {
@@ -84,7 +86,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
         flags: GenericPageFlags,
     ) -> Result<ProtectRangeOutcome, PageTableError> {
-        validate_page_count(page_count)?;
+        validate_virt_range(virt, page_count)?;
 
         let mut candidate = *self;
         let mut flush = TlbFlush::None;
@@ -107,7 +109,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         virt: VirtAddr,
         page_count: u64,
     ) -> Result<UnmapRangeOutcome, PageTableError> {
-        validate_page_count(page_count)?;
+        validate_virt_range(virt, page_count)?;
 
         let mut candidate = *self;
         let mut flush = TlbFlush::None;
@@ -131,6 +133,31 @@ fn validate_page_count(page_count: u64) -> Result<(), PageTableError> {
         return Err(PageTableError::InvalidPageCount);
     }
     Ok(())
+}
+
+fn validate_virt_range(virt: VirtAddr, page_count: u64) -> Result<(), PageTableError> {
+    validate_page_count(page_count)?;
+    validate_virt_page(virt)?;
+
+    let last = add_pages_to_virt(virt, page_count - 1)?;
+    validate_virt_page(last)?;
+    if canonical_sign_bit(virt) != canonical_sign_bit(last) {
+        return Err(PageTableError::InvalidVirtualAddress);
+    }
+
+    Ok(())
+}
+
+fn validate_phys_range(phys: PhysAddr, page_count: u64) -> Result<(), PageTableError> {
+    validate_page_count(page_count)?;
+    validate_phys(phys)?;
+
+    let last = add_pages_to_phys(phys, page_count - 1)?;
+    validate_phys(last)
+}
+
+fn canonical_sign_bit(virt: VirtAddr) -> u64 {
+    (virt.get() >> 47) & 1
 }
 
 fn add_pages_to_virt(virt: VirtAddr, pages: u64) -> Result<VirtAddr, PageTableError> {
