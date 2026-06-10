@@ -245,6 +245,26 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Ok(())
     }
 
+    pub fn ensure_local_contiguous(
+        &self,
+        virt: VirtAddr,
+        page_count: u64,
+    ) -> Result<(), PageTableError> {
+        validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
+
+        let mut offset = 0u64;
+        while offset < page_count {
+            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
+            if mapping.flags().is_global() {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            offset += 1;
+        }
+
+        Ok(())
+    }
+
     pub fn protect_contiguous(
         &mut self,
         virt: VirtAddr,

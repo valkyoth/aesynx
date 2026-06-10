@@ -548,15 +548,17 @@ Deliverables:
   regions.
 - Executable virtual range policy check for text regions.
 - Normal-memory virtual range policy check for RAM-only regions.
+- Local virtual range policy check for non-global per-address-space mappings.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
 - QEMU smoke for map, mapping lookup, page-presence checks, mapped-range
   checks, kernel-range policy checks, user-range policy checks,
   write-protected range checks, non-executable range checks, executable range
-  checks, normal-memory range checks, no-executable policy checks, no-writable
-  policy checks, no-device policy checks, no-global policy checks, kernel-only
-  policy checks, permission change, translated offset, mapping visit, range
-  permission verification, unmap, audit, reclamation, and flush target checks.
+  checks, normal-memory range checks, local range checks, no-executable policy
+  checks, no-writable policy checks, no-device policy checks, no-global policy
+  checks, kernel-only policy checks, permission change, translated offset,
+  mapping visit, range permission verification, unmap, audit, reclamation, and
+  flush target checks.
 
 Verification:
 
@@ -566,11 +568,11 @@ Verification:
   capacity failure, mapping visitor behavior, mapping visitor corruption
   rejection, kernel-range policy checks, user-range policy checks,
   write-protected range checks, non-executable range checks, executable range
-  checks, normal-memory range checks, no-executable policy checks, no-writable
-  policy checks, no-device policy checks, no-global policy checks, kernel-only
-  policy checks, redacted mapping summaries, range permission verification,
-  invalid range flag validation, consistency audit failures, and x86_64 entry
-  flag encode/decode validation.
+  checks, normal-memory range checks, local range checks, no-executable policy
+  checks, no-writable policy checks, no-device policy checks, no-global policy
+  checks, kernel-only policy checks, redacted mapping summaries, range
+  permission verification, invalid range flag validation, consistency audit
+  failures, and x86_64 entry flag encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:
