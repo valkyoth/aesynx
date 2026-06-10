@@ -422,12 +422,24 @@ Deliverables:
 
 - Monotonic nanosecond-ish abstraction.
 - Sleep queue.
-- Timer callbacks.
+- Timer callback model represented as delayed wake events, not arbitrary
+  executable callbacks in IRQ context.
 - Basic timeout support.
+
+Expected serial:
+
+```text
+timer tick 1
+timer tick 2
+timer delayed-log task=0 wake_id=1 at_ns=<n> ticks=<n>
+[TEST] sleep=ok
+timer tick 3
+[TEST] timer=ok
+```
 
 Verification:
 
-- Kernel schedules delayed log event.
+- Kernel schedules delayed log event and the QEMU timer smoke checks it.
 
 Exit criteria:
 

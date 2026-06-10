@@ -81,6 +81,7 @@ dependencies = [
  "aesynx-arch-x86_64",
  "aesynx-boot",
  "aesynx-log",
+ "aesynx-time",
 ]
 
 [[package]]

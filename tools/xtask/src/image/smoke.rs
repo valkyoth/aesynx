@@ -16,6 +16,8 @@ pub const PANIC_DIAGNOSTIC_MARKER: &str = "[kernel][FATAL] panic handler entered
 pub const PANIC_MARKER: &str = "[TEST] panic=ok";
 pub const PANIC_REGISTERS_MARKER: &str = "panic registers=";
 pub const SERIAL_MARKER: &str = "[TEST] boot=ok";
+pub const SLEEP_MARKER: &str = "[TEST] sleep=ok";
+pub const TIMER_DELAYED_LOG_MARKER: &str = "timer delayed-log";
 pub const TIMER_MARKER: &str = "[TEST] timer=ok";
 pub const TIMER_SETUP_MARKER: &str = "timer setup=pit";
 pub const TIMER_TICK_1_MARKER: &str = "timer tick 1";
@@ -52,7 +54,7 @@ impl SmokeKind {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, cr2_present=, cr2_offset=0x, cr3_offset=0x, rflags=0x, interrupts_enabled=, present=, [TEST] pagefault=ok"
             }
             Self::Timer => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, timer tick 1, timer tick 2, timer tick 3, [TEST] timer=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, timer tick 1, timer tick 2, timer delayed-log, [TEST] sleep=ok, timer tick 3, [TEST] timer=ok"
             }
         }
     }

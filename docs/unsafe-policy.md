@@ -127,13 +127,13 @@ Limitations: no APIC MMIO activation, APIC timer, production external IRQ dispat
 
 ```text
 Location: crates/aesynx-arch-x86_64/src/timer.rs and crates/aesynx-arch-x86_64/src/lib.rs
-Status: active candidate in v0.11
-Purpose: prove controlled periodic timer delivery in QEMU before scheduler or clock services exist
+Status: active candidate in v0.12
+Purpose: prove controlled periodic timer delivery in QEMU before scheduler or production clock services exist
 Preconditions: called only through the opt-in timer-smoke kernel feature after GDT, IDT, and interrupt-controller baseline setup
 Unsafe operation: defines a global assembly IRQ0 stub, installs a vector 0x20 interrupt gate, writes PIT channel 0 and command ports, executes sti/cli for the smoke loop, and reads the timestamp counter through rdtsc
 Safety argument: the timer smoke path admits only legacy IRQ0 and PIT ports 0x40/0x43; IRQ0 maps to the already remapped vector 0x20; the stub saves all general-purpose registers before calling Rust, preserves the exact saved-register stack while aligning the call stack for the ABI, restores registers before iretq, and sends EOI through the checked interrupt-controller path; bare-metal kernel rustflags disable SSE/AVX code generation until explicit FPU/SIMD context management exists; timer initialization uses an atomic one-time gate; the smoke wait loop has a bounded timeout diagnostic; the handler increments an atomic tick counter, disables IRQ0 once the fixed three-tick target is reached, and normal boot does not enable external interrupts
-Tests/evidence: timer unit tests verify the IRQ/vector contract and PIT divisor; cargo clippy --target x86_64-unknown-none -p aesynx-kernel --features timer-smoke -- -D warnings passes; cargo xtask qemu --timer-smoke observes timer tick 1, timer tick 2, timer tick 3, and [TEST] timer=ok
-Limitations: QEMU PIT smoke only; no APIC timer, TSC-deadline timer, calibrated monotonic time source, sleep queue, scheduler preemption, driver IRQ routing, SMP timer routing, or production interrupt policy yet
+Tests/evidence: timer unit tests verify the IRQ/vector contract and PIT divisor; aesynx-time unit tests verify tick-to-monotonic conversion, bounded sleep queue ordering, timeout expiry, and overflow handling; cargo clippy --target x86_64-unknown-none -p aesynx-kernel --features timer-smoke -- -D warnings passes; cargo xtask qemu --timer-smoke observes timer tick 1, timer tick 2, timer delayed-log, [TEST] sleep=ok, timer tick 3, and [TEST] timer=ok
+Limitations: QEMU PIT smoke only; no APIC timer, TSC-deadline timer, calibrated production clock source, scheduler-integrated sleep service, scheduler preemption, driver IRQ routing, SMP timer routing, or production interrupt policy yet
 ```
 
 ```text

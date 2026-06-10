@@ -103,12 +103,14 @@ cargo xtask qemu --timer-smoke
 ```
 
 It uses the `timer-smoke` boot phase, enables interrupts only for the controlled
-PIT IRQ0 test, and expects three bounded tick markers plus the final timer
-marker:
+PIT IRQ0 test, converts ticks into monotonic instants, and expects three bounded
+tick markers, a delayed sleep wake marker, and the final timer marker:
 
 ```text
 timer tick 1
 timer tick 2
+timer delayed-log
+[TEST] sleep=ok
 timer tick 3
 [TEST] timer=ok
 ```

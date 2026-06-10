@@ -11,8 +11,9 @@ use smoke::{
     EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
     FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
     IRQ_SETUP_MARKER, PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER,
-    PANIC_REGISTERS_MARKER, SERIAL_MARKER, SmokeKind, TIMER_MARKER, TIMER_SETUP_MARKER,
-    TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER, parse_qemu_args,
+    PANIC_REGISTERS_MARKER, SERIAL_MARKER, SLEEP_MARKER, SmokeKind, TIMER_DELAYED_LOG_MARKER,
+    TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER,
+    TIMER_TICK_3_MARKER, parse_qemu_args,
 };
 
 use std::fs;
@@ -300,7 +301,7 @@ fn write_manifest(
     smoke: SmokeKind,
 ) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.11.0 timer ticks\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nirq_setup_marker={IRQ_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_present_marker={FAULT_ADDRESS_PRESENT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\ntimer_setup_marker={TIMER_SETUP_MARKER}\ntimer_tick_1_marker={TIMER_TICK_1_MARKER}\ntimer_tick_2_marker={TIMER_TICK_2_MARKER}\ntimer_tick_3_marker={TIMER_TICK_3_MARKER}\ntimer_marker={TIMER_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        "name=Aesynx v0.12.0 monotonic time\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nirq_setup_marker={IRQ_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_present_marker={FAULT_ADDRESS_PRESENT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\ntimer_setup_marker={TIMER_SETUP_MARKER}\ntimer_tick_1_marker={TIMER_TICK_1_MARKER}\ntimer_tick_2_marker={TIMER_TICK_2_MARKER}\ntimer_tick_3_marker={TIMER_TICK_3_MARKER}\ntimer_delayed_log_marker={TIMER_DELAYED_LOG_MARKER}\nsleep_marker={SLEEP_MARKER}\ntimer_marker={TIMER_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
         smoke.name(),
         image.display(),
         kernel_elf.display(),
@@ -421,6 +422,8 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
                 && contents.contains(TIMER_TICK_1_MARKER)
                 && contents.contains(TIMER_TICK_2_MARKER)
                 && contents.contains(TIMER_TICK_3_MARKER)
+                && contents.contains(TIMER_DELAYED_LOG_MARKER)
+                && contents.contains(SLEEP_MARKER)
                 && contents.contains(TIMER_MARKER)
         }
     })

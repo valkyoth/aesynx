@@ -4,12 +4,13 @@ use super::{
     FAULT_ADDRESS_PRESENT_MARKER, FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER,
     FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER, IRQ_SETUP_MARKER, KERNEL_PROFILE, KERNEL_TARGET,
     PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER, PANIC_REGISTERS_MARKER,
-    SERIAL_MARKER, SmokeKind, TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER,
-    TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER, parse_qemu_args,
+    SERIAL_MARKER, SLEEP_MARKER, SmokeKind, TIMER_DELAYED_LOG_MARKER, TIMER_MARKER,
+    TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER,
+    parse_qemu_args,
 };
 
 #[test]
-fn qemu_markers_track_v0_11_contracts() {
+fn qemu_markers_track_v0_12_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
@@ -35,6 +36,8 @@ fn qemu_markers_track_v0_11_contracts() {
     assert_eq!(TIMER_TICK_1_MARKER, "timer tick 1");
     assert_eq!(TIMER_TICK_2_MARKER, "timer tick 2");
     assert_eq!(TIMER_TICK_3_MARKER, "timer tick 3");
+    assert_eq!(TIMER_DELAYED_LOG_MARKER, "timer delayed-log");
+    assert_eq!(SLEEP_MARKER, "[TEST] sleep=ok");
     assert_eq!(TIMER_MARKER, "[TEST] timer=ok");
 }
 
