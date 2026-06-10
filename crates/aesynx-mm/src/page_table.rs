@@ -31,6 +31,15 @@ impl X86_64PageTableEntry {
     const NO_EXECUTE: u64 = 1 << 63;
     const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
     const SOFTWARE_NEXT_TABLE: u64 = 1 << 9;
+    const CACHE_POLICY_MASK: u64 = Self::WRITE_THROUGH | Self::CACHE_DISABLE;
+    const ALLOWED_LEAF_BITS: u64 = Self::PRESENT
+        | Self::WRITABLE
+        | Self::USER
+        | Self::WRITE_THROUGH
+        | Self::CACHE_DISABLE
+        | Self::GLOBAL
+        | Self::NO_EXECUTE
+        | Self::ADDRESS_MASK;
 
     #[must_use]
     pub const fn empty() -> Self {
@@ -115,13 +124,18 @@ impl PageTableSlot {
         if self.is_empty() || self.is_next() || self.raw & X86_64PageTableEntry::PRESENT == 0 {
             return None;
         }
+        if self.raw & !X86_64PageTableEntry::ALLOWED_LEAF_BITS != 0 {
+            return None;
+        }
 
         let phys = PhysAddr::new(self.raw & X86_64PageTableEntry::ADDRESS_MASK);
         let writable = self.raw & X86_64PageTableEntry::WRITABLE != 0;
         let executable = self.raw & X86_64PageTableEntry::NO_EXECUTE == 0;
-        let device_memory = self.raw
-            & (X86_64PageTableEntry::WRITE_THROUGH | X86_64PageTableEntry::CACHE_DISABLE)
-            != 0;
+        let cache_policy = self.raw & X86_64PageTableEntry::CACHE_POLICY_MASK;
+        let device_memory = cache_policy == X86_64PageTableEntry::CACHE_POLICY_MASK;
+        if cache_policy != 0 && !device_memory {
+            return None;
+        }
         if writable && executable {
             return None;
         }

@@ -422,6 +422,28 @@ fn raw_slot_decode_rejects_executable_device_corruption() {
 }
 
 #[test]
+fn raw_slot_decode_rejects_partial_cache_policy_corruption() {
+    let write_through_only = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 3) | (1 << 63),
+    };
+    let cache_disable_only = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 4) | (1 << 63),
+    };
+
+    assert_eq!(write_through_only.mapping(), None);
+    assert_eq!(cache_disable_only.mapping(), None);
+}
+
+#[test]
+fn raw_slot_decode_rejects_unknown_leaf_bits() {
+    let slot = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 10) | (1 << 63),
+    };
+
+    assert_eq!(slot.mapping(), None);
+}
+
+#[test]
 fn raw_slot_decode_ignores_empty_and_next_slots() -> Result<(), PageTableError> {
     assert_eq!(PageTableSlot::EMPTY.mapping(), None);
     assert_eq!(PageTableSlot::next(1)?.mapping(), None);
