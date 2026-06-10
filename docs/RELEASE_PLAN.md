@@ -536,8 +536,8 @@ Deliverables:
   gates before future activation code can consume a mapper.
 - User address-space candidate preflight that combines audit, checked root,
   checked status, no-kernel-space-user-mapping, no-user-space-kernel-mapping,
-  and no-physical-alias gates before future per-task address-space code can
-  consume a mapper.
+  no-global, and no-physical-alias gates before future per-task address-space
+  code can consume a mapper.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.

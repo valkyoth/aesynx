@@ -181,6 +181,21 @@ fn mapper_user_candidate_preflight_rejects_physical_aliases() -> Result<(), Page
 }
 
 #[test]
+fn mapper_user_candidate_preflight_rejects_global_mappings() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let global = GenericPageFlags::kernel(PageAccess::ReadOnly)
+        .with_global()
+        .map_err(|_error| PageTableError::InvalidMappingFlags)?;
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, global)?;
+
+    assert_eq!(
+        mapper.verify_user_address_space_candidate(),
+        Err(PageTableError::UnexpectedMappingFlags)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_user_candidate_preflight_rejects_corrupt_tables() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.used[1] = true;
