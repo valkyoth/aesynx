@@ -182,8 +182,9 @@ claim.
 ## Non-Claims
 
 This document does not claim that Aesynx already has a production allocator,
-page tables, address spaces, object-memory integration, IOMMU support, or
-snapshot-aware memory. `v0.13.0` only establishes checked boot memory-map
-accounting. The roadmap exists so the next allocator and mapper decisions move
-toward the clean-slate Aesynx model instead of copying old process/file
+active hardware page tables, address spaces, object-memory integration, IOMMU
+support, or snapshot-aware memory. `v0.15.0` adds checked boot memory-map
+accounting, a bounded bitmap frame allocator model, and a bounded page-table
+mapper model. The roadmap exists so the next allocator and mapper decisions
+move toward the clean-slate Aesynx model instead of copying old process/file
 assumptions by default.

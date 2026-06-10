@@ -524,20 +524,22 @@ Control virtual memory.
 
 Deliverables:
 
-- x86_64 page table structures.
-- Map/unmap/translate.
-- Generic page flags.
-- TLB flush.
+- Safe bounded x86_64-shaped page-table mapper model.
+- Map/unmap/translate for 4 KiB pages.
+- Generic page flags carried through mappings.
+- Explicit TLB flush target shape.
+- QEMU smoke for map, translated offset, unmap, and flush target checks.
 
 Verification:
 
-- Map test page.
-- Translate test page.
-- Unmap test page.
+- Host tests for map, translate, unmap, double-map rejection, invalid address
+  rejection, atomic capacity failure, and x86_64 entry flag encoding.
+- Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:
 
-- Kernel can create mappings intentionally.
+- Kernel can model intentional mappings without activating production page
+  tables yet.
 
 ### v0.16.0 - Kernel Mapping Policy
 

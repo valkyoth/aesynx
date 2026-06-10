@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.14 bitmap-frame-allocator implementation candidate
+Status: v0.15 page-table-mapper implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -55,29 +55,30 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.14.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.15.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `memory total_bytes=`,
 `memory usable_bytes=`, `memory reserved_bytes=`, `[TEST] memory-map=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
-`[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
+`page-table total_tables=`, `[TEST] page-table=ok`, `[TEST] bootinfo=ok`, and
+`[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.14.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.15.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.14.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.15.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.14.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.15.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -91,20 +92,21 @@ defense-in-depth for the release image path. Kernel rustflags also disable
 SSE/AVX code generation until Aesynx owns explicit FPU/SIMD context
 management. The panic handler still emits only an escaped filename basename.
 
-The v0.14 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+The v0.15 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, remap and mask legacy PIC IRQs, detect
 local APIC availability for the deferred MMIO path, handle a returning breakpoint
 exception, catch and decode an opt-in page fault, run a controlled PIT-backed
 timer IRQ0 smoke test, convert ticks into monotonic time, wake a bounded sleep
 request for a delayed log event, provide handoff metadata that normalizes into
 Aesynx `BootInfo`, and emit checked physical memory accounting with total,
-usable, reserved, and frame counts. It does not claim page-table ownership,
-then seed a bounded early bitmap allocator from a usable memory-map window and
-verify one-frame allocation/free, contiguous allocation/free, debug state, and
-double-free detection. It does not claim page-table ownership, APIC MMIO
-activation, global physical-memory ownership, heap allocation, page-fault
-recovery, a calibrated production clock service, scheduler preemption, or
-bootloader memory reclamation.
+usable, reserved, and frame counts. It seeds a bounded early bitmap allocator
+from a usable memory-map window and verifies one-frame allocation/free,
+contiguous allocation/free, debug state, and double-free detection. It also
+exercises a bounded x86_64-shaped page-table mapper model with map, translate,
+unmap, and explicit TLB flush targets. It does not claim active CR3 replacement,
+production page-table ownership, APIC MMIO activation, global physical-memory
+ownership, heap allocation, page-fault recovery, a calibrated production clock
+service, scheduler preemption, or bootloader memory reclamation.
 
 ## Target Shape
 

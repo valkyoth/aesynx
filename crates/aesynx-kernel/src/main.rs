@@ -24,6 +24,14 @@ mod frame_allocator_smoke;
 
 #[cfg(all(
     target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
+))]
+mod page_table_smoke;
+
+#[cfg(all(
+    target_os = "none",
     feature = "timer-smoke",
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke")
@@ -300,6 +308,25 @@ fn boot_entry() -> ! {
                             aesynx_arch_x86_64::X86_64::halt_forever();
                         }
                     }
+                    match page_table_smoke::run() {
+                        Ok(status) => {
+                            aesynx_arch_x86_64::serial_println!(
+                                "page-table total_tables={} used_tables={} mapped_before_unmap={} mapped_after_unmap={} translate_offset_ok={} flush_page={}",
+                                status.total_tables,
+                                status.used_tables,
+                                status.mapped_pages_before_unmap,
+                                status.mapped_pages_after_unmap,
+                                status.translate_offset_ok,
+                                status.flush_page
+                            );
+                            aesynx_arch_x86_64::serial::write_str("[TEST] page-table=ok\n");
+                        }
+                        Err(error) => {
+                            aesynx_arch_x86_64::serial_println!("page-table error={:?}", error);
+                            aesynx_arch_x86_64::serial::write_str("[TEST] page-table=fail\n");
+                            aesynx_arch_x86_64::X86_64::halt_forever();
+                        }
+                    }
                 }
                 Err(error) => {
                     aesynx_arch_x86_64::serial_println!("memory-map error={:?}", error);
@@ -325,7 +352,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.14.0 panic smoke");
+    panic!("intentional v0.15.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

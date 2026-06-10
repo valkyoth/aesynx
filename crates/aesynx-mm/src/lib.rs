@@ -4,10 +4,15 @@
 use aesynx_abi::PhysFrame;
 
 mod frame_allocator;
+mod page_table;
 
 pub use frame_allocator::{
     AllocatedFrames, BitmapFrameAllocator, FRAME_SIZE, FrameAllocatorError, FrameAllocatorStatus,
     FrameRegionKind, FrameState,
+};
+pub use page_table::{
+    MapOutcome, PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageMapping, PageTableError,
+    PageTableMapper, PageTableStatus, TlbFlush, UnmapOutcome, X86_64PageTableEntry,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,6 +68,9 @@ impl GenericPageFlags {
     pub const fn device(mut self) -> Self {
         self.device_memory = true;
         self.cacheable = false;
+        if matches!(self.access, PageAccess::ReadExecute) {
+            self.access = PageAccess::ReadOnly;
+        }
         self
     }
 
@@ -157,5 +165,14 @@ mod tests {
                 .map(GenericPageFlags::is_global),
             Ok(true)
         );
+    }
+
+    #[test]
+    fn device_mappings_are_cache_disabled_and_non_executable() {
+        let flags = GenericPageFlags::kernel(PageAccess::ReadExecute).device();
+
+        assert!(flags.device_memory);
+        assert!(!flags.cacheable);
+        assert_eq!(flags.access, PageAccess::ReadOnly);
     }
 }

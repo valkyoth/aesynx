@@ -46,7 +46,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.14.0` is the current bitmap-frame-allocator implementation candidate. It builds a
+`v0.15.0` is the current page-table-mapper implementation candidate. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
@@ -60,7 +60,9 @@ report with total, usable, reserved, kernel, bootloader, framebuffer, ACPI, bad,
 and frame-count accounting before `[TEST] memory-map=ok`, then initializes a
 bounded early bitmap frame allocator from a usable boot-map window and verifies
 one-frame allocation/free, contiguous allocation/free, debug state, and
-double-free detection before `[TEST] frame-allocator=ok`. The opt-in timer smoke
+double-free detection before `[TEST] frame-allocator=ok`, then exercises a
+bounded x86_64-shaped page-table mapper model with map, translate, unmap, and
+explicit TLB flush targets before `[TEST] page-table=ok`. The opt-in timer smoke
 path installs a checked IRQ0 handler, programs the legacy PIT for QEMU, observes
 three controlled timer ticks, converts ticks into monotonic nanosecond values,
 wakes a bounded sleep request for a delayed log event, acknowledges each
@@ -78,7 +80,7 @@ interrupt, and then disables the smoke IRQ.
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] irq=ok`, `[TEST] exception=ok`, `[TEST] memory-map=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] irq=ok`, `[TEST] exception=ok`, `[TEST] memory-map=ok`, `[TEST] frame-allocator=ok`, `[TEST] page-table=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
 | GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
@@ -88,7 +90,8 @@ interrupt, and then disables the smoke IRQ.
 | Timer ticks | Tagged | `v0.11.0`; opt-in QEMU timer smoke programs PIT IRQ0, records a tick counter, and verifies `timer tick 1..3` plus `[TEST] timer=ok`. |
 | Monotonic time and sleeps | Tagged | `v0.12.0`; converts timer ticks into monotonic instants, schedules a bounded sleep request, and verifies `timer delayed-log`, `[TEST] sleep=ok`, and `[TEST] timer=ok`. |
 | Physical memory map | Tagged | `v0.13.0`; rejects invalid/overlapping regions and reports checked total/usable/reserved bytes, frame counts, and kernel/bootloader reserved accounting with `[TEST] memory-map=ok`. |
-| Bitmap frame allocator | Active candidate | `v0.14.0`; safe `aesynx-mm` bitmap allocator model plus QEMU smoke for bounded early alloc/free, contiguous allocation, debug states, double-free detection, and atomic failure behavior with `[TEST] frame-allocator=ok`. |
+| Bitmap frame allocator | Tagged | `v0.14.0`; safe `aesynx-mm` bitmap allocator model plus QEMU smoke for bounded early alloc/free, contiguous allocation, debug states, double-free detection, and atomic failure behavior with `[TEST] frame-allocator=ok`. |
+| Page table mapper | Active candidate | `v0.15.0`; safe bounded `aesynx-mm` page-table mapper model with x86_64-shaped tables, map/unmap/translate, explicit TLB flush targets, and QEMU smoke with `[TEST] page-table=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -100,7 +103,7 @@ interrupt, and then disables the smoke IRQ.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Page table mapper | Planned | `v0.15.0`; start controlled virtual-memory mapping, unmapping, translation, and TLB flush shape. |
+| Kernel mapping policy | Planned | `v0.16.0`; apply real kernel text/rodata/data/stack/direct-map permission policy. |
 | Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -128,7 +131,7 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.14 Limine QEMU image:
+Create and smoke-test the v0.15 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -167,7 +170,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.14.0
+cargo xtask release-ready v0.15.0
 ```
 
 ## Security Posture
@@ -204,6 +207,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [v0.12.0 Release Candidate Notes](docs/releases/v0.12.0-rc.md)
 - [v0.13.0 Release Candidate Notes](docs/releases/v0.13.0-rc.md)
 - [v0.14.0 Release Candidate Notes](docs/releases/v0.14.0-rc.md)
+- [v0.15.0 Release Candidate Notes](docs/releases/v0.15.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)
