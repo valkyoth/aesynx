@@ -12,6 +12,7 @@ pub struct PageTableSmokeStatus {
     pub range_lookup_ok: bool,
     pub mapped_range_ok: bool,
     pub unmapped_range_ok: bool,
+    pub kernel_only_ok: bool,
     pub audit_ok: bool,
     pub visit_ok: bool,
     pub flags_ok: bool,
@@ -138,6 +139,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     mapper
         .ensure_contiguous_flags(SMOKE_RANGE_VIRT, 2, range_execute_flags)
         .map_err(PageTableSmokeError::Mapper)?;
+    mapper
+        .ensure_no_user_mappings()
+        .map_err(PageTableSmokeError::Mapper)?;
     let mut visited_range_pages = 0u64;
     let visited_pages = mapper
         .visit_mappings(|entry| {
@@ -202,6 +206,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         range_lookup_ok: true,
         mapped_range_ok: true,
         unmapped_range_ok: true,
+        kernel_only_ok: true,
         audit_ok: true,
         visit_ok: true,
         flags_ok: true,
