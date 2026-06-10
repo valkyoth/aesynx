@@ -51,6 +51,29 @@ impl PageMapping {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PageTableMapping {
+    virt: VirtAddr,
+    mapping: PageMapping,
+}
+
+impl PageTableMapping {
+    #[must_use]
+    pub const fn new(virt: VirtAddr, mapping: PageMapping) -> Self {
+        Self { virt, mapping }
+    }
+
+    #[must_use]
+    pub const fn virt(self) -> VirtAddr {
+        self.virt
+    }
+
+    #[must_use]
+    pub const fn mapping(self) -> PageMapping {
+        self.mapping
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageRangeMapping {
     start_phys: PhysAddr,
     pages: u64,

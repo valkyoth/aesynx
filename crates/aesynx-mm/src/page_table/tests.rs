@@ -7,3 +7,4 @@ mod audit;
 mod mapper;
 mod range;
 mod raw;
+mod walk;

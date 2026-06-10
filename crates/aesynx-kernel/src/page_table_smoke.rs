@@ -11,6 +11,7 @@ pub struct PageTableSmokeStatus {
     pub range_lookup_ok: bool,
     pub unmapped_range_ok: bool,
     pub audit_ok: bool,
+    pub visit_ok: bool,
     pub reclaim_ok: bool,
     pub range_ok: bool,
     pub flush_page: bool,
@@ -110,6 +111,29 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    let mut visited_range_pages = 0u64;
+    let visited_pages = mapper
+        .visit_mappings(|entry| {
+            let mapping = entry.mapping();
+            if entry.virt() == SMOKE_RANGE_VIRT
+                && mapping == aesynx_mm::PageMapping::new(SMOKE_RANGE_PHYS, range_execute_flags)
+            {
+                visited_range_pages += 1;
+            } else if entry.virt() == aesynx_abi::VirtAddr::new(SMOKE_RANGE_VIRT.get() + 0x1000)
+                && mapping
+                    == aesynx_mm::PageMapping::new(
+                        aesynx_abi::PhysAddr::new(SMOKE_RANGE_PHYS.get() + 0x1000),
+                        range_execute_flags,
+                    )
+            {
+                visited_range_pages += 1;
+            }
+            Ok(())
+        })
+        .map_err(PageTableSmokeError::Mapper)?;
+    if visited_pages != 2 || visited_range_pages != 2 {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
     let range_unmap = mapper
         .unmap_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
@@ -147,6 +171,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         range_lookup_ok: true,
         unmapped_range_ok: true,
         audit_ok: true,
+        visit_ok: true,
         reclaim_ok: true,
         range_ok: true,
         flush_page: true,

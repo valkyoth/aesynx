@@ -6,11 +6,12 @@ mod address;
 mod audit;
 mod range;
 mod types;
+mod walk;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
 pub use types::{
     MapOutcome, MapRangeOutcome, PageMapping, PageRangeMapping, PageTableAudit, PageTableError,
-    PageTableStatus, ProtectOutcome, ProtectRangeOutcome, TlbFlush, UnmapOutcome,
+    PageTableMapping, PageTableStatus, ProtectOutcome, ProtectRangeOutcome, TlbFlush, UnmapOutcome,
     UnmapRangeOutcome,
 };
 
