@@ -13,8 +13,6 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     pub fn verify_user_address_space_candidate(&self) -> Result<PageTableAudit, PageTableError> {
         let audit = self.checked_candidate_audit()?;
         self.ensure_user_candidate_shape()?;
-        self.ensure_no_device_mappings()?;
-        self.ensure_no_global_mappings()?;
         self.ensure_no_physical_aliases()?;
         Ok(audit)
     }
@@ -64,6 +62,8 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut has_kernel_space_user_mapping = false;
         let mut has_user_space_kernel_mapping = false;
         let mut has_user_mapping = false;
+        let mut has_device_mapping = false;
+        let mut has_global_mapping = false;
         self.visit_mappings(|entry| {
             let in_user_space = entry.virt().get() >> 47 == 0;
             match (in_user_space, entry.mapping().flags().privilege) {
@@ -72,15 +72,23 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
                 (true, PagePrivilege::User) => has_user_mapping = true,
                 (false, PagePrivilege::Kernel) => {}
             }
+            if entry.mapping().flags().is_device_memory() {
+                has_device_mapping = true;
+            }
+            if entry.mapping().flags().is_global() {
+                has_global_mapping = true;
+            }
             Ok(())
         })?;
         if has_kernel_space_user_mapping || has_user_space_kernel_mapping {
             return Err(PageTableError::UnexpectedMappingFlags);
         }
-        if has_user_mapping {
-            Ok(())
-        } else {
-            Err(PageTableError::IncompleteAddressSpace)
+        if !has_user_mapping {
+            return Err(PageTableError::IncompleteAddressSpace);
         }
+        if has_device_mapping || has_global_mapping {
+            return Err(PageTableError::UnexpectedMappingFlags);
+        }
+        Ok(())
     }
 }

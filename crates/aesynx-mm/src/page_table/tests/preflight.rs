@@ -199,6 +199,19 @@ fn mapper_user_candidate_preflight_rejects_kernel_only_address_space() -> Result
 }
 
 #[test]
+fn mapper_user_candidate_preflight_reports_incomplete_before_global_policy()
+-> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let global = GenericPageFlags::kernel(PageAccess::ReadOnly)
+        .with_global()
+        .map_err(|_error| PageTableError::InvalidMappingFlags)?;
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, global)?;
+
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::IncompleteAddressSpace);
+    Ok(())
+}
+
+#[test]
 fn mapper_user_candidate_preflight_rejects_high_half_user_mappings() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
