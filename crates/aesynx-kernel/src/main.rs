@@ -27,13 +27,6 @@ const TIMER_SMOKE_MAX_SPINS: u64 = 100_000_000;
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke")
 ))]
-const TIMER_SMOKE_HZ: u64 = 100;
-#[cfg(all(
-    target_os = "none",
-    feature = "timer-smoke",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke")
-))]
 const TIMER_SMOKE_DELAY_TICKS: u64 = 2;
 
 #[cfg(all(
@@ -151,7 +144,7 @@ fn timer_smoke_entry() -> ! {
     write_diagnostic(LogLevel::Info, "timer smoke starting");
     match aesynx_arch_x86_64::timer::init_smoke_timer() {
         Ok(status) => {
-            let rate = match aesynx_time::TickRate::new(TIMER_SMOKE_HZ) {
+            let rate = match aesynx_time::TickRate::new(status.tick_rate_hz) {
                 Ok(rate) => rate,
                 Err(error) => {
                     aesynx_arch_x86_64::serial_println!("timer setup=fail error={:?}", error);
@@ -187,17 +180,25 @@ fn timer_smoke_entry() -> ! {
             while aesynx_arch_x86_64::timer::ticks() < aesynx_arch_x86_64::timer::target_ticks() {
                 core::hint::spin_loop();
                 let ticks = aesynx_arch_x86_64::timer::ticks();
-                if let Ok(now) = rate.ticks_to_nanos(ticks)
-                    && let Some(wake) = sleep_queue.pop_due(now)
-                {
-                    aesynx_arch_x86_64::serial_println!(
-                        "timer delayed-log task={} wake_id={} at_ns={} ticks={}",
-                        wake.task().get(),
-                        wake.wake_id().get(),
-                        now.nanos(),
-                        ticks
-                    );
-                    aesynx_arch_x86_64::serial::write_str("[TEST] sleep=ok\n");
+                match rate.ticks_to_nanos(ticks) {
+                    Ok(now) => {
+                        if let Some(wake) = sleep_queue.pop_due(now) {
+                            aesynx_arch_x86_64::serial_println!(
+                                "timer delayed-log task={} wake_id={} at_ns={} ticks={}",
+                                wake.task().get(),
+                                wake.wake_id().get(),
+                                now.nanos(),
+                                ticks
+                            );
+                            aesynx_arch_x86_64::serial::write_str("[TEST] sleep=ok\n");
+                        }
+                    }
+                    Err(error) => {
+                        aesynx_arch_x86_64::serial_println!(
+                            "timer monotonic=fail error={:?}",
+                            error
+                        );
+                    }
                 }
                 spins = spins.saturating_add(1);
                 if spins >= TIMER_SMOKE_MAX_SPINS {

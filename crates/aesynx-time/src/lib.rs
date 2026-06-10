@@ -246,11 +246,29 @@ impl<const N: usize> SleepQueue<N> {
         self.slots.iter().all(Option::is_none)
     }
 
+    /// Returns the due request with the earliest deadline.
+    ///
+    /// If multiple requests share the same earliest deadline, the lowest slot
+    /// index wins. Requests whose deadlines are still in the future are left in
+    /// the queue.
     pub fn pop_due(&mut self, now: MonotonicInstant) -> Option<SleepRequest> {
-        let index = self
-            .slots
-            .iter()
-            .position(|slot| matches!(slot, Some(request) if request.deadline() <= now))?;
+        let mut earliest: Option<(usize, MonotonicInstant)> = None;
+
+        for (index, slot) in self.slots.iter().enumerate() {
+            let Some(request) = slot else {
+                continue;
+            };
+            let deadline = request.deadline();
+            if deadline > now {
+                continue;
+            }
+            match earliest {
+                Some((_earliest_index, earliest_deadline)) if earliest_deadline <= deadline => {}
+                _ => earliest = Some((index, deadline)),
+            }
+        }
+
+        let (index, _deadline) = earliest?;
         self.slots[index].take()
     }
 }
@@ -364,6 +382,29 @@ mod tests {
             Some(request)
         );
         assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn sleep_queue_pops_earliest_due_request() {
+        let mut queue = SleepQueue::<2>::new();
+        let later = SleepRequest::new(
+            TaskId::new(1),
+            MonotonicInstant::from_nanos(30),
+            WakeId::new(1),
+        );
+        let earlier = SleepRequest::new(
+            TaskId::new(2),
+            MonotonicInstant::from_nanos(20),
+            WakeId::new(2),
+        );
+
+        assert_eq!(queue.schedule(later), Ok(()));
+        assert_eq!(queue.schedule(earlier), Ok(()));
+        assert_eq!(
+            queue.pop_due(MonotonicInstant::from_nanos(30)),
+            Some(earlier)
+        );
+        assert_eq!(queue.pop_due(MonotonicInstant::from_nanos(30)), Some(later));
     }
 
     #[test]

@@ -9,6 +9,7 @@ use crate::port::{AdmittedPort, Port};
 
 const TIMER_IRQ: u32 = 0;
 pub const TIMER_VECTOR: u8 = 0x20;
+pub const PIT_BASE_HZ: u64 = 1_193_182;
 const PIT_COMMAND_CHANNEL0_LO_HI_MODE2: u8 = 0x34;
 const PIT_DIVISOR_100HZ: u16 = 11_932;
 const TIMER_SMOKE_TARGET_TICKS: u64 = 3;
@@ -72,6 +73,7 @@ pub struct TimerStatus {
     pub vector: u8,
     pub irq: IrqLine,
     pub target_ticks: u64,
+    pub tick_rate_hz: u64,
     pub ticks: u64,
 }
 
@@ -104,6 +106,7 @@ pub fn status() -> TimerStatus {
         vector: TIMER_VECTOR,
         irq: IrqLine::new(TIMER_IRQ),
         target_ticks: TIMER_SMOKE_TARGET_TICKS,
+        tick_rate_hz: configured_rate_hz(),
         ticks: ticks(),
     }
 }
@@ -116,6 +119,11 @@ pub fn ticks() -> u64 {
 #[must_use]
 pub const fn target_ticks() -> u64 {
     TIMER_SMOKE_TARGET_TICKS
+}
+
+#[must_use]
+pub const fn configured_rate_hz() -> u64 {
+    (PIT_BASE_HZ + ((PIT_DIVISOR_100HZ as u64) / 2)) / (PIT_DIVISOR_100HZ as u64)
 }
 
 fn configure_pit_channel0() {
@@ -157,9 +165,9 @@ pub enum TimerError {
 #[cfg(test)]
 mod tests {
     use super::{
-        INIT_FAILED, INIT_IN_PROGRESS, INIT_READY, INIT_UNINITIALIZED,
+        INIT_FAILED, INIT_IN_PROGRESS, INIT_READY, INIT_UNINITIALIZED, PIT_BASE_HZ,
         PIT_COMMAND_CHANNEL0_LO_HI_MODE2, PIT_DIVISOR_100HZ, TIMER_IRQ, TIMER_SMOKE_TARGET_TICKS,
-        TIMER_VECTOR, status, target_ticks,
+        TIMER_VECTOR, configured_rate_hz, status, target_ticks,
     };
 
     #[test]
@@ -172,8 +180,10 @@ mod tests {
 
     #[test]
     fn pit_configuration_uses_channel0_rate_generator() {
+        assert_eq!(PIT_BASE_HZ, 1_193_182);
         assert_eq!(PIT_COMMAND_CHANNEL0_LO_HI_MODE2, 0x34);
         assert_eq!(PIT_DIVISOR_100HZ, 11_932);
+        assert_eq!(configured_rate_hz(), 100);
     }
 
     #[test]
@@ -182,6 +192,7 @@ mod tests {
         assert_eq!(status.vector, TIMER_VECTOR);
         assert_eq!(status.irq.get(), TIMER_IRQ);
         assert_eq!(status.target_ticks, TIMER_SMOKE_TARGET_TICKS);
+        assert_eq!(status.tick_rate_hz, configured_rate_hz());
     }
 
     #[test]
