@@ -546,6 +546,8 @@ Deliverables:
   addresses.
 - Mapper-produced audit and mapping-summary reports are inspectable but not
   externally constructible through public constructors.
+- Mapper-produced operation outcomes and range reports are inspectable but not
+  externally constructible through public constructors.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Kernel-only mapping policy check for candidate kernel address spaces.

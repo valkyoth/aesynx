@@ -74,7 +74,7 @@ pub struct PageTableMapping {
 
 impl PageTableMapping {
     #[must_use]
-    pub const fn new(virt: VirtAddr, mapping: PageMapping) -> Self {
+    pub(crate) const fn new(virt: VirtAddr, mapping: PageMapping) -> Self {
         Self { virt, mapping }
     }
 
@@ -98,7 +98,7 @@ pub struct PageRangeMapping {
 
 impl PageRangeMapping {
     #[must_use]
-    pub const fn new(start_phys: PhysAddr, pages: u64, flags: GenericPageFlags) -> Self {
+    pub(crate) const fn new(start_phys: PhysAddr, pages: u64, flags: GenericPageFlags) -> Self {
         Self {
             start_phys,
             pages,
@@ -132,7 +132,7 @@ pub struct TranslatedRange {
 
 impl TranslatedRange {
     #[must_use]
-    pub const fn new(
+    pub(crate) const fn new(
         start_phys: PhysAddr,
         byte_len: u64,
         pages: u64,

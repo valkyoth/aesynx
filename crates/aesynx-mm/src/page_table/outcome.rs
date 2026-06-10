@@ -7,7 +7,7 @@ pub struct MapOutcome {
 
 impl MapOutcome {
     #[must_use]
-    pub const fn new(flush: TlbFlush) -> Self {
+    pub(crate) const fn new(flush: TlbFlush) -> Self {
         Self { flush }
     }
 
@@ -25,7 +25,7 @@ pub struct MapRangeOutcome {
 
 impl MapRangeOutcome {
     #[must_use]
-    pub const fn new(pages: u64, flush: TlbFlush) -> Self {
+    pub(crate) const fn new(pages: u64, flush: TlbFlush) -> Self {
         Self { pages, flush }
     }
 
@@ -48,7 +48,7 @@ pub struct UnmapOutcome {
 
 impl UnmapOutcome {
     #[must_use]
-    pub const fn new(mapping: PageMapping, flush: TlbFlush) -> Self {
+    pub(crate) const fn new(mapping: PageMapping, flush: TlbFlush) -> Self {
         Self { mapping, flush }
     }
 
@@ -71,7 +71,7 @@ pub struct UnmapRangeOutcome {
 
 impl UnmapRangeOutcome {
     #[must_use]
-    pub const fn new(pages: u64, flush: TlbFlush) -> Self {
+    pub(crate) const fn new(pages: u64, flush: TlbFlush) -> Self {
         Self { pages, flush }
     }
 
@@ -95,7 +95,7 @@ pub struct ProtectOutcome {
 
 impl ProtectOutcome {
     #[must_use]
-    pub const fn new(previous: PageMapping, current: PageMapping, flush: TlbFlush) -> Self {
+    pub(crate) const fn new(previous: PageMapping, current: PageMapping, flush: TlbFlush) -> Self {
         Self {
             previous,
             current,
@@ -127,7 +127,7 @@ pub struct ProtectRangeOutcome {
 
 impl ProtectRangeOutcome {
     #[must_use]
-    pub const fn new(pages: u64, flush: TlbFlush) -> Self {
+    pub(crate) const fn new(pages: u64, flush: TlbFlush) -> Self {
         Self { pages, flush }
     }
 
