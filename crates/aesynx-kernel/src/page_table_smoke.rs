@@ -7,6 +7,7 @@ pub struct PageTableSmokeStatus {
     pub translate_offset_ok: bool,
     pub mapping_lookup_ok: bool,
     pub protect_ok: bool,
+    pub reclaim_ok: bool,
     pub flush_page: bool,
 }
 
@@ -70,6 +71,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let after_unmap = mapper.status();
+    if after_unmap.used_tables != 1 {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
 
     Ok(PageTableSmokeStatus {
         total_tables: after_unmap.total_tables,
@@ -79,6 +83,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         translate_offset_ok: true,
         mapping_lookup_ok: true,
         protect_ok: true,
+        reclaim_ok: true,
         flush_page: true,
     })
 }

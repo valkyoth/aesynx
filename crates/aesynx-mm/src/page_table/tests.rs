@@ -49,6 +49,47 @@ fn mapper_unmaps_page_and_reports_flush() -> Result<(), PageTableError> {
         Err(PageTableError::NotMapped)
     );
     assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().used_tables, 1);
+    Ok(())
+}
+
+#[test]
+fn mapper_unmap_reclaims_empty_intermediate_tables() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+
+    assert_eq!(mapper.status().used_tables, PAGE_TABLE_LEVELS as u64);
+    mapper.unmap_page(KERNEL_VIRT)?;
+
+    assert_eq!(mapper.status().used_tables, 1);
+    assert_eq!(mapper.status().mapped_pages, 0);
+    Ok(())
+}
+
+#[test]
+fn mapper_unmap_preserves_tables_needed_by_siblings() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let sibling = VirtAddr::new(KERNEL_VIRT.get() + 0x1000);
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.map_page(
+        sibling,
+        PhysAddr::new(KERNEL_PHYS.get() + 0x1000),
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+
+    mapper.unmap_page(KERNEL_VIRT)?;
+
+    assert_eq!(mapper.status().used_tables, PAGE_TABLE_LEVELS as u64);
+    assert_eq!(mapper.status().mapped_pages, 1);
+    assert_eq!(mapper.translate(sibling), Some(PhysAddr::new(0x0020_1000)));
     Ok(())
 }
 

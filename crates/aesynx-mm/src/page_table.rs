@@ -160,6 +160,17 @@ impl PageTable {
     const EMPTY: Self = Self {
         slots: [PageTableSlot::EMPTY; PAGE_TABLE_ENTRIES],
     };
+
+    fn is_empty(self) -> bool {
+        let mut index = 0usize;
+        while index < PAGE_TABLE_ENTRIES {
+            if !self.slots[index].is_empty() {
+                return false;
+            }
+            index += 1;
+        }
+        true
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -213,11 +224,13 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     pub fn unmap_page(&mut self, virt: VirtAddr) -> Result<UnmapOutcome, PageTableError> {
         validate_virt_page(virt)?;
         let indices = page_indices(virt);
-        let table_index = self.leaf_table_index(indices)?;
+        let path = self.table_path(indices)?;
+        let table_index = path[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
         let mapping = slot.mapping().ok_or(PageTableError::NotMapped)?;
         *slot = PageTableSlot::EMPTY;
         self.mapped_pages -= 1;
+        self.reclaim_empty_tables(indices, path);
         Ok(UnmapOutcome::new(mapping, TlbFlush::Page(virt)))
     }
 
@@ -228,7 +241,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<ProtectOutcome, PageTableError> {
         validate_virt_page(virt)?;
         let indices = page_indices(virt);
-        let table_index = self.leaf_table_index(indices)?;
+        let table_index = self.table_path(indices)?[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
         let previous = slot.mapping().ok_or(PageTableError::NotMapped)?;
         let current = PageMapping::new(previous.phys(), flags);
@@ -323,29 +336,6 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Err(PageTableError::OutOfPageTables)
     }
 
-    fn leaf_table_index(
-        &self,
-        indices: [usize; PAGE_TABLE_LEVELS],
-    ) -> Result<usize, PageTableError> {
-        let mut table_index = 0usize;
-        for slot_index in indices.iter().take(PAGE_TABLE_LEVELS - 1) {
-            let slot = self.tables[table_index].slots[*slot_index];
-            if slot.is_next() {
-                let next = slot.next_index()?;
-                if next < TABLES && self.used[next] {
-                    table_index = next;
-                } else {
-                    return Err(PageTableError::CorruptTable);
-                }
-            } else if slot.is_empty() {
-                return Err(PageTableError::NotMapped);
-            } else {
-                return Err(PageTableError::CorruptTable);
-            }
-        }
-        Ok(table_index)
-    }
-
     fn used_tables(&self) -> u64 {
         let mut count = 0u64;
         let mut index = 0usize;
@@ -364,10 +354,55 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     fn mapping_for_address(&self, virt: VirtAddr) -> Result<PageMapping, PageTableError> {
         let indices = page_indices(virt);
-        let table_index = self.leaf_table_index(indices)?;
+        let table_index = self.table_path(indices)?[PAGE_TABLE_LEVELS - 1];
         self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]]
             .mapping()
             .ok_or(PageTableError::NotMapped)
+    }
+
+    fn table_path(
+        &self,
+        indices: [usize; PAGE_TABLE_LEVELS],
+    ) -> Result<[usize; PAGE_TABLE_LEVELS], PageTableError> {
+        let mut path = [0usize; PAGE_TABLE_LEVELS];
+        let mut table_index = 0usize;
+        path[0] = table_index;
+        for (level, slot_index) in indices.iter().enumerate().take(PAGE_TABLE_LEVELS - 1) {
+            let slot = self.tables[table_index].slots[*slot_index];
+            if slot.is_next() {
+                let next = slot.next_index()?;
+                if next < TABLES && self.used[next] {
+                    table_index = next;
+                    path[level + 1] = table_index;
+                } else {
+                    return Err(PageTableError::CorruptTable);
+                }
+            } else if slot.is_empty() {
+                return Err(PageTableError::NotMapped);
+            } else {
+                return Err(PageTableError::CorruptTable);
+            }
+        }
+        Ok(path)
+    }
+
+    fn reclaim_empty_tables(
+        &mut self,
+        indices: [usize; PAGE_TABLE_LEVELS],
+        path: [usize; PAGE_TABLE_LEVELS],
+    ) {
+        let mut level = PAGE_TABLE_LEVELS - 1;
+        while level > 0 {
+            let table_index = path[level];
+            if !self.tables[table_index].is_empty() {
+                break;
+            }
+            let parent = path[level - 1];
+            self.tables[parent].slots[indices[level - 1]] = PageTableSlot::EMPTY;
+            self.tables[table_index] = PageTable::EMPTY;
+            self.used[table_index] = false;
+            level -= 1;
+        }
     }
 }
 
