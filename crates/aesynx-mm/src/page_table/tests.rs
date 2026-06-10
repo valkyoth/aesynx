@@ -8,6 +8,7 @@ mod mapper;
 mod policy;
 mod presence;
 mod range;
+mod range_policy;
 mod range_presence;
 mod raw;
 mod summary;

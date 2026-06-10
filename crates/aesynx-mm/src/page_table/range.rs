@@ -1,6 +1,6 @@
 use aesynx_abi::{PhysAddr, VirtAddr};
 
-use crate::{FRAME_SIZE, GenericPageFlags};
+use crate::{FRAME_SIZE, GenericPageFlags, PagePrivilege};
 
 use super::address::{validate_phys, validate_virt_page};
 use super::{
@@ -117,6 +117,26 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         while offset < page_count {
             let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
             if mapping.flags() != flags {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            offset += 1;
+        }
+
+        Ok(())
+    }
+
+    pub fn ensure_kernel_mapped_contiguous(
+        &self,
+        virt: VirtAddr,
+        page_count: u64,
+    ) -> Result<(), PageTableError> {
+        validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
+
+        let mut offset = 0u64;
+        while offset < page_count {
+            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
+            if !matches!(mapping.flags().privilege, PagePrivilege::Kernel) {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;

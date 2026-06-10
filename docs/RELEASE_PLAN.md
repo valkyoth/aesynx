@@ -536,12 +536,13 @@ Deliverables:
 - Redacted mapping summaries for page classes without reporting physical
   addresses.
 - Kernel-only mapping policy check for candidate kernel address spaces.
+- Kernel-privileged virtual range policy check for mixed address spaces.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
 - QEMU smoke for map, mapping lookup, page-presence checks, mapped-range
-  checks, kernel-only policy checks, permission change, translated offset,
-  mapping visit, range permission verification, unmap, audit, reclamation, and
-  flush target checks.
+  checks, kernel-range policy checks, kernel-only policy checks, permission
+  change, translated offset, mapping visit, range permission verification,
+  unmap, audit, reclamation, and flush target checks.
 
 Verification:
 
@@ -549,9 +550,10 @@ Verification:
   mapped-range checks, permission changes, unmap, empty-table reclamation,
   sibling preservation, double-map rejection, invalid address rejection, atomic
   capacity failure, mapping visitor behavior, mapping visitor corruption
-  rejection, kernel-only policy checks, redacted mapping summaries, range
-  permission verification, invalid range flag validation, consistency audit
-  failures, and x86_64 entry flag encode/decode validation.
+  rejection, kernel-range policy checks, kernel-only policy checks, redacted
+  mapping summaries, range permission verification, invalid range flag
+  validation, consistency audit failures, and x86_64 entry flag encode/decode
+  validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:
