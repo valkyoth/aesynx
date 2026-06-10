@@ -81,6 +81,18 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             return Err(PageTableError::CorruptTable);
         }
 
+        let mut table_index = 0usize;
+        while table_index < TABLES {
+            if self.used[table_index] {
+                if !seen_tables[table_index] {
+                    return Err(PageTableError::CorruptTable);
+                }
+            } else if !self.tables[table_index].is_empty() {
+                return Err(PageTableError::CorruptTable);
+            }
+            table_index += 1;
+        }
+
         Ok(count)
     }
 

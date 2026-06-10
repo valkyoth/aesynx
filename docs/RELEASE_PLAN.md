@@ -535,6 +535,8 @@ Deliverables:
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.
 - Read-only mapping visitor for future policy checks.
+- Mapping visitor rejects hidden table ownership drift before policy checks can
+  trust its output.
 - Read-only virtual range permission verification without physical-contiguity
   assumptions.
 - Upfront flag validation for range map/protect/verification paths.
@@ -582,8 +584,8 @@ Verification:
   mapping lookup, page-presence checks, mapped-range checks, permission changes,
   unmap, empty-table reclamation, sibling preservation, double-map rejection,
   invalid address rejection, atomic capacity failure, mapping visitor behavior,
-  mapping visitor corruption
-  rejection, malformed leaf rejection, kernel-range policy
+  mapping visitor corruption rejection, hidden table ownership drift rejection,
+  malformed leaf rejection, kernel-range policy
   checks, user-range policy checks, write-protected range checks,
   non-executable range checks, executable range checks, normal-memory range
   checks, local range checks, kernel-space range checks, user-space range

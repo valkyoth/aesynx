@@ -95,6 +95,35 @@ fn mapper_mapping_visitor_rejects_accounting_drift() -> Result<(), PageTableErro
 }
 
 #[test]
+fn mapper_mapping_visitor_rejects_unreachable_used_tables() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.used[1] = true;
+
+    assert_eq!(
+        mapper.visit_mappings(|_entry| Ok(())),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper.audit(), Err(PageTableError::CorruptTable));
+    Ok(())
+}
+
+#[test]
+fn mapper_mapping_visitor_rejects_nonempty_unused_tables() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.tables[1].slots[0] = PageTableSlot::leaf(PageMapping::new(
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    ))?;
+
+    assert_eq!(
+        mapper.visit_mappings(|_entry| Ok(())),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper.audit(), Err(PageTableError::CorruptTable));
+    Ok(())
+}
+
+#[test]
 fn mapper_mapping_visitor_rejects_intermediate_leaf_slots() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
