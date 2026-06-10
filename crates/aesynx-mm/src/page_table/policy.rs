@@ -12,4 +12,14 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         })?;
         Ok(())
     }
+
+    pub fn ensure_no_executable_mappings(&self) -> Result<(), PageTableError> {
+        self.visit_mappings(|entry| {
+            if entry.mapping().flags().access.executable() {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            Ok(())
+        })?;
+        Ok(())
+    }
 }

@@ -59,3 +59,63 @@ fn mapper_kernel_only_check_rejects_corrupt_tables() -> Result<(), PageTableErro
     );
     Ok(())
 }
+
+#[test]
+fn mapper_no_executable_check_accepts_data_mappings_without_mutation() -> Result<(), PageTableError>
+{
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.map_page(
+        VirtAddr::new(KERNEL_VIRT.get() + crate::FRAME_SIZE),
+        aesynx_abi::PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
+        GenericPageFlags::kernel(PageAccess::ReadWrite),
+    )?;
+    let before = mapper;
+
+    mapper.ensure_no_executable_mappings()?;
+
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_no_executable_check_accepts_empty_mapper() -> Result<(), PageTableError> {
+    let mapper = PageTableMapper::<4>::new()?;
+
+    assert_eq!(mapper.ensure_no_executable_mappings(), Ok(()));
+    Ok(())
+}
+
+#[test]
+fn mapper_no_executable_check_rejects_executable_mappings() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadExecute),
+    )?;
+
+    assert_eq!(
+        mapper.ensure_no_executable_mappings(),
+        Err(PageTableError::UnexpectedMappingFlags)
+    );
+    Ok(())
+}
+
+#[test]
+fn mapper_no_executable_check_rejects_corrupt_tables() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
+    mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    mapper.mapped_pages = 1;
+
+    assert_eq!(
+        mapper.ensure_no_executable_mappings(),
+        Err(PageTableError::CorruptTable)
+    );
+    Ok(())
+}
