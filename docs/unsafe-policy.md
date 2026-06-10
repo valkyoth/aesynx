@@ -165,7 +165,7 @@ Purpose: parse Limine bootloader handoff responses and normalize them into Aesyn
 Preconditions: Limine v12.3.2-compatible bootloader loads the kernel, honours request sections, fills response pointers before _start, and keeps response data valid in bootloader-reclaimable memory during early boot
 Unsafe operation: raw reads of Limine response pointers, raw pointer traversal of memory-map and framebuffer arrays, linker-provided __kernel_end symbol address, and mutable Limine request statics written by the bootloader before Rust executes
 Safety argument: the unsafe code is confined to the boot handoff boundary; it checks response and array pointers for null and alignment before forming references, rejects lower-half Limine response pointers on x86_64, bounds memory-map copies to MAX_EARLY_MEMORY_REGIONS, validates lossy integer conversions, compile-time asserts the transcribed framebuffer ABI layout, and passes only value-copied metadata into the safe aesynx-boot normalization API
-Tests/evidence: cargo xtask qemu observes [TEST] bootinfo=ok and [TEST] boot=ok; aesynx-boot unit tests cover synthetic memory-map normalization and invalid empty-map rejection
+Tests/evidence: cargo xtask qemu observes [TEST] memory-map=ok, [TEST] bootinfo=ok, and [TEST] boot=ok; aesynx-boot unit tests cover synthetic memory-map normalization, checked memory accounting, frame counts, and invalid empty-map rejection
 Limitations: no bootloader memory reclamation, page-table ownership, SMP topology parsing, module parsing, or framebuffer output yet; Limine request statics are placed in the writable data segment because Limine writes them before _start, but Aesynx must not mutate them after handoff
 ```
 

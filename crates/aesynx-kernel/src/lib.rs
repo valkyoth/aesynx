@@ -3,7 +3,7 @@
 
 pub mod diagnostics;
 
-use aesynx_boot::BootInfo;
+use aesynx_boot::{BootInfo, MemoryAccountingError};
 
 pub const BOOT_BANNER: &str = "Aesynx: booting";
 
@@ -12,26 +12,55 @@ pub struct BootSummary {
     pub arch_label: &'static str,
     pub platform_label: &'static str,
     pub memory_regions: usize,
+    pub total_bytes: u64,
+    pub total_frames: u64,
     pub usable_regions: usize,
     pub usable_bytes: u64,
+    pub usable_frames: u64,
+    pub reserved_regions: usize,
+    pub reserved_bytes: u64,
+    pub reserved_frames: u64,
+    pub kernel_bytes: u64,
+    pub bootloader_bytes: u64,
+    pub framebuffer_bytes: u64,
+    pub acpi_bytes: u64,
+    pub bad_bytes: u64,
     pub rsdp_present: bool,
     pub framebuffer_present: bool,
     pub hhdm_present: bool,
 }
 
-#[must_use]
-pub fn boot_summary(info: &BootInfo<'_>) -> BootSummary {
-    let memory = info.memory_map.summary();
-    BootSummary {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BootSummaryError {
+    MemoryAccounting(MemoryAccountingError),
+}
+
+pub fn boot_summary(info: &BootInfo<'_>) -> Result<BootSummary, BootSummaryError> {
+    let memory = info
+        .memory_map
+        .summary()
+        .map_err(BootSummaryError::MemoryAccounting)?;
+    Ok(BootSummary {
         arch_label: arch_label(info),
         platform_label: platform_label(info),
         memory_regions: memory.region_count,
+        total_bytes: memory.total_bytes,
+        total_frames: memory.total_frames,
         usable_regions: memory.usable_regions,
         usable_bytes: memory.usable_bytes,
+        usable_frames: memory.usable_frames,
+        reserved_regions: memory.reserved_regions,
+        reserved_bytes: memory.reserved_bytes,
+        reserved_frames: memory.reserved_frames,
+        kernel_bytes: memory.kernel_bytes,
+        bootloader_bytes: memory.bootloader_bytes,
+        framebuffer_bytes: memory.framebuffer_bytes,
+        acpi_bytes: memory.acpi_bytes,
+        bad_bytes: memory.bad_bytes,
         rsdp_present: info.rsdp_present(),
         framebuffer_present: info.framebuffer_present(),
         hhdm_present: info.hhdm_present(),
-    }
+    })
 }
 
 fn arch_label(info: &BootInfo<'_>) -> &'static str {
@@ -83,13 +112,21 @@ mod tests {
             hhdm: Some(HhdmInfo::new(VirtAddr::new(0xffff800000000000))),
         })?;
 
-        let summary = boot_summary(&info);
+        let summary = boot_summary(&info)
+            .map_err(|_error| aesynx_boot::BootInfoError::InvalidMemoryRegion)?;
 
         assert_eq!(summary.arch_label, "arch=x86_64");
         assert_eq!(summary.platform_label, "platform=qemu");
         assert_eq!(summary.memory_regions, 3);
+        assert_eq!(summary.total_bytes, 0x4000);
+        assert_eq!(summary.total_frames, 4);
         assert_eq!(summary.usable_regions, 2);
         assert_eq!(summary.usable_bytes, 0x3000);
+        assert_eq!(summary.usable_frames, 3);
+        assert_eq!(summary.reserved_regions, 1);
+        assert_eq!(summary.reserved_bytes, 0x1000);
+        assert_eq!(summary.reserved_frames, 1);
+        assert_eq!(summary.bootloader_bytes, 0x1000);
         assert!(summary.rsdp_present);
         assert!(summary.hhdm_present);
         assert!(!summary.framebuffer_present);

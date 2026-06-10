@@ -6,7 +6,7 @@ mod types;
 
 pub use normalize::{BootInfoError, BootMetadata};
 pub use types::{
-    ArchKind, BootInfo, CpuInfo, CpuTopology, FramebufferInfo, HhdmInfo, KernelImageInfo,
-    MAX_EARLY_MEMORY_REGIONS, MemoryMap, MemoryRegion, MemoryRegionKind, MemorySummary,
-    PlatformKind,
+    ArchKind, BootInfo, CpuInfo, CpuTopology, FRAME_SIZE, FramebufferInfo, HhdmInfo,
+    KernelImageInfo, MAX_EARLY_MEMORY_REGIONS, MemoryAccountingError, MemoryMap, MemoryRegion,
+    MemoryRegionKind, MemorySummary, PlatformKind,
 };

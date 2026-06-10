@@ -1,6 +1,6 @@
 use crate::{
     ArchKind, BootInfo, CpuInfo, CpuTopology, FramebufferInfo, HhdmInfo, KernelImageInfo,
-    MemoryMap, MemoryRegion, PlatformKind, types::BootInfoParts,
+    MemoryAccountingError, MemoryMap, MemoryRegion, PlatformKind, types::BootInfoParts,
 };
 
 const PAGE_SIZE: u64 = 4096;
@@ -23,6 +23,9 @@ pub struct BootMetadata<'a> {
 impl<'a> BootInfo<'a> {
     pub fn normalize(metadata: BootMetadata<'a>) -> Result<Self, BootInfoError> {
         validate_memory_regions(metadata.memory_regions)?;
+        MemoryMap::new(metadata.memory_regions)
+            .summary()
+            .map_err(BootInfoError::MemoryAccounting)?;
         validate_kernel_image(metadata.arch, metadata.kernel_image)?;
 
         Ok(Self::new(BootInfoParts {
@@ -59,6 +62,7 @@ impl core::fmt::Debug for BootMetadata<'_> {
 pub enum BootInfoError {
     EmptyMemoryMap,
     InvalidMemoryRegion,
+    MemoryAccounting(MemoryAccountingError),
     KernelImageEmpty,
 }
 
@@ -114,7 +118,7 @@ mod tests {
 
     use crate::{
         ArchKind, BootInfo, BootInfoError, BootMetadata, FramebufferInfo, HhdmInfo,
-        KernelImageInfo, MemoryRegion, MemoryRegionKind, PlatformKind,
+        KernelImageInfo, MemoryAccountingError, MemoryRegion, MemoryRegionKind, PlatformKind,
     };
 
     #[test]
@@ -140,12 +144,60 @@ mod tests {
             hhdm: None,
         })?;
 
-        let summary = info.memory_map.summary();
-        assert_eq!(summary.region_count, 2);
-        assert_eq!(summary.usable_regions, 1);
-        assert_eq!(summary.usable_bytes, 0x9000);
+        assert_eq!(
+            info.memory_map.summary(),
+            Ok(crate::MemorySummary {
+                region_count: 2,
+                total_bytes: 0xb000,
+                total_frames: 11,
+                usable_regions: 1,
+                usable_bytes: 0x9000,
+                usable_frames: 9,
+                reserved_regions: 1,
+                reserved_bytes: 0x2000,
+                reserved_frames: 2,
+                kernel_bytes: 0,
+                bootloader_bytes: 0x2000,
+                framebuffer_bytes: 0,
+                acpi_bytes: 0,
+                bad_bytes: 0,
+            })
+        );
         assert!(info.rsdp_present());
         Ok(())
+    }
+
+    #[test]
+    fn memory_summary_accounts_region_kinds_and_full_frames() {
+        let regions = [
+            MemoryRegion::new(PhysAddr::new(0x1001), 0x2fff, MemoryRegionKind::Usable),
+            MemoryRegion::new(PhysAddr::new(0x5000), 0x2000, MemoryRegionKind::Kernel),
+            MemoryRegion::new(PhysAddr::new(0x7000), 0x1000, MemoryRegionKind::Framebuffer),
+            MemoryRegion::new(PhysAddr::new(0x8000), 0x1000, MemoryRegionKind::Acpi),
+            MemoryRegion::new(PhysAddr::new(0x9000), 0x1000, MemoryRegionKind::Bad),
+        ];
+
+        let summary = crate::MemoryMap::new(&regions).summary();
+
+        assert_eq!(
+            summary,
+            Ok(crate::MemorySummary {
+                region_count: 5,
+                total_bytes: 0x7fff,
+                total_frames: 7,
+                usable_regions: 1,
+                usable_bytes: 0x2fff,
+                usable_frames: 2,
+                reserved_regions: 4,
+                reserved_bytes: 0x5000,
+                reserved_frames: 5,
+                kernel_bytes: 0x2000,
+                bootloader_bytes: 0,
+                framebuffer_bytes: 0x1000,
+                acpi_bytes: 0x1000,
+                bad_bytes: 0x1000,
+            })
+        );
     }
 
     #[test]
@@ -167,6 +219,36 @@ mod tests {
         });
 
         assert_eq!(result, Err(BootInfoError::EmptyMemoryMap));
+    }
+
+    #[test]
+    fn bootinfo_rejects_memory_accounting_overflow() {
+        let regions = [
+            MemoryRegion::new(PhysAddr::new(0), u64::MAX - 1, MemoryRegionKind::Usable),
+            MemoryRegion::new(PhysAddr::new(0), 2, MemoryRegionKind::Usable),
+        ];
+        let result = BootInfo::normalize(BootMetadata {
+            arch: ArchKind::X86_64,
+            platform: PlatformKind::Qemu,
+            memory_regions: &regions,
+            framebuffer: None,
+            rsdp: None,
+            device_tree: None,
+            cpu_topology: &[],
+            kernel_image: KernelImageInfo::new(
+                VirtAddr::new(0xffffffff80000000),
+                VirtAddr::new(0xffffffff80002000),
+                PhysAddr::new(0x200000),
+            ),
+            hhdm: None,
+        });
+
+        assert_eq!(
+            result,
+            Err(BootInfoError::MemoryAccounting(
+                MemoryAccountingError::Overflow
+            ))
+        );
     }
 
     #[test]

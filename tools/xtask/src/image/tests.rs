@@ -3,14 +3,15 @@ use super::{
     CPU_SETUP_MARKER, EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER,
     FAULT_ADDRESS_PRESENT_MARKER, FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER,
     FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER, IRQ_SETUP_MARKER, KERNEL_PROFILE, KERNEL_TARGET,
-    PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER, PANIC_REGISTERS_MARKER,
-    SERIAL_MARKER, SLEEP_MARKER, SmokeKind, TIMER_DELAYED_LOG_MARKER, TIMER_MARKER,
-    TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER,
-    parse_qemu_args,
+    MEMORY_MAP_FAIL_MARKER, MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER, MEMORY_TOTAL_MARKER,
+    MEMORY_USABLE_MARKER, PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER,
+    PANIC_REGISTERS_MARKER, SERIAL_MARKER, SLEEP_MARKER, SmokeKind, TIMER_DELAYED_LOG_MARKER,
+    TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER,
+    TIMER_TICK_3_MARKER, parse_qemu_args,
 };
 
 #[test]
-fn qemu_markers_track_v0_12_contracts() {
+fn qemu_markers_track_v0_13_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
@@ -18,6 +19,11 @@ fn qemu_markers_track_v0_12_contracts() {
     assert_eq!(EXCEPTION_SETUP_MARKER, "[TEST] idt=ok");
     assert_eq!(EXCEPTION_MARKER, "[TEST] exception=ok");
     assert_eq!(IRQ_SETUP_MARKER, "[TEST] irq=ok");
+    assert_eq!(MEMORY_MAP_FAIL_MARKER, "[TEST] memory-map=fail");
+    assert_eq!(MEMORY_MAP_MARKER, "[TEST] memory-map=ok");
+    assert_eq!(MEMORY_RESERVED_MARKER, "memory reserved_bytes=");
+    assert_eq!(MEMORY_TOTAL_MARKER, "memory total_bytes=");
+    assert_eq!(MEMORY_USABLE_MARKER, "memory usable_bytes=");
     assert_eq!(FAULT_ADDRESS_MARKER, "cr2_offset=0x");
     assert_eq!(FAULT_ADDRESS_PRESENT_MARKER, "cr2_present=");
     assert_eq!(FAULT_CR3_MARKER, "cr3_offset=0x");

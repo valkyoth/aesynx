@@ -3,6 +3,7 @@ use core::fmt;
 use aesynx_abi::{CpuHardwareId, PhysAddr, VirtAddr};
 
 pub const MAX_EARLY_MEMORY_REGIONS: usize = 64;
+pub const FRAME_SIZE: u64 = 4096;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct BootInfo<'a> {
@@ -122,31 +123,109 @@ impl<'a> MemoryMap<'a> {
         self.regions.is_empty()
     }
 
-    #[must_use]
-    pub fn summary(self) -> MemorySummary {
+    pub fn summary(self) -> Result<MemorySummary, MemoryAccountingError> {
         let mut usable_regions = 0usize;
         let mut usable_bytes = 0u64;
+        let mut reserved_regions = 0usize;
+        let mut reserved_bytes = 0u64;
+        let mut kernel_bytes = 0u64;
+        let mut bootloader_bytes = 0u64;
+        let mut framebuffer_bytes = 0u64;
+        let mut acpi_bytes = 0u64;
+        let mut bad_bytes = 0u64;
+        let mut total_bytes = 0u64;
+        let mut usable_frames = 0u64;
+        let mut reserved_frames = 0u64;
+        let mut total_frames = 0u64;
 
         for region in self.regions {
-            if region.kind == MemoryRegionKind::Usable {
-                usable_regions += 1;
-                usable_bytes = usable_bytes.saturating_add(region.len);
+            let frames = region.full_frame_count()?;
+            total_bytes = checked_add(total_bytes, region.len)?;
+            total_frames = checked_add(total_frames, frames)?;
+            match region.kind {
+                MemoryRegionKind::Usable => {
+                    usable_regions += 1;
+                    usable_bytes = checked_add(usable_bytes, region.len)?;
+                    usable_frames = checked_add(usable_frames, frames)?;
+                }
+                MemoryRegionKind::Reserved => {
+                    reserved_regions += 1;
+                    reserved_bytes = checked_add(reserved_bytes, region.len)?;
+                    reserved_frames = checked_add(reserved_frames, frames)?;
+                }
+                MemoryRegionKind::Kernel => {
+                    reserved_regions += 1;
+                    reserved_bytes = checked_add(reserved_bytes, region.len)?;
+                    kernel_bytes = checked_add(kernel_bytes, region.len)?;
+                    reserved_frames = checked_add(reserved_frames, frames)?;
+                }
+                MemoryRegionKind::Bootloader => {
+                    reserved_regions += 1;
+                    reserved_bytes = checked_add(reserved_bytes, region.len)?;
+                    bootloader_bytes = checked_add(bootloader_bytes, region.len)?;
+                    reserved_frames = checked_add(reserved_frames, frames)?;
+                }
+                MemoryRegionKind::Framebuffer => {
+                    reserved_regions += 1;
+                    reserved_bytes = checked_add(reserved_bytes, region.len)?;
+                    framebuffer_bytes = checked_add(framebuffer_bytes, region.len)?;
+                    reserved_frames = checked_add(reserved_frames, frames)?;
+                }
+                MemoryRegionKind::Acpi => {
+                    reserved_regions += 1;
+                    reserved_bytes = checked_add(reserved_bytes, region.len)?;
+                    acpi_bytes = checked_add(acpi_bytes, region.len)?;
+                    reserved_frames = checked_add(reserved_frames, frames)?;
+                }
+                MemoryRegionKind::Bad => {
+                    reserved_regions += 1;
+                    reserved_bytes = checked_add(reserved_bytes, region.len)?;
+                    bad_bytes = checked_add(bad_bytes, region.len)?;
+                    reserved_frames = checked_add(reserved_frames, frames)?;
+                }
             }
         }
 
-        MemorySummary {
+        Ok(MemorySummary {
             region_count: self.regions.len(),
+            total_bytes,
+            total_frames,
             usable_regions,
             usable_bytes,
-        }
+            usable_frames,
+            reserved_regions,
+            reserved_bytes,
+            reserved_frames,
+            kernel_bytes,
+            bootloader_bytes,
+            framebuffer_bytes,
+            acpi_bytes,
+            bad_bytes,
+        })
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MemorySummary {
     pub region_count: usize,
+    pub total_bytes: u64,
+    pub total_frames: u64,
     pub usable_regions: usize,
     pub usable_bytes: u64,
+    pub usable_frames: u64,
+    pub reserved_regions: usize,
+    pub reserved_bytes: u64,
+    pub reserved_frames: u64,
+    pub kernel_bytes: u64,
+    pub bootloader_bytes: u64,
+    pub framebuffer_bytes: u64,
+    pub acpi_bytes: u64,
+    pub bad_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MemoryAccountingError {
+    Overflow,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -180,6 +259,19 @@ impl MemoryRegion {
             None => None,
         }
     }
+
+    pub(crate) fn full_frame_count(self) -> Result<u64, MemoryAccountingError> {
+        let start = align_up(self.start.get())?;
+        let Some(end) = self.end() else {
+            return Err(MemoryAccountingError::Overflow);
+        };
+        let end = align_down(end.get());
+        if end <= start {
+            return Ok(0);
+        }
+
+        Ok((end - start) / FRAME_SIZE)
+    }
 }
 
 impl fmt::Debug for MemoryRegion {
@@ -201,6 +293,25 @@ pub enum MemoryRegionKind {
     Framebuffer,
     Acpi,
     Bad,
+}
+
+const fn checked_add(left: u64, right: u64) -> Result<u64, MemoryAccountingError> {
+    match left.checked_add(right) {
+        Some(value) => Ok(value),
+        None => Err(MemoryAccountingError::Overflow),
+    }
+}
+
+const fn align_up(value: u64) -> Result<u64, MemoryAccountingError> {
+    let mask = FRAME_SIZE - 1;
+    match value.checked_add(mask) {
+        Some(value) => Ok(value & !mask),
+        None => Err(MemoryAccountingError::Overflow),
+    }
+}
+
+const fn align_down(value: u64) -> u64 {
+    value & !(FRAME_SIZE - 1)
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]

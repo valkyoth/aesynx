@@ -46,7 +46,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.12.0` is the current monotonic-time implementation candidate. It builds a
+`v0.13.0` is the current physical-memory-map implementation candidate. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
@@ -55,11 +55,13 @@ tables, remaps and masks the legacy PIC, detects whether the local APIC is prese
 publishes checked IRQ vector allocation, handles a returning breakpoint
 exception, and can run opt-in deliberate panic and page-fault smoke tests with
 redacted CR2 presence/page-offset, CR3 low-bit, RFLAGS, interrupt-state, and
-decoded page-fault diagnostics. The opt-in timer smoke path installs a checked
-IRQ0 handler, programs the legacy PIT for QEMU, observes three controlled timer
-ticks, converts ticks into monotonic nanosecond values, wakes a bounded sleep
-request for a delayed log event, acknowledges each interrupt, and then disables
-the smoke IRQ.
+decoded page-fault diagnostics. Normal boot now emits a checked physical memory
+report with total, usable, reserved, kernel, bootloader, framebuffer, ACPI, bad,
+and frame-count accounting before `[TEST] memory-map=ok`. The opt-in timer smoke
+path installs a checked IRQ0 handler, programs the legacy PIT for QEMU, observes
+three controlled timer ticks, converts ticks into monotonic nanosecond values,
+wakes a bounded sleep request for a delayed log event, acknowledges each
+interrupt, and then disables the smoke IRQ.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -72,7 +74,7 @@ the smoke IRQ.
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] irq=ok`, `[TEST] exception=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] irq=ok`, `[TEST] exception=ok`, `[TEST] memory-map=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
 | GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
@@ -80,7 +82,8 @@ the smoke IRQ.
 | Fault decoding | Tagged | `v0.9.0`; page-fault smoke prints redacted CR2 presence/page offset, CR3 low bits, public RFLAGS, interrupt state, and decoded error bits. |
 | Interrupt controller baseline | Tagged | `v0.10.0`; remaps/masks legacy PIC IRQs, detects local APIC presence, defines checked IRQ vectors, and exposes an EOI path. |
 | Timer ticks | Tagged | `v0.11.0`; opt-in QEMU timer smoke programs PIT IRQ0, records a tick counter, and verifies `timer tick 1..3` plus `[TEST] timer=ok`. |
-| Monotonic time and sleeps | Active candidate | `v0.12.0`; converts timer ticks into monotonic instants, schedules a bounded sleep request, and verifies `timer delayed-log`, `[TEST] sleep=ok`, and `[TEST] timer=ok`. |
+| Monotonic time and sleeps | Tagged | `v0.12.0`; converts timer ticks into monotonic instants, schedules a bounded sleep request, and verifies `timer delayed-log`, `[TEST] sleep=ok`, and `[TEST] timer=ok`. |
+| Physical memory map | Active candidate | `v0.13.0`; reports checked total/usable/reserved bytes, frame counts, and kernel/bootloader reserved accounting with `[TEST] memory-map=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -92,7 +95,7 @@ the smoke IRQ.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Physical and virtual memory | Planned | `v0.13.0`; start page-frame accounting and the first page-table ownership boundary. |
+| Bitmap frame allocator | Planned | `v0.14.0`; consume the checked memory report and begin owning physical frames. |
 | Real arch mechanisms | Planned | Core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -119,7 +122,7 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.12 Limine QEMU image:
+Create and smoke-test the v0.13 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -158,7 +161,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.12.0
+cargo xtask release-ready v0.13.0
 ```
 
 ## Security Posture
@@ -191,6 +194,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [v0.10.0 Release Candidate Notes](docs/releases/v0.10.0-rc.md)
 - [v0.11.0 Release Candidate Notes](docs/releases/v0.11.0-rc.md)
 - [v0.12.0 Release Candidate Notes](docs/releases/v0.12.0-rc.md)
+- [v0.13.0 Release Candidate Notes](docs/releases/v0.13.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

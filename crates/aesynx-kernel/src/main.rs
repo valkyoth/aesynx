@@ -233,22 +233,48 @@ fn boot_entry() -> ! {
         Ok(info) => {
             diagnostics::set_boot_phase(BootPhase::BootInfoNormalized);
             write_diagnostic(LogLevel::Info, "bootinfo normalized");
-            let summary = aesynx_kernel::boot_summary(&info);
-            aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
-            aesynx_arch_x86_64::serial::write_str(summary.arch_label);
-            aesynx_arch_x86_64::serial::write_str(" ");
-            aesynx_arch_x86_64::serial::write_str(summary.platform_label);
-            aesynx_arch_x86_64::serial::write_str("\n");
-            aesynx_arch_x86_64::serial_println!(
-                "memmap regions={} usable={} usable_bytes={}",
-                summary.memory_regions,
-                summary.usable_regions,
-                summary.usable_bytes
-            );
-            if summary.rsdp_present {
-                aesynx_arch_x86_64::serial::write_str("rsdp=present\n");
-            } else {
-                aesynx_arch_x86_64::serial::write_str("rsdp=absent\n");
+            match aesynx_kernel::boot_summary(&info) {
+                Ok(summary) => {
+                    aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
+                    aesynx_arch_x86_64::serial::write_str(summary.arch_label);
+                    aesynx_arch_x86_64::serial::write_str(" ");
+                    aesynx_arch_x86_64::serial::write_str(summary.platform_label);
+                    aesynx_arch_x86_64::serial::write_str("\n");
+                    aesynx_arch_x86_64::serial_println!(
+                        "memory total_bytes={} total_frames={} regions={}",
+                        summary.total_bytes,
+                        summary.total_frames,
+                        summary.memory_regions
+                    );
+                    aesynx_arch_x86_64::serial_println!(
+                        "memory usable_bytes={} usable_frames={} usable_regions={}",
+                        summary.usable_bytes,
+                        summary.usable_frames,
+                        summary.usable_regions
+                    );
+                    aesynx_arch_x86_64::serial_println!(
+                        "memory reserved_bytes={} reserved_frames={} reserved_regions={} kernel_bytes={} bootloader_bytes={} framebuffer_bytes={} acpi_bytes={} bad_bytes={}",
+                        summary.reserved_bytes,
+                        summary.reserved_frames,
+                        summary.reserved_regions,
+                        summary.kernel_bytes,
+                        summary.bootloader_bytes,
+                        summary.framebuffer_bytes,
+                        summary.acpi_bytes,
+                        summary.bad_bytes
+                    );
+                    if summary.rsdp_present {
+                        aesynx_arch_x86_64::serial::write_str("rsdp=present\n");
+                    } else {
+                        aesynx_arch_x86_64::serial::write_str("rsdp=absent\n");
+                    }
+                    aesynx_arch_x86_64::serial::write_str("[TEST] memory-map=ok\n");
+                }
+                Err(error) => {
+                    aesynx_arch_x86_64::serial_println!("memory-map error={:?}", error);
+                    aesynx_arch_x86_64::serial::write_str("[TEST] memory-map=fail\n");
+                    aesynx_arch_x86_64::X86_64::halt_forever();
+                }
             }
             aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=ok\n");
             aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
@@ -268,7 +294,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.12.0 panic smoke");
+    panic!("intentional v0.13.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]
