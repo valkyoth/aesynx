@@ -11,6 +11,11 @@ const KERNEL_VIRT: VirtAddr = VirtAddr::new(0xffff_9000_0000_0000);
 const KERNEL_PHYS: PhysAddr = PhysAddr::new(0x0020_0000);
 
 #[test]
+fn mapper_rejects_empty_arena() {
+    assert_eq!(PageTableMapper::<0>::new(), Err(PageTableError::EmptyArena));
+}
+
+#[test]
 fn mapper_maps_and_translates_page() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadWrite);
@@ -103,6 +108,46 @@ fn mapper_rejects_noncanonical_and_unaligned_addresses() -> Result<(), PageTable
 }
 
 #[test]
+fn mapper_rejects_physical_address_above_supported_range() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.map_page(
+            KERNEL_VIRT,
+            PhysAddr::new(0x0010_0000_0000_0000),
+            GenericPageFlags::kernel(PageAccess::ReadOnly),
+        ),
+        Err(PageTableError::InvalidPhysicalAddress)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_unmap_validation_failures_are_atomic() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.unmap_page(VirtAddr::new(0x0000_8000_0000_0000)),
+        Err(PageTableError::InvalidVirtualAddress)
+    );
+    assert_eq!(
+        mapper.unmap_page(VirtAddr::new(KERNEL_VIRT.get() + 1)),
+        Err(PageTableError::UnalignedVirtualAddress)
+    );
+    assert_eq!(mapper, before);
+    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    Ok(())
+}
+
+#[test]
 fn mapper_capacity_failure_is_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<3>::new()?;
     let before = mapper;
@@ -165,4 +210,11 @@ fn raw_slot_decode_rejects_user_global_corruption() {
     };
 
     assert_eq!(slot.mapping(), None);
+}
+
+#[test]
+fn raw_slot_decode_ignores_empty_and_next_slots() -> Result<(), PageTableError> {
+    assert_eq!(PageTableSlot::EMPTY.mapping(), None);
+    assert_eq!(PageTableSlot::next(1)?.mapping(), None);
+    Ok(())
 }
