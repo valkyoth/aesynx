@@ -13,6 +13,7 @@ pub enum PageTableError {
     InvalidMappingFlags,
     AlreadyMapped,
     NotMapped,
+    NonContiguousRange,
     OutOfPageTables,
     CorruptTable,
     AddressOverflow,
@@ -40,6 +41,39 @@ impl PageMapping {
     #[must_use]
     pub const fn phys(self) -> PhysAddr {
         self.phys
+    }
+
+    #[must_use]
+    pub const fn flags(self) -> GenericPageFlags {
+        self.flags
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PageRangeMapping {
+    start_phys: PhysAddr,
+    pages: u64,
+    flags: GenericPageFlags,
+}
+
+impl PageRangeMapping {
+    #[must_use]
+    pub const fn new(start_phys: PhysAddr, pages: u64, flags: GenericPageFlags) -> Self {
+        Self {
+            start_phys,
+            pages,
+            flags,
+        }
+    }
+
+    #[must_use]
+    pub const fn start_phys(self) -> PhysAddr {
+        self.start_phys
+    }
+
+    #[must_use]
+    pub const fn pages(self) -> u64 {
+        self.pages
     }
 
     #[must_use]

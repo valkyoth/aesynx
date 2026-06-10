@@ -3,8 +3,8 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{FRAME_SIZE, GenericPageFlags};
 
 use super::{
-    MapRangeOutcome, PageTableError, PageTableMapper, ProtectRangeOutcome, TlbFlush,
-    UnmapRangeOutcome,
+    MapRangeOutcome, PageRangeMapping, PageTableError, PageTableMapper, ProtectRangeOutcome,
+    TlbFlush, UnmapRangeOutcome,
 };
 
 impl<const TABLES: usize> PageTableMapper<TABLES> {
@@ -33,6 +33,29 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             page_count,
             flush_for_range(virt, page_count),
         ))
+    }
+
+    pub fn mapping_for_contiguous(
+        &self,
+        virt: VirtAddr,
+        page_count: u64,
+    ) -> Result<PageRangeMapping, PageTableError> {
+        validate_page_count(page_count)?;
+
+        let first = self.mapping_for_page(virt)?;
+        let flags = first.flags();
+        let mut offset = 1u64;
+        while offset < page_count {
+            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
+            if mapping.phys() != add_pages_to_phys(first.phys(), offset)?
+                || mapping.flags() != flags
+            {
+                return Err(PageTableError::NonContiguousRange);
+            }
+            offset += 1;
+        }
+
+        Ok(PageRangeMapping::new(first.phys(), page_count, flags))
     }
 
     pub fn protect_contiguous(

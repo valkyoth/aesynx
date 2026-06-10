@@ -8,8 +8,8 @@ mod types;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
 pub use types::{
-    MapOutcome, MapRangeOutcome, PageMapping, PageTableError, PageTableStatus, ProtectOutcome,
-    ProtectRangeOutcome, TlbFlush, UnmapOutcome, UnmapRangeOutcome,
+    MapOutcome, MapRangeOutcome, PageMapping, PageRangeMapping, PageTableError, PageTableStatus,
+    ProtectOutcome, ProtectRangeOutcome, TlbFlush, UnmapOutcome, UnmapRangeOutcome,
 };
 
 pub const PAGE_TABLE_ENTRIES: usize = 512;
