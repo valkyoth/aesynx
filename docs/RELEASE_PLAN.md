@@ -531,6 +531,9 @@ Deliverables:
 - Checked root-table identity that runs mapper audit before reporting the model
   root.
 - Checked status path that reports mapper counters only after audit validation.
+- Kernel address-space candidate preflight that combines audit, checked root,
+  checked status, no-user-mapping, and no-physical-alias gates before future
+  activation code can consume a mapper.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.
@@ -582,7 +585,8 @@ Deliverables:
   checks, local range checks, kernel-space range checks, user-space range
   checks, no-executable policy checks, no-writable policy checks, no-device
   policy checks, no-global policy checks, no-alias policy checks, kernel-only
-  policy checks, permission change, translated offset, mapping visit, range
+  policy checks, kernel address-space candidate preflight, permission change,
+  translated offset, mapping visit, range
   permission verification, unmap, audit, reclamation, and flush target checks.
 
 Verification:
@@ -599,9 +603,10 @@ Verification:
   checks, local range checks, kernel-space range checks, user-space range
   checks, no-executable policy checks, no-writable policy checks, no-device
   policy checks, no-global policy checks, no-alias policy checks, kernel-only
-  policy checks, redacted mapping summaries, range permission verification,
-  invalid range flag validation, consistency audit failures, conservative TLB
-  flush merging, and x86_64 entry flag encode/decode validation.
+  policy checks, kernel address-space candidate preflight, redacted mapping
+  summaries, range permission verification, invalid range flag validation,
+  consistency audit failures, conservative TLB flush merging, and x86_64 entry
+  flag encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:

@@ -8,6 +8,7 @@ mod audit;
 mod leaf_corruption;
 mod mapper;
 mod policy;
+mod preflight;
 mod presence;
 mod range;
 mod range_address_policy;

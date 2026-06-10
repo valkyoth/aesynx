@@ -7,6 +7,7 @@ mod audit;
 mod entry;
 mod outcome;
 mod policy;
+mod preflight;
 mod presence;
 mod range;
 mod range_policy;
