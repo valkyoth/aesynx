@@ -9,6 +9,7 @@ const PAGE_OFFSET_MASK: u64 = FRAME_SIZE - 1;
 const CANONICAL_LOW_END: u64 = 0x0000_7fff_ffff_ffff;
 const CANONICAL_HIGH_START: u64 = 0xffff_8000_0000_0000;
 const MAX_PHYSICAL_ADDR: u64 = 0x000f_ffff_ffff_ffff;
+const MAX_NEXT_TABLE_INDEX: u64 = X86_64PageTableEntry::ADDRESS_MASK >> 12;
 const LEVEL_SHIFTS: [u64; PAGE_TABLE_LEVELS] = [39, 30, 21, 12];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -164,8 +165,11 @@ impl PageTableSlot {
 
     fn next(index: usize) -> Result<Self, PageTableError> {
         let encoded = (index as u64)
-            .checked_shl(12)
+            .checked_mul(FRAME_SIZE)
             .ok_or(PageTableError::AddressOverflow)?;
+        if encoded & !X86_64PageTableEntry::ADDRESS_MASK != 0 {
+            return Err(PageTableError::AddressOverflow);
+        }
         Ok(Self {
             raw: X86_64PageTableEntry::PRESENT
                 | X86_64PageTableEntry::SOFTWARE_NEXT_TABLE
@@ -271,6 +275,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<MapOutcome, PageTableError> {
         validate_virt_page(virt)?;
         validate_phys(phys)?;
+        let leaf = PageTableSlot::leaf(PageMapping::new(phys, flags))?;
         self.validate_map_capacity(virt)?;
         let indices = page_indices(virt);
         let mut table_index = 0usize;
@@ -281,7 +286,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         if !slot.is_empty() {
             return Err(PageTableError::AlreadyMapped);
         }
-        *slot = PageTableSlot::leaf(PageMapping::new(phys, flags))?;
+        *slot = leaf;
         self.mapped_pages = self
             .mapped_pages
             .checked_add(1)
@@ -321,6 +326,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     }
 
     fn validate_map_capacity(&self, virt: VirtAddr) -> Result<(), PageTableError> {
+        if (TABLES - 1) as u64 > MAX_NEXT_TABLE_INDEX {
+            return Err(PageTableError::AddressOverflow);
+        }
         let indices = page_indices(virt);
         let mut table_index = 0usize;
         let mut missing_tables = 0u64;

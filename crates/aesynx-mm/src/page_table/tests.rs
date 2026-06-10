@@ -125,6 +125,24 @@ fn mapper_rejects_physical_address_above_supported_range() -> Result<(), PageTab
 }
 
 #[test]
+fn mapper_invalid_mapping_flags_failure_is_atomic() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
+    let mut flags = GenericPageFlags::kernel(PageAccess::ReadExecute);
+    flags.device_memory = true;
+    flags.cacheable = false;
+
+    assert_eq!(
+        mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+    assert_eq!(mapper, before);
+    assert_eq!(mapper.status().used_tables, 1);
+    assert_eq!(mapper.status().mapped_pages, 0);
+    Ok(())
+}
+
+#[test]
 fn mapper_unmap_validation_failures_are_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
@@ -229,4 +247,12 @@ fn raw_slot_decode_ignores_empty_and_next_slots() -> Result<(), PageTableError> 
     assert_eq!(PageTableSlot::EMPTY.mapping(), None);
     assert_eq!(PageTableSlot::next(1)?.mapping(), None);
     Ok(())
+}
+
+#[test]
+fn next_table_slot_rejects_unencodable_index() {
+    assert_eq!(
+        PageTableSlot::next(usize::MAX),
+        Err(PageTableError::AddressOverflow)
+    );
 }
