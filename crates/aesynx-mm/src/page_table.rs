@@ -5,11 +5,13 @@ use crate::GenericPageFlags;
 mod address;
 mod audit;
 mod entry;
+mod outcome;
 mod policy;
 mod presence;
 mod range;
 mod range_policy;
 mod range_translation;
+mod report;
 mod status;
 mod summary;
 mod types;
@@ -18,10 +20,14 @@ mod walk;
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
 use entry::PageTableSlot;
 pub use entry::X86_64PageTableEntry;
+pub use outcome::{
+    MapOutcome, MapRangeOutcome, ProtectOutcome, ProtectRangeOutcome, UnmapOutcome,
+    UnmapRangeOutcome,
+};
+pub use report::{PageTableAudit, PageTableMappingSummary, PageTableStatus};
 pub use types::{
-    MapOutcome, MapRangeOutcome, PageMapping, PageRangeMapping, PageTableAudit, PageTableError,
-    PageTableMapping, PageTableMappingSummary, PageTableRoot, PageTableStatus, ProtectOutcome,
-    ProtectRangeOutcome, TlbFlush, TranslatedRange, UnmapOutcome, UnmapRangeOutcome,
+    PageMapping, PageRangeMapping, PageTableError, PageTableMapping, PageTableRoot, TlbFlush,
+    TranslatedRange,
 };
 
 pub const PAGE_TABLE_ENTRIES: usize = 512;
