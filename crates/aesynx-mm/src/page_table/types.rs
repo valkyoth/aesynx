@@ -156,6 +156,23 @@ impl TranslatedRange {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PageTableRoot {
+    table_index: usize,
+}
+
+impl PageTableRoot {
+    #[must_use]
+    pub const fn new(table_index: usize) -> Self {
+        Self { table_index }
+    }
+
+    #[must_use]
+    pub const fn table_index(self) -> usize {
+        self.table_index
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MapOutcome {
     flush: TlbFlush,
 }

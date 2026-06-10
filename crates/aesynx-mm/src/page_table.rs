@@ -1,9 +1,10 @@
 use aesynx_abi::{PhysAddr, VirtAddr};
 
-use crate::{FRAME_SIZE, GenericPageFlags};
+use crate::GenericPageFlags;
 
 mod address;
 mod audit;
+mod entry;
 mod policy;
 mod presence;
 mod range;
@@ -13,9 +14,11 @@ mod types;
 mod walk;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
+use entry::PageTableSlot;
+pub use entry::X86_64PageTableEntry;
 pub use types::{
     MapOutcome, MapRangeOutcome, PageMapping, PageRangeMapping, PageTableAudit, PageTableError,
-    PageTableMapping, PageTableMappingSummary, PageTableStatus, ProtectOutcome,
+    PageTableMapping, PageTableMappingSummary, PageTableRoot, PageTableStatus, ProtectOutcome,
     ProtectRangeOutcome, TlbFlush, TranslatedRange, UnmapOutcome, UnmapRangeOutcome,
 };
 
@@ -23,170 +26,6 @@ pub const PAGE_TABLE_ENTRIES: usize = 512;
 pub const PAGE_TABLE_LEVELS: usize = 4;
 
 const MAX_NEXT_TABLE_INDEX: u64 = X86_64PageTableEntry::ADDRESS_MASK >> 12;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct X86_64PageTableEntry {
-    raw: u64,
-}
-
-impl X86_64PageTableEntry {
-    const PRESENT: u64 = 1 << 0;
-    const WRITABLE: u64 = 1 << 1;
-    const USER: u64 = 1 << 2;
-    const WRITE_THROUGH: u64 = 1 << 3;
-    const CACHE_DISABLE: u64 = 1 << 4;
-    const GLOBAL: u64 = 1 << 8;
-    const NO_EXECUTE: u64 = 1 << 63;
-    const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
-    const SOFTWARE_NEXT_TABLE: u64 = 1 << 9;
-    const CACHE_POLICY_MASK: u64 = Self::WRITE_THROUGH | Self::CACHE_DISABLE;
-    const ALLOWED_LEAF_BITS: u64 = Self::PRESENT
-        | Self::WRITABLE
-        | Self::USER
-        | Self::WRITE_THROUGH
-        | Self::CACHE_DISABLE
-        | Self::GLOBAL
-        | Self::NO_EXECUTE
-        | Self::ADDRESS_MASK;
-
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self { raw: 0 }
-    }
-
-    pub fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
-        validate_phys(mapping.phys())?;
-        if mapping.flags().is_device_memory() && mapping.flags().access.executable() {
-            return Err(PageTableError::InvalidMappingFlags);
-        }
-        if mapping.flags().is_global()
-            && matches!(mapping.flags().privilege, crate::PagePrivilege::User)
-        {
-            return Err(PageTableError::InvalidMappingFlags);
-        }
-        let mut raw = (mapping.phys().get() & Self::ADDRESS_MASK) | Self::PRESENT;
-        if mapping.flags().access.writable() {
-            raw |= Self::WRITABLE;
-        }
-        if matches!(mapping.flags().privilege, crate::PagePrivilege::User) {
-            raw |= Self::USER;
-        }
-        if mapping.flags().is_global() {
-            raw |= Self::GLOBAL;
-        }
-        if !mapping.flags().access.executable() {
-            raw |= Self::NO_EXECUTE;
-        }
-        if mapping.flags().is_device_memory() {
-            raw |= Self::WRITE_THROUGH | Self::CACHE_DISABLE;
-        }
-        Ok(Self { raw })
-    }
-
-    #[must_use]
-    pub const fn raw(self) -> u64 {
-        self.raw
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct PageTableSlot {
-    raw: u64,
-}
-
-impl PageTableSlot {
-    const EMPTY: Self = Self { raw: 0 };
-
-    fn next(index: usize) -> Result<Self, PageTableError> {
-        let encoded = (index as u64)
-            .checked_mul(FRAME_SIZE)
-            .ok_or(PageTableError::AddressOverflow)?;
-        if encoded & !X86_64PageTableEntry::ADDRESS_MASK != 0 {
-            return Err(PageTableError::AddressOverflow);
-        }
-        Ok(Self {
-            raw: X86_64PageTableEntry::PRESENT
-                | X86_64PageTableEntry::SOFTWARE_NEXT_TABLE
-                | encoded,
-        })
-    }
-
-    fn leaf(mapping: PageMapping) -> Result<Self, PageTableError> {
-        Ok(Self {
-            raw: X86_64PageTableEntry::from_mapping(mapping)?.raw(),
-        })
-    }
-
-    const fn is_empty(self) -> bool {
-        self.raw == 0
-    }
-
-    const fn is_next(self) -> bool {
-        self.raw & X86_64PageTableEntry::SOFTWARE_NEXT_TABLE != 0
-    }
-
-    fn next_index(self) -> Result<usize, PageTableError> {
-        if !self.is_next() {
-            return Err(PageTableError::CorruptTable);
-        }
-        usize::try_from((self.raw & X86_64PageTableEntry::ADDRESS_MASK) >> 12)
-            .map_err(|_error| PageTableError::CorruptTable)
-    }
-
-    fn mapping(self) -> Option<PageMapping> {
-        if self.is_empty() || self.is_next() || self.raw & X86_64PageTableEntry::PRESENT == 0 {
-            return None;
-        }
-        if self.raw & !X86_64PageTableEntry::ALLOWED_LEAF_BITS != 0 {
-            return None;
-        }
-
-        let phys = PhysAddr::new(self.raw & X86_64PageTableEntry::ADDRESS_MASK);
-        let writable = self.raw & X86_64PageTableEntry::WRITABLE != 0;
-        let executable = self.raw & X86_64PageTableEntry::NO_EXECUTE == 0;
-        let cache_policy = self.raw & X86_64PageTableEntry::CACHE_POLICY_MASK;
-        let device_memory = cache_policy == X86_64PageTableEntry::CACHE_POLICY_MASK;
-        if cache_policy != 0 && !device_memory {
-            return None;
-        }
-        if writable && executable {
-            return None;
-        }
-        if device_memory && executable {
-            return None;
-        }
-        let access = if writable {
-            crate::PageAccess::ReadWrite
-        } else if executable {
-            crate::PageAccess::ReadExecute
-        } else {
-            crate::PageAccess::ReadOnly
-        };
-        let mut flags = if self.raw & X86_64PageTableEntry::USER != 0 {
-            GenericPageFlags::user(access)
-        } else {
-            GenericPageFlags::kernel(access)
-        };
-        if device_memory {
-            flags = flags.device();
-        }
-        if self.raw & X86_64PageTableEntry::GLOBAL != 0 {
-            flags = flags.with_global().ok()?;
-        }
-
-        Some(PageMapping::new(phys, flags))
-    }
-
-    fn leaf_mapping(self) -> Result<PageMapping, PageTableError> {
-        if self.is_empty() {
-            return Err(PageTableError::NotMapped);
-        }
-        if self.is_next() {
-            return Err(PageTableError::CorruptTable);
-        }
-        self.mapping().ok_or(PageTableError::CorruptTable)
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PageTable {
@@ -229,6 +68,11 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             used,
             mapped_pages: 0,
         })
+    }
+
+    #[must_use]
+    pub const fn root_table(&self) -> PageTableRoot {
+        PageTableRoot::new(0)
     }
 
     pub fn map_page(

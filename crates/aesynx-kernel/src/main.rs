@@ -311,11 +311,12 @@ fn boot_entry() -> ! {
                     match page_table_smoke::run() {
                         Ok(status) => {
                             aesynx_arch_x86_64::serial_println!(
-                                "page-table total_tables={} used_tables={} mapped_before_unmap={} mapped_after_unmap={} translate_offset_ok={} checked_translate_ok={} mapping_lookup_ok={} presence_ok={} protect_ok={} protect_range_ok={} range_lookup_ok={} range_translate_ok={} mapped_range_ok={} unmapped_range_ok={} kernel_range_ok={} user_range_ok={} write_protected_range_ok={} non_executable_range_ok={} executable_range_ok={} normal_memory_range_ok={} local_range_ok={} kernel_space_range_ok={} user_space_range_ok={} no_executable_ok={} no_writable_ok={} no_device_ok={} no_global_ok={} no_alias_ok={} kernel_only_ok={} audit_ok={} visit_ok={} flags_ok={} reclaim_ok={} range_ok={} flush_page={}",
+                                "page-table total_tables={} used_tables={} mapped_before_unmap={} mapped_after_unmap={} root_ok={} translate_offset_ok={} checked_translate_ok={} mapping_lookup_ok={} presence_ok={} protect_ok={} protect_range_ok={} range_lookup_ok={} range_translate_ok={} mapped_range_ok={} unmapped_range_ok={} kernel_range_ok={} user_range_ok={} write_protected_range_ok={} non_executable_range_ok={} executable_range_ok={} normal_memory_range_ok={} local_range_ok={} kernel_space_range_ok={} user_space_range_ok={} no_executable_ok={} no_writable_ok={} no_device_ok={} no_global_ok={} no_alias_ok={} kernel_only_ok={} audit_ok={} visit_ok={} flags_ok={} reclaim_ok={} range_ok={} flush_page={}",
                                 status.total_tables,
                                 status.used_tables,
                                 status.mapped_pages_before_unmap,
                                 status.mapped_pages_after_unmap,
+                                status.root_ok,
                                 status.translate_offset_ok,
                                 status.checked_translate_ok,
                                 status.mapping_lookup_ok,

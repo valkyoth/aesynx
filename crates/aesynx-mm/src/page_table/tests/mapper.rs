@@ -17,6 +17,7 @@ fn mapper_maps_and_translates_page() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadWrite);
 
+    assert_eq!(mapper.root_table().table_index(), 0);
     let outcome = mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
 
     assert_eq!(outcome.flush(), TlbFlush::Page(KERNEL_VIRT));
@@ -31,6 +32,7 @@ fn mapper_maps_and_translates_page() -> Result<(), PageTableError> {
     );
     assert_eq!(mapper.status().mapped_pages, 1);
     assert_eq!(mapper.status().used_tables, PAGE_TABLE_LEVELS as u64);
+    assert_eq!(mapper.root_table().table_index(), 0);
     Ok(())
 }
 
