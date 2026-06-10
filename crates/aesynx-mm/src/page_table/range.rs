@@ -1,6 +1,6 @@
 use aesynx_abi::{PhysAddr, VirtAddr};
 
-use crate::{FRAME_SIZE, GenericPageFlags, PagePrivilege};
+use crate::{FRAME_SIZE, GenericPageFlags};
 
 use super::address::{validate_phys, validate_virt_page};
 use super::{
@@ -125,188 +125,6 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Ok(())
     }
 
-    pub fn ensure_kernel_mapped_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::Kernel) {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_user_mapped_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::User) {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_write_protected_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if mapping.flags().access.writable() {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_non_executable_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if mapping.flags().access.executable() {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_executable_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if !mapping.flags().access.executable() {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_normal_memory_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if mapping.flags().is_device_memory() {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_local_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if mapping.flags().is_global() {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_kernel_space_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-        validate_virtual_space(virt, page_count, VirtualSpace::Kernel)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::Kernel) {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
-    pub fn ensure_user_space_contiguous(
-        &self,
-        virt: VirtAddr,
-        page_count: u64,
-    ) -> Result<(), PageTableError> {
-        validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
-        validate_virtual_space(virt, page_count, VirtualSpace::User)?;
-
-        let mut offset = 0u64;
-        while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::User) {
-                return Err(PageTableError::UnexpectedMappingFlags);
-            }
-            offset += 1;
-        }
-
-        Ok(())
-    }
-
     pub fn protect_contiguous(
         &mut self,
         virt: VirtAddr,
@@ -365,7 +183,7 @@ fn validate_page_count(page_count: u64) -> Result<(), PageTableError> {
     Ok(())
 }
 
-fn validate_virt_range(virt: VirtAddr, page_count: u64) -> Result<(), PageTableError> {
+pub(super) fn validate_virt_range(virt: VirtAddr, page_count: u64) -> Result<(), PageTableError> {
     validate_page_count(page_count)?;
     validate_virt_page(virt)?;
 
@@ -391,7 +209,7 @@ fn validate_flags(flags: GenericPageFlags) -> Result<(), PageTableError> {
     Ok(())
 }
 
-fn validate_virtual_space(
+pub(super) fn validate_virtual_space(
     virt: VirtAddr,
     page_count: u64,
     space: VirtualSpace,
@@ -420,7 +238,7 @@ fn canonical_sign_bit(virt: VirtAddr) -> u64 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum VirtualSpace {
+pub(super) enum VirtualSpace {
     User,
     Kernel,
 }
