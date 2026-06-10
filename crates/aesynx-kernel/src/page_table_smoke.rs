@@ -7,6 +7,7 @@ pub struct PageTableSmokeStatus {
     pub translate_offset_ok: bool,
     pub mapping_lookup_ok: bool,
     pub protect_ok: bool,
+    pub protect_range_ok: bool,
     pub reclaim_ok: bool,
     pub range_ok: bool,
     pub flush_page: bool,
@@ -84,6 +85,14 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if range_map.pages() != 2 || range_map.flush() != aesynx_mm::TlbFlush::AddressSpace {
         return Err(PageTableSmokeError::FlushMismatch);
     }
+    let range_execute_flags =
+        aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadExecute);
+    let range_protect = mapper
+        .protect_contiguous(SMOKE_RANGE_VIRT, 2, range_execute_flags)
+        .map_err(PageTableSmokeError::Mapper)?;
+    if range_protect.pages() != 2 || range_protect.flush() != aesynx_mm::TlbFlush::AddressSpace {
+        return Err(PageTableSmokeError::FlushMismatch);
+    }
     if mapper.translate(aesynx_abi::VirtAddr::new(SMOKE_RANGE_VIRT.get() + 0x1000))
         != Some(aesynx_abi::PhysAddr::new(SMOKE_RANGE_PHYS.get() + 0x1000))
     {
@@ -111,6 +120,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         translate_offset_ok: true,
         mapping_lookup_ok: true,
         protect_ok: true,
+        protect_range_ok: true,
         reclaim_ok: true,
         range_ok: true,
         flush_page: true,

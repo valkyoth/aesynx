@@ -168,6 +168,29 @@ impl ProtectOutcome {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProtectRangeOutcome {
+    pages: u64,
+    flush: TlbFlush,
+}
+
+impl ProtectRangeOutcome {
+    #[must_use]
+    pub const fn new(pages: u64, flush: TlbFlush) -> Self {
+        Self { pages, flush }
+    }
+
+    #[must_use]
+    pub const fn pages(self) -> u64 {
+        self.pages
+    }
+
+    #[must_use]
+    pub const fn flush(self) -> TlbFlush {
+        self.flush
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageTableStatus {
     pub total_tables: u64,
     pub used_tables: u64,

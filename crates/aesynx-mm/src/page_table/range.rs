@@ -2,7 +2,10 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 
 use crate::{FRAME_SIZE, GenericPageFlags};
 
-use super::{MapRangeOutcome, PageTableError, PageTableMapper, TlbFlush, UnmapRangeOutcome};
+use super::{
+    MapRangeOutcome, PageTableError, PageTableMapper, ProtectRangeOutcome, TlbFlush,
+    UnmapRangeOutcome,
+};
 
 impl<const TABLES: usize> PageTableMapper<TABLES> {
     pub fn map_contiguous(
@@ -29,6 +32,30 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Ok(MapRangeOutcome::new(
             page_count,
             flush_for_range(virt, page_count),
+        ))
+    }
+
+    pub fn protect_contiguous(
+        &mut self,
+        virt: VirtAddr,
+        page_count: u64,
+        flags: GenericPageFlags,
+    ) -> Result<ProtectRangeOutcome, PageTableError> {
+        validate_page_count(page_count)?;
+
+        let mut candidate = *self;
+        let mut flush = TlbFlush::None;
+        let mut offset = 0u64;
+        while offset < page_count {
+            let outcome = candidate.protect_page(add_pages_to_virt(virt, offset)?, flags)?;
+            flush = combine_flushes(flush, outcome.flush());
+            offset += 1;
+        }
+
+        *self = candidate;
+        Ok(ProtectRangeOutcome::new(
+            page_count,
+            collapse_range_flush(virt, page_count, flush),
         ))
     }
 
