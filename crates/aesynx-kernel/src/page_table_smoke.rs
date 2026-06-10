@@ -322,7 +322,10 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     let user_candidate = mapper
         .verify_user_address_space_candidate()
         .map_err(PageTableSmokeError::Mapper)?;
-    if user_candidate.mapped_pages() != 2 {
+    if user_candidate.mapped_pages() != 2
+        || user_candidate.used_tables() != aesynx_mm::PAGE_TABLE_LEVELS as u64
+        || user_candidate.reachable_tables() != aesynx_mm::PAGE_TABLE_LEVELS as u64
+    {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let user_range_unmap = mapper

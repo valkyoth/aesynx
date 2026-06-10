@@ -606,9 +606,9 @@ Deliverables:
   policy checks, no-device policy checks, no-global policy checks, no-alias
   policy checks, high-half kernel user-access guard checks, low-half user
   kernel-privilege guard checks, kernel-only policy checks, kernel/user
-  address-space candidate preflights, permission change, translated offset,
-  mapping visit, range permission verification, unmap, audit, reclamation, and
-  flush target checks.
+  address-space candidate preflight audit counts, permission change,
+  translated offset, mapping visit, range permission verification, unmap,
+  audit, reclamation, and flush target checks.
 
 Verification:
 
