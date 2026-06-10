@@ -7,6 +7,11 @@ The native model is the object graph already used throughout the kernel and
 userspace design. Disk persistence should preserve that model instead of
 translating it into path-first filesystem semantics.
 
+The same object-store substrate should eventually persist the native OS world
+model: signed facts, branchable worlds, projections, context packs, package
+generations, snapshots, and audit proofs. See
+[Aesynx OS World Roadmap](os-world-roadmap.md).
+
 ## Core Decision
 
 The native persistent format should be a content-addressed object store:

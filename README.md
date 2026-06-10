@@ -70,6 +70,7 @@ interrupt, and then disables the smoke IRQ.
 | Kernel crate policy | Active | Crates under `crates/` must be `no_std`, deny unsafe by default, and avoid external dependencies without exceptions. |
 | Capability model | Model active | Private non-copy authority values, permission validation, audited derive/grant paths, generation/epoch validation, and revoke authority checks. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
+| OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
@@ -99,6 +100,7 @@ interrupt, and then disables the smoke IRQ.
 | Real arch mechanisms | Planned | Core identity, timestamp, page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
+| OS world service | Planned | Signed/versioned facts, branchable worlds, policy-aware queries, context packs, and AI-safe explanations over deterministic OS evidence. |
 | Package manager | Planned | `aepkg`/`aepkgd` roadmap for search, install, update, rollback, repair, and future store UI. |
 | Post-quantum readiness | Planned | Crypto-agile signature envelopes and trust policy before signed boot capsules, package registries, or update metadata. |
 
@@ -180,6 +182,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Userspace Vision](docs/userspace-vision.md)
 - [Memory Model Roadmap](docs/memory-model-roadmap.md)
+- [OS World Roadmap](docs/os-world-roadmap.md)
 - [Package Manager Roadmap](docs/package-manager-roadmap.md)
 - [Driver Roadmap](docs/driver-roadmap.md)
 - [Release Plan](docs/RELEASE_PLAN.md)

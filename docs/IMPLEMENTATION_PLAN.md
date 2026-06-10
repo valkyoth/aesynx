@@ -27,6 +27,9 @@ The 1.0 target is a working QEMU version with:
 - Per-core ownership and message-passing design, even before full SMP maturity.
 - Native service queues instead of Unix syscalls.
 - Native init, shell, runtime, and command utilities.
+- A native OS world service that records kernel-stamped and service-stamped
+  facts about boot, memory, capabilities, packages, drivers, snapshots, and
+  policy decisions without moving high-level query logic into the kernel.
 - Driver architecture prepared for isolated, restartable driver services.
 - A top-level `drivers/` area for hardware-facing components so the core
   kernel does not become a driver warehouse.
@@ -56,6 +59,12 @@ Long-term memory policy is tracked in
 frame allocator, mapper, address-space, IPC, WASM, DMA, and snapshot work so
 memory does not become an old process heap model with Aesynx names added later.
 
+The native OS fact/world direction is tracked in
+[Aesynx OS World Roadmap](os-world-roadmap.md). The kernel should remain a
+small trust anchor, while userspace world services provide signed facts,
+branchable system states, policy-aware queries, context packs, projections, and
+AI-safe explanations.
+
 ## 1. Core Position
 
 Aesynx is not "Linux in Rust" and not "Windows rewritten." It is a clean research kernel whose design center is:
@@ -66,6 +75,7 @@ Aesynx is not "Linux in Rust" and not "Windows rewritten." It is a clean researc
 - Revocable driver resources.
 - Queue-based service APIs.
 - Immutable object identities.
+- Signed/versioned OS facts and branchable worlds for explainable system state.
 - Deterministic policy first, AI-assisted policy later.
 - Strong separation between portable policy and architecture-specific mechanism.
 
@@ -271,6 +281,8 @@ aesynx/
 |   |-- capability-model.md
 |   |-- ipc-protocol.md
 |   |-- driver-roadmap.md
+|   |-- memory-model-roadmap.md
+|   |-- os-world-roadmap.md
 |   |-- object-store.md
 |   |-- ai-telemetry-plane.md
 |   |-- native-userspace.md

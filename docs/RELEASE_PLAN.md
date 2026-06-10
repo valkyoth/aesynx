@@ -888,6 +888,11 @@ Exit criteria:
 
 ## Phase 8: AI-Ready Telemetry Plane
 
+Telemetry should grow into the lower layer of the Aesynx OS world model: small,
+bounded, deterministic facts emitted by the kernel and services, later consumed
+by native world/query/context services. See
+[OS World Roadmap](os-world-roadmap.md).
+
 ### v0.30.0 - Telemetry Event Schema
 
 Goal:
@@ -1711,6 +1716,31 @@ Verification:
 Exit criteria:
 
 - Future AI work has data.
+
+### v0.60.1 - OS World Trace Prototype
+
+Goal:
+
+Convert deterministic trace events into a host-side OS world prototype.
+
+Deliverables:
+
+- Trace-to-fact converter.
+- Initial fact envelope for boot, memory, capabilities, objects, drivers, and
+  tasks.
+- Host-side world file with immutable fact records.
+- Basic query examples for "why did this happen" and "what changed".
+- Documentation that this is userspace tooling, not kernel query logic.
+
+Verification:
+
+- QEMU trace produces a deterministic world file.
+- Host query can list boot facts, memory facts, and capability events.
+- Redaction rules hide sensitive fields in public query mode.
+
+Exit criteria:
+
+- Aesynx has a concrete bridge from telemetry to the future world service.
 
 ### v0.61.0 - Advisory Scheduler Policy
 

@@ -37,6 +37,10 @@ Native Aesynx userspace should be:
 - WASM-extensible: third-party commands and scripts can run in a sandbox.
 - Rust-first: core shell, runtime, and system tools are Rust.
 - AI-assisted: autocomplete, explanation, summarization, and query building are integrated but constrained.
+
+It should also expose a native OS world layer. The kernel and core services
+emit bounded facts; userspace stores, indexes, queries, redacts, and explains
+those facts. See [Aesynx OS World Roadmap](os-world-roadmap.md).
 - Auditable: commands can explain what they accessed and what authority they used.
 - Fast: avoid fork/text-parse overhead as the normal path.
 - Portable: WASM components can run across Aesynx architectures and, where useful, on other hosts.
