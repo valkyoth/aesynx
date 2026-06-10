@@ -32,6 +32,7 @@ pub struct PageTableSmokeStatus {
     pub no_device_ok: bool,
     pub no_global_ok: bool,
     pub no_alias_ok: bool,
+    pub kernel_user_guard_ok: bool,
     pub kernel_only_ok: bool,
     pub audit_ok: bool,
     pub visit_ok: bool,
@@ -309,6 +310,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     mapper
         .ensure_user_space_contiguous(SMOKE_USER_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
+    mapper
+        .ensure_no_kernel_space_user_mappings()
+        .map_err(PageTableSmokeError::Mapper)?;
     let user_range_unmap = mapper
         .unmap_contiguous(SMOKE_USER_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
@@ -355,6 +359,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         no_device_ok: true,
         no_global_ok: true,
         no_alias_ok: true,
+        kernel_user_guard_ok: true,
         kernel_only_ok: true,
         audit_ok: true,
         visit_ok: true,

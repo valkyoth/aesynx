@@ -558,6 +558,8 @@ Deliverables:
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Kernel-only mapping policy check for candidate kernel address spaces.
+- High-half kernel user-access guard policy check for future mixed address
+  spaces.
 - No-user-space mapping policy check for candidate kernel address spaces.
 - No-executable mapping policy check for candidate data-only address spaces.
 - No-writable mapping policy check for candidate read-only address spaces.
@@ -586,9 +588,10 @@ Deliverables:
   checks, local range checks, kernel-space range checks, user-space range
   checks, no-user-space policy checks, no-executable policy checks, no-writable
   policy checks, no-device policy checks, no-global policy checks, no-alias
-  policy checks, kernel-only policy checks, kernel address-space candidate
-  preflight, permission change, translated offset, mapping visit, range
-  permission verification, unmap, audit, reclamation, and flush target checks.
+  policy checks, high-half kernel user-access guard checks, kernel-only policy
+  checks, kernel address-space candidate preflight, permission change,
+  translated offset, mapping visit, range permission verification, unmap, audit,
+  reclamation, and flush target checks.
 
 Verification:
 
@@ -604,8 +607,8 @@ Verification:
   checks, local range checks, kernel-space range checks, user-space range
   checks, no-user-space policy checks, no-executable policy checks, no-writable
   policy checks, no-device policy checks, no-global policy checks, no-alias
-  policy checks, kernel-only policy checks, kernel address-space candidate
-  preflight, redacted mapping
+  policy checks, high-half kernel user-access guard checks, kernel-only policy
+  checks, kernel address-space candidate preflight, redacted mapping
   summaries, range permission verification, invalid range flag validation,
   consistency audit failures, conservative TLB flush merging, and x86_64 entry
   flag encode/decode validation.

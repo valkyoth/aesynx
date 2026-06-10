@@ -37,6 +37,7 @@ pub const PAGE_TABLE_CHECKED_STATUS_MARKER: &str = "checked_status_ok=true";
 pub const PAGE_TABLE_FAIL_MARKER: &str = "[TEST] page-table=fail";
 pub const PAGE_TABLE_FLAGS_MARKER: &str = "flags_ok=true";
 pub const PAGE_TABLE_KERNEL_CANDIDATE_MARKER: &str = "kernel_candidate_ok=true";
+pub const PAGE_TABLE_KERNEL_USER_GUARD_MARKER: &str = "kernel_user_guard_ok=true";
 pub const PAGE_TABLE_KERNEL_ONLY_MARKER: &str = "kernel_only_ok=true";
 pub const PAGE_TABLE_KERNEL_RANGE_MARKER: &str = "kernel_range_ok=true";
 pub const PAGE_TABLE_USER_RANGE_MARKER: &str = "user_range_ok=true";
@@ -89,7 +90,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
