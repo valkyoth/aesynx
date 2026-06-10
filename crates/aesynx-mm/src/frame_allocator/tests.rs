@@ -81,6 +81,38 @@ fn allocator_rejects_overlapping_regions() -> Result<(), FrameAllocatorError> {
 }
 
 #[test]
+fn mark_region_overlap_is_atomic() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.mark_region(
+        PhysAddr::new(3 * FRAME_SIZE),
+        FRAME_SIZE,
+        FrameRegionKind::Free,
+    )?;
+
+    let before = allocator;
+
+    assert_eq!(
+        allocator.mark_region(
+            PhysAddr::new(FRAME_SIZE),
+            3 * FRAME_SIZE,
+            FrameRegionKind::Kernel,
+        ),
+        Err(FrameAllocatorError::RegionOverlap)
+    );
+    assert_eq!(allocator, before);
+    assert_eq!(
+        allocator.debug_state(PhysFrame::new(1)),
+        FrameState::Unknown
+    );
+    assert_eq!(
+        allocator.debug_state(PhysFrame::new(2)),
+        FrameState::Unknown
+    );
+    assert_eq!(allocator.debug_state(PhysFrame::new(3)), FrameState::Free);
+    Ok(())
+}
+
+#[test]
 fn allocator_reports_reserved_states() -> Result<(), FrameAllocatorError> {
     let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
     allocator.mark_region(
@@ -121,6 +153,30 @@ fn allocator_reports_reserved_states() -> Result<(), FrameAllocatorError> {
         allocator.debug_state(PhysFrame::new(6)),
         FrameState::Unknown
     );
+    Ok(())
+}
+
+#[test]
+fn free_contiguous_double_free_is_atomic() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.mark_region(
+        PhysAddr::new(FRAME_SIZE),
+        8 * FRAME_SIZE,
+        FrameRegionKind::Free,
+    )?;
+    let frames = allocator.allocate_contiguous(3)?;
+    allocator.free(PhysFrame::new(2))?;
+
+    let before = allocator;
+
+    assert_eq!(
+        allocator.free_contiguous(frames),
+        Err(FrameAllocatorError::DoubleFree)
+    );
+    assert_eq!(allocator, before);
+    assert_eq!(allocator.debug_state(PhysFrame::new(1)), FrameState::Used);
+    assert_eq!(allocator.debug_state(PhysFrame::new(2)), FrameState::Free);
+    assert_eq!(allocator.debug_state(PhysFrame::new(3)), FrameState::Used);
     Ok(())
 }
 

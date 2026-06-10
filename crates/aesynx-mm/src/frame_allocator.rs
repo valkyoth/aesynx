@@ -199,24 +199,8 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
             return Ok(());
         }
 
-        let mut frame = mark_start;
-        while frame < mark_end {
-            let index = frame - allocator_start;
-            if self.known.get(index) {
-                return Err(FrameAllocatorError::RegionOverlap);
-            }
-            self.known.set(index, true)?;
-            match kind {
-                FrameRegionKind::Free => self.free.set(index, true)?,
-                FrameRegionKind::Reserved => self.reserved.set(index, true)?,
-                FrameRegionKind::Kernel => self.kernel.set(index, true)?,
-                FrameRegionKind::Bootloader => self.bootloader.set(index, true)?,
-                FrameRegionKind::Device => self.device.set(index, true)?,
-                FrameRegionKind::Acpi => self.acpi.set(index, true)?,
-                FrameRegionKind::Bad => self.bad.set(index, true)?,
-            }
-            frame += 1;
-        }
+        self.validate_unknown_range(mark_start, mark_end, allocator_start)?;
+        self.commit_region(mark_start, mark_end, allocator_start, kind)?;
 
         Ok(())
     }
@@ -278,9 +262,12 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
         if frames.count() == 0 {
             return Err(FrameAllocatorError::InvalidFrameCount);
         }
+        self.validate_freeable_run(frames)?;
         let mut offset = 0u64;
         while offset < frames.count() {
-            self.free(PhysFrame::new(frames.start().get() + offset))?;
+            let frame = checked_frame_offset(frames.start(), offset)?;
+            let index = self.index_of(frame)?;
+            self.free.set(index, true)?;
             offset += 1;
         }
         Ok(())
@@ -352,6 +339,68 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
         Ok(value - start)
     }
 
+    fn validate_unknown_range(
+        &self,
+        mark_start: u64,
+        mark_end: u64,
+        allocator_start: u64,
+    ) -> Result<(), FrameAllocatorError> {
+        let mut frame = mark_start;
+        while frame < mark_end {
+            let index = frame - allocator_start;
+            if self.known.get(index) {
+                return Err(FrameAllocatorError::RegionOverlap);
+            }
+            frame += 1;
+        }
+        Ok(())
+    }
+
+    fn commit_region(
+        &mut self,
+        mark_start: u64,
+        mark_end: u64,
+        allocator_start: u64,
+        kind: FrameRegionKind,
+    ) -> Result<(), FrameAllocatorError> {
+        let mut frame = mark_start;
+        while frame < mark_end {
+            let index = frame - allocator_start;
+            self.known.set(index, true)?;
+            match kind {
+                FrameRegionKind::Free => self.free.set(index, true)?,
+                FrameRegionKind::Reserved => self.reserved.set(index, true)?,
+                FrameRegionKind::Kernel => self.kernel.set(index, true)?,
+                FrameRegionKind::Bootloader => self.bootloader.set(index, true)?,
+                FrameRegionKind::Device => self.device.set(index, true)?,
+                FrameRegionKind::Acpi => self.acpi.set(index, true)?,
+                FrameRegionKind::Bad => self.bad.set(index, true)?,
+            }
+            frame += 1;
+        }
+        Ok(())
+    }
+
+    fn validate_freeable_run(&self, frames: AllocatedFrames) -> Result<(), FrameAllocatorError> {
+        let mut offset = 0u64;
+        while offset < frames.count() {
+            let frame = checked_frame_offset(frames.start(), offset)?;
+            match self.debug_state(frame) {
+                FrameState::Used => {}
+                FrameState::Free => return Err(FrameAllocatorError::DoubleFree),
+                FrameState::Unknown => return Err(FrameAllocatorError::FrameOutsideKnownMap),
+                FrameState::Reserved
+                | FrameState::Kernel
+                | FrameState::Bootloader
+                | FrameState::Device
+                | FrameState::Acpi
+                | FrameState::Bad => return Err(FrameAllocatorError::FrameNotAllocatable),
+            }
+            offset += 1;
+        }
+        Ok(())
+    }
+
     fn reserved_count(&self) -> u64 {
         self.reserved.count_ones(self.total_frames)
             + self.kernel.count_ones(self.total_frames)
@@ -373,6 +422,14 @@ fn align_up(value: u64) -> Result<u64, FrameAllocatorError> {
     value
         .checked_add(mask)
         .map(|rounded| rounded & !mask)
+        .ok_or(FrameAllocatorError::AddressOverflow)
+}
+
+fn checked_frame_offset(frame: PhysFrame, offset: u64) -> Result<PhysFrame, FrameAllocatorError> {
+    frame
+        .get()
+        .checked_add(offset)
+        .map(PhysFrame::new)
         .ok_or(FrameAllocatorError::AddressOverflow)
 }
 
