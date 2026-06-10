@@ -87,6 +87,22 @@ fn mapper_kernel_candidate_preflight_rejects_physical_aliases() -> Result<(), Pa
 }
 
 #[test]
+fn mapper_kernel_candidate_preflight_rejects_device_mappings() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly).device(),
+    )?;
+
+    assert_eq!(
+        mapper.verify_kernel_address_space_candidate(),
+        Err(PageTableError::UnexpectedMappingFlags)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_kernel_candidate_preflight_rejects_corrupt_tables() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.used[1] = true;

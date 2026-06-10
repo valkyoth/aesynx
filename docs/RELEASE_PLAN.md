@@ -532,8 +532,8 @@ Deliverables:
   root.
 - Checked status path that reports mapper counters only after audit validation.
 - Kernel address-space candidate preflight that combines audit, checked root,
-  checked status, no-user-space-mapping, no-user-mapping, and no-physical-alias
-  gates before future activation code can consume a mapper.
+  checked status, no-user-space-mapping, no-user-mapping, no-device, and
+  no-physical-alias gates before future activation code can consume a mapper.
 - User address-space candidate preflight that combines audit, checked root,
   checked status, no-kernel-space-user-mapping, no-user-space-kernel-mapping,
   no-device, no-global, and no-physical-alias gates before future per-task
