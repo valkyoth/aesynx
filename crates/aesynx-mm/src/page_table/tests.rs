@@ -7,5 +7,6 @@ mod audit;
 mod mapper;
 mod presence;
 mod range;
+mod range_presence;
 mod raw;
 mod walk;

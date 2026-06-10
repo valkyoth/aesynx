@@ -535,18 +535,18 @@ Deliverables:
 - Read-only consistency audit for reachable tables and mapped-page accounting.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
-- QEMU smoke for map, mapping lookup, page-presence checks, permission change,
-  translated offset, mapping visit, range permission verification, unmap,
-  audit, reclamation, and flush target checks.
+- QEMU smoke for map, mapping lookup, page-presence checks, mapped-range
+  checks, permission change, translated offset, mapping visit, range permission
+  verification, unmap, audit, reclamation, and flush target checks.
 
 Verification:
 
 - Host tests for map, translate, mapping lookup, page-presence checks,
-  permission changes, unmap, empty-table reclamation, sibling preservation,
-  double-map rejection, invalid address rejection, atomic capacity failure,
-  mapping visitor behavior, mapping visitor corruption rejection, range
-  permission verification, invalid range flag validation, consistency audit
-  failures, and x86_64 entry flag encode/decode validation.
+  mapped-range checks, permission changes, unmap, empty-table reclamation,
+  sibling preservation, double-map rejection, invalid address rejection, atomic
+  capacity failure, mapping visitor behavior, mapping visitor corruption
+  rejection, range permission verification, invalid range flag validation,
+  consistency audit failures, and x86_64 entry flag encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:

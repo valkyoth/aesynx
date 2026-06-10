@@ -10,6 +10,7 @@ pub struct PageTableSmokeStatus {
     pub protect_ok: bool,
     pub protect_range_ok: bool,
     pub range_lookup_ok: bool,
+    pub mapped_range_ok: bool,
     pub unmapped_range_ok: bool,
     pub audit_ok: bool,
     pub visit_ok: bool,
@@ -118,6 +119,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    mapper
+        .ensure_mapped_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
     let range_execute_flags =
         aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadExecute);
     let range_protect = mapper
@@ -166,6 +170,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if mapper.translate(SMOKE_RANGE_VIRT).is_some() {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    if mapper.ensure_mapped_contiguous(SMOKE_RANGE_VIRT, 2).is_ok() {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
     mapper
         .ensure_unmapped_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
@@ -193,6 +200,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         protect_ok: true,
         protect_range_ok: true,
         range_lookup_ok: true,
+        mapped_range_ok: true,
         unmapped_range_ok: true,
         audit_ok: true,
         visit_ok: true,
