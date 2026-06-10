@@ -18,6 +18,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<MapRangeOutcome, PageTableError> {
         validate_virt_range(virt, page_count)?;
         validate_phys_range(phys, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
 
         let mut candidate = *self;
         let mut offset = 0u64;
@@ -43,6 +44,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
     ) -> Result<PageRangeMapping, PageTableError> {
         validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
 
         let first = self.mapping_for_page(virt)?;
         let flags = first.flags();
@@ -66,6 +68,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
     ) -> Result<(), PageTableError> {
         validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
 
         let mut offset = 0u64;
         while offset < page_count {
@@ -87,6 +90,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         flags: GenericPageFlags,
     ) -> Result<ProtectRangeOutcome, PageTableError> {
         validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
 
         let mut candidate = *self;
         let mut flush = TlbFlush::None;
@@ -110,6 +114,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
     ) -> Result<UnmapRangeOutcome, PageTableError> {
         validate_virt_range(virt, page_count)?;
+        validate_range_walk::<TABLES>(page_count)?;
 
         let mut candidate = *self;
         let mut flush = TlbFlush::None;
@@ -154,6 +159,16 @@ fn validate_phys_range(phys: PhysAddr, page_count: u64) -> Result<(), PageTableE
 
     let last = add_pages_to_phys(phys, page_count - 1)?;
     validate_phys(last)
+}
+
+fn validate_range_walk<const TABLES: usize>(page_count: u64) -> Result<(), PageTableError> {
+    let max_pages = (TABLES as u64)
+        .checked_mul(super::PAGE_TABLE_ENTRIES as u64)
+        .ok_or(PageTableError::AddressOverflow)?;
+    if page_count > max_pages {
+        return Err(PageTableError::RangeTooLarge);
+    }
+    Ok(())
 }
 
 fn canonical_sign_bit(virt: VirtAddr) -> u64 {

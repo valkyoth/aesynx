@@ -3,7 +3,7 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{GenericPageFlags, PageAccess};
 
 use super::{KERNEL_PHYS, KERNEL_VIRT};
-use crate::page_table::{PageTableError, PageTableMapper, TlbFlush};
+use crate::page_table::{PAGE_TABLE_ENTRIES, PageTableError, PageTableMapper, TlbFlush};
 
 #[test]
 fn mapper_maps_contiguous_range_atomically() -> Result<(), PageTableError> {
@@ -97,6 +97,49 @@ fn mapper_contiguous_map_rejects_malformed_physical_ranges() -> Result<(), PageT
         Err(PageTableError::AddressOverflow)
     );
     assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_contiguous_ranges_are_walk_bounded() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
+    let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
+    let too_many = max_pages + 1;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+
+    assert_eq!(
+        mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, too_many, flags),
+        Err(PageTableError::RangeTooLarge)
+    );
+    assert_eq!(
+        mapper.mapping_for_contiguous(KERNEL_VIRT, too_many),
+        Err(PageTableError::RangeTooLarge)
+    );
+    assert_eq!(
+        mapper.ensure_unmapped_contiguous(KERNEL_VIRT, too_many),
+        Err(PageTableError::RangeTooLarge)
+    );
+    assert_eq!(
+        mapper.protect_contiguous(KERNEL_VIRT, too_many, flags),
+        Err(PageTableError::RangeTooLarge)
+    );
+    assert_eq!(
+        mapper.unmap_contiguous(KERNEL_VIRT, too_many),
+        Err(PageTableError::RangeTooLarge)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_unmapped_range_check_allows_maximum_bounded_walk() -> Result<(), PageTableError> {
+    let mapper = PageTableMapper::<4>::new()?;
+    let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
+
+    mapper.ensure_unmapped_contiguous(KERNEL_VIRT, max_pages)?;
+
+    assert_eq!(mapper.status().mapped_pages, 0);
     Ok(())
 }
 
