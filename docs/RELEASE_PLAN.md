@@ -495,6 +495,7 @@ Deliverables:
 - Safe bitmap allocator model.
 - Alloc/free one frame.
 - Alloc contiguous.
+- Atomic failure behavior for region seeding and contiguous frees.
 - Debug frame states.
 - Double-free detection in debug mode.
 - QEMU smoke over a bounded usable memory-map window.
@@ -509,6 +510,7 @@ Verification:
 
 - Alloc/free smoke test in kernel.
 - Host model tests.
+- Regression tests prove failed mark/free calls leave allocator state unchanged.
 
 Exit criteria:
 
