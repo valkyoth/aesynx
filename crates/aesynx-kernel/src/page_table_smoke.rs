@@ -13,6 +13,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_range_ok: bool,
     pub unmapped_range_ok: bool,
     pub kernel_range_ok: bool,
+    pub user_range_ok: bool,
     pub write_protected_range_ok: bool,
     pub non_executable_range_ok: bool,
     pub executable_range_ok: bool,
@@ -229,6 +230,29 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
 
+    let user_flags = aesynx_mm::GenericPageFlags::user(aesynx_mm::PageAccess::ReadOnly);
+    let user_range_map = mapper
+        .map_contiguous(SMOKE_RANGE_VIRT, SMOKE_RANGE_PHYS, 2, user_flags)
+        .map_err(PageTableSmokeError::Mapper)?;
+    if user_range_map.pages() != 2 || user_range_map.flush() != aesynx_mm::TlbFlush::AddressSpace {
+        return Err(PageTableSmokeError::FlushMismatch);
+    }
+    mapper
+        .ensure_user_mapped_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
+    let user_range_unmap = mapper
+        .unmap_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
+    if user_range_unmap.pages() != 2
+        || user_range_unmap.flush() != aesynx_mm::TlbFlush::AddressSpace
+    {
+        return Err(PageTableSmokeError::FlushMismatch);
+    }
+    let final_status = mapper.status();
+    if final_status.used_tables != 1 || final_status.mapped_pages != 0 {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+
     Ok(PageTableSmokeStatus {
         total_tables: after_unmap.total_tables,
         used_tables: after_range.used_tables,
@@ -243,6 +267,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_range_ok: true,
         unmapped_range_ok: true,
         kernel_range_ok: true,
+        user_range_ok: true,
         write_protected_range_ok: true,
         non_executable_range_ok: true,
         executable_range_ok: true,

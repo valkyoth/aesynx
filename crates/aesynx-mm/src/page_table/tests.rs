@@ -10,6 +10,7 @@ mod presence;
 mod range;
 mod range_policy;
 mod range_presence;
+mod range_privilege_policy;
 mod raw;
 mod summary;
 mod walk;
