@@ -14,6 +14,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<TranslatedRange, PageTableError> {
         let checked = validate_virt_byte_range(virt, byte_len)?;
         validate_range_walk::<TABLES>(checked.pages)?;
+        self.audit()?;
 
         let first = self.mapping_for_page(checked.start_page)?;
         let offset = virt.get() & PAGE_OFFSET_MASK;

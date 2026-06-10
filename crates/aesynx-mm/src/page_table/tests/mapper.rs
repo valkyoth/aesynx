@@ -180,6 +180,23 @@ fn mapper_mapping_lookup_rejects_invalid_or_unmapped_pages() -> Result<(), PageT
 }
 
 #[test]
+fn mapper_checked_translation_rejects_accounting_drift() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.mapped_pages = 2;
+
+    assert_eq!(
+        mapper.translate_checked(KERNEL_VIRT),
+        Err(PageTableError::CorruptTable)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_protects_existing_page_permissions() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let initial = GenericPageFlags::kernel(PageAccess::ReadWrite);

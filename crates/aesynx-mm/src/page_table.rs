@@ -161,6 +161,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         if !is_canonical(virt.get()) {
             return Err(PageTableError::InvalidVirtualAddress);
         }
+        self.audit()?;
         let page = VirtAddr::new(virt.get() & !PAGE_OFFSET_MASK);
         let mapping = self.mapping_for_page(page)?;
         let offset = virt.get() & PAGE_OFFSET_MASK;

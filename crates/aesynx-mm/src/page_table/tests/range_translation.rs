@@ -85,6 +85,23 @@ fn mapper_translate_byte_range_rejects_gaps_without_mutation() -> Result<(), Pag
 }
 
 #[test]
+fn mapper_translate_byte_range_rejects_accounting_drift() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.mapped_pages = 2;
+
+    assert_eq!(
+        mapper.translate_contiguous_range_checked(KERNEL_VIRT, 0x80),
+        Err(PageTableError::CorruptTable)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_translate_byte_range_rejects_noncontiguous_physical_pages() -> Result<(), PageTableError>
 {
     let mut mapper = PageTableMapper::<4>::new()?;
