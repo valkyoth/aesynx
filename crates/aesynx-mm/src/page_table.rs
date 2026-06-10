@@ -55,6 +55,11 @@ impl X86_64PageTableEntry {
         if mapping.flags().is_device_memory() && mapping.flags().access.executable() {
             return Err(PageTableError::InvalidMappingFlags);
         }
+        if mapping.flags().is_global()
+            && matches!(mapping.flags().privilege, crate::PagePrivilege::User)
+        {
+            return Err(PageTableError::InvalidMappingFlags);
+        }
         let mut raw = (mapping.phys().get() & Self::ADDRESS_MASK) | Self::PRESENT;
         if mapping.flags().access.writable() {
             raw |= Self::WRITABLE;

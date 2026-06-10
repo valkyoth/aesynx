@@ -44,6 +44,17 @@ fn x86_64_entry_rejects_executable_device_mapping() {
 }
 
 #[test]
+fn x86_64_entry_rejects_user_global_mapping() {
+    let mut flags = GenericPageFlags::user(PageAccess::ReadOnly);
+    flags.global = true;
+
+    assert_eq!(
+        X86_64PageTableEntry::from_mapping(PageMapping::new(KERNEL_PHYS, flags)),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+}
+
+#[test]
 fn raw_slot_decode_rejects_write_execute_corruption() {
     let slot = PageTableSlot {
         raw: KERNEL_PHYS.get() | 1 | (1 << 1),
