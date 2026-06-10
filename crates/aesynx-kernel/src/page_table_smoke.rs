@@ -139,7 +139,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let after_unmap = mapper.status();
-    if after_unmap.used_tables != 1 {
+    if after_unmap.used_tables() != 1 {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
 
@@ -268,14 +268,14 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .ensure_unmapped_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
     let after_range = mapper.status();
-    if after_range.used_tables != 1 || after_range.mapped_pages != 0 {
+    if after_range.used_tables() != 1 || after_range.mapped_pages() != 0 {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let audit = mapper.audit().map_err(PageTableSmokeError::Mapper)?;
-    if audit.total_tables() != after_range.total_tables
-        || audit.used_tables() != after_range.used_tables
-        || audit.reachable_tables() != after_range.used_tables
-        || audit.mapped_pages() != after_range.mapped_pages
+    if audit.total_tables() != after_range.total_tables()
+        || audit.used_tables() != after_range.used_tables()
+        || audit.reachable_tables() != after_range.used_tables()
+        || audit.mapped_pages() != after_range.mapped_pages()
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
@@ -308,15 +308,15 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::FlushMismatch);
     }
     let final_status = mapper.status();
-    if final_status.used_tables != 1 || final_status.mapped_pages != 0 {
+    if final_status.used_tables() != 1 || final_status.mapped_pages() != 0 {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
 
     Ok(PageTableSmokeStatus {
-        total_tables: after_unmap.total_tables,
-        used_tables: after_range.used_tables,
-        mapped_pages_before_unmap: before_unmap.mapped_pages,
-        mapped_pages_after_unmap: after_range.mapped_pages,
+        total_tables: after_unmap.total_tables(),
+        used_tables: after_range.used_tables(),
+        mapped_pages_before_unmap: before_unmap.mapped_pages(),
+        mapped_pages_after_unmap: after_range.mapped_pages(),
         root_ok: true,
         checked_root_ok: true,
         checked_status_ok: true,

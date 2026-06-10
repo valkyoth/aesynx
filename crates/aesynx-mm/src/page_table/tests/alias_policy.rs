@@ -11,7 +11,7 @@ fn mapper_alias_check_accepts_empty_mapper() -> Result<(), PageTableError> {
 
     mapper.ensure_no_physical_aliases()?;
 
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
 
@@ -42,7 +42,7 @@ fn mapper_alias_check_rejects_duplicate_physical_frames() -> Result<(), PageTabl
         Err(PageTableError::PhysicalAlias)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().mapped_pages, 2);
+    assert_eq!(mapper.status().mapped_pages(), 2);
     Ok(())
 }
 

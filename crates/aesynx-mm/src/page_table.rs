@@ -178,11 +178,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     #[must_use]
     pub fn status(&self) -> PageTableStatus {
-        PageTableStatus {
-            total_tables: TABLES as u64,
-            used_tables: self.used_tables(),
-            mapped_pages: self.mapped_pages,
-        }
+        PageTableStatus::new(TABLES as u64, self.used_tables(), self.mapped_pages)
     }
 
     fn validate_map_capacity(&self, virt: VirtAddr) -> Result<(), PageTableError> {

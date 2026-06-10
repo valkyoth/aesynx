@@ -1,8 +1,34 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageTableStatus {
-    pub total_tables: u64,
-    pub used_tables: u64,
-    pub mapped_pages: u64,
+    total_tables: u64,
+    used_tables: u64,
+    mapped_pages: u64,
+}
+
+impl PageTableStatus {
+    #[must_use]
+    pub(crate) const fn new(total_tables: u64, used_tables: u64, mapped_pages: u64) -> Self {
+        Self {
+            total_tables,
+            used_tables,
+            mapped_pages,
+        }
+    }
+
+    #[must_use]
+    pub const fn total_tables(self) -> u64 {
+        self.total_tables
+    }
+
+    #[must_use]
+    pub const fn used_tables(self) -> u64 {
+        self.used_tables
+    }
+
+    #[must_use]
+    pub const fn mapped_pages(self) -> u64 {
+        self.mapped_pages
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

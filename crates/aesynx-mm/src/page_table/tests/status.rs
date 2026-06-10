@@ -16,9 +16,9 @@ fn mapper_checked_status_matches_valid_mapper() -> Result<(), PageTableError> {
     )?;
 
     let status = mapper.status_checked()?;
-    assert_eq!(status.total_tables, 4);
-    assert_eq!(status.used_tables, PAGE_TABLE_LEVELS as u64);
-    assert_eq!(status.mapped_pages, 1);
+    assert_eq!(status.total_tables(), 4);
+    assert_eq!(status.used_tables(), PAGE_TABLE_LEVELS as u64);
+    assert_eq!(status.mapped_pages(), 1);
     assert_eq!(status, mapper.status());
     Ok(())
 }
@@ -34,7 +34,7 @@ fn mapper_checked_status_rejects_accounting_drift() -> Result<(), PageTableError
 
     mapper.mapped_pages = 0;
 
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     assert_eq!(mapper.status_checked(), Err(PageTableError::CorruptTable));
     Ok(())
 }

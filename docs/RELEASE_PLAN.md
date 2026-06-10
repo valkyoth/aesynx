@@ -546,6 +546,8 @@ Deliverables:
   addresses.
 - Mapper-produced audit and mapping-summary reports are inspectable but not
   externally constructible through public constructors.
+- Mapper-produced status reports are inspectable but not externally
+  constructible through public fields or constructors.
 - Mapper-produced operation outcomes and range reports are inspectable but not
   externally constructible through public constructors.
 - Raw x86_64 page-table entries expose only the checked mapping encoder and raw

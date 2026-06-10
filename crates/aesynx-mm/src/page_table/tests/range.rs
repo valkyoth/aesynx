@@ -14,7 +14,7 @@ fn mapper_maps_contiguous_range_atomically() -> Result<(), PageTableError> {
 
     assert_eq!(outcome.pages(), 3);
     assert_eq!(outcome.flush(), TlbFlush::AddressSpace);
-    assert_eq!(mapper.status().mapped_pages, 3);
+    assert_eq!(mapper.status().mapped_pages(), 3);
     assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
     assert_eq!(
         mapper.translate(VirtAddr::new(KERNEL_VIRT.get() + 0x2000)),
@@ -113,7 +113,7 @@ fn mapper_contiguous_map_rejects_invalid_flags_before_mutation() -> Result<(), P
         Err(PageTableError::InvalidMappingFlags)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
 
@@ -160,7 +160,7 @@ fn mapper_unmapped_range_check_allows_maximum_bounded_walk() -> Result<(), PageT
 
     mapper.ensure_unmapped_contiguous(KERNEL_VIRT, max_pages)?;
 
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
 
@@ -188,7 +188,7 @@ fn mapper_verifies_unmapped_contiguous_range_without_mutation() -> Result<(), Pa
     mapper.ensure_unmapped_contiguous(KERNEL_VIRT, 3)?;
 
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
 
@@ -340,7 +340,7 @@ fn mapper_protects_contiguous_range_atomically() -> Result<(), PageTableError> {
             protected
         ))
     );
-    assert_eq!(mapper.status().mapped_pages, 2);
+    assert_eq!(mapper.status().mapped_pages(), 2);
     Ok(())
 }
 
@@ -399,8 +399,8 @@ fn mapper_unmaps_contiguous_range_atomically() -> Result<(), PageTableError> {
 
     assert_eq!(outcome.pages(), 2);
     assert_eq!(outcome.flush(), TlbFlush::AddressSpace);
-    assert_eq!(mapper.status().mapped_pages, 0);
-    assert_eq!(mapper.status().used_tables, 1);
+    assert_eq!(mapper.status().mapped_pages(), 0);
+    assert_eq!(mapper.status().used_tables(), 1);
     assert_eq!(mapper.translate(KERNEL_VIRT), None);
     Ok(())
 }
@@ -417,7 +417,7 @@ fn mapper_contiguous_unmap_failure_is_atomic() -> Result<(), PageTableError> {
         Err(PageTableError::NotMapped)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().mapped_pages, 2);
+    assert_eq!(mapper.status().mapped_pages(), 2);
     assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
     Ok(())
 }
@@ -463,6 +463,6 @@ fn mapper_contiguous_ranges_reject_zero_pages() -> Result<(), PageTableError> {
         ),
         Err(PageTableError::InvalidPageCount)
     );
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }

@@ -27,7 +27,7 @@ fn mapper_verifies_mapped_contiguous_range_without_mutation() -> Result<(), Page
     mapper.ensure_mapped_contiguous(first_virt, 2)?;
 
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().mapped_pages, 2);
+    assert_eq!(mapper.status().mapped_pages(), 2);
     Ok(())
 }
 

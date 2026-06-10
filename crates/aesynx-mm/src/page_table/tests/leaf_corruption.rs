@@ -20,7 +20,7 @@ fn mapper_lookup_rejects_corrupt_leaf_slot() -> Result<(), PageTableError> {
         Err(PageTableError::CorruptTable)
     );
     assert_eq!(mapper.translate(KERNEL_VIRT), None);
-    assert_eq!(mapper.status().mapped_pages, 1);
+    assert_eq!(mapper.status().mapped_pages(), 1);
     Ok(())
 }
 
@@ -47,7 +47,7 @@ fn mapper_unmap_rejects_corrupt_leaf_without_mutation() -> Result<(), PageTableE
         Err(PageTableError::CorruptTable)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().mapped_pages, 1);
+    assert_eq!(mapper.status().mapped_pages(), 1);
     Ok(())
 }
 

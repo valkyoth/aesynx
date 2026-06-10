@@ -30,8 +30,8 @@ fn mapper_maps_and_translates_page() -> Result<(), PageTableError> {
         mapper.translate_checked(VirtAddr::new(KERNEL_VIRT.get() + 0x123)),
         Ok(PhysAddr::new(KERNEL_PHYS.get() + 0x123))
     );
-    assert_eq!(mapper.status().mapped_pages, 1);
-    assert_eq!(mapper.status().used_tables, PAGE_TABLE_LEVELS as u64);
+    assert_eq!(mapper.status().mapped_pages(), 1);
+    assert_eq!(mapper.status().used_tables(), PAGE_TABLE_LEVELS as u64);
     assert_eq!(mapper.root_table().table_index(), 0);
     Ok(())
 }
@@ -78,8 +78,8 @@ fn mapper_unmaps_page_and_reports_flush() -> Result<(), PageTableError> {
         mapper.unmap_page(KERNEL_VIRT),
         Err(PageTableError::NotMapped)
     );
-    assert_eq!(mapper.status().mapped_pages, 0);
-    assert_eq!(mapper.status().used_tables, 1);
+    assert_eq!(mapper.status().mapped_pages(), 0);
+    assert_eq!(mapper.status().used_tables(), 1);
     Ok(())
 }
 
@@ -95,7 +95,7 @@ fn mapper_unmap_global_page_requests_address_space_flush() -> Result<(), PageTab
 
     assert_eq!(outcome.mapping(), PageMapping::new(KERNEL_PHYS, flags));
     assert_eq!(outcome.flush(), TlbFlush::AddressSpace);
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
 
@@ -108,11 +108,11 @@ fn mapper_unmap_reclaims_empty_intermediate_tables() -> Result<(), PageTableErro
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
 
-    assert_eq!(mapper.status().used_tables, PAGE_TABLE_LEVELS as u64);
+    assert_eq!(mapper.status().used_tables(), PAGE_TABLE_LEVELS as u64);
     mapper.unmap_page(KERNEL_VIRT)?;
 
-    assert_eq!(mapper.status().used_tables, 1);
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().used_tables(), 1);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
 
@@ -133,8 +133,8 @@ fn mapper_unmap_preserves_tables_needed_by_siblings() -> Result<(), PageTableErr
 
     mapper.unmap_page(KERNEL_VIRT)?;
 
-    assert_eq!(mapper.status().used_tables, PAGE_TABLE_LEVELS as u64);
-    assert_eq!(mapper.status().mapped_pages, 1);
+    assert_eq!(mapper.status().used_tables(), PAGE_TABLE_LEVELS as u64);
+    assert_eq!(mapper.status().mapped_pages(), 1);
     assert_eq!(mapper.translate(sibling), Some(PhysAddr::new(0x0020_1000)));
     Ok(())
 }
@@ -196,7 +196,7 @@ fn mapper_protects_existing_page_permissions() -> Result<(), PageTableError> {
         Ok(PageMapping::new(KERNEL_PHYS, protected))
     );
     assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
-    assert_eq!(mapper.status().mapped_pages, 1);
+    assert_eq!(mapper.status().mapped_pages(), 1);
     Ok(())
 }
 
@@ -336,8 +336,8 @@ fn mapper_invalid_mapping_flags_failure_is_atomic() -> Result<(), PageTableError
         Err(PageTableError::InvalidMappingFlags)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().used_tables, 1);
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().used_tables(), 1);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
 
@@ -420,7 +420,7 @@ fn mapper_capacity_failure_is_atomic() -> Result<(), PageTableError> {
         Err(PageTableError::OutOfPageTables)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().used_tables, 1);
-    assert_eq!(mapper.status().mapped_pages, 0);
+    assert_eq!(mapper.status().used_tables(), 1);
+    assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
