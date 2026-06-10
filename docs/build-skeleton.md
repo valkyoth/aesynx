@@ -70,8 +70,9 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `normal_memory_range_ok=true`, `local_range_ok=true`,
 `kernel_space_range_ok=true`, `user_space_range_ok=true`,
 `no_executable_ok=true`, `no_writable_ok=true`, `no_device_ok=true`,
-`no_global_ok=true`, `kernel_only_ok=true`, `visit_ok=true`, `flags_ok=true`,
-`reclaim_ok=true`, `range_ok=true`, `[TEST] page-table=ok`,
+`no_global_ok=true`, `no_alias_ok=true`, `kernel_only_ok=true`,
+`visit_ok=true`, `flags_ok=true`, `reclaim_ok=true`, `range_ok=true`,
+`[TEST] page-table=ok`,
 `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
@@ -115,8 +116,8 @@ exercises a bounded x86_64-shaped page-table mapper model with map, permission
 lookup, contiguous range lookup, permission change, translate, contiguous range
 map/protect/unmap, unmapped range checks, read-only mapping visit, virtual range
 permission verification, kernel-space and user-space virtual range policy,
-unmap, consistency audit, empty-table reclamation, and explicit TLB flush
-targets. It does not claim active CR3 replacement, production page-table
+no-alias policy, unmap, consistency audit, empty-table reclamation, and
+explicit TLB flush targets. It does not claim active CR3 replacement, production page-table
 ownership, APIC MMIO activation, global physical-memory ownership, heap
 allocation, page-fault recovery, a calibrated production clock service,
 scheduler preemption, or bootloader memory reclamation.

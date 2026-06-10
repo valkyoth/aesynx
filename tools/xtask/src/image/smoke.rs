@@ -16,6 +16,7 @@ pub const MEMORY_USABLE_MARKER: &str = "memory usable_bytes=";
 pub const PAGE_TABLE_NO_DEVICE_MARKER: &str = "no_device_ok=true";
 pub const PAGE_TABLE_NO_EXECUTABLE_MARKER: &str = "no_executable_ok=true";
 pub const PAGE_TABLE_NO_GLOBAL_MARKER: &str = "no_global_ok=true";
+pub const PAGE_TABLE_NO_ALIAS_MARKER: &str = "no_alias_ok=true";
 pub const PAGE_TABLE_NO_WRITABLE_MARKER: &str = "no_writable_ok=true";
 pub const PAGE_TABLE_EXECUTABLE_RANGE_MARKER: &str = "executable_range_ok=true";
 pub const PAGE_TABLE_NORMAL_MEMORY_RANGE_MARKER: &str = "normal_memory_range_ok=true";
@@ -82,7 +83,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"

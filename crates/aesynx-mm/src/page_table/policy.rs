@@ -52,4 +52,17 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         })?;
         Ok(())
     }
+
+    pub fn ensure_no_physical_aliases(&self) -> Result<(), PageTableError> {
+        self.visit_mappings(|left| {
+            self.visit_mappings(|right| {
+                if left.virt() != right.virt() && left.mapping().phys() == right.mapping().phys() {
+                    return Err(PageTableError::PhysicalAlias);
+                }
+                Ok(())
+            })?;
+            Ok(())
+        })?;
+        Ok(())
+    }
 }
