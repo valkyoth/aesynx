@@ -527,6 +527,7 @@ Deliverables:
 - Safe bounded x86_64-shaped page-table mapper model.
 - Typed root-table identity for future address-space activation work without
   exposing raw physical addresses.
+- Checked status path that reports mapper counters only after audit validation.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.
@@ -559,8 +560,9 @@ Deliverables:
 - Low-half user-space virtual range policy check.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
-- QEMU smoke for root-table identity, map, checked translation, checked
-  byte-range translation, mapping lookup, page-presence checks, mapped-range checks, kernel-range policy
+- QEMU smoke for root-table identity, checked status, map, checked translation,
+  checked byte-range translation, mapping lookup, page-presence checks,
+  mapped-range checks, kernel-range policy
   checks, user-range policy checks, write-protected range checks,
   non-executable range checks, executable range checks, normal-memory range
   checks, local range checks, kernel-space range checks, user-space range
@@ -571,9 +573,9 @@ Deliverables:
 
 Verification:
 
-- Host tests for root-table identity, map, translate, checked translation,
-  checked byte-range translation, mapping lookup, page-presence checks,
-  mapped-range checks, permission changes, unmap, empty-table reclamation,
+- Host tests for root-table identity, checked status, map, translate, checked
+  translation, checked byte-range translation, mapping lookup, page-presence
+  checks, mapped-range checks, permission changes, unmap, empty-table reclamation,
   sibling preservation, double-map rejection, invalid address rejection, atomic
   capacity failure, mapping visitor behavior, mapping visitor corruption
   rejection, malformed leaf rejection, kernel-range policy

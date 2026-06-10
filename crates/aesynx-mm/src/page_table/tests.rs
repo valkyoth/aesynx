@@ -16,5 +16,6 @@ mod range_presence;
 mod range_privilege_policy;
 mod range_translation;
 mod raw;
+mod status;
 mod summary;
 mod walk;

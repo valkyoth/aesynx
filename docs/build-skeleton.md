@@ -62,8 +62,8 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `memory total_bytes=`,
 `memory usable_bytes=`, `memory reserved_bytes=`, `[TEST] memory-map=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
-`page-table total_tables=`, `root_ok=true`, `checked_translate_ok=true`,
-`mapping_lookup_ok=true`, `presence_ok=true`, `protect_ok=true`,
+`page-table total_tables=`, `root_ok=true`, `checked_status_ok=true`,
+`checked_translate_ok=true`, `mapping_lookup_ok=true`, `presence_ok=true`, `protect_ok=true`,
 `protect_range_ok=true`, `range_lookup_ok=true`, `range_translate_ok=true`,
 `mapped_range_ok=true`, `unmapped_range_ok=true`, `audit_ok=true`,
 `kernel_range_ok=true`, `user_range_ok=true`, `write_protected_range_ok=true`,
@@ -114,7 +114,7 @@ usable, reserved, and frame counts. It seeds a bounded early bitmap allocator
 from a usable memory-map window and verifies one-frame allocation/free,
 contiguous allocation/free, debug state, and double-free detection. It also
 exercises a bounded x86_64-shaped page-table mapper model with typed root-table
-identity, map, checked translation, checked byte-range translation, permission lookup, contiguous
+identity, checked status, map, checked translation, checked byte-range translation, permission lookup, contiguous
 range lookup, permission change, translate, contiguous range map/protect/unmap,
 unmapped range checks, read-only mapping visit, virtual range permission
 verification, kernel-space and user-space virtual range policy, no-alias

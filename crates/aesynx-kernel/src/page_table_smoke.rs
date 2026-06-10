@@ -5,6 +5,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_pages_before_unmap: u64,
     pub mapped_pages_after_unmap: u64,
     pub root_ok: bool,
+    pub checked_status_ok: bool,
     pub translate_offset_ok: bool,
     pub checked_translate_ok: bool,
     pub mapping_lookup_ok: bool,
@@ -269,6 +270,12 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    let checked_status = mapper
+        .status_checked()
+        .map_err(PageTableSmokeError::Mapper)?;
+    if checked_status != after_range {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
 
     let user_flags = aesynx_mm::GenericPageFlags::user(aesynx_mm::PageAccess::ReadOnly);
     let user_range_map = mapper
@@ -302,6 +309,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_pages_before_unmap: before_unmap.mapped_pages,
         mapped_pages_after_unmap: after_range.mapped_pages,
         root_ok: true,
+        checked_status_ok: true,
         translate_offset_ok: true,
         checked_translate_ok: true,
         mapping_lookup_ok: true,
