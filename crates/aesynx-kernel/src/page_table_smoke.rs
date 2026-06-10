@@ -288,12 +288,17 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if checked_status != after_range {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
-    let kernel_candidate = mapper
+    let mut kernel_candidate_mapper = aesynx_mm::PageTableMapper::<SMOKE_PAGE_TABLES>::new()
+        .map_err(PageTableSmokeError::Mapper)?;
+    kernel_candidate_mapper
+        .map_page(SMOKE_VIRT, SMOKE_PHYS, protected_flags)
+        .map_err(PageTableSmokeError::Mapper)?;
+    let kernel_candidate = kernel_candidate_mapper
         .verify_kernel_address_space_candidate()
         .map_err(PageTableSmokeError::Mapper)?;
-    if kernel_candidate.mapped_pages() != 0
-        || kernel_candidate.used_tables() != after_range.used_tables()
-        || kernel_candidate.reachable_tables() != after_range.used_tables()
+    if kernel_candidate.mapped_pages() != 1
+        || kernel_candidate.used_tables() != aesynx_mm::PAGE_TABLE_LEVELS as u64
+        || kernel_candidate.reachable_tables() != aesynx_mm::PAGE_TABLE_LEVELS as u64
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }

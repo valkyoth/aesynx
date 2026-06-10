@@ -532,16 +532,19 @@ Deliverables:
   root.
 - Checked status path that reports mapper counters only after audit validation.
 - Kernel address-space candidate preflight that combines audit, checked root,
-  checked status, no-user-space-mapping, no-user-mapping, no-device, and
-  no-physical-alias gates before future activation code can consume a mapper.
+  checked status, non-empty mapping state, no-user-space-mapping,
+  no-user-mapping, no-device, and no-physical-alias gates before future
+  activation code can consume a mapper.
 - User address-space candidate preflight that combines audit, checked root,
-  checked status, no-kernel-space-user-mapping, no-user-space-kernel-mapping,
-  no-device, no-global, and no-physical-alias gates before future per-task
-  address-space code can consume a mapper.
+  checked status, non-empty mapping state, no-kernel-space-user-mapping,
+  no-user-space-kernel-mapping, no-device, no-global, and no-physical-alias
+  gates before future per-task address-space code can consume a mapper.
 - Kernel and user address-space candidate preflight success and failure paths
   stay read-only against the mapper being verified.
 - Kernel and user address-space candidate preflights report structural mapper
   corruption before mapping-policy violations.
+- Kernel and user address-space candidate preflights reject structurally valid
+  but empty address spaces before policy validation.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.

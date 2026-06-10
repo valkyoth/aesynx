@@ -30,6 +30,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         {
             return Err(PageTableError::CorruptTable);
         }
+        if audit.mapped_pages() == 0 {
+            return Err(PageTableError::EmptyAddressSpace);
+        }
         Ok(audit)
     }
 }

@@ -34,6 +34,14 @@ fn mapper_kernel_candidate_preflight_accepts_kernel_mappings_without_mutation()
 }
 
 #[test]
+fn mapper_kernel_candidate_preflight_rejects_empty_address_space() -> Result<(), PageTableError> {
+    let mapper = PageTableMapper::<4>::new()?;
+
+    assert_kernel_candidate_rejects_without_mutation(&mapper, PageTableError::EmptyAddressSpace);
+    Ok(())
+}
+
+#[test]
 fn mapper_kernel_candidate_preflight_rejects_user_mappings() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
@@ -148,6 +156,14 @@ fn mapper_user_candidate_preflight_accepts_split_address_space_without_mutation(
     assert_eq!(audit.reachable_tables(), (PAGE_TABLE_LEVELS * 2 - 1) as u64);
     assert_eq!(audit.mapped_pages(), 2);
     assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_user_candidate_preflight_rejects_empty_address_space() -> Result<(), PageTableError> {
+    let mapper = PageTableMapper::<4>::new()?;
+
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::EmptyAddressSpace);
     Ok(())
 }
 

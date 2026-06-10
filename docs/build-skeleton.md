@@ -122,8 +122,8 @@ range lookup, permission change, translate, contiguous range map/protect/unmap,
 unmapped range checks, read-only mapping visit, virtual range permission
 verification, kernel-space and user-space virtual range policy, high-half
 kernel user-access guard policy, low-half user kernel-privilege guard policy,
-kernel/user address-space candidate preflights, no-alias policy, fail-closed
-malformed leaf decoding, unmap, consistency audit,
+non-empty kernel/user address-space candidate preflights, no-alias policy,
+fail-closed malformed leaf decoding, unmap, consistency audit,
 empty-table reclamation, and explicit TLB flush targets. It does not claim
 active CR3 replacement, production page-table
 ownership, APIC MMIO activation, global physical-memory ownership, heap
