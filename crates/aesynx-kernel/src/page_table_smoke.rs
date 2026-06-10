@@ -28,6 +28,7 @@ pub struct PageTableSmokeStatus {
     pub local_range_ok: bool,
     pub kernel_space_range_ok: bool,
     pub user_space_range_ok: bool,
+    pub no_user_space_ok: bool,
     pub no_executable_ok: bool,
     pub no_writable_ok: bool,
     pub no_device_ok: bool,
@@ -230,6 +231,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .ensure_kernel_space_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
     mapper
+        .ensure_no_user_space_mappings()
+        .map_err(PageTableSmokeError::Mapper)?;
+    mapper
         .ensure_no_user_mappings()
         .map_err(PageTableSmokeError::Mapper)?;
     let mut visited_range_pages = 0u64;
@@ -370,6 +374,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         local_range_ok: true,
         kernel_space_range_ok: true,
         user_space_range_ok: true,
+        no_user_space_ok: true,
         no_executable_ok: true,
         no_writable_ok: true,
         no_device_ok: true,
