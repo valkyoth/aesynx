@@ -11,8 +11,9 @@ pub use frame_allocator::{
     FrameRegionKind, FrameState,
 };
 pub use page_table::{
-    MapOutcome, PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageMapping, PageTableError,
-    PageTableMapper, PageTableStatus, ProtectOutcome, TlbFlush, UnmapOutcome, X86_64PageTableEntry,
+    MapOutcome, MapRangeOutcome, PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageMapping,
+    PageTableError, PageTableMapper, PageTableStatus, ProtectOutcome, TlbFlush, UnmapOutcome,
+    UnmapRangeOutcome, X86_64PageTableEntry,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

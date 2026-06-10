@@ -5,6 +5,7 @@ use crate::GenericPageFlags;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PageTableError {
     EmptyArena,
+    InvalidPageCount,
     InvalidVirtualAddress,
     InvalidPhysicalAddress,
     UnalignedVirtualAddress,
@@ -65,6 +66,29 @@ impl MapOutcome {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MapRangeOutcome {
+    pages: u64,
+    flush: TlbFlush,
+}
+
+impl MapRangeOutcome {
+    #[must_use]
+    pub const fn new(pages: u64, flush: TlbFlush) -> Self {
+        Self { pages, flush }
+    }
+
+    #[must_use]
+    pub const fn pages(self) -> u64 {
+        self.pages
+    }
+
+    #[must_use]
+    pub const fn flush(self) -> TlbFlush {
+        self.flush
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct UnmapOutcome {
     mapping: PageMapping,
     flush: TlbFlush,
@@ -79,6 +103,29 @@ impl UnmapOutcome {
     #[must_use]
     pub const fn mapping(self) -> PageMapping {
         self.mapping
+    }
+
+    #[must_use]
+    pub const fn flush(self) -> TlbFlush {
+        self.flush
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UnmapRangeOutcome {
+    pages: u64,
+    flush: TlbFlush,
+}
+
+impl UnmapRangeOutcome {
+    #[must_use]
+    pub const fn new(pages: u64, flush: TlbFlush) -> Self {
+        Self { pages, flush }
+    }
+
+    #[must_use]
+    pub const fn pages(self) -> u64 {
+        self.pages
     }
 
     #[must_use]

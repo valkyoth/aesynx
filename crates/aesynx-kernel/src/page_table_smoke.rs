@@ -8,6 +8,7 @@ pub struct PageTableSmokeStatus {
     pub mapping_lookup_ok: bool,
     pub protect_ok: bool,
     pub reclaim_ok: bool,
+    pub range_ok: bool,
     pub flush_page: bool,
 }
 
@@ -20,6 +21,8 @@ pub enum PageTableSmokeError {
 
 const SMOKE_VIRT: aesynx_abi::VirtAddr = aesynx_abi::VirtAddr::new(0xffff_9000_0000_0000);
 const SMOKE_PHYS: aesynx_abi::PhysAddr = aesynx_abi::PhysAddr::new(0x0020_0000);
+const SMOKE_RANGE_VIRT: aesynx_abi::VirtAddr = aesynx_abi::VirtAddr::new(0xffff_9000_0000_4000);
+const SMOKE_RANGE_PHYS: aesynx_abi::PhysAddr = aesynx_abi::PhysAddr::new(0x0020_4000);
 const SMOKE_OFFSET: u64 = 0x123;
 const SMOKE_PAGE_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 
@@ -75,15 +78,41 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
 
+    let range_map = mapper
+        .map_contiguous(SMOKE_RANGE_VIRT, SMOKE_RANGE_PHYS, 2, protected_flags)
+        .map_err(PageTableSmokeError::Mapper)?;
+    if range_map.pages() != 2 || range_map.flush() != aesynx_mm::TlbFlush::AddressSpace {
+        return Err(PageTableSmokeError::FlushMismatch);
+    }
+    if mapper.translate(aesynx_abi::VirtAddr::new(SMOKE_RANGE_VIRT.get() + 0x1000))
+        != Some(aesynx_abi::PhysAddr::new(SMOKE_RANGE_PHYS.get() + 0x1000))
+    {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+    let range_unmap = mapper
+        .unmap_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
+    if range_unmap.pages() != 2 || range_unmap.flush() != aesynx_mm::TlbFlush::AddressSpace {
+        return Err(PageTableSmokeError::FlushMismatch);
+    }
+    if mapper.translate(SMOKE_RANGE_VIRT).is_some() {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+    let after_range = mapper.status();
+    if after_range.used_tables != 1 || after_range.mapped_pages != 0 {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+
     Ok(PageTableSmokeStatus {
         total_tables: after_unmap.total_tables,
-        used_tables: after_unmap.used_tables,
+        used_tables: after_range.used_tables,
         mapped_pages_before_unmap: before_unmap.mapped_pages,
-        mapped_pages_after_unmap: after_unmap.mapped_pages,
+        mapped_pages_after_unmap: after_range.mapped_pages,
         translate_offset_ok: true,
         mapping_lookup_ok: true,
         protect_ok: true,
         reclaim_ok: true,
+        range_ok: true,
         flush_page: true,
     })
 }

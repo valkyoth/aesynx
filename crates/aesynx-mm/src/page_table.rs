@@ -3,12 +3,13 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{FRAME_SIZE, GenericPageFlags};
 
 mod address;
+mod range;
 mod types;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
 pub use types::{
-    MapOutcome, PageMapping, PageTableError, PageTableStatus, ProtectOutcome, TlbFlush,
-    UnmapOutcome,
+    MapOutcome, MapRangeOutcome, PageMapping, PageTableError, PageTableStatus, ProtectOutcome,
+    TlbFlush, UnmapOutcome, UnmapRangeOutcome,
 };
 
 pub const PAGE_TABLE_ENTRIES: usize = 512;
