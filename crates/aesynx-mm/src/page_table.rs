@@ -12,6 +12,7 @@ mod range;
 mod range_policy;
 mod range_translation;
 mod report;
+mod root;
 mod status;
 mod summary;
 mod types;

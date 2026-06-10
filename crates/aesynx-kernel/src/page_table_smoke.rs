@@ -5,6 +5,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_pages_before_unmap: u64,
     pub mapped_pages_after_unmap: u64,
     pub root_ok: bool,
+    pub checked_root_ok: bool,
     pub checked_status_ok: bool,
     pub translate_offset_ok: bool,
     pub checked_translate_ok: bool,
@@ -59,6 +60,14 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     let mut mapper = aesynx_mm::PageTableMapper::<SMOKE_PAGE_TABLES>::new()
         .map_err(PageTableSmokeError::Mapper)?;
     if mapper.root_table().table_index() != 0 {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+    if mapper
+        .root_table_checked()
+        .map_err(PageTableSmokeError::Mapper)?
+        .table_index()
+        != 0
+    {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite);
@@ -309,6 +318,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_pages_before_unmap: before_unmap.mapped_pages,
         mapped_pages_after_unmap: after_range.mapped_pages,
         root_ok: true,
+        checked_root_ok: true,
         checked_status_ok: true,
         translate_offset_ok: true,
         checked_translate_ok: true,
