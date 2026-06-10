@@ -175,6 +175,16 @@ impl PageTableSlot {
 
         Some(PageMapping::new(phys, flags))
     }
+
+    fn leaf_mapping(self) -> Result<PageMapping, PageTableError> {
+        if self.is_empty() {
+            return Err(PageTableError::NotMapped);
+        }
+        if self.is_next() {
+            return Err(PageTableError::CorruptTable);
+        }
+        self.mapping().ok_or(PageTableError::CorruptTable)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -254,7 +264,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let path = self.table_path(indices)?;
         let table_index = path[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
-        let mapping = slot.mapping().ok_or(PageTableError::NotMapped)?;
+        let mapping = slot.leaf_mapping()?;
         let mapped_pages = self
             .mapped_pages
             .checked_sub(1)
@@ -277,7 +287,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let indices = page_indices(virt);
         let table_index = self.table_path(indices)?[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
-        let previous = slot.mapping().ok_or(PageTableError::NotMapped)?;
+        let previous = slot.leaf_mapping()?;
         let current = PageMapping::new(previous.phys(), flags);
         let replacement = PageTableSlot::leaf(current)?;
         *slot = replacement;
@@ -393,9 +403,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     fn mapping_for_address(&self, virt: VirtAddr) -> Result<PageMapping, PageTableError> {
         let indices = page_indices(virt);
         let table_index = self.table_path(indices)?[PAGE_TABLE_LEVELS - 1];
-        self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]]
-            .mapping()
-            .ok_or(PageTableError::NotMapped)
+        self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]].leaf_mapping()
     }
 
     fn table_path(

@@ -535,6 +535,8 @@ Deliverables:
 - Read-only consistency audit for reachable tables and mapped-page accounting.
 - Redacted mapping summaries for page classes without reporting physical
   addresses.
+- Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
+  checks.
 - Kernel-only mapping policy check for candidate kernel address spaces.
 - No-executable mapping policy check for candidate data-only address spaces.
 - No-writable mapping policy check for candidate read-only address spaces.
@@ -570,10 +572,10 @@ Verification:
   mapped-range checks, permission changes, unmap, empty-table reclamation,
   sibling preservation, double-map rejection, invalid address rejection, atomic
   capacity failure, mapping visitor behavior, mapping visitor corruption
-  rejection, kernel-range policy checks, user-range policy checks,
-  write-protected range checks, non-executable range checks, executable range
-  checks, normal-memory range checks, local range checks, kernel-space range
-  checks, user-space range checks, no-executable policy checks, no-writable
+  rejection, malformed leaf rejection, kernel-range policy checks, user-range
+  policy checks, write-protected range checks, non-executable range checks,
+  executable range checks, normal-memory range checks, local range checks,
+  kernel-space range checks, user-space range checks, no-executable policy checks, no-writable
   policy checks, no-device policy checks, no-global policy checks, no-alias
   policy checks, kernel-only policy checks, redacted mapping summaries, range
   permission verification, invalid range flag validation, consistency audit

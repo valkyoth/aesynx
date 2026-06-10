@@ -5,6 +5,7 @@ const KERNEL_PHYS: PhysAddr = PhysAddr::new(0x0020_0000);
 
 mod alias_policy;
 mod audit;
+mod leaf_corruption;
 mod mapper;
 mod policy;
 mod presence;
