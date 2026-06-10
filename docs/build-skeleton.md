@@ -64,7 +64,7 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
 `page-table total_tables=`, `checked_translate_ok=true`,
 `mapping_lookup_ok=true`, `presence_ok=true`, `protect_ok=true`,
-`protect_range_ok=true`, `range_lookup_ok=true`,
+`protect_range_ok=true`, `range_lookup_ok=true`, `range_translate_ok=true`,
 `mapped_range_ok=true`, `unmapped_range_ok=true`, `audit_ok=true`,
 `kernel_range_ok=true`, `user_range_ok=true`, `write_protected_range_ok=true`,
 `non_executable_range_ok=true`, `executable_range_ok=true`,
@@ -114,12 +114,12 @@ usable, reserved, and frame counts. It seeds a bounded early bitmap allocator
 from a usable memory-map window and verifies one-frame allocation/free,
 contiguous allocation/free, debug state, and double-free detection. It also
 exercises a bounded x86_64-shaped page-table mapper model with map, checked
-translation, permission lookup, contiguous range lookup, permission change,
-translate, contiguous range map/protect/unmap, unmapped range checks, read-only
-mapping visit, virtual range permission verification, kernel-space and
-user-space virtual range policy, no-alias policy, fail-closed malformed leaf
-decoding, unmap, consistency audit, empty-table reclamation, and explicit TLB
-flush targets. It does not claim
+translation, checked byte-range translation, permission lookup, contiguous
+range lookup, permission change, translate, contiguous range map/protect/unmap,
+unmapped range checks, read-only mapping visit, virtual range permission
+verification, kernel-space and user-space virtual range policy, no-alias
+policy, fail-closed malformed leaf decoding, unmap, consistency audit,
+empty-table reclamation, and explicit TLB flush targets. It does not claim
 active CR3 replacement, production page-table
 ownership, APIC MMIO activation, global physical-memory ownership, heap
 allocation, page-fault recovery, a calibrated production clock service,

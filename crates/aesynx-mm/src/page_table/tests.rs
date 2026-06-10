@@ -14,6 +14,7 @@ mod range_address_policy;
 mod range_policy;
 mod range_presence;
 mod range_privilege_policy;
+mod range_translation;
 mod raw;
 mod summary;
 mod walk;

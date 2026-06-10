@@ -7,6 +7,7 @@ mod audit;
 mod policy;
 mod presence;
 mod range;
+mod range_translation;
 mod summary;
 mod types;
 mod walk;
@@ -15,7 +16,7 @@ use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, valid
 pub use types::{
     MapOutcome, MapRangeOutcome, PageMapping, PageRangeMapping, PageTableAudit, PageTableError,
     PageTableMapping, PageTableMappingSummary, PageTableStatus, ProtectOutcome,
-    ProtectRangeOutcome, TlbFlush, UnmapOutcome, UnmapRangeOutcome,
+    ProtectRangeOutcome, TlbFlush, TranslatedRange, UnmapOutcome, UnmapRangeOutcome,
 };
 
 pub const PAGE_TABLE_ENTRIES: usize = 512;

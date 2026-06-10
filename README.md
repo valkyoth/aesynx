@@ -63,9 +63,10 @@ one-frame allocation/free, contiguous allocation/free, debug state, and
 double-free detection before `[TEST] frame-allocator=ok`, then exercises a
 bounded x86_64-shaped page-table mapper model with map, contiguous range
 map/protect/unmap, permission lookup, contiguous range lookup, permission
-change, unmapped range checks, read-only mapping visit, virtual range permission
-verification, page-presence checks, mapped-range checks, kernel-only policy
-checks, kernel-range policy checks, user-range policy checks, write-protected range checks,
+change, unmapped range checks, read-only mapping visit, checked byte-range
+translation, virtual range permission verification, page-presence checks,
+mapped-range checks, kernel-only policy checks, kernel-range policy checks,
+user-range policy checks, write-protected range checks,
 non-executable range checks, executable range checks, normal-memory range
 checks, no-executable address-space policy checks, no-writable address-space
 policy checks, no-device address-space policy checks, no-global address-space
@@ -101,7 +102,7 @@ interrupt, and then disables the smoke IRQ.
 | Monotonic time and sleeps | Tagged | `v0.12.0`; converts timer ticks into monotonic instants, schedules a bounded sleep request, and verifies `timer delayed-log`, `[TEST] sleep=ok`, and `[TEST] timer=ok`. |
 | Physical memory map | Tagged | `v0.13.0`; rejects invalid/overlapping regions and reports checked total/usable/reserved bytes, frame counts, and kernel/bootloader reserved accounting with `[TEST] memory-map=ok`. |
 | Bitmap frame allocator | Tagged | `v0.14.0`; safe `aesynx-mm` bitmap allocator model plus QEMU smoke for bounded early alloc/free, contiguous allocation, debug states, double-free detection, and atomic failure behavior with `[TEST] frame-allocator=ok`. |
-| Page table mapper | Active candidate | `v0.15.0`; safe bounded `aesynx-mm` page-table mapper model with x86_64-shaped tables, map/unmap/translate, checked translation, contiguous range map/protect/unmap plus lookup, upfront range validation, bounded range walks, unmapped range checks, mapped-range checks, page-presence checks, kernel-only policy checks, no-executable policy checks, no-writable policy checks, no-device policy checks, no-global policy checks, no-physical-alias policy checks, kernel-range policy checks, user-range policy checks, write-protected range checks, non-executable range checks, executable range checks, normal-memory range checks, local range checks, high-half kernel-space checks, low-half user-space checks, read-only mapping visit, redacted mapping summaries, virtual range permission verification, fail-closed leaf decoding, permission lookup/change, consistency audit, empty-table reclamation, explicit TLB flush targets, and QEMU smoke with `[TEST] page-table=ok`. |
+| Page table mapper | Active candidate | `v0.15.0`; safe bounded `aesynx-mm` page-table mapper model with x86_64-shaped tables, map/unmap/translate, checked translation, checked contiguous byte-range translation, contiguous range map/protect/unmap plus lookup, upfront range validation, bounded range walks, unmapped range checks, mapped-range checks, page-presence checks, kernel-only policy checks, no-executable policy checks, no-writable policy checks, no-device policy checks, no-global policy checks, no-physical-alias policy checks, kernel-range policy checks, user-range policy checks, write-protected range checks, non-executable range checks, executable range checks, normal-memory range checks, local range checks, high-half kernel-space checks, low-half user-space checks, read-only mapping visit, redacted mapping summaries, virtual range permission verification, fail-closed leaf decoding, permission lookup/change, consistency audit, empty-table reclamation, explicit TLB flush targets, and QEMU smoke with `[TEST] page-table=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |

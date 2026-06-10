@@ -403,7 +403,9 @@ fn validate_virtual_space(
     Ok(())
 }
 
-fn validate_range_walk<const TABLES: usize>(page_count: u64) -> Result<(), PageTableError> {
+pub(super) fn validate_range_walk<const TABLES: usize>(
+    page_count: u64,
+) -> Result<(), PageTableError> {
     let max_pages = (TABLES as u64)
         .checked_mul(super::PAGE_TABLE_ENTRIES as u64)
         .ok_or(PageTableError::AddressOverflow)?;
@@ -431,7 +433,7 @@ fn virtual_space(virt: VirtAddr) -> VirtualSpace {
     }
 }
 
-fn add_pages_to_virt(virt: VirtAddr, pages: u64) -> Result<VirtAddr, PageTableError> {
+pub(super) fn add_pages_to_virt(virt: VirtAddr, pages: u64) -> Result<VirtAddr, PageTableError> {
     let offset = pages
         .checked_mul(FRAME_SIZE)
         .ok_or(PageTableError::AddressOverflow)?;
@@ -441,7 +443,7 @@ fn add_pages_to_virt(virt: VirtAddr, pages: u64) -> Result<VirtAddr, PageTableEr
         .ok_or(PageTableError::AddressOverflow)
 }
 
-fn add_pages_to_phys(phys: PhysAddr, pages: u64) -> Result<PhysAddr, PageTableError> {
+pub(super) fn add_pages_to_phys(phys: PhysAddr, pages: u64) -> Result<PhysAddr, PageTableError> {
     let offset = pages
         .checked_mul(FRAME_SIZE)
         .ok_or(PageTableError::AddressOverflow)?;

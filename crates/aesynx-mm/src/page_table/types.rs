@@ -6,6 +6,7 @@ use crate::GenericPageFlags;
 pub enum PageTableError {
     EmptyArena,
     InvalidPageCount,
+    InvalidByteCount,
     InvalidVirtualAddress,
     InvalidPhysicalAddress,
     UnalignedVirtualAddress,
@@ -96,6 +97,51 @@ impl PageRangeMapping {
     #[must_use]
     pub const fn start_phys(self) -> PhysAddr {
         self.start_phys
+    }
+
+    #[must_use]
+    pub const fn pages(self) -> u64 {
+        self.pages
+    }
+
+    #[must_use]
+    pub const fn flags(self) -> GenericPageFlags {
+        self.flags
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TranslatedRange {
+    start_phys: PhysAddr,
+    byte_len: u64,
+    pages: u64,
+    flags: GenericPageFlags,
+}
+
+impl TranslatedRange {
+    #[must_use]
+    pub const fn new(
+        start_phys: PhysAddr,
+        byte_len: u64,
+        pages: u64,
+        flags: GenericPageFlags,
+    ) -> Self {
+        Self {
+            start_phys,
+            byte_len,
+            pages,
+            flags,
+        }
+    }
+
+    #[must_use]
+    pub const fn start_phys(self) -> PhysAddr {
+        self.start_phys
+    }
+
+    #[must_use]
+    pub const fn byte_len(self) -> u64 {
+        self.byte_len
     }
 
     #[must_use]
