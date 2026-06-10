@@ -231,3 +231,48 @@ pub struct PageTableStatus {
     pub used_tables: u64,
     pub mapped_pages: u64,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PageTableAudit {
+    total_tables: u64,
+    used_tables: u64,
+    reachable_tables: u64,
+    mapped_pages: u64,
+}
+
+impl PageTableAudit {
+    #[must_use]
+    pub const fn new(
+        total_tables: u64,
+        used_tables: u64,
+        reachable_tables: u64,
+        mapped_pages: u64,
+    ) -> Self {
+        Self {
+            total_tables,
+            used_tables,
+            reachable_tables,
+            mapped_pages,
+        }
+    }
+
+    #[must_use]
+    pub const fn total_tables(self) -> u64 {
+        self.total_tables
+    }
+
+    #[must_use]
+    pub const fn used_tables(self) -> u64 {
+        self.used_tables
+    }
+
+    #[must_use]
+    pub const fn reachable_tables(self) -> u64 {
+        self.reachable_tables
+    }
+
+    #[must_use]
+    pub const fn mapped_pages(self) -> u64 {
+        self.mapped_pages
+    }
+}

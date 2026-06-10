@@ -528,16 +528,18 @@ Deliverables:
 - Map/unmap/translate plus read-only mapping lookup and checked permission
   changes for 4 KiB pages.
 - Empty intermediate table reclamation after unmap.
+- Read-only consistency audit for reachable tables and mapped-page accounting.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
 - QEMU smoke for map, mapping lookup, permission change, translated offset,
-  unmap, reclamation, and flush target checks.
+  unmap, audit, reclamation, and flush target checks.
 
 Verification:
 
 - Host tests for map, translate, mapping lookup, permission changes, unmap,
   empty-table reclamation, sibling preservation, double-map rejection, invalid
-  address rejection, atomic capacity failure, and x86_64 entry flag encoding.
+  address rejection, atomic capacity failure, consistency audit failures, and
+  x86_64 entry flag encoding.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:
