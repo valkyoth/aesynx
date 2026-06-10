@@ -65,8 +65,9 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `page-table total_tables=`, `mapping_lookup_ok=true`, `presence_ok=true`,
 `protect_ok=true`, `protect_range_ok=true`, `range_lookup_ok=true`,
 `mapped_range_ok=true`, `unmapped_range_ok=true`, `audit_ok=true`,
-`kernel_range_ok=true`, `kernel_only_ok=true`, `visit_ok=true`,
-`flags_ok=true`, `reclaim_ok=true`, `range_ok=true`, `[TEST] page-table=ok`,
+`kernel_range_ok=true`, `write_protected_range_ok=true`,
+`kernel_only_ok=true`, `visit_ok=true`, `flags_ok=true`, `reclaim_ok=true`,
+`range_ok=true`, `[TEST] page-table=ok`,
 `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate

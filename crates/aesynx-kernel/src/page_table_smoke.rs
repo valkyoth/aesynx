@@ -13,6 +13,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_range_ok: bool,
     pub unmapped_range_ok: bool,
     pub kernel_range_ok: bool,
+    pub write_protected_range_ok: bool,
     pub kernel_only_ok: bool,
     pub audit_ok: bool,
     pub visit_ok: bool,
@@ -144,6 +145,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .ensure_kernel_mapped_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
     mapper
+        .ensure_write_protected_contiguous(SMOKE_RANGE_VIRT, 2)
+        .map_err(PageTableSmokeError::Mapper)?;
+    mapper
         .ensure_no_user_mappings()
         .map_err(PageTableSmokeError::Mapper)?;
     let mut visited_range_pages = 0u64;
@@ -211,6 +215,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_range_ok: true,
         unmapped_range_ok: true,
         kernel_range_ok: true,
+        write_protected_range_ok: true,
         kernel_only_ok: true,
         audit_ok: true,
         visit_ok: true,
