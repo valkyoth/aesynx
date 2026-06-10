@@ -4,6 +4,7 @@ use crate::{FRAME_SIZE, GenericPageFlags};
 
 mod address;
 mod audit;
+mod presence;
 mod range;
 mod types;
 mod walk;

@@ -5,6 +5,7 @@ const KERNEL_PHYS: PhysAddr = PhysAddr::new(0x0020_0000);
 
 mod audit;
 mod mapper;
+mod presence;
 mod range;
 mod raw;
 mod walk;

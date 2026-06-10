@@ -6,6 +6,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_pages_after_unmap: u64,
     pub translate_offset_ok: bool,
     pub mapping_lookup_ok: bool,
+    pub presence_ok: bool,
     pub protect_ok: bool,
     pub protect_range_ok: bool,
     pub range_lookup_ok: bool,
@@ -37,6 +38,12 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .map_err(PageTableSmokeError::Mapper)?;
     let flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite);
     let protected_flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadOnly);
+    if mapper
+        .is_page_mapped(SMOKE_VIRT)
+        .map_err(PageTableSmokeError::Mapper)?
+    {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
     let map = mapper
         .map_page(SMOKE_VIRT, SMOKE_PHYS, flags)
         .map_err(PageTableSmokeError::Mapper)?;
@@ -54,6 +61,12 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .mapping_for_page(SMOKE_VIRT)
         .map_err(PageTableSmokeError::Mapper)?;
     if mapping.phys() != SMOKE_PHYS || mapping.flags() != flags {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+    if !mapper
+        .is_page_mapped(SMOKE_VIRT)
+        .map_err(PageTableSmokeError::Mapper)?
+    {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let protect = mapper
@@ -77,6 +90,12 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     if mapper.translate(SMOKE_VIRT).is_some() {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+    if mapper
+        .is_page_mapped(SMOKE_VIRT)
+        .map_err(PageTableSmokeError::Mapper)?
+    {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let after_unmap = mapper.status();
@@ -170,6 +189,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_pages_after_unmap: after_range.mapped_pages,
         translate_offset_ok: true,
         mapping_lookup_ok: true,
+        presence_ok: true,
         protect_ok: true,
         protect_range_ok: true,
         range_lookup_ok: true,
