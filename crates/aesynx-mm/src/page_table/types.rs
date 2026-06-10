@@ -6,6 +6,7 @@ use crate::GenericPageFlags;
 pub enum PageTableError {
     EmptyArena,
     EmptyAddressSpace,
+    IncompleteAddressSpace,
     InvalidPageCount,
     InvalidByteCount,
     InvalidVirtualAddress,

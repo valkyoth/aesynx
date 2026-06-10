@@ -168,6 +168,20 @@ fn mapper_user_candidate_preflight_rejects_empty_address_space() -> Result<(), P
 }
 
 #[test]
+fn mapper_user_candidate_preflight_rejects_kernel_only_address_space() -> Result<(), PageTableError>
+{
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::IncompleteAddressSpace);
+    Ok(())
+}
+
+#[test]
 fn mapper_user_candidate_preflight_rejects_high_half_user_mappings() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
@@ -227,7 +241,12 @@ fn mapper_user_candidate_preflight_rejects_device_mappings() -> Result<(), PageT
 
 #[test]
 fn mapper_user_candidate_preflight_rejects_global_mappings() -> Result<(), PageTableError> {
-    let mut mapper = PageTableMapper::<4>::new()?;
+    let mut mapper = PageTableMapper::<8>::new()?;
+    mapper.map_page(
+        USER_VIRT,
+        PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
+        GenericPageFlags::user(PageAccess::ReadOnly),
+    )?;
     let global = GenericPageFlags::kernel(PageAccess::ReadOnly)
         .with_global()
         .map_err(|_error| PageTableError::InvalidMappingFlags)?;

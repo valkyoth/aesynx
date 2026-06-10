@@ -14,6 +14,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let audit = self.checked_candidate_audit()?;
         self.ensure_no_kernel_space_user_mappings()?;
         self.ensure_no_user_space_kernel_mappings()?;
+        self.ensure_user_candidate_has_user_mappings()?;
         self.ensure_no_device_mappings()?;
         self.ensure_no_global_mappings()?;
         self.ensure_no_physical_aliases()?;
@@ -34,5 +35,25 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             return Err(PageTableError::EmptyAddressSpace);
         }
         Ok(audit)
+    }
+
+    fn ensure_user_candidate_has_user_mappings(&self) -> Result<(), PageTableError> {
+        let mut has_user_mapping = false;
+        self.visit_mappings(|entry| {
+            if entry.virt().get() >> 47 == 0
+                && matches!(
+                    entry.mapping().flags().privilege,
+                    crate::PagePrivilege::User
+                )
+            {
+                has_user_mapping = true;
+            }
+            Ok(())
+        })?;
+        if has_user_mapping {
+            Ok(())
+        } else {
+            Err(PageTableError::IncompleteAddressSpace)
+        }
     }
 }
