@@ -30,11 +30,6 @@ impl X86_64PageTableEntry {
         | Self::NO_EXECUTE
         | Self::ADDRESS_MASK;
 
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self { raw: 0 }
-    }
-
     pub fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
         validate_phys(mapping.phys())?;
         if mapping.flags().is_device_memory() && mapping.flags().access.executable() {
