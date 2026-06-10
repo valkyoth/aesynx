@@ -243,6 +243,15 @@ fn raw_slot_decode_rejects_user_global_corruption() {
 }
 
 #[test]
+fn raw_slot_decode_rejects_executable_device_corruption() {
+    let slot = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 4),
+    };
+
+    assert_eq!(slot.mapping(), None);
+}
+
+#[test]
 fn raw_slot_decode_ignores_empty_and_next_slots() -> Result<(), PageTableError> {
     assert_eq!(PageTableSlot::EMPTY.mapping(), None);
     assert_eq!(PageTableSlot::next(1)?.mapping(), None);

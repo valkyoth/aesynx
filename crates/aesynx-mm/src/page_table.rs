@@ -207,7 +207,13 @@ impl PageTableSlot {
         let phys = PhysAddr::new(self.raw & X86_64PageTableEntry::ADDRESS_MASK);
         let writable = self.raw & X86_64PageTableEntry::WRITABLE != 0;
         let executable = self.raw & X86_64PageTableEntry::NO_EXECUTE == 0;
+        let device_memory = self.raw
+            & (X86_64PageTableEntry::WRITE_THROUGH | X86_64PageTableEntry::CACHE_DISABLE)
+            != 0;
         if writable && executable {
+            return None;
+        }
+        if device_memory && executable {
             return None;
         }
         let access = if writable {
@@ -222,9 +228,7 @@ impl PageTableSlot {
         } else {
             GenericPageFlags::kernel(access)
         };
-        if self.raw & (X86_64PageTableEntry::WRITE_THROUGH | X86_64PageTableEntry::CACHE_DISABLE)
-            != 0
-        {
+        if device_memory {
             flags = flags.device();
         }
         if self.raw & X86_64PageTableEntry::GLOBAL != 0 {
