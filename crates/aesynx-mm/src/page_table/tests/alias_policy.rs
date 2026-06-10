@@ -96,3 +96,19 @@ fn mapper_alias_check_rejects_accounting_drift() -> Result<(), PageTableError> {
     );
     Ok(())
 }
+
+#[test]
+fn mapper_alias_check_reports_corruption_before_alias() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    let alias_virt = VirtAddr::new(KERNEL_VIRT.get() + 0x4000);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
+    mapper.map_page(alias_virt, KERNEL_PHYS, flags)?;
+    mapper.mapped_pages = 1;
+
+    assert_eq!(
+        mapper.ensure_no_physical_aliases(),
+        Err(PageTableError::CorruptTable)
+    );
+    Ok(())
+}

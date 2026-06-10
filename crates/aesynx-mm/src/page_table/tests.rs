@@ -7,6 +7,7 @@ mod alias_policy;
 mod audit;
 mod leaf_corruption;
 mod mapper;
+mod mapping_policy;
 mod policy;
 mod preflight;
 mod presence;
