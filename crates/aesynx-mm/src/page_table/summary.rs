@@ -4,7 +4,7 @@ use super::{PageTableError, PageTableMapper, PageTableMappingSummary};
 
 impl<const TABLES: usize> PageTableMapper<TABLES> {
     pub fn mapping_summary(&self) -> Result<PageTableMappingSummary, PageTableError> {
-        let mut summary = PageTableMappingSummary::default();
+        let mut summary = PageTableMappingSummary::empty();
         self.visit_mappings(|entry| {
             let flags = entry.mapping().flags();
             summary.total_pages = checked_increment(summary.total_pages)?;

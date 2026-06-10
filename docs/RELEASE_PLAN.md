@@ -544,6 +544,8 @@ Deliverables:
 - Read-only consistency audit for reachable tables and mapped-page accounting.
 - Redacted mapping summaries for page classes without reporting physical
   addresses.
+- Mapper-produced audit and mapping-summary reports are inspectable but not
+  externally constructible through public constructors.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Kernel-only mapping policy check for candidate kernel address spaces.

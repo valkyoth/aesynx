@@ -15,7 +15,7 @@ pub struct PageTableAudit {
 
 impl PageTableAudit {
     #[must_use]
-    pub const fn new(
+    pub(crate) const fn new(
         total_tables: u64,
         used_tables: u64,
         reachable_tables: u64,
@@ -50,7 +50,7 @@ impl PageTableAudit {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageTableMappingSummary {
     pub(crate) total_pages: u64,
     pub(crate) kernel_pages: u64,
@@ -63,23 +63,15 @@ pub struct PageTableMappingSummary {
 
 impl PageTableMappingSummary {
     #[must_use]
-    pub const fn new(
-        total_pages: u64,
-        kernel_pages: u64,
-        user_pages: u64,
-        writable_pages: u64,
-        executable_pages: u64,
-        global_pages: u64,
-        device_pages: u64,
-    ) -> Self {
+    pub(crate) const fn empty() -> Self {
         Self {
-            total_pages,
-            kernel_pages,
-            user_pages,
-            writable_pages,
-            executable_pages,
-            global_pages,
-            device_pages,
+            total_pages: 0,
+            kernel_pages: 0,
+            user_pages: 0,
+            writable_pages: 0,
+            executable_pages: 0,
+            global_pages: 0,
+            device_pages: 0,
         }
     }
 

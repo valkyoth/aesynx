@@ -3,9 +3,7 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{GenericPageFlags, PageAccess};
 
 use super::{KERNEL_PHYS, KERNEL_VIRT};
-use crate::page_table::{
-    PageMapping, PageTableError, PageTableMapper, PageTableMappingSummary, PageTableSlot,
-};
+use crate::page_table::{PageMapping, PageTableError, PageTableMapper, PageTableSlot};
 
 #[test]
 fn mapper_summarizes_mapping_classes_without_addresses() -> Result<(), PageTableError> {
@@ -31,10 +29,14 @@ fn mapper_summarizes_mapping_classes_without_addresses() -> Result<(), PageTable
     )?;
     let before = mapper;
 
-    assert_eq!(
-        mapper.mapping_summary(),
-        Ok(PageTableMappingSummary::new(4, 3, 1, 1, 1, 1, 1))
-    );
+    let summary = mapper.mapping_summary()?;
+    assert_eq!(summary.total_pages(), 4);
+    assert_eq!(summary.kernel_pages(), 3);
+    assert_eq!(summary.user_pages(), 1);
+    assert_eq!(summary.writable_pages(), 1);
+    assert_eq!(summary.executable_pages(), 1);
+    assert_eq!(summary.global_pages(), 1);
+    assert_eq!(summary.device_pages(), 1);
     assert_eq!(mapper, before);
     Ok(())
 }
@@ -43,10 +45,14 @@ fn mapper_summarizes_mapping_classes_without_addresses() -> Result<(), PageTable
 fn mapper_summary_reports_empty_arena() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
 
-    assert_eq!(
-        mapper.mapping_summary(),
-        Ok(PageTableMappingSummary::default())
-    );
+    let summary = mapper.mapping_summary()?;
+    assert_eq!(summary.total_pages(), 0);
+    assert_eq!(summary.kernel_pages(), 0);
+    assert_eq!(summary.user_pages(), 0);
+    assert_eq!(summary.writable_pages(), 0);
+    assert_eq!(summary.executable_pages(), 0);
+    assert_eq!(summary.global_pages(), 0);
+    assert_eq!(summary.device_pages(), 0);
     Ok(())
 }
 
