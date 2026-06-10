@@ -13,6 +13,7 @@ mod preflight;
 mod presence;
 mod range;
 mod range_address_policy;
+mod range_audit;
 mod range_policy;
 mod range_presence;
 mod range_privilege_policy;

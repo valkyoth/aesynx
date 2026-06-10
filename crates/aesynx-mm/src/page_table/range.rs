@@ -46,6 +46,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<PageRangeMapping, PageTableError> {
         validate_virt_range(virt, page_count)?;
         validate_range_walk::<TABLES>(page_count)?;
+        self.audit()?;
 
         let first = self.mapping_for_page(virt)?;
         let flags = first.flags();
@@ -70,6 +71,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<(), PageTableError> {
         validate_virt_range(virt, page_count)?;
         validate_range_walk::<TABLES>(page_count)?;
+        self.audit()?;
 
         let mut offset = 0u64;
         while offset < page_count {
@@ -91,6 +93,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<(), PageTableError> {
         validate_virt_range(virt, page_count)?;
         validate_range_walk::<TABLES>(page_count)?;
+        self.audit()?;
 
         let mut offset = 0u64;
         while offset < page_count {
@@ -112,6 +115,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         validate_virt_range(virt, page_count)?;
         validate_flags(flags)?;
         validate_range_walk::<TABLES>(page_count)?;
+        self.audit()?;
 
         let mut offset = 0u64;
         while offset < page_count {
