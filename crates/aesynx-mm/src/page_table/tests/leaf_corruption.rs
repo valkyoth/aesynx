@@ -15,6 +15,11 @@ fn mapper_lookup_rejects_corrupt_leaf_slot() -> Result<(), PageTableError> {
         mapper.is_page_mapped(KERNEL_VIRT),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(
+        mapper.translate_checked(KERNEL_VIRT),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper.translate(KERNEL_VIRT), None);
     assert_eq!(mapper.status().mapped_pages, 1);
     Ok(())
 }

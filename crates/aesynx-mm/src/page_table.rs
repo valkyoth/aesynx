@@ -299,12 +299,22 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     }
 
     pub fn translate(&self, virt: VirtAddr) -> Option<PhysAddr> {
+        self.translate_checked(virt).ok()
+    }
+
+    pub fn translate_checked(&self, virt: VirtAddr) -> Result<PhysAddr, PageTableError> {
         if !is_canonical(virt.get()) {
-            return None;
+            return Err(PageTableError::InvalidVirtualAddress);
         }
-        let mapping = self.mapping_for_address(virt).ok()?;
+        let page = VirtAddr::new(virt.get() & !PAGE_OFFSET_MASK);
+        let mapping = self.mapping_for_page(page)?;
         let offset = virt.get() & PAGE_OFFSET_MASK;
-        mapping.phys().get().checked_add(offset).map(PhysAddr::new)
+        mapping
+            .phys()
+            .get()
+            .checked_add(offset)
+            .map(PhysAddr::new)
+            .ok_or(PageTableError::AddressOverflow)
     }
 
     pub fn mapping_for_page(&self, virt: VirtAddr) -> Result<PageMapping, PageTableError> {

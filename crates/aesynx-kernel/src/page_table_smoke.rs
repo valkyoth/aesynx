@@ -5,6 +5,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_pages_before_unmap: u64,
     pub mapped_pages_after_unmap: u64,
     pub translate_offset_ok: bool,
+    pub checked_translate_ok: bool,
     pub mapping_lookup_ok: bool,
     pub presence_ok: bool,
     pub protect_ok: bool,
@@ -73,6 +74,12 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         .translate(aesynx_abi::VirtAddr::new(SMOKE_VIRT.get() + SMOKE_OFFSET))
         .ok_or(PageTableSmokeError::UnexpectedTranslation)?;
     if translated != aesynx_abi::PhysAddr::new(SMOKE_PHYS.get() + SMOKE_OFFSET) {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
+    let checked_translated = mapper
+        .translate_checked(aesynx_abi::VirtAddr::new(SMOKE_VIRT.get() + SMOKE_OFFSET))
+        .map_err(PageTableSmokeError::Mapper)?;
+    if checked_translated != aesynx_abi::PhysAddr::new(SMOKE_PHYS.get() + SMOKE_OFFSET) {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     let mapping = mapper
@@ -277,6 +284,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_pages_before_unmap: before_unmap.mapped_pages,
         mapped_pages_after_unmap: after_range.mapped_pages,
         translate_offset_ok: true,
+        checked_translate_ok: true,
         mapping_lookup_ok: true,
         presence_ok: true,
         protect_ok: true,

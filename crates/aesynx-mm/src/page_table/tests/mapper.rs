@@ -25,6 +25,10 @@ fn mapper_maps_and_translates_page() -> Result<(), PageTableError> {
         mapper.translate(VirtAddr::new(KERNEL_VIRT.get() + 0x123)),
         Some(PhysAddr::new(KERNEL_PHYS.get() + 0x123))
     );
+    assert_eq!(
+        mapper.translate_checked(VirtAddr::new(KERNEL_VIRT.get() + 0x123)),
+        Ok(PhysAddr::new(KERNEL_PHYS.get() + 0x123))
+    );
     assert_eq!(mapper.status().mapped_pages, 1);
     assert_eq!(mapper.status().used_tables, PAGE_TABLE_LEVELS as u64);
     Ok(())
@@ -137,6 +141,10 @@ fn mapper_mapping_lookup_rejects_invalid_or_unmapped_pages() -> Result<(), PageT
     );
     assert_eq!(
         mapper.mapping_for_page(KERNEL_VIRT),
+        Err(PageTableError::NotMapped)
+    );
+    assert_eq!(
+        mapper.translate_checked(KERNEL_VIRT),
         Err(PageTableError::NotMapped)
     );
     Ok(())
@@ -262,6 +270,10 @@ fn mapper_rejects_noncanonical_and_unaligned_addresses() -> Result<(), PageTable
         Err(PageTableError::UnalignedPhysicalAddress)
     );
     assert_eq!(mapper.translate(VirtAddr::new(0x0000_8000_0000_0000)), None);
+    assert_eq!(
+        mapper.translate_checked(VirtAddr::new(0x0000_8000_0000_0000)),
+        Err(PageTableError::InvalidVirtualAddress)
+    );
     Ok(())
 }
 

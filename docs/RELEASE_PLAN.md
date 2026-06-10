@@ -525,8 +525,8 @@ Control virtual memory.
 Deliverables:
 
 - Safe bounded x86_64-shaped page-table mapper model.
-- Map/unmap/translate plus read-only mapping lookup and checked permission
-  changes for 4 KiB pages.
+- Map/unmap/translate plus checked translation, read-only mapping lookup, and
+  checked permission changes for 4 KiB pages.
 - Read-only mapping visitor for future policy checks.
 - Read-only virtual range permission verification without physical-contiguity
   assumptions.
@@ -556,8 +556,8 @@ Deliverables:
 - Low-half user-space virtual range policy check.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
-- QEMU smoke for map, mapping lookup, page-presence checks, mapped-range
-  checks, kernel-range policy checks, user-range policy checks,
+- QEMU smoke for map, checked translation, mapping lookup, page-presence checks,
+  mapped-range checks, kernel-range policy checks, user-range policy checks,
   write-protected range checks, non-executable range checks, executable range
   checks, normal-memory range checks, local range checks, kernel-space range
   checks, user-space range checks, no-executable policy checks, no-writable
@@ -568,18 +568,19 @@ Deliverables:
 
 Verification:
 
-- Host tests for map, translate, mapping lookup, page-presence checks,
-  mapped-range checks, permission changes, unmap, empty-table reclamation,
-  sibling preservation, double-map rejection, invalid address rejection, atomic
-  capacity failure, mapping visitor behavior, mapping visitor corruption
-  rejection, malformed leaf rejection, kernel-range policy checks, user-range
-  policy checks, write-protected range checks, non-executable range checks,
-  executable range checks, normal-memory range checks, local range checks,
-  kernel-space range checks, user-space range checks, no-executable policy checks, no-writable
-  policy checks, no-device policy checks, no-global policy checks, no-alias
-  policy checks, kernel-only policy checks, redacted mapping summaries, range
-  permission verification, invalid range flag validation, consistency audit
-  failures, and x86_64 entry flag encode/decode validation.
+- Host tests for map, translate, checked translation, mapping lookup,
+  page-presence checks, mapped-range checks, permission changes, unmap,
+  empty-table reclamation, sibling preservation, double-map rejection, invalid
+  address rejection, atomic capacity failure, mapping visitor behavior, mapping
+  visitor corruption rejection, malformed leaf rejection, kernel-range policy
+  checks, user-range policy checks, write-protected range checks,
+  non-executable range checks, executable range checks, normal-memory range
+  checks, local range checks, kernel-space range checks, user-space range
+  checks, no-executable policy checks, no-writable policy checks, no-device
+  policy checks, no-global policy checks, no-alias policy checks, kernel-only
+  policy checks, redacted mapping summaries, range permission verification,
+  invalid range flag validation, consistency audit failures, and x86_64 entry
+  flag encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:
