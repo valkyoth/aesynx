@@ -42,9 +42,9 @@ fn mapper_kernel_candidate_preflight_rejects_user_mappings() -> Result<(), PageT
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
 
-    assert_eq!(
-        mapper.verify_kernel_address_space_candidate(),
-        Err(PageTableError::UnexpectedMappingFlags)
+    assert_kernel_candidate_rejects_without_mutation(
+        &mapper,
+        PageTableError::UnexpectedMappingFlags,
     );
     Ok(())
 }
@@ -58,9 +58,9 @@ fn mapper_kernel_candidate_preflight_rejects_low_half_mappings() -> Result<(), P
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
 
-    assert_eq!(
-        mapper.verify_kernel_address_space_candidate(),
-        Err(PageTableError::UnexpectedVirtualAddressSpace)
+    assert_kernel_candidate_rejects_without_mutation(
+        &mapper,
+        PageTableError::UnexpectedVirtualAddressSpace,
     );
     Ok(())
 }
@@ -79,10 +79,7 @@ fn mapper_kernel_candidate_preflight_rejects_physical_aliases() -> Result<(), Pa
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
 
-    assert_eq!(
-        mapper.verify_kernel_address_space_candidate(),
-        Err(PageTableError::PhysicalAlias)
-    );
+    assert_kernel_candidate_rejects_without_mutation(&mapper, PageTableError::PhysicalAlias);
     Ok(())
 }
 
@@ -95,9 +92,9 @@ fn mapper_kernel_candidate_preflight_rejects_device_mappings() -> Result<(), Pag
         GenericPageFlags::kernel(PageAccess::ReadOnly).device(),
     )?;
 
-    assert_eq!(
-        mapper.verify_kernel_address_space_candidate(),
-        Err(PageTableError::UnexpectedMappingFlags)
+    assert_kernel_candidate_rejects_without_mutation(
+        &mapper,
+        PageTableError::UnexpectedMappingFlags,
     );
     Ok(())
 }
@@ -109,10 +106,7 @@ fn mapper_kernel_candidate_preflight_rejects_corrupt_tables() -> Result<(), Page
     mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
     mapper.tables[0].slots[1] = PageTableSlot::next(1)?;
 
-    assert_eq!(
-        mapper.verify_kernel_address_space_candidate(),
-        Err(PageTableError::CorruptTable)
-    );
+    assert_kernel_candidate_rejects_without_mutation(&mapper, PageTableError::CorruptTable);
     Ok(())
 }
 
@@ -151,10 +145,7 @@ fn mapper_user_candidate_preflight_rejects_high_half_user_mappings() -> Result<(
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
 
-    assert_eq!(
-        mapper.verify_user_address_space_candidate(),
-        Err(PageTableError::UnexpectedMappingFlags)
-    );
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::UnexpectedMappingFlags);
     Ok(())
 }
 
@@ -168,10 +159,7 @@ fn mapper_user_candidate_preflight_rejects_low_half_kernel_mappings() -> Result<
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
 
-    assert_eq!(
-        mapper.verify_user_address_space_candidate(),
-        Err(PageTableError::UnexpectedMappingFlags)
-    );
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::UnexpectedMappingFlags);
     Ok(())
 }
 
@@ -189,10 +177,7 @@ fn mapper_user_candidate_preflight_rejects_physical_aliases() -> Result<(), Page
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
 
-    assert_eq!(
-        mapper.verify_user_address_space_candidate(),
-        Err(PageTableError::PhysicalAlias)
-    );
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::PhysicalAlias);
     Ok(())
 }
 
@@ -205,10 +190,7 @@ fn mapper_user_candidate_preflight_rejects_device_mappings() -> Result<(), PageT
         GenericPageFlags::user(PageAccess::ReadOnly).device(),
     )?;
 
-    assert_eq!(
-        mapper.verify_user_address_space_candidate(),
-        Err(PageTableError::UnexpectedMappingFlags)
-    );
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::UnexpectedMappingFlags);
     Ok(())
 }
 
@@ -220,10 +202,7 @@ fn mapper_user_candidate_preflight_rejects_global_mappings() -> Result<(), PageT
         .map_err(|_error| PageTableError::InvalidMappingFlags)?;
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, global)?;
 
-    assert_eq!(
-        mapper.verify_user_address_space_candidate(),
-        Err(PageTableError::UnexpectedMappingFlags)
-    );
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::UnexpectedMappingFlags);
     Ok(())
 }
 
@@ -234,9 +213,26 @@ fn mapper_user_candidate_preflight_rejects_corrupt_tables() -> Result<(), PageTa
     mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
     mapper.tables[0].slots[1] = PageTableSlot::next(1)?;
 
-    assert_eq!(
-        mapper.verify_user_address_space_candidate(),
-        Err(PageTableError::CorruptTable)
-    );
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::CorruptTable);
     Ok(())
+}
+
+fn assert_kernel_candidate_rejects_without_mutation<const TABLES: usize>(
+    mapper: &PageTableMapper<TABLES>,
+    error: PageTableError,
+) {
+    let before = *mapper;
+
+    assert_eq!(mapper.verify_kernel_address_space_candidate(), Err(error));
+    assert_eq!(*mapper, before);
+}
+
+fn assert_user_candidate_rejects_without_mutation<const TABLES: usize>(
+    mapper: &PageTableMapper<TABLES>,
+    error: PageTableError,
+) {
+    let before = *mapper;
+
+    assert_eq!(mapper.verify_user_address_space_candidate(), Err(error));
+    assert_eq!(*mapper, before);
 }

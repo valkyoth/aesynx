@@ -538,6 +538,8 @@ Deliverables:
   checked status, no-kernel-space-user-mapping, no-user-space-kernel-mapping,
   no-device, no-global, and no-physical-alias gates before future per-task
   address-space code can consume a mapper.
+- Kernel and user address-space candidate preflight success and failure paths
+  stay read-only against the mapper being verified.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.
