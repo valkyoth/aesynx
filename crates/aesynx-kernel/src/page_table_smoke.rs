@@ -17,6 +17,7 @@ pub struct PageTableSmokeStatus {
     pub non_executable_range_ok: bool,
     pub no_executable_ok: bool,
     pub no_writable_ok: bool,
+    pub no_device_ok: bool,
     pub kernel_only_ok: bool,
     pub audit_ok: bool,
     pub visit_ok: bool,
@@ -137,6 +138,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     mapper
         .ensure_no_writable_mappings()
         .map_err(PageTableSmokeError::Mapper)?;
+    mapper
+        .ensure_no_device_mappings()
+        .map_err(PageTableSmokeError::Mapper)?;
     let range_execute_flags =
         aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadExecute);
     let range_protect = mapper
@@ -231,6 +235,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         non_executable_range_ok: true,
         no_executable_ok: true,
         no_writable_ok: true,
+        no_device_ok: true,
         kernel_only_ok: true,
         audit_ok: true,
         visit_ok: true,

@@ -32,4 +32,14 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         })?;
         Ok(())
     }
+
+    pub fn ensure_no_device_mappings(&self) -> Result<(), PageTableError> {
+        self.visit_mappings(|entry| {
+            if entry.mapping().flags().is_device_memory() {
+                return Err(PageTableError::UnexpectedMappingFlags);
+            }
+            Ok(())
+        })?;
+        Ok(())
+    }
 }

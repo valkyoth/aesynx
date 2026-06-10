@@ -311,7 +311,7 @@ fn boot_entry() -> ! {
                     match page_table_smoke::run() {
                         Ok(status) => {
                             aesynx_arch_x86_64::serial_println!(
-                                "page-table total_tables={} used_tables={} mapped_before_unmap={} mapped_after_unmap={} translate_offset_ok={} mapping_lookup_ok={} presence_ok={} protect_ok={} protect_range_ok={} range_lookup_ok={} mapped_range_ok={} unmapped_range_ok={} kernel_range_ok={} write_protected_range_ok={} non_executable_range_ok={} no_executable_ok={} no_writable_ok={} kernel_only_ok={} audit_ok={} visit_ok={} flags_ok={} reclaim_ok={} range_ok={} flush_page={}",
+                                "page-table total_tables={} used_tables={} mapped_before_unmap={} mapped_after_unmap={} translate_offset_ok={} mapping_lookup_ok={} presence_ok={} protect_ok={} protect_range_ok={} range_lookup_ok={} mapped_range_ok={} unmapped_range_ok={} kernel_range_ok={} write_protected_range_ok={} non_executable_range_ok={} no_executable_ok={} no_writable_ok={} no_device_ok={} kernel_only_ok={} audit_ok={} visit_ok={} flags_ok={} reclaim_ok={} range_ok={} flush_page={}",
                                 status.total_tables,
                                 status.used_tables,
                                 status.mapped_pages_before_unmap,
@@ -329,6 +329,7 @@ fn boot_entry() -> ! {
                                 status.non_executable_range_ok,
                                 status.no_executable_ok,
                                 status.no_writable_ok,
+                                status.no_device_ok,
                                 status.kernel_only_ok,
                                 status.audit_ok,
                                 status.visit_ok,
