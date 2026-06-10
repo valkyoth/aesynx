@@ -53,6 +53,42 @@ fn mapper_unmaps_page_and_reports_flush() -> Result<(), PageTableError> {
 }
 
 #[test]
+fn mapper_reports_mapping_flags_without_mutation() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadExecute)
+        .with_global()
+        .map_err(|_error| PageTableError::InvalidMappingFlags)?;
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Ok(PageMapping::new(KERNEL_PHYS, flags))
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_mapping_lookup_rejects_invalid_or_unmapped_pages() -> Result<(), PageTableError> {
+    let mapper = PageTableMapper::<4>::new()?;
+
+    assert_eq!(
+        mapper.mapping_for_page(VirtAddr::new(0x0000_8000_0000_0000)),
+        Err(PageTableError::InvalidVirtualAddress)
+    );
+    assert_eq!(
+        mapper.mapping_for_page(VirtAddr::new(KERNEL_VIRT.get() + 1)),
+        Err(PageTableError::UnalignedVirtualAddress)
+    );
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Err(PageTableError::NotMapped)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_rejects_double_map_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(

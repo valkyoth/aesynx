@@ -5,6 +5,7 @@ pub struct PageTableSmokeStatus {
     pub mapped_pages_before_unmap: u64,
     pub mapped_pages_after_unmap: u64,
     pub translate_offset_ok: bool,
+    pub mapping_lookup_ok: bool,
     pub flush_page: bool,
 }
 
@@ -37,6 +38,12 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if translated != aesynx_abi::PhysAddr::new(SMOKE_PHYS.get() + SMOKE_OFFSET) {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    let mapping = mapper
+        .mapping_for_page(SMOKE_VIRT)
+        .map_err(PageTableSmokeError::Mapper)?;
+    if mapping.phys() != SMOKE_PHYS || mapping.flags() != flags {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
 
     let before_unmap = mapper.status();
     let unmap = mapper
@@ -59,6 +66,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         mapped_pages_before_unmap: before_unmap.mapped_pages,
         mapped_pages_after_unmap: after_unmap.mapped_pages,
         translate_offset_ok: true,
+        mapping_lookup_ok: true,
         flush_page: true,
     })
 }

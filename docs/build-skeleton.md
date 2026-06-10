@@ -62,8 +62,8 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `memory total_bytes=`,
 `memory usable_bytes=`, `memory reserved_bytes=`, `[TEST] memory-map=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
-`page-table total_tables=`, `[TEST] page-table=ok`, `[TEST] bootinfo=ok`, and
-`[TEST] boot=ok`.
+`page-table total_tables=`, `mapping_lookup_ok=true`, `[TEST] page-table=ok`,
+`[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
 `build/qemu/aesynx-v0.15.0-panic.iso`, enables the kernel `panic-smoke` feature,

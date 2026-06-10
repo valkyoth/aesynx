@@ -2,15 +2,14 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 
 use crate::{FRAME_SIZE, GenericPageFlags};
 
+mod address;
+
+use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
+
 pub const PAGE_TABLE_ENTRIES: usize = 512;
 pub const PAGE_TABLE_LEVELS: usize = 4;
 
-const PAGE_OFFSET_MASK: u64 = FRAME_SIZE - 1;
-const CANONICAL_LOW_END: u64 = 0x0000_7fff_ffff_ffff;
-const CANONICAL_HIGH_START: u64 = 0xffff_8000_0000_0000;
-const MAX_PHYSICAL_ADDR: u64 = 0x000f_ffff_ffff_ffff;
 const MAX_NEXT_TABLE_INDEX: u64 = X86_64PageTableEntry::ADDRESS_MASK >> 12;
-const LEVEL_SHIFTS: [u64; PAGE_TABLE_LEVELS] = [39, 30, 21, 12];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PageTableError {
@@ -313,11 +312,14 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         if !is_canonical(virt.get()) {
             return None;
         }
-        let indices = page_indices(virt);
-        let table_index = self.leaf_table_index(indices).ok()?;
-        let mapping = self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]].mapping()?;
+        let mapping = self.mapping_for_address(virt).ok()?;
         let offset = virt.get() & PAGE_OFFSET_MASK;
         mapping.phys().get().checked_add(offset).map(PhysAddr::new)
+    }
+
+    pub fn mapping_for_page(&self, virt: VirtAddr) -> Result<PageMapping, PageTableError> {
+        validate_virt_page(virt)?;
+        self.mapping_for_address(virt)
     }
 
     #[must_use]
@@ -430,39 +432,14 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     fn free_tables(&self) -> u64 {
         TABLES as u64 - self.used_tables()
     }
-}
 
-fn validate_virt_page(virt: VirtAddr) -> Result<(), PageTableError> {
-    if !is_canonical(virt.get()) {
-        return Err(PageTableError::InvalidVirtualAddress);
+    fn mapping_for_address(&self, virt: VirtAddr) -> Result<PageMapping, PageTableError> {
+        let indices = page_indices(virt);
+        let table_index = self.leaf_table_index(indices)?;
+        self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]]
+            .mapping()
+            .ok_or(PageTableError::NotMapped)
     }
-    if virt.get() & PAGE_OFFSET_MASK != 0 {
-        return Err(PageTableError::UnalignedVirtualAddress);
-    }
-    Ok(())
-}
-
-fn validate_phys(phys: PhysAddr) -> Result<(), PageTableError> {
-    if phys.get() > MAX_PHYSICAL_ADDR {
-        return Err(PageTableError::InvalidPhysicalAddress);
-    }
-    if phys.get() & PAGE_OFFSET_MASK != 0 {
-        return Err(PageTableError::UnalignedPhysicalAddress);
-    }
-    Ok(())
-}
-
-const fn is_canonical(value: u64) -> bool {
-    value <= CANONICAL_LOW_END || value >= CANONICAL_HIGH_START
-}
-
-fn page_indices(virt: VirtAddr) -> [usize; PAGE_TABLE_LEVELS] {
-    [
-        ((virt.get() >> LEVEL_SHIFTS[0]) & 0x1ff) as usize,
-        ((virt.get() >> LEVEL_SHIFTS[1]) & 0x1ff) as usize,
-        ((virt.get() >> LEVEL_SHIFTS[2]) & 0x1ff) as usize,
-        ((virt.get() >> LEVEL_SHIFTS[3]) & 0x1ff) as usize,
-    ]
 }
 
 #[cfg(test)]
