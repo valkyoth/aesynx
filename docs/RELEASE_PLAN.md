@@ -540,6 +540,8 @@ Deliverables:
   address-space code can consume a mapper.
 - Kernel and user address-space candidate preflight success and failure paths
   stay read-only against the mapper being verified.
+- Kernel and user address-space candidate preflights report structural mapper
+  corruption before mapping-policy violations.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.

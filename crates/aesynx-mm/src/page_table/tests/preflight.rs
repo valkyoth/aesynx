@@ -111,6 +111,21 @@ fn mapper_kernel_candidate_preflight_rejects_corrupt_tables() -> Result<(), Page
 }
 
 #[test]
+fn mapper_kernel_candidate_preflight_reports_corruption_before_policy() -> Result<(), PageTableError>
+{
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::user(PageAccess::ReadOnly),
+    )?;
+    mapper.mapped_pages += 1;
+
+    assert_kernel_candidate_rejects_without_mutation(&mapper, PageTableError::CorruptTable);
+    Ok(())
+}
+
+#[test]
 fn mapper_user_candidate_preflight_accepts_split_address_space_without_mutation()
 -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
@@ -212,6 +227,21 @@ fn mapper_user_candidate_preflight_rejects_corrupt_tables() -> Result<(), PageTa
     mapper.used[1] = true;
     mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
     mapper.tables[0].slots[1] = PageTableSlot::next(1)?;
+
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::CorruptTable);
+    Ok(())
+}
+
+#[test]
+fn mapper_user_candidate_preflight_reports_corruption_before_policy() -> Result<(), PageTableError>
+{
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        USER_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.mapped_pages += 1;
 
     assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::CorruptTable);
     Ok(())
