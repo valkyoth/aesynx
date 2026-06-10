@@ -204,6 +204,10 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         validate_phys(phys)?;
         let leaf = PageTableSlot::leaf(PageMapping::new(phys, flags))?;
         self.validate_map_capacity(virt)?;
+        let mapped_pages = self
+            .mapped_pages
+            .checked_add(1)
+            .ok_or(PageTableError::AddressOverflow)?;
         let indices = page_indices(virt);
         let mut table_index = 0usize;
         for slot_index in indices.iter().take(PAGE_TABLE_LEVELS - 1) {
@@ -214,10 +218,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             return Err(PageTableError::AlreadyMapped);
         }
         *slot = leaf;
-        self.mapped_pages = self
-            .mapped_pages
-            .checked_add(1)
-            .ok_or(PageTableError::AddressOverflow)?;
+        self.mapped_pages = mapped_pages;
         Ok(MapOutcome::new(TlbFlush::Page(virt)))
     }
 
@@ -228,8 +229,12 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let table_index = path[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
         let mapping = slot.mapping().ok_or(PageTableError::NotMapped)?;
+        let mapped_pages = self
+            .mapped_pages
+            .checked_sub(1)
+            .ok_or(PageTableError::CorruptTable)?;
         *slot = PageTableSlot::EMPTY;
-        self.mapped_pages -= 1;
+        self.mapped_pages = mapped_pages;
         self.reclaim_empty_tables(indices, path);
         Ok(UnmapOutcome::new(mapping, TlbFlush::Page(virt)))
     }

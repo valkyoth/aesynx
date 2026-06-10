@@ -271,6 +271,28 @@ fn mapper_invalid_mapping_flags_failure_is_atomic() -> Result<(), PageTableError
 }
 
 #[test]
+fn mapper_accounting_overflow_failure_is_atomic() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.mapped_pages = u64::MAX;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.map_page(
+            KERNEL_VIRT,
+            KERNEL_PHYS,
+            GenericPageFlags::kernel(PageAccess::ReadOnly),
+        ),
+        Err(PageTableError::AddressOverflow)
+    );
+    assert_eq!(mapper, before);
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Err(PageTableError::NotMapped)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_unmap_validation_failures_are_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
@@ -290,6 +312,26 @@ fn mapper_unmap_validation_failures_are_atomic() -> Result<(), PageTableError> {
     );
     assert_eq!(mapper, before);
     assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    Ok(())
+}
+
+#[test]
+fn mapper_unmap_rejects_accounting_underflow_without_mutation() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
+    mapper.mapped_pages = 0;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.unmap_page(KERNEL_VIRT),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, before);
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Ok(PageMapping::new(KERNEL_PHYS, flags))
+    );
     Ok(())
 }
 
