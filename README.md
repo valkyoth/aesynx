@@ -1,6 +1,6 @@
 <p align="center">
-  <b>Rust no_std research OS with explicit capabilities, native userspace, and security gates from day one.</b><br>
-  Modular by design. Capability-first. Built toward a serious QEMU release.
+  <b>A clean-slate Rust operating system built around capabilities, objects, and native services.</b><br>
+  Not Unix in new clothes. Not Windows rewritten. A fresh standalone OS path, built carefully from the first boot.
 </p>
 
 <div align="center">
@@ -21,16 +21,26 @@
 
 # Aesynx
 
-Aesynx is a Rust `no_std` operating-system research project built around
-explicit capabilities, per-core ownership, service queues, driver isolation, an
-immutable object graph, native userspace, and AI-ready telemetry from day one.
-It is explicitly not planned as one huge OS binary: components should remain
-separately identified, signed, versioned, updateable, and rollback-capable.
+Aesynx is a Rust `no_std` operating-system project with a clean-slate goal: a
+standalone OS that does not begin by copying Unix, Linux, or Windows. Its native
+model is built around explicit capabilities, per-core ownership, service queues,
+driver isolation, an immutable object graph, structured userspace, and AI-ready
+telemetry from day one.
 
-The first major goal is not a desktop OS and not a Unix clone. The first major
-goal is a serious x86_64 QEMU research release with a coherent security model,
-clear non-claims, and release gates that block tagging until checks and pentest
-evidence are complete.
+The long-term goal is a different kind of general-purpose system, not a compatibility
+skin over old assumptions. Paths, processes, packages, drivers, snapshots, and
+automation should be native Aesynx concepts first. Unix or Linux compatibility
+can exist later as an isolated service, but it must not define the kernel,
+userspace, or security model.
+
+Aesynx is also explicitly not planned as one huge OS binary: components should
+remain separately identified, signed, versioned, updateable, and
+rollback-capable.
+
+The first major milestone is a serious x86_64 QEMU release with a coherent
+security model, clear non-claims, and release gates that block tagging until
+checks and pentest evidence are complete. The project is early, but the direction
+is intentionally standalone.
 
 Aesynx is licensed under the European Union Public Licence 1.2.
 
