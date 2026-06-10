@@ -532,8 +532,8 @@ Deliverables:
   root.
 - Checked status path that reports mapper counters only after audit validation.
 - Kernel address-space candidate preflight that combines audit, checked root,
-  checked status, no-user-mapping, and no-physical-alias gates before future
-  activation code can consume a mapper.
+  checked status, no-user-space-mapping, no-user-mapping, and no-physical-alias
+  gates before future activation code can consume a mapper.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.
@@ -558,6 +558,7 @@ Deliverables:
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Kernel-only mapping policy check for candidate kernel address spaces.
+- No-user-space mapping policy check for candidate kernel address spaces.
 - No-executable mapping policy check for candidate data-only address spaces.
 - No-writable mapping policy check for candidate read-only address spaces.
 - No-device mapping policy check for candidate normal-RAM address spaces.
@@ -583,10 +584,10 @@ Deliverables:
   checks, user-range policy checks, write-protected range checks,
   non-executable range checks, executable range checks, normal-memory range
   checks, local range checks, kernel-space range checks, user-space range
-  checks, no-executable policy checks, no-writable policy checks, no-device
-  policy checks, no-global policy checks, no-alias policy checks, kernel-only
-  policy checks, kernel address-space candidate preflight, permission change,
-  translated offset, mapping visit, range
+  checks, no-user-space policy checks, no-executable policy checks, no-writable
+  policy checks, no-device policy checks, no-global policy checks, no-alias
+  policy checks, kernel-only policy checks, kernel address-space candidate
+  preflight, permission change, translated offset, mapping visit, range
   permission verification, unmap, audit, reclamation, and flush target checks.
 
 Verification:
@@ -601,9 +602,10 @@ Verification:
   checks, user-range policy checks, write-protected range checks,
   non-executable range checks, executable range checks, normal-memory range
   checks, local range checks, kernel-space range checks, user-space range
-  checks, no-executable policy checks, no-writable policy checks, no-device
-  policy checks, no-global policy checks, no-alias policy checks, kernel-only
-  policy checks, kernel address-space candidate preflight, redacted mapping
+  checks, no-user-space policy checks, no-executable policy checks, no-writable
+  policy checks, no-device policy checks, no-global policy checks, no-alias
+  policy checks, kernel-only policy checks, kernel address-space candidate
+  preflight, redacted mapping
   summaries, range permission verification, invalid range flag validation,
   consistency audit failures, conservative TLB flush merging, and x86_64 entry
   flag encode/decode validation.

@@ -3,6 +3,16 @@ use crate::PagePrivilege;
 use super::{PageTableError, PageTableMapper};
 
 impl<const TABLES: usize> PageTableMapper<TABLES> {
+    pub fn ensure_no_user_space_mappings(&self) -> Result<(), PageTableError> {
+        self.visit_mappings(|entry| {
+            if entry.virt().get() >> 47 == 0 {
+                return Err(PageTableError::UnexpectedVirtualAddressSpace);
+            }
+            Ok(())
+        })?;
+        Ok(())
+    }
+
     pub fn ensure_no_user_mappings(&self) -> Result<(), PageTableError> {
         self.visit_mappings(|entry| {
             if matches!(entry.mapping().flags().privilege, PagePrivilege::User) {

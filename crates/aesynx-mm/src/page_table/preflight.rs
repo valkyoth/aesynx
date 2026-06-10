@@ -11,6 +11,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         {
             return Err(PageTableError::CorruptTable);
         }
+        self.ensure_no_user_space_mappings()?;
         self.ensure_no_user_mappings()?;
         self.ensure_no_physical_aliases()?;
         Ok(audit)
