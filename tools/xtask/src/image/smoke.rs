@@ -22,6 +22,7 @@ pub const FAULT_RFLAGS_MARKER: &str = "rflags=0x";
 pub const PAGE_FAULT_MARKER: &str = "[TEST] pagefault=ok";
 pub const PAGE_TABLE_AUDIT_MARKER: &str = "audit_ok=true";
 pub const PAGE_TABLE_FAIL_MARKER: &str = "[TEST] page-table=fail";
+pub const PAGE_TABLE_FLAGS_MARKER: &str = "flags_ok=true";
 pub const PAGE_TABLE_LOOKUP_MARKER: &str = "mapping_lookup_ok=true";
 pub const PAGE_TABLE_MARKER: &str = "[TEST] page-table=ok";
 pub const PAGE_TABLE_PROTECT_MARKER: &str = "protect_ok=true";
@@ -65,7 +66,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, mapping_lookup_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, unmapped_range_ok=true, audit_ok=true, visit_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, mapping_lookup_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, unmapped_range_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, [TEST] page-table=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"

@@ -172,6 +172,59 @@ fn mapper_verifies_unmapped_contiguous_range_without_mutation() -> Result<(), Pa
 }
 
 #[test]
+fn mapper_verifies_contiguous_range_flags_without_physical_contiguity() -> Result<(), PageTableError>
+{
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    let first_virt = KERNEL_VIRT;
+    let second_virt = VirtAddr::new(KERNEL_VIRT.get() + crate::FRAME_SIZE);
+    mapper.map_page(first_virt, KERNEL_PHYS, flags)?;
+    mapper.map_page(
+        second_virt,
+        PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
+        flags,
+    )?;
+    let before = mapper;
+
+    assert_eq!(mapper.ensure_contiguous_flags(first_virt, 2, flags), Ok(()));
+    assert_eq!(
+        mapper.mapping_for_contiguous(first_virt, 2),
+        Err(PageTableError::NonContiguousRange)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_contiguous_flag_check_rejects_gaps_or_mismatches() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    let writable = GenericPageFlags::kernel(PageAccess::ReadWrite);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, initial)?;
+    mapper.map_page(
+        VirtAddr::new(KERNEL_VIRT.get() + crate::FRAME_SIZE),
+        PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
+        writable,
+    )?;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.ensure_contiguous_flags(KERNEL_VIRT, 2, initial),
+        Err(PageTableError::UnexpectedMappingFlags)
+    );
+    assert_eq!(
+        mapper.ensure_contiguous_flags(VirtAddr::new(KERNEL_VIRT.get() + 0x2000), 1, initial),
+        Err(PageTableError::NotMapped)
+    );
+    assert_eq!(
+        mapper.ensure_contiguous_flags(KERNEL_VIRT, 0, initial),
+        Err(PageTableError::InvalidPageCount)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
 fn mapper_unmapped_range_check_rejects_any_mapped_page() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let second = VirtAddr::new(KERNEL_VIRT.get() + 0x1000);

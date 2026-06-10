@@ -12,6 +12,7 @@ pub struct PageTableSmokeStatus {
     pub unmapped_range_ok: bool,
     pub audit_ok: bool,
     pub visit_ok: bool,
+    pub flags_ok: bool,
     pub reclaim_ok: bool,
     pub range_ok: bool,
     pub flush_page: bool,
@@ -111,6 +112,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
+    mapper
+        .ensure_contiguous_flags(SMOKE_RANGE_VIRT, 2, range_execute_flags)
+        .map_err(PageTableSmokeError::Mapper)?;
     let mut visited_range_pages = 0u64;
     let visited_pages = mapper
         .visit_mappings(|entry| {
@@ -172,6 +176,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         unmapped_range_ok: true,
         audit_ok: true,
         visit_ok: true,
+        flags_ok: true,
         reclaim_ok: true,
         range_ok: true,
         flush_page: true,

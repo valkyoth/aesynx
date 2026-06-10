@@ -64,7 +64,7 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
 `page-table total_tables=`, `mapping_lookup_ok=true`, `protect_ok=true`,
 `protect_range_ok=true`, `range_lookup_ok=true`, `unmapped_range_ok=true`,
-`audit_ok=true`, `visit_ok=true`, `reclaim_ok=true`, `range_ok=true`,
+`audit_ok=true`, `visit_ok=true`, `flags_ok=true`, `reclaim_ok=true`, `range_ok=true`,
 `[TEST] page-table=ok`,
 `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
@@ -107,8 +107,8 @@ from a usable memory-map window and verifies one-frame allocation/free,
 contiguous allocation/free, debug state, and double-free detection. It also
 exercises a bounded x86_64-shaped page-table mapper model with map, permission
 lookup, contiguous range lookup, permission change, translate, contiguous range
-map/protect/unmap, unmapped range checks, read-only mapping visit, unmap, consistency audit,
-empty-table reclamation, and explicit TLB flush targets. It does not claim active CR3 replacement,
+map/protect/unmap, unmapped range checks, read-only mapping visit, virtual range
+permission verification, unmap, consistency audit, empty-table reclamation, and explicit TLB flush targets. It does not claim active CR3 replacement,
 production page-table ownership, APIC MMIO activation, global physical-memory
 ownership, heap allocation, page-fault recovery, a calibrated production clock
 service, scheduler preemption, or bootloader memory reclamation.
