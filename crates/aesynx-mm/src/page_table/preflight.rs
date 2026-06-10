@@ -1,3 +1,5 @@
+use crate::PagePrivilege;
+
 use super::{PageTableAudit, PageTableError, PageTableMapper};
 
 impl<const TABLES: usize> PageTableMapper<TABLES> {
@@ -12,9 +14,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     pub fn verify_user_address_space_candidate(&self) -> Result<PageTableAudit, PageTableError> {
         let audit = self.checked_candidate_audit()?;
-        self.ensure_no_kernel_space_user_mappings()?;
-        self.ensure_no_user_space_kernel_mappings()?;
-        self.ensure_user_candidate_has_user_mappings()?;
+        self.ensure_user_candidate_shape()?;
         self.ensure_no_device_mappings()?;
         self.ensure_no_global_mappings()?;
         self.ensure_no_physical_aliases()?;
@@ -37,19 +37,23 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         Ok(audit)
     }
 
-    fn ensure_user_candidate_has_user_mappings(&self) -> Result<(), PageTableError> {
+    fn ensure_user_candidate_shape(&self) -> Result<(), PageTableError> {
+        let mut has_kernel_space_user_mapping = false;
+        let mut has_user_space_kernel_mapping = false;
         let mut has_user_mapping = false;
         self.visit_mappings(|entry| {
-            if entry.virt().get() >> 47 == 0
-                && matches!(
-                    entry.mapping().flags().privilege,
-                    crate::PagePrivilege::User
-                )
-            {
-                has_user_mapping = true;
+            let in_user_space = entry.virt().get() >> 47 == 0;
+            match (in_user_space, entry.mapping().flags().privilege) {
+                (false, PagePrivilege::User) => has_kernel_space_user_mapping = true,
+                (true, PagePrivilege::Kernel) => has_user_space_kernel_mapping = true,
+                (true, PagePrivilege::User) => has_user_mapping = true,
+                (false, PagePrivilege::Kernel) => {}
             }
             Ok(())
         })?;
+        if has_kernel_space_user_mapping || has_user_space_kernel_mapping {
+            return Err(PageTableError::UnexpectedMappingFlags);
+        }
         if has_user_mapping {
             Ok(())
         } else {
