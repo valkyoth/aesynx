@@ -488,15 +488,16 @@ Exit criteria:
 
 Goal:
 
-Own physical frames.
+Introduce bounded physical-frame ownership.
 
 Deliverables:
 
-- Bitmap allocator.
+- Safe bitmap allocator model.
 - Alloc/free one frame.
 - Alloc contiguous.
 - Debug frame states.
 - Double-free detection in debug mode.
+- QEMU smoke over a bounded usable memory-map window.
 
 Expected serial:
 
@@ -511,7 +512,7 @@ Verification:
 
 Exit criteria:
 
-- Physical memory is kernel-owned.
+- A bounded allocator window is kernel-owned and ready to feed page-table work.
 
 ### v0.15.0 - Page Table Mapper
 

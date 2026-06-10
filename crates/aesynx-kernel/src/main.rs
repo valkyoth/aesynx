@@ -16,6 +16,14 @@ use aesynx_log::{LogLevel, LogMessage};
 
 #[cfg(all(
     target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
+))]
+mod frame_allocator_smoke;
+
+#[cfg(all(
+    target_os = "none",
     feature = "timer-smoke",
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke")
@@ -269,6 +277,29 @@ fn boot_entry() -> ! {
                         aesynx_arch_x86_64::serial::write_str("rsdp=absent\n");
                     }
                     aesynx_arch_x86_64::serial::write_str("[TEST] memory-map=ok\n");
+                    match frame_allocator_smoke::run(&info) {
+                        Ok(status) => {
+                            aesynx_arch_x86_64::serial_println!(
+                                "frame-allocator total_frames={} known_frames={} free_before={} free_after={} reserved_frames={} contiguous_count={} double_free_check={}",
+                                status.total_frames,
+                                status.known_frames,
+                                status.free_before,
+                                status.free_after,
+                                status.reserved_frames,
+                                status.contiguous_count,
+                                status.double_free_check
+                            );
+                            aesynx_arch_x86_64::serial::write_str("[TEST] frame-allocator=ok\n");
+                        }
+                        Err(error) => {
+                            aesynx_arch_x86_64::serial_println!(
+                                "frame-allocator error={:?}",
+                                error
+                            );
+                            aesynx_arch_x86_64::serial::write_str("[TEST] frame-allocator=fail\n");
+                            aesynx_arch_x86_64::X86_64::halt_forever();
+                        }
+                    }
                 }
                 Err(error) => {
                     aesynx_arch_x86_64::serial_println!("memory-map error={:?}", error);
@@ -294,7 +325,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.13.0 panic smoke");
+    panic!("intentional v0.14.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

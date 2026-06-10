@@ -46,7 +46,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.13.0` is the current tagged physical-memory-map milestone. It builds a
+`v0.14.0` is the current bitmap-frame-allocator implementation candidate. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
@@ -57,7 +57,10 @@ exception, and can run opt-in deliberate panic and page-fault smoke tests with
 redacted CR2 presence/page-offset, CR3 low-bit, RFLAGS, interrupt-state, and
 decoded page-fault diagnostics. Normal boot now emits a checked physical memory
 report with total, usable, reserved, kernel, bootloader, framebuffer, ACPI, bad,
-and frame-count accounting before `[TEST] memory-map=ok`. The opt-in timer smoke
+and frame-count accounting before `[TEST] memory-map=ok`, then initializes a
+bounded early bitmap frame allocator from a usable boot-map window and verifies
+one-frame allocation/free, contiguous allocation/free, debug state, and
+double-free detection before `[TEST] frame-allocator=ok`. The opt-in timer smoke
 path installs a checked IRQ0 handler, programs the legacy PIT for QEMU, observes
 three controlled timer ticks, converts ticks into monotonic nanosecond values,
 wakes a bounded sleep request for a delayed log event, acknowledges each
@@ -85,6 +88,7 @@ interrupt, and then disables the smoke IRQ.
 | Timer ticks | Tagged | `v0.11.0`; opt-in QEMU timer smoke programs PIT IRQ0, records a tick counter, and verifies `timer tick 1..3` plus `[TEST] timer=ok`. |
 | Monotonic time and sleeps | Tagged | `v0.12.0`; converts timer ticks into monotonic instants, schedules a bounded sleep request, and verifies `timer delayed-log`, `[TEST] sleep=ok`, and `[TEST] timer=ok`. |
 | Physical memory map | Tagged | `v0.13.0`; rejects invalid/overlapping regions and reports checked total/usable/reserved bytes, frame counts, and kernel/bootloader reserved accounting with `[TEST] memory-map=ok`. |
+| Bitmap frame allocator | Active candidate | `v0.14.0`; safe `aesynx-mm` bitmap allocator model plus QEMU smoke for bounded early alloc/free, contiguous allocation, debug states, and double-free detection with `[TEST] frame-allocator=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -96,8 +100,8 @@ interrupt, and then disables the smoke IRQ.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Bitmap frame allocator | Planned | `v0.14.0`; consume the checked memory report and begin owning physical frames. |
-| Real arch mechanisms | Planned | Core identity, timestamp, page tables, and CPU setup. |
+| Page table mapper | Planned | `v0.15.0`; start controlled virtual-memory mapping, unmapping, translation, and TLB flush shape. |
+| Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
 | OS world service | Planned | Signed/versioned facts, branchable worlds, policy-aware queries, context packs, and AI-safe explanations over deterministic OS evidence. |
@@ -124,7 +128,7 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.13 Limine QEMU image:
+Create and smoke-test the v0.14 Limine QEMU image:
 
 ```bash
 cargo xtask image
@@ -163,7 +167,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.13.0
+cargo xtask release-ready v0.14.0
 ```
 
 ## Security Posture
@@ -199,6 +203,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [v0.11.0 Release Candidate Notes](docs/releases/v0.11.0-rc.md)
 - [v0.12.0 Release Candidate Notes](docs/releases/v0.12.0-rc.md)
 - [v0.13.0 Release Candidate Notes](docs/releases/v0.13.0-rc.md)
+- [v0.14.0 Release Candidate Notes](docs/releases/v0.14.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

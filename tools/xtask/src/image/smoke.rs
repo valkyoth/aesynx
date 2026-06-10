@@ -4,6 +4,9 @@ pub const BOOT_DIAGNOSTIC_MARKER: &str = "[kernel][INFO] bootinfo normalized";
 pub const CPU_SETUP_MARKER: &str = "[TEST] gdt=ok";
 pub const EXCEPTION_SETUP_MARKER: &str = "[TEST] idt=ok";
 pub const EXCEPTION_MARKER: &str = "[TEST] exception=ok";
+pub const FRAME_ALLOCATOR_FAIL_MARKER: &str = "[TEST] frame-allocator=fail";
+pub const FRAME_ALLOCATOR_MARKER: &str = "[TEST] frame-allocator=ok";
+pub const FRAME_ALLOCATOR_STATUS_MARKER: &str = "frame-allocator total_frames=";
 pub const IRQ_SETUP_MARKER: &str = "[TEST] irq=ok";
 pub const MEMORY_MAP_FAIL_MARKER: &str = "[TEST] memory-map=fail";
 pub const MEMORY_MAP_MARKER: &str = "[TEST] memory-map=ok";
@@ -50,7 +53,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"

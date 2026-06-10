@@ -10,6 +10,7 @@ use smoke::{
     BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_SETUP_MARKER,
     EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
     FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
+    FRAME_ALLOCATOR_FAIL_MARKER, FRAME_ALLOCATOR_MARKER, FRAME_ALLOCATOR_STATUS_MARKER,
     IRQ_SETUP_MARKER, MEMORY_MAP_FAIL_MARKER, MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER,
     MEMORY_TOTAL_MARKER, MEMORY_USABLE_MARKER, PAGE_FAULT_MARKER, PANIC_DIAGNOSTIC_MARKER,
     PANIC_MARKER, PANIC_REGISTERS_MARKER, SERIAL_MARKER, SLEEP_MARKER, SmokeKind,
@@ -302,7 +303,7 @@ fn write_manifest(
     smoke: SmokeKind,
 ) -> Result<(), String> {
     let manifest_contents = format!(
-        "name=Aesynx v0.13.0 physical memory map\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nirq_setup_marker={IRQ_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_present_marker={FAULT_ADDRESS_PRESENT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nmemory_total_marker={MEMORY_TOTAL_MARKER}\nmemory_usable_marker={MEMORY_USABLE_MARKER}\nmemory_reserved_marker={MEMORY_RESERVED_MARKER}\nmemory_map_marker={MEMORY_MAP_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\ntimer_setup_marker={TIMER_SETUP_MARKER}\ntimer_tick_1_marker={TIMER_TICK_1_MARKER}\ntimer_tick_2_marker={TIMER_TICK_2_MARKER}\ntimer_tick_3_marker={TIMER_TICK_3_MARKER}\ntimer_delayed_log_marker={TIMER_DELAYED_LOG_MARKER}\nsleep_marker={SLEEP_MARKER}\ntimer_marker={TIMER_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
+        "name=Aesynx v0.14.0 bitmap frame allocator\nsmoke={}\nimage={}\nformat=iso\nbootloader=limine\nkernel={}\nkernel_target={KERNEL_TARGET}\nkernel_profile={KERNEL_PROFILE}\ncpu_setup_marker={CPU_SETUP_MARKER}\nexception_setup_marker={EXCEPTION_SETUP_MARKER}\nirq_setup_marker={IRQ_SETUP_MARKER}\nexception_marker={EXCEPTION_MARKER}\npage_fault_marker={PAGE_FAULT_MARKER}\nfault_address_present_marker={FAULT_ADDRESS_PRESENT_MARKER}\nfault_address_marker={FAULT_ADDRESS_MARKER}\nfault_cr3_marker={FAULT_CR3_MARKER}\nfault_rflags_marker={FAULT_RFLAGS_MARKER}\nfault_interrupts_marker={FAULT_INTERRUPTS_MARKER}\nfault_error_decode_marker={FAULT_ERROR_DECODE_MARKER}\nmemory_total_marker={MEMORY_TOTAL_MARKER}\nmemory_usable_marker={MEMORY_USABLE_MARKER}\nmemory_reserved_marker={MEMORY_RESERVED_MARKER}\nmemory_map_marker={MEMORY_MAP_MARKER}\nframe_allocator_status_marker={FRAME_ALLOCATOR_STATUS_MARKER}\nframe_allocator_marker={FRAME_ALLOCATOR_MARKER}\nbootinfo_marker={BOOTINFO_MARKER}\nserial_marker={SERIAL_MARKER}\npanic_marker={PANIC_MARKER}\ntimer_setup_marker={TIMER_SETUP_MARKER}\ntimer_tick_1_marker={TIMER_TICK_1_MARKER}\ntimer_tick_2_marker={TIMER_TICK_2_MARKER}\ntimer_tick_3_marker={TIMER_TICK_3_MARKER}\ntimer_delayed_log_marker={TIMER_DELAYED_LOG_MARKER}\nsleep_marker={SLEEP_MARKER}\ntimer_marker={TIMER_MARKER}\nrustc_version={}\ncargo_version={}\nlimine_version={}\nlimine_min_version={}\nxorriso_version={}\nqemu_version={}\n",
         smoke.name(),
         image.display(),
         kernel_elf.display(),
@@ -385,6 +386,7 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
         SmokeKind::Boot => {
             !contents.contains(BOOTINFO_FAIL_MARKER)
                 && !contents.contains(MEMORY_MAP_FAIL_MARKER)
+                && !contents.contains(FRAME_ALLOCATOR_FAIL_MARKER)
                 && contents.contains(CPU_SETUP_MARKER)
                 && contents.contains(EXCEPTION_SETUP_MARKER)
                 && contents.contains(IRQ_SETUP_MARKER)
@@ -394,6 +396,8 @@ fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
                 && contents.contains(MEMORY_USABLE_MARKER)
                 && contents.contains(MEMORY_RESERVED_MARKER)
                 && contents.contains(MEMORY_MAP_MARKER)
+                && contents.contains(FRAME_ALLOCATOR_STATUS_MARKER)
+                && contents.contains(FRAME_ALLOCATOR_MARKER)
                 && contents.contains(BOOTINFO_MARKER)
                 && contents.contains(SERIAL_MARKER)
         }

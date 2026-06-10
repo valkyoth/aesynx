@@ -3,6 +3,13 @@
 
 use aesynx_abi::PhysFrame;
 
+mod frame_allocator;
+
+pub use frame_allocator::{
+    AllocatedFrames, BitmapFrameAllocator, FRAME_SIZE, FrameAllocatorError, FrameAllocatorStatus,
+    FrameRegionKind, FrameState,
+};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AddressSpace {
     root: PhysFrame,

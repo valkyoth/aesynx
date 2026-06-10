@@ -248,12 +248,17 @@ impl MemoryRegion {
     }
 
     #[must_use]
+    pub const fn start(self) -> PhysAddr {
+        self.start
+    }
+
+    #[must_use]
     pub const fn start_present(self) -> bool {
         self.start.get() != 0
     }
 
     #[must_use]
-    pub(crate) const fn end(self) -> Option<PhysAddr> {
+    pub const fn end(self) -> Option<PhysAddr> {
         match self.start.get().checked_add(self.len) {
             Some(end) => Some(PhysAddr::new(end)),
             None => None,
