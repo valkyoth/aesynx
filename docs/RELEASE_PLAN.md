@@ -533,6 +533,8 @@ Deliverables:
 - Upfront flag validation for range map/protect/verification paths.
 - Empty intermediate table reclamation after unmap.
 - Read-only consistency audit for reachable tables and mapped-page accounting.
+- Redacted mapping summaries for page classes without reporting physical
+  addresses.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape.
 - QEMU smoke for map, mapping lookup, page-presence checks, mapped-range
@@ -545,8 +547,9 @@ Verification:
   mapped-range checks, permission changes, unmap, empty-table reclamation,
   sibling preservation, double-map rejection, invalid address rejection, atomic
   capacity failure, mapping visitor behavior, mapping visitor corruption
-  rejection, range permission verification, invalid range flag validation,
-  consistency audit failures, and x86_64 entry flag encode/decode validation.
+  rejection, redacted mapping summaries, range permission verification, invalid
+  range flag validation, consistency audit failures, and x86_64 entry flag
+  encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
 
 Exit criteria:

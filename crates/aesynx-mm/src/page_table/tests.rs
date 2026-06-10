@@ -9,4 +9,5 @@ mod presence;
 mod range;
 mod range_presence;
 mod raw;
+mod summary;
 mod walk;

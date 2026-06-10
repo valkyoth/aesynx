@@ -13,8 +13,8 @@ pub use frame_allocator::{
 pub use page_table::{
     MapOutcome, MapRangeOutcome, PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageMapping,
     PageRangeMapping, PageTableAudit, PageTableError, PageTableMapper, PageTableMapping,
-    PageTableStatus, ProtectOutcome, ProtectRangeOutcome, TlbFlush, UnmapOutcome,
-    UnmapRangeOutcome, X86_64PageTableEntry,
+    PageTableMappingSummary, PageTableStatus, ProtectOutcome, ProtectRangeOutcome, TlbFlush,
+    UnmapOutcome, UnmapRangeOutcome, X86_64PageTableEntry,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
