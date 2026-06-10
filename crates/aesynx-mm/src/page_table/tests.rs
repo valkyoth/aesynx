@@ -54,6 +54,22 @@ fn mapper_unmaps_page_and_reports_flush() -> Result<(), PageTableError> {
 }
 
 #[test]
+fn mapper_unmap_global_page_requests_address_space_flush() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly)
+        .with_global()
+        .map_err(|_error| PageTableError::InvalidMappingFlags)?;
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
+
+    let outcome = mapper.unmap_page(KERNEL_VIRT)?;
+
+    assert_eq!(outcome.mapping(), PageMapping::new(KERNEL_PHYS, flags));
+    assert_eq!(outcome.flush(), TlbFlush::AddressSpace);
+    assert_eq!(mapper.status().mapped_pages, 0);
+    Ok(())
+}
+
+#[test]
 fn mapper_unmap_reclaims_empty_intermediate_tables() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
@@ -147,6 +163,23 @@ fn mapper_protects_existing_page_permissions() -> Result<(), PageTableError> {
     );
     assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
     assert_eq!(mapper.status().mapped_pages, 1);
+    Ok(())
+}
+
+#[test]
+fn mapper_protect_global_page_requests_address_space_flush() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    let global = initial
+        .with_global()
+        .map_err(|_error| PageTableError::InvalidMappingFlags)?;
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, initial)?;
+
+    let outcome = mapper.protect_page(KERNEL_VIRT, global)?;
+
+    assert_eq!(outcome.previous(), PageMapping::new(KERNEL_PHYS, initial));
+    assert_eq!(outcome.current(), PageMapping::new(KERNEL_PHYS, global));
+    assert_eq!(outcome.flush(), TlbFlush::AddressSpace);
     Ok(())
 }
 

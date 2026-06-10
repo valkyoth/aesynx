@@ -250,7 +250,10 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         *slot = PageTableSlot::EMPTY;
         self.mapped_pages = mapped_pages;
         self.reclaim_empty_tables(indices, path);
-        Ok(UnmapOutcome::new(mapping, TlbFlush::Page(virt)))
+        Ok(UnmapOutcome::new(
+            mapping,
+            flush_for_removed_mapping(virt, mapping),
+        ))
     }
 
     pub fn protect_page(
@@ -266,7 +269,11 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let current = PageMapping::new(previous.phys(), flags);
         let replacement = PageTableSlot::leaf(current)?;
         *slot = replacement;
-        Ok(ProtectOutcome::new(previous, current, TlbFlush::Page(virt)))
+        Ok(ProtectOutcome::new(
+            previous,
+            current,
+            flush_for_protect(virt, previous, current),
+        ))
     }
 
     pub fn translate(&self, virt: VirtAddr) -> Option<PhysAddr> {
@@ -422,6 +429,22 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             self.used[table_index] = false;
             level -= 1;
         }
+    }
+}
+
+fn flush_for_removed_mapping(virt: VirtAddr, mapping: PageMapping) -> TlbFlush {
+    if mapping.flags().is_global() {
+        TlbFlush::AddressSpace
+    } else {
+        TlbFlush::Page(virt)
+    }
+}
+
+fn flush_for_protect(virt: VirtAddr, previous: PageMapping, current: PageMapping) -> TlbFlush {
+    if previous.flags().is_global() || current.flags().is_global() {
+        TlbFlush::AddressSpace
+    } else {
+        TlbFlush::Page(virt)
     }
 }
 
