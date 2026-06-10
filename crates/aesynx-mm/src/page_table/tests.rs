@@ -195,6 +195,18 @@ fn x86_64_entry_encodes_user_nx_device_mapping() -> Result<(), PageTableError> {
 }
 
 #[test]
+fn x86_64_entry_rejects_executable_device_mapping() {
+    let mut flags = GenericPageFlags::kernel(PageAccess::ReadExecute);
+    flags.device_memory = true;
+    flags.cacheable = false;
+
+    assert_eq!(
+        X86_64PageTableEntry::from_mapping(PageMapping::new(KERNEL_PHYS, flags)),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+}
+
+#[test]
 fn raw_slot_decode_rejects_write_execute_corruption() {
     let slot = PageTableSlot {
         raw: KERNEL_PHYS.get() | 1 | (1 << 1),

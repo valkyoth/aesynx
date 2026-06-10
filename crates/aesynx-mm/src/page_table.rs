@@ -18,6 +18,7 @@ pub enum PageTableError {
     InvalidPhysicalAddress,
     UnalignedVirtualAddress,
     UnalignedPhysicalAddress,
+    InvalidMappingFlags,
     AlreadyMapped,
     NotMapped,
     OutOfPageTables,
@@ -125,6 +126,9 @@ impl X86_64PageTableEntry {
 
     pub fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
         validate_phys(mapping.phys())?;
+        if mapping.flags().device_memory && mapping.flags().access.executable() {
+            return Err(PageTableError::InvalidMappingFlags);
+        }
         let mut raw = (mapping.phys().get() & Self::ADDRESS_MASK) | Self::PRESENT;
         if mapping.flags().access.writable() {
             raw |= Self::WRITABLE;
