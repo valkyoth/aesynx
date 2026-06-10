@@ -174,7 +174,7 @@ pub struct PageTableRoot {
 
 impl PageTableRoot {
     #[must_use]
-    pub const fn new(table_index: usize) -> Self {
+    pub(crate) const fn new(table_index: usize) -> Self {
         Self { table_index }
     }
 
