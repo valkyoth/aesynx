@@ -188,6 +188,78 @@ fn mapper_kernel_user_guard_rejects_corrupt_tables() -> Result<(), PageTableErro
 }
 
 #[test]
+fn mapper_user_kernel_guard_accepts_low_half_user_mappings_without_mutation()
+-> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        VirtAddr::new(0x0000_0000_0040_0000),
+        KERNEL_PHYS,
+        GenericPageFlags::user(PageAccess::ReadOnly),
+    )?;
+    let before = mapper;
+
+    mapper.ensure_no_user_space_kernel_mappings()?;
+
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_user_kernel_guard_accepts_high_half_kernel_mappings_without_mutation()
+-> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    let before = mapper;
+
+    mapper.ensure_no_user_space_kernel_mappings()?;
+
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_user_kernel_guard_accepts_empty_mapper() -> Result<(), PageTableError> {
+    let mapper = PageTableMapper::<4>::new()?;
+
+    assert_eq!(mapper.ensure_no_user_space_kernel_mappings(), Ok(()));
+    Ok(())
+}
+
+#[test]
+fn mapper_user_kernel_guard_rejects_low_half_kernel_mappings() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        VirtAddr::new(0x0000_0000_0040_0000),
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+
+    assert_eq!(
+        mapper.ensure_no_user_space_kernel_mappings(),
+        Err(PageTableError::UnexpectedMappingFlags)
+    );
+    Ok(())
+}
+
+#[test]
+fn mapper_user_kernel_guard_rejects_corrupt_tables() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
+    mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    mapper.mapped_pages = 1;
+
+    assert_eq!(
+        mapper.ensure_no_user_space_kernel_mappings(),
+        Err(PageTableError::CorruptTable)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_no_executable_check_accepts_data_mappings_without_mutation() -> Result<(), PageTableError>
 {
     let mut mapper = PageTableMapper::<4>::new()?;

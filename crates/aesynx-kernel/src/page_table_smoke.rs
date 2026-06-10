@@ -8,6 +8,7 @@ pub struct PageTableSmokeStatus {
     pub checked_root_ok: bool,
     pub checked_status_ok: bool,
     pub kernel_candidate_ok: bool,
+    pub user_candidate_ok: bool,
     pub translate_offset_ok: bool,
     pub checked_translate_ok: bool,
     pub mapping_lookup_ok: bool,
@@ -313,6 +314,12 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     mapper
         .ensure_no_kernel_space_user_mappings()
         .map_err(PageTableSmokeError::Mapper)?;
+    let user_candidate = mapper
+        .verify_user_address_space_candidate()
+        .map_err(PageTableSmokeError::Mapper)?;
+    if user_candidate.mapped_pages() != 2 {
+        return Err(PageTableSmokeError::UnexpectedTranslation);
+    }
     let user_range_unmap = mapper
         .unmap_contiguous(SMOKE_USER_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
@@ -335,6 +342,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         checked_root_ok: true,
         checked_status_ok: true,
         kernel_candidate_ok: true,
+        user_candidate_ok: true,
         translate_offset_ok: true,
         checked_translate_ok: true,
         mapping_lookup_ok: true,

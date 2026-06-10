@@ -534,6 +534,10 @@ Deliverables:
 - Kernel address-space candidate preflight that combines audit, checked root,
   checked status, no-user-space-mapping, no-user-mapping, and no-physical-alias
   gates before future activation code can consume a mapper.
+- User address-space candidate preflight that combines audit, checked root,
+  checked status, no-kernel-space-user-mapping, no-user-space-kernel-mapping,
+  and no-physical-alias gates before future per-task address-space code can
+  consume a mapper.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
   translation, read-only mapping lookup, and checked permission changes for
   4 KiB pages.
@@ -559,6 +563,8 @@ Deliverables:
   checks.
 - Kernel-only mapping policy check for candidate kernel address spaces.
 - High-half kernel user-access guard policy check for future mixed address
+  spaces.
+- Low-half user kernel-privilege guard policy check for future mixed address
   spaces.
 - No-user-space mapping policy check for candidate kernel address spaces.
 - No-executable mapping policy check for candidate data-only address spaces.
@@ -588,10 +594,11 @@ Deliverables:
   checks, local range checks, kernel-space range checks, user-space range
   checks, no-user-space policy checks, no-executable policy checks, no-writable
   policy checks, no-device policy checks, no-global policy checks, no-alias
-  policy checks, high-half kernel user-access guard checks, kernel-only policy
-  checks, kernel address-space candidate preflight, permission change,
-  translated offset, mapping visit, range permission verification, unmap, audit,
-  reclamation, and flush target checks.
+  policy checks, high-half kernel user-access guard checks, low-half user
+  kernel-privilege guard checks, kernel-only policy checks, kernel/user
+  address-space candidate preflights, permission change, translated offset,
+  mapping visit, range permission verification, unmap, audit, reclamation, and
+  flush target checks.
 
 Verification:
 
@@ -607,8 +614,9 @@ Verification:
   checks, local range checks, kernel-space range checks, user-space range
   checks, no-user-space policy checks, no-executable policy checks, no-writable
   policy checks, no-device policy checks, no-global policy checks, no-alias
-  policy checks, high-half kernel user-access guard checks, kernel-only policy
-  checks, kernel address-space candidate preflight, redacted mapping
+  policy checks, high-half kernel user-access guard checks, low-half user
+  kernel-privilege guard checks, kernel-only policy checks, kernel/user
+  address-space candidate preflights, redacted mapping
   summaries, range permission verification, invalid range flag validation,
   consistency audit failures, conservative TLB flush merging, and x86_64 entry
   flag encode/decode validation.

@@ -64,6 +64,7 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
 `page-table total_tables=`, `root_ok=true`, `checked_root_ok=true`,
 `checked_status_ok=true`, `kernel_candidate_ok=true`,
+`user_candidate_ok=true`,
 `checked_translate_ok=true`, `mapping_lookup_ok=true`, `presence_ok=true`, `protect_ok=true`,
 `protect_range_ok=true`, `range_lookup_ok=true`, `range_translate_ok=true`,
 `mapped_range_ok=true`, `unmapped_range_ok=true`, `audit_ok=true`,
@@ -120,8 +121,9 @@ identity, checked status, map, checked translation, checked byte-range translati
 range lookup, permission change, translate, contiguous range map/protect/unmap,
 unmapped range checks, read-only mapping visit, virtual range permission
 verification, kernel-space and user-space virtual range policy, high-half
-kernel user-access guard policy, no-alias policy, fail-closed malformed leaf
-decoding, unmap, consistency audit,
+kernel user-access guard policy, low-half user kernel-privilege guard policy,
+kernel/user address-space candidate preflights, no-alias policy, fail-closed
+malformed leaf decoding, unmap, consistency audit,
 empty-table reclamation, and explicit TLB flush targets. It does not claim
 active CR3 replacement, production page-table
 ownership, APIC MMIO activation, global physical-memory ownership, heap
