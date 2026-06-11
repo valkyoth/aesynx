@@ -240,6 +240,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         table_index: usize,
         slot_index: usize,
     ) -> Result<usize, PageTableError> {
+        if table_index >= TABLES || slot_index >= PAGE_TABLE_ENTRIES {
+            return Err(PageTableError::CorruptTable);
+        }
         let slot = self.tables[table_index].slots[slot_index];
         if slot.is_next() {
             let next = slot.next_index()?;

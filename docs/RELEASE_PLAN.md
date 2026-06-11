@@ -580,6 +580,8 @@ Deliverables:
 - Internal next-table slot construction rejects root-table child links.
 - Internal next-table traversal helpers reject dangling and out-of-range child
   links before returning a table index.
+- Internal next-table traversal helpers reject invalid parent/slot indices as
+  corruption instead of panicking.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Map, protect, and unmap reject malformed next-table links without mutating
