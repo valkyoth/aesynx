@@ -86,11 +86,16 @@ fn mapper_mapping_visitor_rejects_accounting_drift() -> Result<(), PageTableErro
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.mapped_pages = 0;
+    let mut called = false;
 
     assert_eq!(
-        mapper.visit_mappings(|_entry| Ok(())),
+        mapper.visit_mappings(|_entry| {
+            called = true;
+            Ok(())
+        }),
         Err(PageTableError::CorruptTable)
     );
+    assert!(!called);
     Ok(())
 }
 

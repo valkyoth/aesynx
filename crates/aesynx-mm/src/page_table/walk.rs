@@ -7,6 +7,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     where
         F: FnMut(PageTableMapping) -> Result<(), PageTableError>,
     {
+        self.audit()?;
         if TABLES == 0 {
             return Err(PageTableError::EmptyArena);
         }
