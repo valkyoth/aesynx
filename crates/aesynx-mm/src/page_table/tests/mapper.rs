@@ -359,7 +359,7 @@ fn mapper_invalid_mapping_flags_failure_is_atomic() -> Result<(), PageTableError
 }
 
 #[test]
-fn mapper_accounting_overflow_failure_is_atomic() -> Result<(), PageTableError> {
+fn mapper_accounting_drift_failure_is_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.mapped_pages = u64::MAX;
     let before = mapper;
@@ -370,7 +370,7 @@ fn mapper_accounting_overflow_failure_is_atomic() -> Result<(), PageTableError> 
             KERNEL_PHYS,
             GenericPageFlags::kernel(PageAccess::ReadOnly),
         ),
-        Err(PageTableError::AddressOverflow)
+        Err(PageTableError::CorruptTable)
     );
     assert_eq!(mapper, before);
     assert_eq!(

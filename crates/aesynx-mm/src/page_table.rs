@@ -94,6 +94,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         validate_virt_page(virt)?;
         validate_phys(phys)?;
         let leaf = PageTableSlot::leaf(PageMapping::new(phys, flags))?;
+        self.audit()?;
         self.validate_map_capacity(virt)?;
         let mapped_pages = self
             .mapped_pages
@@ -115,6 +116,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     pub fn unmap_page(&mut self, virt: VirtAddr) -> Result<UnmapOutcome, PageTableError> {
         validate_virt_page(virt)?;
+        self.audit()?;
         let indices = page_indices(virt);
         let path = self.table_path(indices)?;
         let table_index = path[PAGE_TABLE_LEVELS - 1];
@@ -139,6 +141,8 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         flags: GenericPageFlags,
     ) -> Result<ProtectOutcome, PageTableError> {
         validate_virt_page(virt)?;
+        validate_mapping_flags(flags)?;
+        self.audit()?;
         let indices = page_indices(virt);
         let table_index = self.table_path(indices)?[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
@@ -312,6 +316,11 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             level -= 1;
         }
     }
+}
+
+fn validate_mapping_flags(flags: GenericPageFlags) -> Result<(), PageTableError> {
+    PageTableSlot::leaf(PageMapping::new(PhysAddr::new(0), flags))?;
+    Ok(())
 }
 
 fn flush_for_removed_mapping(virt: VirtAddr, mapping: PageMapping) -> TlbFlush {
