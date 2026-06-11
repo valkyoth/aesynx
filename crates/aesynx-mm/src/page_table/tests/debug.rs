@@ -5,7 +5,7 @@ use crate::{GenericPageFlags, PageAccess};
 use super::{KERNEL_PHYS, KERNEL_VIRT};
 use crate::page_table::{
     PageMapping, PageRangeMapping, PageTableError, PageTableMapper, PageTableMapping,
-    PageTableSlot, TlbFlush, TranslatedRange, X86_64PageTableEntry,
+    PageTableRoot, PageTableSlot, TlbFlush, TranslatedRange, X86_64PageTableEntry,
 };
 
 #[test]
@@ -70,6 +70,20 @@ fn public_mapping_debug_outputs_redact_addresses() -> Result<(), PageTableError>
     assert!(!leaf_slot_debug.contains("raw"));
     assert_debug_hides_addresses(&leaf_slot_debug);
     Ok(())
+}
+
+#[test]
+fn root_debug_reports_model_identity_without_physical_claims() {
+    let root = PageTableRoot::new(0);
+    let debug = format!("{root:?}");
+
+    assert!(debug.contains("PageTableRoot"));
+    assert!(debug.contains("model-root"));
+    assert!(debug.contains("model_table_index"));
+    assert!(!debug.contains("PhysAddr"));
+    assert!(!debug.contains("PhysFrame"));
+    assert!(!debug.contains("cr3"));
+    assert!(!debug.contains("physical"));
 }
 
 #[test]

@@ -224,9 +224,19 @@ impl TranslatedRange {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct PageTableRoot {
     table_index: usize,
+}
+
+impl fmt::Debug for PageTableRoot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PageTableRoot")
+            .field("kind", &"model-root")
+            .field("model_table_index", &self.table_index)
+            .finish()
+    }
 }
 
 impl PageTableRoot {

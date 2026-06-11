@@ -579,6 +579,8 @@ Deliverables:
 - Page-table debug output for mapper, mapping, translation, flush, outcome,
   raw-entry, internal raw-slot, and validated-range types does not dump raw
   table slots or address-bearing fields.
+- Page-table root debug output reports a model-root identity without physical
+  root or CR3 claims.
 - Address-space wrapper debug output redacts the root physical frame.
 - Mapper-produced status reports are inspectable but not externally
   constructible through public fields or constructors.
