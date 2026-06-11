@@ -569,9 +569,9 @@ Deliverables:
   constructor instead of open-coding a separate validation shape.
 - Single-page map/protect/unmap operations validate caller input, audit existing
   mapper structure, and only then mutate slots or accounting.
-- Contiguous map/protect/unmap operations are covered by audit-drift
-  regression tests and must reject corrupt mapper state without committing
-  candidate changes back into the original mapper.
+- Contiguous map/protect/unmap operations are covered by accounting-drift and
+  malformed-link regression tests and must reject corrupt mapper state without
+  committing candidate changes back into the original mapper.
 - Internal map-capacity validation rejects empty table arenas before table
   indexing.
 - Internal table-path validation rejects empty table arenas and invalid slot

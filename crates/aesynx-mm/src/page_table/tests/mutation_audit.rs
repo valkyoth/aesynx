@@ -172,3 +172,66 @@ fn mapper_unmap_page_rejects_malformed_next_link_without_mutation() -> Result<()
     assert_eq!(mapper, corrupt);
     Ok(())
 }
+
+#[test]
+fn mapper_map_range_rejects_malformed_next_link_without_mutation() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    let indices = page_indices(KERNEL_VIRT);
+    mapper.tables[0].slots[indices[0]] = PageTableSlot { raw: 1 << 9 };
+    let corrupt = mapper;
+
+    assert_eq!(
+        mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, flags),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, corrupt);
+    Ok(())
+}
+
+#[test]
+fn mapper_protect_range_rejects_malformed_next_link_without_mutation() -> Result<(), PageTableError>
+{
+    let mut mapper = PageTableMapper::<8>::new()?;
+    mapper.map_contiguous(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        2,
+        GenericPageFlags::kernel(PageAccess::ReadWrite),
+    )?;
+    let indices = page_indices(KERNEL_VIRT);
+    mapper.tables[0].slots[indices[0]] = PageTableSlot { raw: 1 << 9 };
+    let corrupt = mapper;
+
+    assert_eq!(
+        mapper.protect_contiguous(
+            KERNEL_VIRT,
+            2,
+            GenericPageFlags::kernel(PageAccess::ReadOnly)
+        ),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, corrupt);
+    Ok(())
+}
+
+#[test]
+fn mapper_unmap_range_rejects_malformed_next_link_without_mutation() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    mapper.map_contiguous(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        2,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    let indices = page_indices(KERNEL_VIRT);
+    mapper.tables[0].slots[indices[0]] = PageTableSlot { raw: 1 << 9 };
+    let corrupt = mapper;
+
+    assert_eq!(
+        mapper.unmap_contiguous(KERNEL_VIRT, 2),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, corrupt);
+    Ok(())
+}
