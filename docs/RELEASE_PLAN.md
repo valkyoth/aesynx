@@ -554,6 +554,8 @@ Deliverables:
 - Checked public page-mapping descriptor construction for callers that need to
   validate physical-address shape and flags before handing mappings to future
   activation code.
+- Single-page map/protect paths build mappings through the checked descriptor
+  constructor instead of open-coding a separate validation shape.
 - Single-page map/protect/unmap operations validate caller input, audit existing
   mapper structure, and only then mutate slots or accounting.
 - Internal map-capacity validation rejects empty table arenas before table

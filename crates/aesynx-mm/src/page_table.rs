@@ -106,8 +106,8 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         flags: GenericPageFlags,
     ) -> Result<MapOutcome, PageTableError> {
         validate_virt_page(virt)?;
-        validate_phys(phys)?;
-        let leaf = PageTableSlot::leaf(PageMapping::new(phys, flags))?;
+        let mapping = PageMapping::new_checked(phys, flags)?;
+        let leaf = PageTableSlot::leaf(mapping)?;
         self.audit()?;
         self.validate_map_capacity(virt)?;
         let mapped_pages = self
@@ -161,7 +161,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let table_index = self.table_path(indices)?[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
         let previous = slot.leaf_mapping()?;
-        let current = PageMapping::new(previous.phys(), flags);
+        let current = PageMapping::new_checked(previous.phys(), flags)?;
         let replacement = PageTableSlot::leaf(current)?;
         *slot = replacement;
         Ok(ProtectOutcome::new(
