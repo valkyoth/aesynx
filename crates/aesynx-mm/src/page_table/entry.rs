@@ -133,8 +133,12 @@ impl PageTableSlot {
         {
             return Err(PageTableError::CorruptTable);
         }
-        usize::try_from((self.raw & X86_64PageTableEntry::ADDRESS_MASK) >> 12)
-            .map_err(|_error| PageTableError::CorruptTable)
+        let index = usize::try_from((self.raw & X86_64PageTableEntry::ADDRESS_MASK) >> 12)
+            .map_err(|_error| PageTableError::CorruptTable)?;
+        if index == 0 {
+            return Err(PageTableError::CorruptTable);
+        }
+        Ok(index)
     }
 
     pub(crate) fn mapping(self) -> Result<Option<PageMapping>, PageTableError> {

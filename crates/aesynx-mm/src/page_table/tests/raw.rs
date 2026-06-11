@@ -155,3 +155,11 @@ fn next_table_slot_rejects_unencodable_index() {
 fn next_table_slot_rejects_root_table_index() {
     assert_eq!(PageTableSlot::next(0), Err(PageTableError::CorruptTable));
 }
+
+#[test]
+fn raw_next_table_slot_rejects_root_table_index() {
+    let slot = PageTableSlot { raw: 1 | (1 << 9) };
+
+    assert_eq!(slot.next_index(), Err(PageTableError::CorruptTable));
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
+}

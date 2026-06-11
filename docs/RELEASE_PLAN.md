@@ -575,7 +575,8 @@ Deliverables:
 - Raw x86_64 page-table entries expose only the checked mapping encoder and raw
   value accessor; empty/internal slot construction stays private to the mapper,
   and internal raw-slot decoding reports malformed non-empty slots, nonzero
-  non-present slots, and malformed next-table links as `CorruptTable`.
+  non-present slots, malformed next-table links, and decoded root-table child
+  links as `CorruptTable`.
 - Internal next-table slot construction rejects root-table child links.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
