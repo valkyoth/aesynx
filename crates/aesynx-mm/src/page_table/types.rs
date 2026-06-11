@@ -75,7 +75,7 @@ impl fmt::Debug for PageMapping {
 
 impl PageMapping {
     #[must_use]
-    pub const fn new(phys: PhysAddr, flags: GenericPageFlags) -> Self {
+    pub(crate) const fn new(phys: PhysAddr, flags: GenericPageFlags) -> Self {
         Self { phys, flags }
     }
 

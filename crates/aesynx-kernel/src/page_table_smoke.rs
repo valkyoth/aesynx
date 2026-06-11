@@ -236,20 +236,22 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     mapper
         .ensure_no_user_mappings()
         .map_err(PageTableSmokeError::Mapper)?;
+    let expected_range_first =
+        aesynx_mm::PageMapping::new_checked(SMOKE_RANGE_PHYS, range_execute_flags)
+            .map_err(PageTableSmokeError::Mapper)?;
+    let expected_range_second = aesynx_mm::PageMapping::new_checked(
+        aesynx_abi::PhysAddr::new(SMOKE_RANGE_PHYS.get() + 0x1000),
+        range_execute_flags,
+    )
+    .map_err(PageTableSmokeError::Mapper)?;
     let mut visited_range_pages = 0u64;
     let visited_pages = mapper
         .visit_mappings(|entry| {
             let mapping = entry.mapping();
-            if entry.virt() == SMOKE_RANGE_VIRT
-                && mapping == aesynx_mm::PageMapping::new(SMOKE_RANGE_PHYS, range_execute_flags)
-            {
+            if entry.virt() == SMOKE_RANGE_VIRT && mapping == expected_range_first {
                 visited_range_pages += 1;
             } else if entry.virt() == aesynx_abi::VirtAddr::new(SMOKE_RANGE_VIRT.get() + 0x1000)
-                && mapping
-                    == aesynx_mm::PageMapping::new(
-                        aesynx_abi::PhysAddr::new(SMOKE_RANGE_PHYS.get() + 0x1000),
-                        range_execute_flags,
-                    )
+                && mapping == expected_range_second
             {
                 visited_range_pages += 1;
             }

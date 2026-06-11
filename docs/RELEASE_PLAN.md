@@ -556,6 +556,9 @@ Deliverables:
 - Checked public page-mapping descriptor construction for callers that need to
   validate physical-address shape and flags before handing mappings to future
   activation code.
+- Unchecked page-mapping descriptor construction is crate-private; external
+  callers must use the checked constructor before comparing or passing mapping
+  descriptors around.
 - Single-page map/protect paths build mappings through the checked descriptor
   constructor instead of open-coding a separate validation shape.
 - Single-page map/protect/unmap operations validate caller input, audit existing
