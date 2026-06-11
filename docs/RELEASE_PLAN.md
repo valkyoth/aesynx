@@ -578,6 +578,8 @@ Deliverables:
   non-present slots, and malformed next-table links as `CorruptTable`.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
+- Map, protect, and unmap reject malformed next-table links without mutating
+  mapper state.
 - Kernel-only mapping policy check for candidate kernel address spaces.
 - High-half kernel user-access guard policy check for future mixed address
   spaces.
@@ -625,7 +627,8 @@ Verification:
   unmap, empty-table reclamation, sibling preservation, double-map rejection,
   invalid address rejection, atomic capacity failure, mapping visitor behavior,
   mapping visitor corruption rejection, hidden table ownership drift rejection,
-  mutation and lookup rejection on pre-existing accounting drift,
+  mutation and lookup rejection on pre-existing accounting drift, malformed
+  next-link mutation rejection,
   malformed leaf rejection, redacted page-table debug output, kernel-range policy
   checks, user-range policy checks, write-protected range checks,
   non-executable range checks, executable range checks, normal-memory range
