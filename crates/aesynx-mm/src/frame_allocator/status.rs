@@ -2,12 +2,44 @@ use super::{BitmapFrameAllocator, FrameAllocatorError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FrameAllocatorStatus {
-    pub total_frames: u64,
-    pub known_frames: u64,
-    pub free_frames: u64,
-    pub used_frames: u64,
-    pub reserved_frames: u64,
-    pub unknown_frames: u64,
+    total_frames: u64,
+    known_frames: u64,
+    free_frames: u64,
+    used_frames: u64,
+    reserved_frames: u64,
+    unknown_frames: u64,
+}
+
+impl FrameAllocatorStatus {
+    #[must_use]
+    pub const fn total_frames(self) -> u64 {
+        self.total_frames
+    }
+
+    #[must_use]
+    pub const fn known_frames(self) -> u64 {
+        self.known_frames
+    }
+
+    #[must_use]
+    pub const fn free_frames(self) -> u64 {
+        self.free_frames
+    }
+
+    #[must_use]
+    pub const fn used_frames(self) -> u64 {
+        self.used_frames
+    }
+
+    #[must_use]
+    pub const fn reserved_frames(self) -> u64 {
+        self.reserved_frames
+    }
+
+    #[must_use]
+    pub const fn unknown_frames(self) -> u64 {
+        self.unknown_frames
+    }
 }
 
 impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {

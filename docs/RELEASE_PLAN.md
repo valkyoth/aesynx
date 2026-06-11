@@ -558,7 +558,9 @@ Deliverables:
 - Internal table-path validation rejects empty table arenas and invalid slot
   indices before root-table indexing.
 - Frame allocator checked status reporting rejects impossible private bitmap
-  combinations, while unchecked status reporting avoids arithmetic underflow.
+  combinations, keeps status fields read-only through public accessors, is used
+  by the QEMU frame-allocator smoke, and leaves unchecked status reporting
+  underflow-resistant.
 - Read-only mapping visitor for future policy checks.
 - Mapping visitor rejects hidden table ownership drift before policy checks can
   trust its output.

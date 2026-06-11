@@ -36,7 +36,9 @@ pub fn run(
             .map_err(FrameAllocatorSmokeError::Allocator)?;
     }
 
-    let before = allocator.status();
+    let before = allocator
+        .status_checked()
+        .map_err(FrameAllocatorSmokeError::Allocator)?;
     let contiguous = allocator
         .allocate_contiguous(2)
         .map_err(FrameAllocatorSmokeError::Allocator)?;
@@ -55,17 +57,19 @@ pub fn run(
     allocator
         .free_contiguous(contiguous)
         .map_err(FrameAllocatorSmokeError::Allocator)?;
-    let after = allocator.status();
-    if before.free_frames != after.free_frames {
+    let after = allocator
+        .status_checked()
+        .map_err(FrameAllocatorSmokeError::Allocator)?;
+    if before.free_frames() != after.free_frames() {
         return Err(FrameAllocatorSmokeError::StateMismatch);
     }
 
     Ok(FrameAllocatorSmokeStatus {
-        total_frames: after.total_frames,
-        known_frames: after.known_frames,
-        free_before: before.free_frames,
-        free_after: after.free_frames,
-        reserved_frames: after.reserved_frames,
+        total_frames: after.total_frames(),
+        known_frames: after.known_frames(),
+        free_before: before.free_frames(),
+        free_after: after.free_frames(),
+        reserved_frames: after.reserved_frames(),
         contiguous_count: contiguous.count(),
         double_free_check: true,
     })
