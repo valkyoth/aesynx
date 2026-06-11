@@ -404,6 +404,14 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     }
 }
 
+impl PageMapping {
+    pub fn new_checked(phys: PhysAddr, flags: GenericPageFlags) -> Result<Self, PageTableError> {
+        validate_phys(phys)?;
+        validate_mapping_flags(flags)?;
+        Ok(Self::new(phys, flags))
+    }
+}
+
 fn validate_mapping_flags(flags: GenericPageFlags) -> Result<(), PageTableError> {
     PageTableSlot::leaf(PageMapping::new(PhysAddr::new(0), flags))?;
     Ok(())

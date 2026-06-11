@@ -551,6 +551,9 @@ Deliverables:
 - Map/unmap plus fail-closed single-address and contiguous byte-range
   translation, audit-backed read-only mapping lookup, and checked permission
   changes for 4 KiB pages.
+- Checked public page-mapping descriptor construction for callers that need to
+  validate physical-address shape and flags before handing mappings to future
+  activation code.
 - Single-page map/protect/unmap operations validate caller input, audit existing
   mapper structure, and only then mutate slots or accounting.
 - Internal map-capacity validation rejects empty table arenas before table

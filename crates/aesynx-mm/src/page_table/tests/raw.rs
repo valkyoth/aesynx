@@ -4,6 +4,44 @@ use super::KERNEL_PHYS;
 use crate::page_table::{PageMapping, PageTableError, PageTableSlot, X86_64PageTableEntry};
 
 #[test]
+fn page_mapping_checked_constructor_accepts_safe_mapping() {
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+
+    assert_eq!(
+        PageMapping::new_checked(KERNEL_PHYS, flags),
+        Ok(PageMapping::new(KERNEL_PHYS, flags))
+    );
+}
+
+#[test]
+fn page_mapping_checked_constructor_rejects_malformed_physical_address() {
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+
+    assert_eq!(
+        PageMapping::new_checked(aesynx_abi::PhysAddr::new(KERNEL_PHYS.get() + 1), flags),
+        Err(PageTableError::UnalignedPhysicalAddress)
+    );
+}
+
+#[test]
+fn page_mapping_checked_constructor_rejects_invalid_flags() {
+    let mut device_execute = GenericPageFlags::kernel(PageAccess::ReadExecute);
+    device_execute.device_memory = true;
+    device_execute.cacheable = false;
+    let mut user_global = GenericPageFlags::user(PageAccess::ReadOnly);
+    user_global.global = true;
+
+    assert_eq!(
+        PageMapping::new_checked(KERNEL_PHYS, device_execute),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+    assert_eq!(
+        PageMapping::new_checked(KERNEL_PHYS, user_global),
+        Err(PageTableError::InvalidMappingFlags)
+    );
+}
+
+#[test]
 fn x86_64_entry_encodes_safe_mapping_flags() -> Result<(), PageTableError> {
     let flags = GenericPageFlags::kernel(PageAccess::ReadExecute)
         .with_global()
