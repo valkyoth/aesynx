@@ -614,6 +614,8 @@ Deliverables:
 - Local virtual range policy check for non-global per-address-space mappings.
 - High-half kernel-space virtual range policy check.
 - Low-half user-space virtual range policy check.
+- Internal virtual-space range validation rejects zero-page input before
+  endpoint arithmetic.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape with conservative merge semantics.
 - QEMU smoke for root-table identity, checked root-table identity, checked

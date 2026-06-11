@@ -220,6 +220,7 @@ pub(super) fn validate_virtual_space(
     page_count: u64,
     space: VirtualSpace,
 ) -> Result<(), PageTableError> {
+    validate_page_count(page_count)?;
     let last = add_pages_to_virt(virt, page_count - 1)?;
     if virtual_space(virt) != space || virtual_space(last) != space {
         return Err(PageTableError::UnexpectedVirtualAddressSpace);

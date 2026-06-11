@@ -3,6 +3,7 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{GenericPageFlags, PageAccess};
 
 use super::{KERNEL_PHYS, KERNEL_VIRT};
+use crate::page_table::range::{VirtualSpace, validate_virtual_space};
 use crate::page_table::{PAGE_TABLE_ENTRIES, PageTableError, PageTableMapper, PageTableSlot};
 
 const USER_VIRT: VirtAddr = VirtAddr::new(0x0000_0000_0040_0000);
@@ -31,6 +32,14 @@ fn mapper_verifies_user_space_range() -> Result<(), PageTableError> {
 
     assert_eq!(mapper, before);
     Ok(())
+}
+
+#[test]
+fn virtual_space_validator_rejects_zero_pages() {
+    assert_eq!(
+        validate_virtual_space(KERNEL_VIRT, 0, VirtualSpace::Kernel),
+        Err(PageTableError::InvalidPageCount)
+    );
 }
 
 #[test]
