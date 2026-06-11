@@ -110,6 +110,33 @@ fn raw_slot_decode_rejects_unknown_leaf_bits() {
 }
 
 #[test]
+fn raw_slot_decode_rejects_nonpresent_nonempty_slot() {
+    let slot = PageTableSlot {
+        raw: KERNEL_PHYS.get(),
+    };
+
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
+}
+
+#[test]
+fn next_table_slot_rejects_missing_present_bit() {
+    let slot = PageTableSlot { raw: 1 << 9 };
+
+    assert_eq!(slot.next_index(), Err(PageTableError::CorruptTable));
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
+}
+
+#[test]
+fn next_table_slot_rejects_leaf_flag_corruption() {
+    let slot = PageTableSlot {
+        raw: 1 | (1 << 1) | (1 << 9) | 0x1000,
+    };
+
+    assert_eq!(slot.next_index(), Err(PageTableError::CorruptTable));
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
+}
+
+#[test]
 fn raw_slot_decode_ignores_empty_and_next_slots() -> Result<(), PageTableError> {
     assert_eq!(PageTableSlot::EMPTY.mapping(), Ok(None));
     assert_eq!(PageTableSlot::next(1)?.mapping(), Ok(None));

@@ -69,3 +69,12 @@ fn mapper_audit_rejects_duplicate_table_parent() -> Result<(), PageTableError> {
     assert_eq!(mapper.audit(), Err(PageTableError::CorruptTable));
     Ok(())
 }
+
+#[test]
+fn mapper_audit_rejects_malformed_next_table_slot() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.tables[0].slots[0] = PageTableSlot { raw: 1 << 9 };
+
+    assert_eq!(mapper.audit(), Err(PageTableError::CorruptTable));
+    Ok(())
+}

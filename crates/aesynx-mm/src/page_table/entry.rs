@@ -40,6 +40,8 @@ impl X86_64PageTableEntry {
         | Self::GLOBAL
         | Self::NO_EXECUTE
         | Self::ADDRESS_MASK;
+    const ALLOWED_NEXT_TABLE_BITS: u64 =
+        Self::PRESENT | Self::SOFTWARE_NEXT_TABLE | Self::ADDRESS_MASK;
 
     pub fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
         validate_phys(mapping.phys())?;
@@ -122,7 +124,10 @@ impl PageTableSlot {
     }
 
     pub(crate) fn next_index(self) -> Result<usize, PageTableError> {
-        if !self.is_next() {
+        if !self.is_next()
+            || self.raw & X86_64PageTableEntry::PRESENT == 0
+            || self.raw & !X86_64PageTableEntry::ALLOWED_NEXT_TABLE_BITS != 0
+        {
             return Err(PageTableError::CorruptTable);
         }
         usize::try_from((self.raw & X86_64PageTableEntry::ADDRESS_MASK) >> 12)
@@ -130,8 +135,15 @@ impl PageTableSlot {
     }
 
     pub(crate) fn mapping(self) -> Result<Option<PageMapping>, PageTableError> {
-        if self.is_empty() || self.is_next() || self.raw & X86_64PageTableEntry::PRESENT == 0 {
+        if self.is_empty() {
             return Ok(None);
+        }
+        if self.is_next() {
+            self.next_index()?;
+            return Ok(None);
+        }
+        if self.raw & X86_64PageTableEntry::PRESENT == 0 {
+            return Err(PageTableError::CorruptTable);
         }
         if self.raw & !X86_64PageTableEntry::ALLOWED_LEAF_BITS != 0 {
             return Err(PageTableError::CorruptTable);
