@@ -302,6 +302,89 @@ fn allocator_checked_status_rejects_overlapping_classes() -> Result<(), FrameAll
 }
 
 #[test]
+fn allocator_allocation_rejects_corrupt_bitmap_without_mutation() -> Result<(), FrameAllocatorError>
+{
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.free.set(0, true)?;
+    let before = allocator;
+
+    assert_eq!(
+        allocator.allocate_one(),
+        Err(FrameAllocatorError::CorruptAllocator)
+    );
+    assert_eq!(allocator, before);
+    Ok(())
+}
+
+#[test]
+fn allocator_mark_region_rejects_corrupt_bitmap_without_mutation() -> Result<(), FrameAllocatorError>
+{
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.known.set(0, true)?;
+    allocator.free.set(0, true)?;
+    allocator.kernel.set(0, true)?;
+    let before = allocator;
+
+    assert_eq!(
+        allocator.mark_region(
+            PhysAddr::new(2 * FRAME_SIZE),
+            FRAME_SIZE,
+            FrameRegionKind::Free,
+        ),
+        Err(FrameAllocatorError::CorruptAllocator)
+    );
+    assert_eq!(allocator, before);
+    assert_eq!(
+        allocator.debug_state(PhysFrame::new(2)),
+        FrameState::Unknown
+    );
+    Ok(())
+}
+
+#[test]
+fn allocator_free_rejects_corrupt_bitmap_without_mutation() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.mark_region(
+        PhysAddr::new(FRAME_SIZE),
+        4 * FRAME_SIZE,
+        FrameRegionKind::Free,
+    )?;
+    let frame = allocator.allocate_one()?;
+    allocator.free.set(0, true)?;
+    allocator.kernel.set(0, true)?;
+    let before = allocator;
+
+    assert_eq!(
+        allocator.free(frame),
+        Err(FrameAllocatorError::CorruptAllocator)
+    );
+    assert_eq!(allocator, before);
+    Ok(())
+}
+
+#[test]
+fn allocator_free_contiguous_rejects_corrupt_bitmap_without_mutation()
+-> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.mark_region(
+        PhysAddr::new(FRAME_SIZE),
+        4 * FRAME_SIZE,
+        FrameRegionKind::Free,
+    )?;
+    let frames = allocator.allocate_contiguous(2)?;
+    allocator.free.set(0, true)?;
+    allocator.kernel.set(0, true)?;
+    let before = allocator;
+
+    assert_eq!(
+        allocator.free_contiguous(frames),
+        Err(FrameAllocatorError::CorruptAllocator)
+    );
+    assert_eq!(allocator, before);
+    Ok(())
+}
+
+#[test]
 fn allocator_rejects_reserved_free() -> Result<(), FrameAllocatorError> {
     let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
     allocator.mark_region(

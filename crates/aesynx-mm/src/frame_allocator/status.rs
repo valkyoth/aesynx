@@ -84,7 +84,7 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
             + self.bad.count_ones(self.total_frames)
     }
 
-    fn validate_status_bitmaps(&self) -> Result<(), FrameAllocatorError> {
+    pub(super) fn validate_status_bitmaps(&self) -> Result<(), FrameAllocatorError> {
         let mut index = 0u64;
         while index < self.total_frames {
             let free = self.free.get(index);

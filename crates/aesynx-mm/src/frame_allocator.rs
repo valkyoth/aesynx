@@ -223,6 +223,7 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
             return Ok(());
         }
 
+        self.validate_status_bitmaps()?;
         self.validate_unknown_range(mark_start, mark_end, allocator_start)?;
         self.commit_region(mark_start, mark_end, allocator_start, kind)?;
 
@@ -241,6 +242,7 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
         if count == 0 || count > self.total_frames {
             return Err(FrameAllocatorError::InvalidFrameCount);
         }
+        self.validate_status_bitmaps()?;
 
         let mut run_start = 0u64;
         let mut run_len = 0u64;
@@ -268,6 +270,7 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
     }
 
     pub fn free(&mut self, frame: PhysFrame) -> Result<(), FrameAllocatorError> {
+        self.validate_status_bitmaps()?;
         let index = self.index_of(frame)?;
         match self.debug_state(frame) {
             FrameState::Used => self.free.set(index, true),
@@ -286,6 +289,7 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
         if frames.count() == 0 {
             return Err(FrameAllocatorError::InvalidFrameCount);
         }
+        self.validate_status_bitmaps()?;
         self.validate_freeable_run(frames)?;
         let mut offset = 0u64;
         while offset < frames.count() {

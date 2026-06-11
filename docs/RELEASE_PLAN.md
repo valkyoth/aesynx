@@ -566,6 +566,8 @@ Deliverables:
   combinations, keeps status fields read-only through public accessors, is used
   by the QEMU frame-allocator smoke, and leaves unchecked status reporting
   underflow-resistant.
+- Frame allocator region marking, allocation, and free paths reject corrupt
+  private bitmap combinations before committing bitmap mutations.
 - Frame allocator contiguous-allocation tokens are allocator-produced; external
   code can inspect start/count but cannot directly construct tokens for free
   paths, and debug output redacts the start frame.
