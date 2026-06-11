@@ -231,6 +231,7 @@ pub(super) fn validate_virtual_space(
 pub(super) fn validate_range_walk<const TABLES: usize>(
     page_count: u64,
 ) -> Result<(), PageTableError> {
+    validate_page_count(page_count)?;
     let max_pages = (TABLES as u64)
         .checked_mul(super::PAGE_TABLE_ENTRIES as u64)
         .ok_or(PageTableError::AddressOverflow)?;

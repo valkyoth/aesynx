@@ -616,6 +616,8 @@ Deliverables:
 - Low-half user-space virtual range policy check.
 - Internal virtual-space range validation rejects zero-page input before
   endpoint arithmetic.
+- Internal range-walk validation rejects zero-page input before bounded walk
+  accounting.
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape with conservative merge semantics.
 - QEMU smoke for root-table identity, checked root-table identity, checked

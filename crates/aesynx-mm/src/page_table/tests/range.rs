@@ -3,6 +3,7 @@ use aesynx_abi::{PhysAddr, VirtAddr};
 use crate::{GenericPageFlags, PageAccess};
 
 use super::{KERNEL_PHYS, KERNEL_VIRT};
+use crate::page_table::range::validate_range_walk;
 use crate::page_table::{PAGE_TABLE_ENTRIES, PageTableError, PageTableMapper, TlbFlush};
 
 #[test]
@@ -151,6 +152,14 @@ fn mapper_contiguous_ranges_are_walk_bounded() -> Result<(), PageTableError> {
     );
     assert_eq!(mapper, before);
     Ok(())
+}
+
+#[test]
+fn range_walk_validator_rejects_zero_pages() {
+    assert_eq!(
+        validate_range_walk::<4>(0),
+        Err(PageTableError::InvalidPageCount)
+    );
 }
 
 #[test]
