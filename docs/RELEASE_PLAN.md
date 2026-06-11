@@ -565,8 +565,9 @@ Deliverables:
   addresses.
 - Mapper-produced audit and mapping-summary reports are inspectable but not
   externally constructible through public constructors.
-- Page-table debug output for mapper, mapping, translation, flush, outcome, and
-  raw-entry types does not dump raw table slots or address-bearing fields.
+- Page-table debug output for mapper, mapping, translation, flush, outcome,
+  raw-entry, internal raw-slot, and validated-range types does not dump raw
+  table slots or address-bearing fields.
 - Mapper-produced status reports are inspectable but not externally
   constructible through public fields or constructors.
 - Mapper-produced operation outcomes and range reports are inspectable but not

@@ -1,3 +1,5 @@
+use core::fmt;
+
 use aesynx_abi::{PhysAddr, VirtAddr};
 
 use crate::FRAME_SIZE;
@@ -47,10 +49,20 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 struct ValidatedByteRange {
     start_page: VirtAddr,
     pages: u64,
+}
+
+impl fmt::Debug for ValidatedByteRange {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ValidatedByteRange")
+            .field("start_page", &"<redacted>")
+            .field("pages", &self.pages)
+            .finish()
+    }
 }
 
 fn validate_virt_byte_range(
@@ -93,4 +105,42 @@ fn validate_virt_byte_range(
 
 fn canonical_sign_bit(virt: VirtAddr) -> u64 {
     (virt.get() >> 47) & 1
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::{format, string::ToString};
+
+    use aesynx_abi::VirtAddr;
+
+    use crate::page_table::PageTableError;
+
+    use super::{ValidatedByteRange, validate_virt_byte_range};
+
+    #[test]
+    fn validated_byte_range_debug_redacts_start_page() -> Result<(), PageTableError> {
+        let virt = VirtAddr::new(0xffff_8000_0000_3000);
+        let range = validate_virt_byte_range(virt, 64)?;
+        let debug = format!("{range:?}");
+
+        assert!(debug.contains("<redacted>"));
+        assert!(debug.contains("pages"));
+        assert!(!debug.contains("VirtAddr"));
+        assert!(!debug.contains(&virt.get().to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn validated_byte_range_debug_keeps_accounting_visible() {
+        let range = ValidatedByteRange {
+            start_page: VirtAddr::new(0),
+            pages: 3,
+        };
+        let debug = format!("{range:?}");
+
+        assert!(debug.contains("<redacted>"));
+        assert!(debug.contains("pages"));
+        assert!(debug.contains('3'));
+        assert!(!debug.contains("VirtAddr"));
+    }
 }

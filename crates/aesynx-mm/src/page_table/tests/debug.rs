@@ -4,8 +4,8 @@ use crate::{GenericPageFlags, PageAccess};
 
 use super::{KERNEL_PHYS, KERNEL_VIRT};
 use crate::page_table::{
-    PageMapping, PageRangeMapping, PageTableError, PageTableMapper, PageTableMapping, TlbFlush,
-    TranslatedRange, X86_64PageTableEntry,
+    PageMapping, PageRangeMapping, PageTableError, PageTableMapper, PageTableMapping,
+    PageTableSlot, TlbFlush, TranslatedRange, X86_64PageTableEntry,
 };
 
 #[test]
@@ -57,6 +57,7 @@ fn public_mapping_debug_outputs_redact_addresses() -> Result<(), PageTableError>
     let range = PageRangeMapping::new(KERNEL_PHYS, 2, flags);
     let translated = TranslatedRange::new(KERNEL_PHYS, 64, 1, flags);
     let entry = X86_64PageTableEntry::from_mapping(mapping)?;
+    let leaf_slot = PageTableSlot::leaf(mapping)?;
 
     assert_debug_redacts_addresses(&format!("{mapping:?}"));
     assert_debug_redacts_addresses(&format!("{visited:?}"));
@@ -64,6 +65,10 @@ fn public_mapping_debug_outputs_redact_addresses() -> Result<(), PageTableError>
     assert_debug_redacts_addresses(&format!("{translated:?}"));
     assert_debug_redacts_addresses(&format!("{:?}", TlbFlush::Page(KERNEL_VIRT)));
     assert_debug_redacts_addresses(&format!("{entry:?}"));
+    let leaf_slot_debug = format!("{leaf_slot:?}");
+    assert!(leaf_slot_debug.contains("leaf-or-corrupt"));
+    assert!(!leaf_slot_debug.contains("raw"));
+    assert_debug_hides_addresses(&leaf_slot_debug);
     Ok(())
 }
 
@@ -85,6 +90,10 @@ fn outcome_debug_outputs_redact_mapping_addresses() -> Result<(), PageTableError
 
 fn assert_debug_redacts_addresses(debug: &str) {
     assert!(debug.contains("<redacted>"));
+    assert_debug_hides_addresses(debug);
+}
+
+fn assert_debug_hides_addresses(debug: &str) {
     assert!(!debug.contains("PhysAddr"));
     assert!(!debug.contains("VirtAddr"));
     assert!(!debug.contains(&KERNEL_PHYS.get().to_string()));

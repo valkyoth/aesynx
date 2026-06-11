@@ -76,9 +76,18 @@ impl X86_64PageTableEntry {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) struct PageTableSlot {
     pub(crate) raw: u64,
+}
+
+impl fmt::Debug for PageTableSlot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PageTableSlot")
+            .field("state", &self.debug_state())
+            .finish()
+    }
 }
 
 impl PageTableSlot {
@@ -172,5 +181,15 @@ impl PageTableSlot {
             return Err(PageTableError::CorruptTable);
         }
         self.mapping().ok_or(PageTableError::CorruptTable)
+    }
+
+    fn debug_state(self) -> &'static str {
+        if self.is_empty() {
+            "empty"
+        } else if self.is_next() {
+            "next"
+        } else {
+            "leaf-or-corrupt"
+        }
     }
 }
