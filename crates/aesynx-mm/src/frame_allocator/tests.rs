@@ -82,6 +82,47 @@ fn allocated_frames_debug_redacts_start_frame() -> Result<(), FrameAllocatorErro
 }
 
 #[test]
+fn allocator_debug_redacts_base_and_raw_bitmaps() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.mark_region(
+        PhysAddr::new(FRAME_SIZE),
+        4 * FRAME_SIZE,
+        FrameRegionKind::Free,
+    )?;
+    let _frame = allocator.allocate_one()?;
+
+    let debug = format!("{allocator:?}");
+
+    assert!(debug.contains("BitmapFrameAllocator"));
+    assert!(debug.contains("base_frame: \"<redacted>\""));
+    assert!(debug.contains("total_frames: 8"));
+    assert!(debug.contains("known_frames: 4"));
+    assert!(debug.contains("free_frames: 3"));
+    assert!(debug.contains("used_frames: 1"));
+    assert!(debug.contains("status_ok: true"));
+    assert!(!debug.contains("PhysFrame"));
+    assert!(!debug.contains("FrameBitmap"));
+    assert!(!debug.contains("words"));
+    Ok(())
+}
+
+#[test]
+fn allocator_debug_reports_corruption_without_dumping_bitmaps() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.free.set(0, true)?;
+
+    let debug = format!("{allocator:?}");
+
+    assert!(debug.contains("BitmapFrameAllocator"));
+    assert!(debug.contains("base_frame: \"<redacted>\""));
+    assert!(debug.contains("status_ok: false"));
+    assert!(!debug.contains("PhysFrame"));
+    assert!(!debug.contains("FrameBitmap"));
+    assert!(!debug.contains("words"));
+    Ok(())
+}
+
+#[test]
 fn allocator_rejects_overlapping_regions() -> Result<(), FrameAllocatorError> {
     let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
     allocator.mark_region(

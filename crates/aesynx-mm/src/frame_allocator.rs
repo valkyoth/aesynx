@@ -124,7 +124,7 @@ impl<const WORDS: usize> FrameBitmap<WORDS> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct BitmapFrameAllocator<const WORDS: usize> {
     base_frame: PhysFrame,
     total_frames: u64,
@@ -136,6 +136,23 @@ pub struct BitmapFrameAllocator<const WORDS: usize> {
     device: FrameBitmap<WORDS>,
     acpi: FrameBitmap<WORDS>,
     bad: FrameBitmap<WORDS>,
+}
+
+impl<const WORDS: usize> fmt::Debug for BitmapFrameAllocator<WORDS> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = self.status();
+        formatter
+            .debug_struct("BitmapFrameAllocator")
+            .field("base_frame", &"<redacted>")
+            .field("total_frames", &status.total_frames())
+            .field("known_frames", &status.known_frames())
+            .field("free_frames", &status.free_frames())
+            .field("used_frames", &status.used_frames())
+            .field("reserved_frames", &status.reserved_frames())
+            .field("unknown_frames", &status.unknown_frames())
+            .field("status_ok", &self.status_checked().is_ok())
+            .finish()
+    }
 }
 
 impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {

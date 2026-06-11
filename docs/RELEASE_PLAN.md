@@ -569,6 +569,8 @@ Deliverables:
 - Frame allocator contiguous-allocation tokens are allocator-produced; external
   code can inspect start/count but cannot directly construct tokens for free
   paths, and debug output redacts the start frame.
+- Frame allocator debug output redacts the allocator base frame and raw bitmap
+  words while preserving aggregate counters and corruption status.
 - Read-only mapping visitor for future policy checks.
 - Mapping visitor rejects hidden table ownership drift before policy checks can
   trust its output.
