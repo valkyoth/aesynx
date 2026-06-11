@@ -1,3 +1,5 @@
+use alloc::format;
+
 use aesynx_abi::{PhysAddr, PhysFrame};
 
 use super::{BitmapFrameAllocator, FRAME_SIZE, FrameAllocatorError, FrameRegionKind, FrameState};
@@ -57,6 +59,25 @@ fn allocator_allocates_contiguous_frames() -> Result<(), FrameAllocatorError> {
     assert_eq!(allocator.debug_state(PhysFrame::new(2)), FrameState::Used);
     assert_eq!(allocator.debug_state(PhysFrame::new(4)), FrameState::Used);
     assert_eq!(allocator.debug_state(PhysFrame::new(5)), FrameState::Free);
+    Ok(())
+}
+
+#[test]
+fn allocated_frames_debug_redacts_start_frame() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.mark_region(
+        PhysAddr::new(FRAME_SIZE),
+        8 * FRAME_SIZE,
+        FrameRegionKind::Free,
+    )?;
+
+    let frames = allocator.allocate_contiguous(3)?;
+    let debug = format!("{frames:?}");
+
+    assert!(debug.contains("AllocatedFrames"));
+    assert!(debug.contains("start: \"<redacted>\""));
+    assert!(debug.contains("count: 3"));
+    assert!(!debug.contains("PhysFrame"));
     Ok(())
 }
 

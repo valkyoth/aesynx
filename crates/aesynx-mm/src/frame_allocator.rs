@@ -1,3 +1,5 @@
+use core::fmt;
+
 use aesynx_abi::{PhysAddr, PhysFrame};
 
 mod status;
@@ -47,15 +49,25 @@ pub enum FrameAllocatorError {
     OutOfFrames,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AllocatedFrames {
     start: PhysFrame,
     count: u64,
 }
 
+impl fmt::Debug for AllocatedFrames {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AllocatedFrames")
+            .field("start", &"<redacted>")
+            .field("count", &self.count)
+            .finish()
+    }
+}
+
 impl AllocatedFrames {
     #[must_use]
-    pub const fn new(start: PhysFrame, count: u64) -> Self {
+    pub(crate) const fn new(start: PhysFrame, count: u64) -> Self {
         Self { start, count }
     }
 
