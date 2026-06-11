@@ -530,6 +530,8 @@ Deliverables:
   handle construction.
 - Checked root-table identity that runs mapper audit before reporting the model
   root.
+- Unchecked page-table root reporting is test-only; external callers must use
+  the audit-backed checked root path.
 - Checked status path that reports mapper counters only after audit validation.
 - Unchecked page-table status reporting is test-only; external callers must use
   the audit-backed checked status path.

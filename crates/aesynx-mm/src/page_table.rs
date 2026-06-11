@@ -94,8 +94,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         })
     }
 
+    #[cfg(test)]
     #[must_use]
-    pub const fn root_table(&self) -> PageTableRoot {
+    pub(crate) const fn root_table(&self) -> PageTableRoot {
         PageTableRoot::new(0)
     }
 
