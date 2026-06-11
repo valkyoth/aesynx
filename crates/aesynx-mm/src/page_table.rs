@@ -301,6 +301,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         &self,
         indices: [usize; PAGE_TABLE_LEVELS],
     ) -> Result<[usize; PAGE_TABLE_LEVELS], PageTableError> {
+        if TABLES == 0 {
+            return Err(PageTableError::EmptyArena);
+        }
         let mut path = [0usize; PAGE_TABLE_LEVELS];
         let mut table_index = 0usize;
         path[0] = table_index;

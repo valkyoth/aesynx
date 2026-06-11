@@ -555,6 +555,8 @@ Deliverables:
   mapper structure, and only then mutate slots or accounting.
 - Internal map-capacity validation rejects empty table arenas before table
   indexing.
+- Internal table-path validation rejects empty table arenas before root-table
+  indexing.
 - Read-only mapping visitor for future policy checks.
 - Mapping visitor rejects hidden table ownership drift before policy checks can
   trust its output.

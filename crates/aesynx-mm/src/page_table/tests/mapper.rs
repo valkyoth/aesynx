@@ -461,3 +461,17 @@ fn mapper_capacity_helper_rejects_empty_arena() {
         Err(PageTableError::EmptyArena)
     );
 }
+
+#[test]
+fn mapper_table_path_helper_rejects_empty_arena() {
+    let mapper = PageTableMapper::<0> {
+        tables: [],
+        used: [],
+        mapped_pages: 0,
+    };
+
+    assert_eq!(
+        mapper.table_path([0usize; crate::page_table::PAGE_TABLE_LEVELS]),
+        Err(PageTableError::EmptyArena)
+    );
+}
