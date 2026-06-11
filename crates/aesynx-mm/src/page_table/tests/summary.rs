@@ -62,7 +62,25 @@ fn mapper_summary_rejects_corrupt_tables() -> Result<(), PageTableError> {
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
     mapper.mapped_pages = 1;
+    let corrupt = mapper;
 
     assert_eq!(mapper.mapping_summary(), Err(PageTableError::CorruptTable));
+    assert_eq!(mapper, corrupt);
+    Ok(())
+}
+
+#[test]
+fn mapper_summary_rejects_accounting_drift_without_mutation() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.mapped_pages = 0;
+    let corrupt = mapper;
+
+    assert_eq!(mapper.mapping_summary(), Err(PageTableError::CorruptTable));
+    assert_eq!(mapper, corrupt);
     Ok(())
 }

@@ -596,7 +596,7 @@ Deliverables:
 - Empty intermediate table reclamation after unmap.
 - Read-only consistency audit for reachable tables and mapped-page accounting.
 - Redacted mapping summaries for page classes without reporting physical
-  addresses.
+  addresses, with fail-closed accounting-drift and corrupt-table coverage.
 - Mapper-produced audit and mapping-summary reports are inspectable but not
   externally constructible through public constructors.
 - Page-table debug output for mapper, mapping, translation, flush, outcome,
