@@ -21,10 +21,10 @@ fn mapper_maps_and_translates_page() -> Result<(), PageTableError> {
     let outcome = mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
 
     assert_eq!(outcome.flush(), TlbFlush::Page(KERNEL_VIRT));
-    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    assert_eq!(mapper.translate(KERNEL_VIRT), Ok(KERNEL_PHYS));
     assert_eq!(
         mapper.translate(VirtAddr::new(KERNEL_VIRT.get() + 0x123)),
-        Some(PhysAddr::new(KERNEL_PHYS.get() + 0x123))
+        Ok(PhysAddr::new(KERNEL_PHYS.get() + 0x123))
     );
     assert_eq!(
         mapper.translate_checked(VirtAddr::new(KERNEL_VIRT.get() + 0x123)),
@@ -73,7 +73,10 @@ fn mapper_unmaps_page_and_reports_flush() -> Result<(), PageTableError> {
 
     assert_eq!(outcome.mapping(), PageMapping::new(KERNEL_PHYS, flags));
     assert_eq!(outcome.flush(), TlbFlush::Page(KERNEL_VIRT));
-    assert_eq!(mapper.translate(KERNEL_VIRT), None);
+    assert_eq!(
+        mapper.translate(KERNEL_VIRT),
+        Err(PageTableError::NotMapped)
+    );
     assert_eq!(
         mapper.unmap_page(KERNEL_VIRT),
         Err(PageTableError::NotMapped)
@@ -135,7 +138,7 @@ fn mapper_unmap_preserves_tables_needed_by_siblings() -> Result<(), PageTableErr
 
     assert_eq!(mapper.status().used_tables(), PAGE_TABLE_LEVELS as u64);
     assert_eq!(mapper.status().mapped_pages(), 1);
-    assert_eq!(mapper.translate(sibling), Some(PhysAddr::new(0x0020_1000)));
+    assert_eq!(mapper.translate(sibling), Ok(PhysAddr::new(0x0020_1000)));
     Ok(())
 }
 
@@ -212,7 +215,7 @@ fn mapper_protects_existing_page_permissions() -> Result<(), PageTableError> {
         mapper.mapping_for_page(KERNEL_VIRT),
         Ok(PageMapping::new(KERNEL_PHYS, protected))
     );
-    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    assert_eq!(mapper.translate(KERNEL_VIRT), Ok(KERNEL_PHYS));
     assert_eq!(mapper.status().mapped_pages(), 1);
     Ok(())
 }
@@ -283,7 +286,7 @@ fn mapper_rejects_double_map_without_mutation() -> Result<(), PageTableError> {
         Err(PageTableError::AlreadyMapped)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    assert_eq!(mapper.translate(KERNEL_VIRT), Ok(KERNEL_PHYS));
     Ok(())
 }
 
@@ -315,7 +318,10 @@ fn mapper_rejects_noncanonical_and_unaligned_addresses() -> Result<(), PageTable
         ),
         Err(PageTableError::UnalignedPhysicalAddress)
     );
-    assert_eq!(mapper.translate(VirtAddr::new(0x0000_8000_0000_0000)), None);
+    assert_eq!(
+        mapper.translate(VirtAddr::new(0x0000_8000_0000_0000)),
+        Err(PageTableError::InvalidVirtualAddress)
+    );
     assert_eq!(
         mapper.translate_checked(VirtAddr::new(0x0000_8000_0000_0000)),
         Err(PageTableError::InvalidVirtualAddress)
@@ -399,7 +405,7 @@ fn mapper_unmap_validation_failures_are_atomic() -> Result<(), PageTableError> {
         Err(PageTableError::UnalignedVirtualAddress)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    assert_eq!(mapper.translate(KERNEL_VIRT), Ok(KERNEL_PHYS));
     Ok(())
 }
 

@@ -117,8 +117,9 @@ usable, reserved, and frame counts. It seeds a bounded early bitmap allocator
 from a usable memory-map window and verifies one-frame allocation/free,
 contiguous allocation/free, debug state, and double-free detection. It also
 exercises a bounded x86_64-shaped page-table mapper model with typed root-table
-identity, checked status, map, checked translation, checked byte-range translation, permission lookup, contiguous
-range lookup, permission change, translate, contiguous range map/protect/unmap,
+identity, checked status, map, fail-closed single-address translation, checked
+byte-range translation, permission lookup, contiguous range lookup, permission
+change, contiguous range map/protect/unmap,
 unmapped range checks, read-only mapping visit, virtual range permission
 verification, kernel-space and user-space virtual range policy, high-half
 kernel user-access guard policy, low-half user kernel-privilege guard policy,

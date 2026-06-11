@@ -91,7 +91,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
 
     let translated = mapper
         .translate(aesynx_abi::VirtAddr::new(SMOKE_VIRT.get() + SMOKE_OFFSET))
-        .ok_or(PageTableSmokeError::UnexpectedTranslation)?;
+        .map_err(PageTableSmokeError::Mapper)?;
     if translated != aesynx_abi::PhysAddr::new(SMOKE_PHYS.get() + SMOKE_OFFSET) {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
@@ -133,7 +133,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if unmap.mapping().phys() != SMOKE_PHYS || unmap.mapping().flags() != protected_flags {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
-    if mapper.translate(SMOKE_VIRT).is_some() {
+    if mapper.translate(SMOKE_VIRT) != Err(aesynx_mm::PageTableError::NotMapped) {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     if mapper
@@ -205,7 +205,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::FlushMismatch);
     }
     if mapper.translate(aesynx_abi::VirtAddr::new(SMOKE_RANGE_VIRT.get() + 0x1000))
-        != Some(aesynx_abi::PhysAddr::new(SMOKE_RANGE_PHYS.get() + 0x1000))
+        != Ok(aesynx_abi::PhysAddr::new(SMOKE_RANGE_PHYS.get() + 0x1000))
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
@@ -265,7 +265,7 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     if range_unmap.pages() != 2 || range_unmap.flush() != aesynx_mm::TlbFlush::AddressSpace {
         return Err(PageTableSmokeError::FlushMismatch);
     }
-    if mapper.translate(SMOKE_RANGE_VIRT).is_some() {
+    if mapper.translate(SMOKE_RANGE_VIRT) != Err(aesynx_mm::PageTableError::NotMapped) {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
     if mapper.ensure_mapped_contiguous(SMOKE_RANGE_VIRT, 2).is_ok() {

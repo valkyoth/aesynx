@@ -837,7 +837,7 @@ pub fn map_page(
 
 pub fn unmap_page(&mut self, page: Page) -> Result<PhysFrame, UnmapError>;
 
-pub fn translate(&self, addr: VirtAddr) -> Option<PhysAddr>;
+pub fn translate(&self, addr: VirtAddr) -> Result<PhysAddr, PageTableError>;
 ```
 
 ## 8.3 Page flags

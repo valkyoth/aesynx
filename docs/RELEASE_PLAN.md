@@ -548,7 +548,7 @@ Deliverables:
   but empty address spaces before policy validation.
 - User address-space candidate preflight rejects structurally valid but
   kernel-only address spaces before future per-task code can consume them.
-- Map/unmap/translate plus checked single-address and contiguous byte-range
+- Map/unmap plus fail-closed single-address and contiguous byte-range
   translation, audit-backed read-only mapping lookup, and checked permission
   changes for 4 KiB pages.
 - Single-page map/protect/unmap operations validate caller input, audit existing
@@ -601,7 +601,7 @@ Deliverables:
 - Generic page flags carried through mappings.
 - Explicit TLB flush target shape with conservative merge semantics.
 - QEMU smoke for root-table identity, checked root-table identity, checked
-  status, map, checked translation, checked byte-range translation, mapping
+  status, map, fail-closed translation, checked byte-range translation, mapping
   lookup, page-presence checks,
   mapped-range checks, kernel-range policy
   checks, user-range policy checks, write-protected range checks,
@@ -618,7 +618,7 @@ Deliverables:
 Verification:
 
 - Host tests for root-table identity, checked root-table identity, checked
-  status, map, translate, checked translation, checked byte-range translation,
+  status, map, fail-closed translation, checked byte-range translation,
   mapping lookup, page-presence checks, mapped-range checks, permission changes,
   unmap, empty-table reclamation, sibling preservation, double-map rejection,
   invalid address rejection, atomic capacity failure, mapping visitor behavior,

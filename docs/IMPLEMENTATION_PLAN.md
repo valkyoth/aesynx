@@ -505,7 +505,7 @@ pub trait ArchMemory {
         space: &mut AddressSpace,
         virt: VirtAddr,
     ) -> Result<PhysAddr, MemoryError>;
-    fn translate(space: &AddressSpace, virt: VirtAddr) -> Option<PhysAddr>;
+    fn translate(space: &AddressSpace, virt: VirtAddr) -> Result<PhysAddr, MemoryError>;
     fn activate_address_space(space: &AddressSpace) -> Result<(), MemoryError>;
     fn flush_tlb(addr: Option<VirtAddr>) -> Result<(), MemoryError>;
 }

@@ -171,8 +171,8 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         ))
     }
 
-    pub fn translate(&self, virt: VirtAddr) -> Option<PhysAddr> {
-        self.translate_checked(virt).ok()
+    pub fn translate(&self, virt: VirtAddr) -> Result<PhysAddr, PageTableError> {
+        self.translate_checked(virt)
     }
 
     pub fn translate_checked(&self, virt: VirtAddr) -> Result<PhysAddr, PageTableError> {

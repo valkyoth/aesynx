@@ -15,10 +15,10 @@ fn mapper_maps_contiguous_range_atomically() -> Result<(), PageTableError> {
     assert_eq!(outcome.pages(), 3);
     assert_eq!(outcome.flush(), TlbFlush::AddressSpace);
     assert_eq!(mapper.status().mapped_pages(), 3);
-    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    assert_eq!(mapper.translate(KERNEL_VIRT), Ok(KERNEL_PHYS));
     assert_eq!(
         mapper.translate(VirtAddr::new(KERNEL_VIRT.get() + 0x2000)),
-        Some(PhysAddr::new(KERNEL_PHYS.get() + 0x2000))
+        Ok(PhysAddr::new(KERNEL_PHYS.get() + 0x2000))
     );
     Ok(())
 }
@@ -401,7 +401,10 @@ fn mapper_unmaps_contiguous_range_atomically() -> Result<(), PageTableError> {
     assert_eq!(outcome.flush(), TlbFlush::AddressSpace);
     assert_eq!(mapper.status().mapped_pages(), 0);
     assert_eq!(mapper.status().used_tables(), 1);
-    assert_eq!(mapper.translate(KERNEL_VIRT), None);
+    assert_eq!(
+        mapper.translate(KERNEL_VIRT),
+        Err(PageTableError::NotMapped)
+    );
     Ok(())
 }
 
@@ -418,7 +421,7 @@ fn mapper_contiguous_unmap_failure_is_atomic() -> Result<(), PageTableError> {
     );
     assert_eq!(mapper, before);
     assert_eq!(mapper.status().mapped_pages(), 2);
-    assert_eq!(mapper.translate(KERNEL_VIRT), Some(KERNEL_PHYS));
+    assert_eq!(mapper.translate(KERNEL_VIRT), Ok(KERNEL_PHYS));
     Ok(())
 }
 
