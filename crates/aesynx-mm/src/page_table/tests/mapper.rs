@@ -375,7 +375,7 @@ fn mapper_accounting_drift_failure_is_atomic() -> Result<(), PageTableError> {
     assert_eq!(mapper, before);
     assert_eq!(
         mapper.mapping_for_page(KERNEL_VIRT),
-        Err(PageTableError::NotMapped)
+        Err(PageTableError::CorruptTable)
     );
     Ok(())
 }
@@ -418,7 +418,7 @@ fn mapper_unmap_rejects_accounting_underflow_without_mutation() -> Result<(), Pa
     assert_eq!(mapper, before);
     assert_eq!(
         mapper.mapping_for_page(KERNEL_VIRT),
-        Ok(PageMapping::new(KERNEL_PHYS, flags))
+        Err(PageTableError::CorruptTable)
     );
     Ok(())
 }

@@ -35,6 +35,29 @@ fn mapper_reports_page_presence_without_mutation() -> Result<(), PageTableError>
 }
 
 #[test]
+fn mapper_lookup_and_presence_reject_accounting_drift() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.mapped_pages = 2;
+    let corrupt = mapper;
+
+    assert_eq!(
+        mapper.mapping_for_page(KERNEL_VIRT),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(
+        mapper.is_page_mapped(KERNEL_VIRT),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, corrupt);
+    Ok(())
+}
+
+#[test]
 fn mapper_page_presence_rejects_invalid_virtual_addresses() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
 

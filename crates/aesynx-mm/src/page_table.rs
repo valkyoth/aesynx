@@ -167,7 +167,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         }
         self.audit()?;
         let page = VirtAddr::new(virt.get() & !PAGE_OFFSET_MASK);
-        let mapping = self.mapping_for_page(page)?;
+        let mapping = self.mapping_for_address(page)?;
         let offset = virt.get() & PAGE_OFFSET_MASK;
         mapping
             .phys()
@@ -179,6 +179,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     pub fn mapping_for_page(&self, virt: VirtAddr) -> Result<PageMapping, PageTableError> {
         validate_virt_page(virt)?;
+        self.audit()?;
         self.mapping_for_address(virt)
     }
 

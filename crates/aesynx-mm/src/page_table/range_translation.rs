@@ -16,7 +16,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         validate_range_walk::<TABLES>(checked.pages)?;
         self.audit()?;
 
-        let first = self.mapping_for_page(checked.start_page)?;
+        let first = self.mapping_for_address(checked.start_page)?;
         let offset = virt.get() & PAGE_OFFSET_MASK;
         let start_phys = first
             .phys()
@@ -28,7 +28,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut page_offset = 1u64;
         while page_offset < checked.pages {
             let mapping =
-                self.mapping_for_page(add_pages_to_virt(checked.start_page, page_offset)?)?;
+                self.mapping_for_address(add_pages_to_virt(checked.start_page, page_offset)?)?;
             if mapping.phys() != add_pages_to_phys(first.phys(), page_offset)? {
                 return Err(PageTableError::NonContiguousRange);
             }

@@ -48,11 +48,11 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         validate_range_walk::<TABLES>(page_count)?;
         self.audit()?;
 
-        let first = self.mapping_for_page(virt)?;
+        let first = self.mapping_for_address(virt)?;
         let flags = first.flags();
         let mut offset = 1u64;
         while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
+            let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
             if mapping.phys() != add_pages_to_phys(first.phys(), offset)?
                 || mapping.flags() != flags
             {
@@ -75,7 +75,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
         let mut offset = 0u64;
         while offset < page_count {
-            match self.mapping_for_page(add_pages_to_virt(virt, offset)?) {
+            match self.mapping_for_address(add_pages_to_virt(virt, offset)?) {
                 Ok(_mapping) => return Err(PageTableError::AlreadyMapped),
                 Err(PageTableError::NotMapped) => {}
                 Err(error) => return Err(error),
@@ -97,8 +97,10 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
         let mut offset = 0u64;
         while offset < page_count {
-            if !self.is_page_mapped(add_pages_to_virt(virt, offset)?)? {
-                return Err(PageTableError::NotMapped);
+            match self.mapping_for_address(add_pages_to_virt(virt, offset)?) {
+                Ok(_mapping) => {}
+                Err(PageTableError::NotMapped) => return Err(PageTableError::NotMapped),
+                Err(error) => return Err(error),
             }
             offset += 1;
         }
@@ -119,7 +121,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
         let mut offset = 0u64;
         while offset < page_count {
-            let mapping = self.mapping_for_page(add_pages_to_virt(virt, offset)?)?;
+            let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
             if mapping.flags() != flags {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }

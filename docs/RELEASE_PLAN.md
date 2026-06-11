@@ -549,8 +549,8 @@ Deliverables:
 - User address-space candidate preflight rejects structurally valid but
   kernel-only address spaces before future per-task code can consume them.
 - Map/unmap/translate plus checked single-address and contiguous byte-range
-  translation, read-only mapping lookup, and checked permission changes for
-  4 KiB pages.
+  translation, audit-backed read-only mapping lookup, and checked permission
+  changes for 4 KiB pages.
 - Single-page map/protect/unmap operations validate caller input, audit existing
   mapper structure, and only then mutate slots or accounting.
 - Read-only mapping visitor for future policy checks.
@@ -620,7 +620,7 @@ Verification:
   unmap, empty-table reclamation, sibling preservation, double-map rejection,
   invalid address rejection, atomic capacity failure, mapping visitor behavior,
   mapping visitor corruption rejection, hidden table ownership drift rejection,
-  mutation rejection on pre-existing accounting drift,
+  mutation and lookup rejection on pre-existing accounting drift,
   malformed leaf rejection, kernel-range policy
   checks, user-range policy checks, write-protected range checks,
   non-executable range checks, executable range checks, normal-memory range
