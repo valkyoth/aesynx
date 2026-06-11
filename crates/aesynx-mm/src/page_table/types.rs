@@ -234,7 +234,6 @@ impl fmt::Debug for PageTableRoot {
         formatter
             .debug_struct("PageTableRoot")
             .field("kind", &"model-root")
-            .field("model_table_index", &self.table_index)
             .finish()
     }
 }
@@ -245,6 +244,7 @@ impl PageTableRoot {
         Self { table_index }
     }
 
+    #[cfg(test)]
     #[must_use]
     pub const fn table_index(self) -> usize {
         self.table_index

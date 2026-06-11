@@ -73,13 +73,14 @@ fn public_mapping_debug_outputs_redact_addresses() -> Result<(), PageTableError>
 }
 
 #[test]
-fn root_debug_reports_model_identity_without_physical_claims() {
+fn root_debug_redacts_model_internals_without_physical_claims() {
     let root = PageTableRoot::new(0);
     let debug = format!("{root:?}");
 
     assert!(debug.contains("PageTableRoot"));
     assert!(debug.contains("model-root"));
-    assert!(debug.contains("model_table_index"));
+    assert!(!debug.contains("model_table_index"));
+    assert!(!debug.contains("table_index"));
     assert!(!debug.contains("PhysAddr"));
     assert!(!debug.contains("PhysFrame"));
     assert!(!debug.contains("cr3"));

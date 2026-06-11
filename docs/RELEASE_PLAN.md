@@ -525,9 +525,9 @@ Control virtual memory.
 Deliverables:
 
 - Safe bounded x86_64-shaped page-table mapper model.
-- Mapper-issued typed root-table identity for future address-space activation
-  work without exposing raw physical addresses or allowing external root
-  handle construction.
+- Mapper-issued opaque typed root-table identity for future address-space
+  activation work without exposing raw physical addresses, model table indices,
+  or allowing external root handle construction.
 - Checked root-table identity that runs mapper audit before reporting the model
   root.
 - Unchecked page-table root reporting is test-only; external callers must use

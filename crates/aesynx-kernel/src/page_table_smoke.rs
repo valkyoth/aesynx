@@ -63,14 +63,9 @@ const SMOKE_PAGE_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     let mut mapper = aesynx_mm::PageTableMapper::<SMOKE_PAGE_TABLES>::new()
         .map_err(PageTableSmokeError::Mapper)?;
-    if mapper
+    mapper
         .root_table_checked()
-        .map_err(PageTableSmokeError::Mapper)?
-        .table_index()
-        != 0
-    {
-        return Err(PageTableSmokeError::UnexpectedTranslation);
-    }
+        .map_err(PageTableSmokeError::Mapper)?;
     let flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite);
     let protected_flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadOnly);
     if mapper
