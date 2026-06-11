@@ -475,3 +475,16 @@ fn mapper_table_path_helper_rejects_empty_arena() {
         Err(PageTableError::EmptyArena)
     );
 }
+
+#[test]
+fn mapper_table_path_helper_rejects_invalid_slot_index() -> Result<(), PageTableError> {
+    let mapper = PageTableMapper::<4>::new()?;
+    let mut indices = [0usize; crate::page_table::PAGE_TABLE_LEVELS];
+    indices[0] = crate::page_table::PAGE_TABLE_ENTRIES;
+
+    assert_eq!(
+        mapper.table_path(indices),
+        Err(PageTableError::CorruptTable)
+    );
+    Ok(())
+}

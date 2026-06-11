@@ -308,6 +308,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut table_index = 0usize;
         path[0] = table_index;
         for (level, slot_index) in indices.iter().enumerate().take(PAGE_TABLE_LEVELS - 1) {
+            if *slot_index >= PAGE_TABLE_ENTRIES {
+                return Err(PageTableError::CorruptTable);
+            }
             let slot = self.tables[table_index].slots[*slot_index];
             if slot.is_next() {
                 let next = slot.next_index()?;
