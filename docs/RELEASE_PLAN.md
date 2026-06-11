@@ -531,6 +531,8 @@ Deliverables:
 - Checked root-table identity that runs mapper audit before reporting the model
   root.
 - Checked status path that reports mapper counters only after audit validation.
+- Unchecked page-table status reporting is test-only; external callers must use
+  the audit-backed checked status path.
 - Kernel address-space candidate preflight that combines audit, checked root,
   checked status, non-empty mapping state, no-user-space-mapping,
   no-user-mapping, no-device, and no-physical-alias gates before future

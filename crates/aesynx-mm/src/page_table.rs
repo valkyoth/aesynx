@@ -197,8 +197,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         self.mapping_for_address(virt)
     }
 
+    #[cfg(test)]
     #[must_use]
-    pub fn status(&self) -> PageTableStatus {
+    pub(crate) fn status(&self) -> PageTableStatus {
         PageTableStatus::new(TABLES as u64, self.used_tables(), self.mapped_pages)
     }
 

@@ -123,7 +123,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
 
-    let before_unmap = mapper.status();
+    let before_unmap = mapper
+        .status_checked()
+        .map_err(PageTableSmokeError::Mapper)?;
     let unmap = mapper
         .unmap_page(SMOKE_VIRT)
         .map_err(PageTableSmokeError::Mapper)?;
@@ -142,7 +144,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
-    let after_unmap = mapper.status();
+    let after_unmap = mapper
+        .status_checked()
+        .map_err(PageTableSmokeError::Mapper)?;
     if after_unmap.used_tables() != 1 {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
@@ -276,7 +280,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     mapper
         .ensure_unmapped_contiguous(SMOKE_RANGE_VIRT, 2)
         .map_err(PageTableSmokeError::Mapper)?;
-    let after_range = mapper.status();
+    let after_range = mapper
+        .status_checked()
+        .map_err(PageTableSmokeError::Mapper)?;
     if after_range.used_tables() != 1 || after_range.mapped_pages() != 0 {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
@@ -342,7 +348,9 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     {
         return Err(PageTableSmokeError::FlushMismatch);
     }
-    let final_status = mapper.status();
+    let final_status = mapper
+        .status_checked()
+        .map_err(PageTableSmokeError::Mapper)?;
     if final_status.used_tables() != 1 || final_status.mapped_pages() != 0 {
         return Err(PageTableSmokeError::UnexpectedTranslation);
     }
