@@ -4,6 +4,8 @@
 #[cfg(test)]
 extern crate alloc;
 
+use core::fmt;
+
 use aesynx_abi::PhysFrame;
 
 mod frame_allocator;
@@ -20,9 +22,18 @@ pub use page_table::{
     TlbFlush, TranslatedRange, UnmapOutcome, UnmapRangeOutcome, X86_64PageTableEntry,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct AddressSpace {
     root: PhysFrame,
+}
+
+impl fmt::Debug for AddressSpace {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AddressSpace")
+            .field("root", &"<redacted>")
+            .finish()
+    }
 }
 
 impl AddressSpace {
@@ -149,7 +160,22 @@ pub enum MmError {
 
 #[cfg(test)]
 mod tests {
-    use super::{GenericPageFlags, PageAccess, PagePrivilege};
+    use alloc::format;
+
+    use aesynx_abi::PhysFrame;
+
+    use super::{AddressSpace, GenericPageFlags, PageAccess, PagePrivilege};
+
+    #[test]
+    fn address_space_debug_redacts_root_frame() {
+        let space = AddressSpace::new(PhysFrame::new(42));
+        let debug = format!("{space:?}");
+
+        assert!(debug.contains("AddressSpace"));
+        assert!(debug.contains("root: \"<redacted>\""));
+        assert!(!debug.contains("PhysFrame"));
+        assert!(!debug.contains("42"));
+    }
 
     #[test]
     fn page_access_cannot_be_write_and_execute() {

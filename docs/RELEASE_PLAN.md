@@ -579,6 +579,7 @@ Deliverables:
 - Page-table debug output for mapper, mapping, translation, flush, outcome,
   raw-entry, internal raw-slot, and validated-range types does not dump raw
   table slots or address-bearing fields.
+- Address-space wrapper debug output redacts the root physical frame.
 - Mapper-produced status reports are inspectable but not externally
   constructible through public fields or constructors.
 - Mapper-produced operation outcomes and range reports are inspectable but not
