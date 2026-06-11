@@ -242,7 +242,11 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<usize, PageTableError> {
         let slot = self.tables[table_index].slots[slot_index];
         if slot.is_next() {
-            return slot.next_index();
+            let next = slot.next_index()?;
+            if next >= TABLES || !self.used[next] {
+                return Err(PageTableError::CorruptTable);
+            }
+            return Ok(next);
         }
         if slot.is_empty() {
             let next = self.allocate_table()?;

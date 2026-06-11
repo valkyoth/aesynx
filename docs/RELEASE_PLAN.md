@@ -578,6 +578,8 @@ Deliverables:
   non-present slots, malformed next-table links, and decoded root-table child
   links as `CorruptTable`.
 - Internal next-table slot construction rejects root-table child links.
+- Internal next-table traversal helpers reject dangling and out-of-range child
+  links before returning a table index.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Map, protect, and unmap reject malformed next-table links without mutating

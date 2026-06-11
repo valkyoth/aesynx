@@ -4,7 +4,7 @@ use crate::{GenericPageFlags, PageAccess};
 
 use super::{KERNEL_PHYS, KERNEL_VIRT};
 use crate::page_table::{
-    PAGE_TABLE_LEVELS, PageMapping, PageTableError, PageTableMapper, TlbFlush,
+    PAGE_TABLE_LEVELS, PageMapping, PageTableError, PageTableMapper, PageTableSlot, TlbFlush,
 };
 
 #[test]
@@ -445,5 +445,35 @@ fn mapper_capacity_failure_is_atomic() -> Result<(), PageTableError> {
     assert_eq!(mapper, before);
     assert_eq!(mapper.status().used_tables(), 1);
     assert_eq!(mapper.status().mapped_pages(), 0);
+    Ok(())
+}
+
+#[test]
+fn mapper_next_table_helper_rejects_unused_child_link() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.ensure_next_table(0, 0),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_next_table_helper_rejects_out_of_range_child_link() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<2>::new()?;
+    mapper.tables[0].slots[0] = PageTableSlot {
+        raw: 1 | (1 << 9) | (2 << 12),
+    };
+    let before = mapper;
+
+    assert_eq!(
+        mapper.ensure_next_table(0, 0),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, before);
     Ok(())
 }
