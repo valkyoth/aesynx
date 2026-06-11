@@ -582,6 +582,8 @@ Deliverables:
   links before returning a table index.
 - Internal next-table traversal helpers reject invalid parent/slot indices as
   corruption instead of panicking.
+- Internal empty-table reclamation rejects invalid, root-child, unused, or
+  out-of-range paths before mutating mapper state.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Map, protect, and unmap reject malformed next-table links without mutating

@@ -142,7 +142,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             .ok_or(PageTableError::CorruptTable)?;
         *slot = PageTableSlot::EMPTY;
         self.mapped_pages = mapped_pages;
-        self.reclaim_empty_tables(indices, path);
+        self.reclaim_empty_tables(indices, path)?;
         Ok(UnmapOutcome::new(
             mapping,
             flush_for_removed_mapping(virt, mapping),
@@ -324,19 +324,30 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         &mut self,
         indices: [usize; PAGE_TABLE_LEVELS],
         path: [usize; PAGE_TABLE_LEVELS],
-    ) {
+    ) -> Result<(), PageTableError> {
         let mut level = PAGE_TABLE_LEVELS - 1;
         while level > 0 {
             let table_index = path[level];
+            let parent = path[level - 1];
+            let parent_slot = indices[level - 1];
+            if table_index == 0
+                || table_index >= TABLES
+                || parent >= TABLES
+                || parent_slot >= PAGE_TABLE_ENTRIES
+                || !self.used[table_index]
+                || !self.used[parent]
+            {
+                return Err(PageTableError::CorruptTable);
+            }
             if !self.tables[table_index].is_empty() {
                 break;
             }
-            let parent = path[level - 1];
-            self.tables[parent].slots[indices[level - 1]] = PageTableSlot::EMPTY;
+            self.tables[parent].slots[parent_slot] = PageTableSlot::EMPTY;
             self.tables[table_index] = PageTable::EMPTY;
             self.used[table_index] = false;
             level -= 1;
         }
+        Ok(())
     }
 }
 
