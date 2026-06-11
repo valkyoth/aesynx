@@ -93,11 +93,13 @@ fn mapper_translate_byte_range_rejects_accounting_drift() -> Result<(), PageTabl
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.mapped_pages = 2;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(KERNEL_VIRT, 0x80),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -157,11 +159,13 @@ fn mapper_translate_byte_range_rejects_corrupt_leaf() -> Result<(), PageTableErr
     mapper.tables[3].slots[1] = PageTableSlot {
         raw: (KERNEL_PHYS.get() + FRAME_SIZE) | 1 | (1 << 1),
     };
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(VirtAddr::new(KERNEL_VIRT.get() + 0xff0), 0x20),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 

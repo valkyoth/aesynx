@@ -74,10 +74,12 @@ fn mapper_mapped_range_check_rejects_corrupt_intermediate_leaf() -> Result<(), P
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_mapped_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }

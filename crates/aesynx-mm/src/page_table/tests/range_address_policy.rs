@@ -139,16 +139,20 @@ fn mapper_space_range_checks_reject_corrupt_tables() -> Result<(), PageTableErro
         Err(PageTableError::UnexpectedVirtualAddressSpace)
     );
     kernel_mapper.used[1] = false;
+    let corrupt_kernel = kernel_mapper;
     assert_eq!(
         kernel_mapper.ensure_kernel_space_contiguous(KERNEL_VIRT, 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(kernel_mapper, corrupt_kernel);
 
     let mut user_mapper = PageTableMapper::<4>::new()?;
     user_mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
+    let corrupt_user = user_mapper;
     assert_eq!(
         user_mapper.ensure_user_space_contiguous(USER_VIRT, 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(user_mapper, corrupt_user);
     Ok(())
 }

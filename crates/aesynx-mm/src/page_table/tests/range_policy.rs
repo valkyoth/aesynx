@@ -375,11 +375,13 @@ fn mapper_write_protected_range_check_rejects_corrupt_tables() -> Result<(), Pag
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_write_protected_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -388,11 +390,13 @@ fn mapper_non_executable_range_check_rejects_corrupt_tables() -> Result<(), Page
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_non_executable_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -401,11 +405,13 @@ fn mapper_executable_range_check_rejects_corrupt_tables() -> Result<(), PageTabl
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_executable_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -414,11 +420,13 @@ fn mapper_normal_memory_range_check_rejects_corrupt_tables() -> Result<(), PageT
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_normal_memory_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -427,10 +435,12 @@ fn mapper_local_range_check_rejects_corrupt_tables() -> Result<(), PageTableErro
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_local_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }

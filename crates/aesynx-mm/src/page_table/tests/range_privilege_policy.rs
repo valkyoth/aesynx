@@ -154,11 +154,13 @@ fn mapper_kernel_range_check_rejects_corrupt_tables() -> Result<(), PageTableErr
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_kernel_mapped_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -167,10 +169,12 @@ fn mapper_user_range_check_rejects_corrupt_tables() -> Result<(), PageTableError
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_user_mapped_contiguous(VirtAddr::new(0), 1),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
