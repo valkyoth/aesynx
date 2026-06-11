@@ -142,7 +142,7 @@ fn mapper_mapping_visitor_rejects_intermediate_leaf_slots() -> Result<(), PageTa
 fn mapper_mapping_visitor_rejects_table_cycles_without_leaf_mappings() -> Result<(), PageTableError>
 {
     let mut mapper = PageTableMapper::<4>::new()?;
-    mapper.tables[0].slots[0] = PageTableSlot::next(0)?;
+    mapper.tables[0].slots[0] = PageTableSlot { raw: 1 | (1 << 9) };
 
     assert_eq!(
         mapper.visit_mappings(|_entry| Ok(())),

@@ -96,6 +96,9 @@ impl PageTableSlot {
     pub(crate) const EMPTY: Self = Self { raw: 0 };
 
     pub(crate) fn next(index: usize) -> Result<Self, PageTableError> {
+        if index == 0 {
+            return Err(PageTableError::CorruptTable);
+        }
         let encoded = (index as u64)
             .checked_mul(FRAME_SIZE)
             .ok_or(PageTableError::AddressOverflow)?;

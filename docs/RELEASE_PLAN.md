@@ -576,6 +576,7 @@ Deliverables:
   value accessor; empty/internal slot construction stays private to the mapper,
   and internal raw-slot decoding reports malformed non-empty slots, nonzero
   non-present slots, and malformed next-table links as `CorruptTable`.
+- Internal next-table slot construction rejects root-table child links.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Map, protect, and unmap reject malformed next-table links without mutating

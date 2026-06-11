@@ -150,3 +150,8 @@ fn next_table_slot_rejects_unencodable_index() {
         Err(PageTableError::AddressOverflow)
     );
 }
+
+#[test]
+fn next_table_slot_rejects_root_table_index() {
+    assert_eq!(PageTableSlot::next(0), Err(PageTableError::CorruptTable));
+}
