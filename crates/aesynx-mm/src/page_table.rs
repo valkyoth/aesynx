@@ -325,27 +325,67 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         indices: [usize; PAGE_TABLE_LEVELS],
         path: [usize; PAGE_TABLE_LEVELS],
     ) -> Result<(), PageTableError> {
+        let mut lowest_reclaim_level = PAGE_TABLE_LEVELS;
+        let mut ignored_child_slot = None;
         let mut level = PAGE_TABLE_LEVELS - 1;
         while level > 0 {
             let table_index = path[level];
             let parent = path[level - 1];
             let parent_slot = indices[level - 1];
-            if table_index == 0
-                || table_index >= TABLES
-                || parent >= TABLES
-                || parent_slot >= PAGE_TABLE_ENTRIES
-                || !self.used[table_index]
-                || !self.used[parent]
-            {
-                return Err(PageTableError::CorruptTable);
-            }
-            if !self.tables[table_index].is_empty() {
+            self.validate_reclaim_step(table_index, parent, parent_slot)?;
+            if !self.table_is_empty_except(table_index, ignored_child_slot) {
                 break;
             }
+            lowest_reclaim_level = level;
+            ignored_child_slot = Some(parent_slot);
+            level -= 1;
+        }
+
+        if lowest_reclaim_level == PAGE_TABLE_LEVELS {
+            return Ok(());
+        }
+
+        let mut level = PAGE_TABLE_LEVELS - 1;
+        while level >= lowest_reclaim_level {
+            let table_index = path[level];
+            let parent = path[level - 1];
+            let parent_slot = indices[level - 1];
             self.tables[parent].slots[parent_slot] = PageTableSlot::EMPTY;
             self.tables[table_index] = PageTable::EMPTY;
             self.used[table_index] = false;
+            if level == lowest_reclaim_level {
+                break;
+            }
             level -= 1;
+        }
+        Ok(())
+    }
+
+    fn table_is_empty_except(&self, table_index: usize, ignored_slot: Option<usize>) -> bool {
+        let mut slot = 0usize;
+        while slot < PAGE_TABLE_ENTRIES {
+            if Some(slot) != ignored_slot && !self.tables[table_index].slots[slot].is_empty() {
+                return false;
+            }
+            slot += 1;
+        }
+        true
+    }
+
+    fn validate_reclaim_step(
+        &self,
+        table_index: usize,
+        parent: usize,
+        parent_slot: usize,
+    ) -> Result<(), PageTableError> {
+        if table_index == 0
+            || table_index >= TABLES
+            || parent >= TABLES
+            || parent_slot >= PAGE_TABLE_ENTRIES
+            || !self.used[table_index]
+            || !self.used[parent]
+        {
+            return Err(PageTableError::CorruptTable);
         }
         Ok(())
     }

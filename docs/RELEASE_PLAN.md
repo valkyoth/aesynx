@@ -584,6 +584,8 @@ Deliverables:
   corruption instead of panicking.
 - Internal empty-table reclamation rejects invalid, root-child, unused, or
   out-of-range paths before mutating mapper state.
+- Internal empty-table reclamation validates the full reclaim span before
+  committing slot/table changes.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Map, protect, and unmap reject malformed next-table links without mutating

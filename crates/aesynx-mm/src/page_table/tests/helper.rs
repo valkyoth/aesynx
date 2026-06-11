@@ -128,3 +128,28 @@ fn mapper_reclaim_helper_rejects_unused_path_without_mutation() -> Result<(), Pa
     assert_eq!(mapper, before);
     Ok(())
 }
+
+#[test]
+fn mapper_reclaim_helper_rejects_late_invalid_path_atomically() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    let mut slot = 0usize;
+    while slot < PAGE_TABLE_ENTRIES {
+        mapper.tables[3].slots[slot] = PageTableSlot::EMPTY;
+        slot += 1;
+    }
+    let before = mapper;
+    let indices = [0usize; PAGE_TABLE_LEVELS];
+    let path = [0usize, 4, 2, 3];
+
+    assert_eq!(
+        mapper.reclaim_empty_tables(indices, path),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
