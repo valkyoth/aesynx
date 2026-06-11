@@ -1,3 +1,5 @@
+use core::fmt;
+
 use aesynx_abi::{PhysAddr, VirtAddr};
 
 use crate::GenericPageFlags;
@@ -26,11 +28,21 @@ pub enum PageTableError {
     AddressOverflow,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TlbFlush {
     None,
     Page(VirtAddr),
     AddressSpace,
+}
+
+impl fmt::Debug for TlbFlush {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::None => formatter.write_str("None"),
+            Self::Page(_virt) => formatter.debug_tuple("Page").field(&"<redacted>").finish(),
+            Self::AddressSpace => formatter.write_str("AddressSpace"),
+        }
+    }
 }
 
 impl TlbFlush {
@@ -45,10 +57,20 @@ impl TlbFlush {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct PageMapping {
     phys: PhysAddr,
     flags: GenericPageFlags,
+}
+
+impl fmt::Debug for PageMapping {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PageMapping")
+            .field("phys", &"<redacted>")
+            .field("flags", &self.flags)
+            .finish()
+    }
 }
 
 impl PageMapping {
@@ -68,10 +90,20 @@ impl PageMapping {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct PageTableMapping {
     virt: VirtAddr,
     mapping: PageMapping,
+}
+
+impl fmt::Debug for PageTableMapping {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PageTableMapping")
+            .field("virt", &"<redacted>")
+            .field("mapping", &self.mapping)
+            .finish()
+    }
 }
 
 impl PageTableMapping {
@@ -91,11 +123,22 @@ impl PageTableMapping {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct PageRangeMapping {
     start_phys: PhysAddr,
     pages: u64,
     flags: GenericPageFlags,
+}
+
+impl fmt::Debug for PageRangeMapping {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PageRangeMapping")
+            .field("start_phys", &"<redacted>")
+            .field("pages", &self.pages)
+            .field("flags", &self.flags)
+            .finish()
+    }
 }
 
 impl PageRangeMapping {
@@ -124,12 +167,24 @@ impl PageRangeMapping {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct TranslatedRange {
     start_phys: PhysAddr,
     byte_len: u64,
     pages: u64,
     flags: GenericPageFlags,
+}
+
+impl fmt::Debug for TranslatedRange {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TranslatedRange")
+            .field("start_phys", &"<redacted>")
+            .field("byte_len", &self.byte_len)
+            .field("pages", &self.pages)
+            .field("flags", &self.flags)
+            .finish()
+    }
 }
 
 impl TranslatedRange {

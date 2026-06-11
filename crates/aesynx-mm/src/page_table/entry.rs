@@ -1,3 +1,5 @@
+use core::fmt;
+
 use aesynx_abi::PhysAddr;
 
 use crate::{FRAME_SIZE, GenericPageFlags};
@@ -5,9 +7,18 @@ use crate::{FRAME_SIZE, GenericPageFlags};
 use super::address::validate_phys;
 use super::{PageMapping, PageTableError};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct X86_64PageTableEntry {
     raw: u64,
+}
+
+impl fmt::Debug for X86_64PageTableEntry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("X86_64PageTableEntry")
+            .field("raw", &"<redacted>")
+            .finish()
+    }
 }
 
 impl X86_64PageTableEntry {
