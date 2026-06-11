@@ -203,6 +203,9 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     }
 
     fn validate_map_capacity(&self, virt: VirtAddr) -> Result<(), PageTableError> {
+        if TABLES == 0 {
+            return Err(PageTableError::EmptyArena);
+        }
         if (TABLES - 1) as u64 > MAX_NEXT_TABLE_INDEX {
             return Err(PageTableError::AddressOverflow);
         }

@@ -553,6 +553,8 @@ Deliverables:
   changes for 4 KiB pages.
 - Single-page map/protect/unmap operations validate caller input, audit existing
   mapper structure, and only then mutate slots or accounting.
+- Internal map-capacity validation rejects empty table arenas before table
+  indexing.
 - Read-only mapping visitor for future policy checks.
 - Mapping visitor rejects hidden table ownership drift before policy checks can
   trust its output.

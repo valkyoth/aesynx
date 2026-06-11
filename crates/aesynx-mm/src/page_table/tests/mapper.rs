@@ -447,3 +447,17 @@ fn mapper_capacity_failure_is_atomic() -> Result<(), PageTableError> {
     assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
+
+#[test]
+fn mapper_capacity_helper_rejects_empty_arena() {
+    let mapper = PageTableMapper::<0> {
+        tables: [],
+        used: [],
+        mapped_pages: 0,
+    };
+
+    assert_eq!(
+        mapper.validate_map_capacity(KERNEL_VIRT),
+        Err(PageTableError::EmptyArena)
+    );
+}
