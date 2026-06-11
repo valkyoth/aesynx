@@ -573,7 +573,9 @@ Deliverables:
 - Mapper-produced operation outcomes and range reports are inspectable but not
   externally constructible through public constructors.
 - Raw x86_64 page-table entries expose only the checked mapping encoder and raw
-  value accessor; empty/internal slot construction stays private to the mapper.
+  value accessor; empty/internal slot construction stays private to the mapper,
+  and internal raw-slot decoding reports malformed non-empty slots as
+  `CorruptTable`.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Kernel-only mapping policy check for candidate kernel address spaces.

@@ -59,7 +59,10 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
                             return Err(PageTableError::CorruptTable);
                         }
                         if !slot.is_empty() {
-                            let mapping = slot.mapping().ok_or(PageTableError::CorruptTable)?;
+                            let mapping = match slot.mapping()? {
+                                Some(mapping) => mapping,
+                                None => return Err(PageTableError::CorruptTable),
+                            };
                             visitor(PageTableMapping::new(
                                 virt_from_indices(l0, l1, l2, l3),
                                 mapping,

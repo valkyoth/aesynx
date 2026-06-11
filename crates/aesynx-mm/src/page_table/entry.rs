@@ -129,12 +129,12 @@ impl PageTableSlot {
             .map_err(|_error| PageTableError::CorruptTable)
     }
 
-    pub(crate) fn mapping(self) -> Option<PageMapping> {
+    pub(crate) fn mapping(self) -> Result<Option<PageMapping>, PageTableError> {
         if self.is_empty() || self.is_next() || self.raw & X86_64PageTableEntry::PRESENT == 0 {
-            return None;
+            return Ok(None);
         }
         if self.raw & !X86_64PageTableEntry::ALLOWED_LEAF_BITS != 0 {
-            return None;
+            return Err(PageTableError::CorruptTable);
         }
 
         let phys = PhysAddr::new(self.raw & X86_64PageTableEntry::ADDRESS_MASK);
@@ -143,13 +143,13 @@ impl PageTableSlot {
         let cache_policy = self.raw & X86_64PageTableEntry::CACHE_POLICY_MASK;
         let device_memory = cache_policy == X86_64PageTableEntry::CACHE_POLICY_MASK;
         if cache_policy != 0 && !device_memory {
-            return None;
+            return Err(PageTableError::CorruptTable);
         }
         if writable && executable {
-            return None;
+            return Err(PageTableError::CorruptTable);
         }
         if device_memory && executable {
-            return None;
+            return Err(PageTableError::CorruptTable);
         }
         let access = if writable {
             crate::PageAccess::ReadWrite
@@ -167,10 +167,12 @@ impl PageTableSlot {
             flags = flags.device();
         }
         if self.raw & X86_64PageTableEntry::GLOBAL != 0 {
-            flags = flags.with_global().ok()?;
+            flags = flags
+                .with_global()
+                .map_err(|_error| PageTableError::CorruptTable)?;
         }
 
-        Some(PageMapping::new(phys, flags))
+        Ok(Some(PageMapping::new(phys, flags)))
     }
 
     pub(crate) fn leaf_mapping(self) -> Result<PageMapping, PageTableError> {
@@ -180,7 +182,10 @@ impl PageTableSlot {
         if self.is_next() {
             return Err(PageTableError::CorruptTable);
         }
-        self.mapping().ok_or(PageTableError::CorruptTable)
+        match self.mapping()? {
+            Some(mapping) => Ok(mapping),
+            None => Err(PageTableError::CorruptTable),
+        }
     }
 
     fn debug_state(self) -> &'static str {

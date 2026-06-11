@@ -60,7 +60,7 @@ fn raw_slot_decode_rejects_write_execute_corruption() {
         raw: KERNEL_PHYS.get() | 1 | (1 << 1),
     };
 
-    assert_eq!(slot.mapping(), None);
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn raw_slot_decode_rejects_user_global_corruption() {
         raw: KERNEL_PHYS.get() | 1 | (1 << 2) | (1 << 8) | (1 << 63),
     };
 
-    assert_eq!(slot.mapping(), None);
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn raw_slot_decode_rejects_executable_device_corruption() {
         raw: KERNEL_PHYS.get() | 1 | (1 << 4),
     };
 
-    assert_eq!(slot.mapping(), None);
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
 }
 
 #[test]
@@ -90,8 +90,14 @@ fn raw_slot_decode_rejects_partial_cache_policy_corruption() {
         raw: KERNEL_PHYS.get() | 1 | (1 << 4) | (1 << 63),
     };
 
-    assert_eq!(write_through_only.mapping(), None);
-    assert_eq!(cache_disable_only.mapping(), None);
+    assert_eq!(
+        write_through_only.mapping(),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(
+        cache_disable_only.mapping(),
+        Err(PageTableError::CorruptTable)
+    );
 }
 
 #[test]
@@ -100,13 +106,13 @@ fn raw_slot_decode_rejects_unknown_leaf_bits() {
         raw: KERNEL_PHYS.get() | 1 | (1 << 10) | (1 << 63),
     };
 
-    assert_eq!(slot.mapping(), None);
+    assert_eq!(slot.mapping(), Err(PageTableError::CorruptTable));
 }
 
 #[test]
 fn raw_slot_decode_ignores_empty_and_next_slots() -> Result<(), PageTableError> {
-    assert_eq!(PageTableSlot::EMPTY.mapping(), None);
-    assert_eq!(PageTableSlot::next(1)?.mapping(), None);
+    assert_eq!(PageTableSlot::EMPTY.mapping(), Ok(None));
+    assert_eq!(PageTableSlot::next(1)?.mapping(), Ok(None));
     Ok(())
 }
 

@@ -84,7 +84,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
                         if levels[table_index] != super::PAGE_TABLE_LEVELS - 1 {
                             return Err(PageTableError::CorruptTable);
                         }
-                        if slot.mapping().is_none() {
+                        if slot.mapping()?.is_none() {
                             return Err(PageTableError::CorruptTable);
                         }
                         mapped_pages = mapped_pages
