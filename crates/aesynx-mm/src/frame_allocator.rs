@@ -1,5 +1,9 @@
 use aesynx_abi::{PhysAddr, PhysFrame};
 
+mod status;
+
+pub use status::FrameAllocatorStatus;
+
 pub const FRAME_SIZE: u64 = 4096;
 const BITS_PER_WORD: u64 = 64;
 
@@ -33,6 +37,7 @@ pub enum FrameAllocatorError {
     CapacityOverflow,
     CapacityTooSmall,
     AddressOverflow,
+    CorruptAllocator,
     RegionOverlap,
     FrameOutsideAllocator,
     FrameOutsideKnownMap,
@@ -40,16 +45,6 @@ pub enum FrameAllocatorError {
     DoubleFree,
     InvalidFrameCount,
     OutOfFrames,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct FrameAllocatorStatus {
-    pub total_frames: u64,
-    pub known_frames: u64,
-    pub free_frames: u64,
-    pub used_frames: u64,
-    pub reserved_frames: u64,
-    pub unknown_frames: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -304,20 +299,6 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
         FrameState::Used
     }
 
-    pub fn status(&self) -> FrameAllocatorStatus {
-        let known_frames = self.known.count_ones(self.total_frames);
-        let free_frames = self.free.count_ones(self.total_frames);
-        let reserved_frames = self.reserved_count();
-        FrameAllocatorStatus {
-            total_frames: self.total_frames,
-            known_frames,
-            free_frames,
-            used_frames: known_frames - free_frames - reserved_frames,
-            reserved_frames,
-            unknown_frames: self.total_frames - known_frames,
-        }
-    }
-
     fn claim_run(&mut self, start: u64, count: u64) -> Result<(), FrameAllocatorError> {
         let mut offset = 0u64;
         while offset < count {
@@ -399,15 +380,6 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
             offset += 1;
         }
         Ok(())
-    }
-
-    fn reserved_count(&self) -> u64 {
-        self.reserved.count_ones(self.total_frames)
-            + self.kernel.count_ones(self.total_frames)
-            + self.bootloader.count_ones(self.total_frames)
-            + self.device.count_ones(self.total_frames)
-            + self.acpi.count_ones(self.total_frames)
-            + self.bad.count_ones(self.total_frames)
     }
 }
 

@@ -557,6 +557,8 @@ Deliverables:
   indexing.
 - Internal table-path validation rejects empty table arenas and invalid slot
   indices before root-table indexing.
+- Frame allocator checked status reporting rejects impossible private bitmap
+  combinations, while unchecked status reporting avoids arithmetic underflow.
 - Read-only mapping visitor for future policy checks.
 - Mapping visitor rejects hidden table ownership drift before policy checks can
   trust its output.

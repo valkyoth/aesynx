@@ -202,6 +202,40 @@ fn allocator_status_counts_state_classes() -> Result<(), FrameAllocatorError> {
     assert_eq!(status.used_frames, 1);
     assert_eq!(status.reserved_frames, 2);
     assert_eq!(status.unknown_frames, 2);
+    assert_eq!(allocator.status_checked(), Ok(status));
+    Ok(())
+}
+
+#[test]
+fn allocator_checked_status_rejects_unknown_classification() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.free.set(0, true)?;
+
+    assert_eq!(
+        allocator.status_checked(),
+        Err(FrameAllocatorError::CorruptAllocator)
+    );
+    assert_eq!(allocator.status().known_frames, 0);
+    assert_eq!(allocator.status().free_frames, 1);
+    assert_eq!(allocator.status().used_frames, 0);
+    Ok(())
+}
+
+#[test]
+fn allocator_checked_status_rejects_overlapping_classes() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.known.set(0, true)?;
+    allocator.free.set(0, true)?;
+    allocator.kernel.set(0, true)?;
+
+    assert_eq!(
+        allocator.status_checked(),
+        Err(FrameAllocatorError::CorruptAllocator)
+    );
+    assert_eq!(allocator.status().known_frames, 1);
+    assert_eq!(allocator.status().free_frames, 1);
+    assert_eq!(allocator.status().reserved_frames, 1);
+    assert_eq!(allocator.status().used_frames, 0);
     Ok(())
 }
 
