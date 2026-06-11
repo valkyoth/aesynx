@@ -565,6 +565,8 @@ Deliverables:
   addresses.
 - Mapper-produced audit and mapping-summary reports are inspectable but not
   externally constructible through public constructors.
+- Mapper debug output is aggregate-only and does not dump raw table slots or
+  physical-address-bearing leaf entries.
 - Mapper-produced status reports are inspectable but not externally
   constructible through public fields or constructors.
 - Mapper-produced operation outcomes and range reports are inspectable but not
@@ -621,7 +623,7 @@ Verification:
   invalid address rejection, atomic capacity failure, mapping visitor behavior,
   mapping visitor corruption rejection, hidden table ownership drift rejection,
   mutation and lookup rejection on pre-existing accounting drift,
-  malformed leaf rejection, kernel-range policy
+  malformed leaf rejection, redacted mapper debug output, kernel-range policy
   checks, user-range policy checks, write-protected range checks,
   non-executable range checks, executable range checks, normal-memory range
   checks, local range checks, kernel-space range checks, user-space range

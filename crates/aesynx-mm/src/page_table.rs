@@ -1,3 +1,5 @@
+use core::fmt;
+
 use aesynx_abi::{PhysAddr, VirtAddr};
 
 use crate::GenericPageFlags;
@@ -59,11 +61,23 @@ impl PageTable {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct PageTableMapper<const TABLES: usize> {
     tables: [PageTable; TABLES],
     used: [bool; TABLES],
     mapped_pages: u64,
+}
+
+impl<const TABLES: usize> fmt::Debug for PageTableMapper<TABLES> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PageTableMapper")
+            .field("total_tables", &(TABLES as u64))
+            .field("used_tables", &self.used_tables())
+            .field("mapped_pages", &self.mapped_pages)
+            .field("audit_ok", &self.audit().is_ok())
+            .finish()
+    }
 }
 
 impl<const TABLES: usize> PageTableMapper<TABLES> {

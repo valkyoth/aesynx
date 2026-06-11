@@ -1,6 +1,9 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+#[cfg(test)]
+extern crate alloc;
+
 use aesynx_abi::PhysFrame;
 
 mod frame_allocator;
