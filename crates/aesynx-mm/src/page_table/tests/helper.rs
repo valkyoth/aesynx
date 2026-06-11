@@ -115,6 +115,33 @@ fn mapper_reclaim_helper_rejects_invalid_parent_slot_without_mutation() -> Resul
 }
 
 #[test]
+fn mapper_reclaim_helper_rejects_mismatched_parent_link() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<5>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+    mapper.tables[1].slots[0] = PageTableSlot::next(4)?;
+    mapper.used[4] = true;
+    let mut slot = 0usize;
+    while slot < PAGE_TABLE_ENTRIES {
+        mapper.tables[3].slots[slot] = PageTableSlot::EMPTY;
+        slot += 1;
+    }
+    let before = mapper;
+    let indices = [0usize; PAGE_TABLE_LEVELS];
+    let path = [0usize, 1, 2, 3];
+
+    assert_eq!(
+        mapper.reclaim_empty_tables(indices, path),
+        Err(PageTableError::CorruptTable)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
 fn mapper_reclaim_helper_rejects_unused_path_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let before = mapper;

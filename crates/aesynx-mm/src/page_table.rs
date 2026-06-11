@@ -387,6 +387,10 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         {
             return Err(PageTableError::CorruptTable);
         }
+        let slot = self.tables[parent].slots[parent_slot];
+        if slot.next_index()? != table_index {
+            return Err(PageTableError::CorruptTable);
+        }
         Ok(())
     }
 }

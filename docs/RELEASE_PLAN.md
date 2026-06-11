@@ -586,6 +586,8 @@ Deliverables:
   out-of-range paths before mutating mapper state.
 - Internal empty-table reclamation validates the full reclaim span before
   committing slot/table changes.
+- Internal empty-table reclamation validates parent slots link to the exact
+  child table being reclaimed.
 - Fail-closed leaf decoding for lookup, protect, unmap, and page-presence
   checks.
 - Map, protect, and unmap reject malformed next-table links without mutating
