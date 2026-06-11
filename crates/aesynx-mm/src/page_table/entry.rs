@@ -45,25 +45,25 @@ impl X86_64PageTableEntry {
 
     pub fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
         validate_phys(mapping.phys())?;
-        if mapping.flags().is_device_memory() && mapping.flags().access.executable() {
+        if mapping.flags().is_device_memory() && mapping.flags().access().executable() {
             return Err(PageTableError::InvalidMappingFlags);
         }
         if mapping.flags().is_global()
-            && matches!(mapping.flags().privilege, crate::PagePrivilege::User)
+            && matches!(mapping.flags().privilege(), crate::PagePrivilege::User)
         {
             return Err(PageTableError::InvalidMappingFlags);
         }
         let mut raw = (mapping.phys().get() & Self::ADDRESS_MASK) | Self::PRESENT;
-        if mapping.flags().access.writable() {
+        if mapping.flags().access().writable() {
             raw |= Self::WRITABLE;
         }
-        if matches!(mapping.flags().privilege, crate::PagePrivilege::User) {
+        if matches!(mapping.flags().privilege(), crate::PagePrivilege::User) {
             raw |= Self::USER;
         }
         if mapping.flags().is_global() {
             raw |= Self::GLOBAL;
         }
-        if !mapping.flags().access.executable() {
+        if !mapping.flags().access().executable() {
             raw |= Self::NO_EXECUTE;
         }
         if mapping.flags().is_device_memory() {

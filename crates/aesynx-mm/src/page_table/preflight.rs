@@ -41,7 +41,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             if entry.virt().get() >> 47 == 0 {
                 has_user_space_mapping = true;
             }
-            if matches!(entry.mapping().flags().privilege, PagePrivilege::User) {
+            if matches!(entry.mapping().flags().privilege(), PagePrivilege::User) {
                 has_user_mapping = true;
             }
             if entry.mapping().flags().is_device_memory() {
@@ -66,7 +66,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut has_global_mapping = false;
         self.visit_mappings(|entry| {
             let in_user_space = entry.virt().get() >> 47 == 0;
-            match (in_user_space, entry.mapping().flags().privilege) {
+            match (in_user_space, entry.mapping().flags().privilege()) {
                 (false, PagePrivilege::User) => has_kernel_space_user_mapping = true,
                 (true, PagePrivilege::Kernel) => has_user_space_kernel_mapping = true,
                 (true, PagePrivilege::User) => has_user_mapping = true,

@@ -14,7 +14,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     pub fn ensure_no_user_mappings(&self) -> Result<(), PageTableError> {
         self.visit_policy_mappings(|entry| {
-            if matches!(entry.mapping().flags().privilege, PagePrivilege::User) {
+            if matches!(entry.mapping().flags().privilege(), PagePrivilege::User) {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             Ok(())
@@ -24,7 +24,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     pub fn ensure_no_kernel_space_user_mappings(&self) -> Result<(), PageTableError> {
         self.visit_policy_mappings(|entry| {
             if entry.virt().get() >> 47 != 0
-                && matches!(entry.mapping().flags().privilege, PagePrivilege::User)
+                && matches!(entry.mapping().flags().privilege(), PagePrivilege::User)
             {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
@@ -35,7 +35,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     pub fn ensure_no_user_space_kernel_mappings(&self) -> Result<(), PageTableError> {
         self.visit_policy_mappings(|entry| {
             if entry.virt().get() >> 47 == 0
-                && matches!(entry.mapping().flags().privilege, PagePrivilege::Kernel)
+                && matches!(entry.mapping().flags().privilege(), PagePrivilege::Kernel)
             {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
@@ -45,7 +45,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     pub fn ensure_no_executable_mappings(&self) -> Result<(), PageTableError> {
         self.visit_policy_mappings(|entry| {
-            if entry.mapping().flags().access.executable() {
+            if entry.mapping().flags().access().executable() {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             Ok(())
@@ -54,7 +54,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     pub fn ensure_no_writable_mappings(&self) -> Result<(), PageTableError> {
         self.visit_policy_mappings(|entry| {
-            if entry.mapping().flags().access.writable() {
+            if entry.mapping().flags().access().writable() {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             Ok(())

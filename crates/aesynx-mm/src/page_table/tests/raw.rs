@@ -61,7 +61,7 @@ fn x86_64_entry_encodes_user_nx_device_mapping() -> Result<(), PageTableError> {
     let flags = GenericPageFlags::user(PageAccess::ReadOnly).device();
     let entry = X86_64PageTableEntry::from_mapping(PageMapping::new(KERNEL_PHYS, flags))?;
 
-    assert_eq!(flags.privilege, PagePrivilege::User);
+    assert_eq!(flags.privilege(), PagePrivilege::User);
     assert_eq!(entry.raw() & (1 << 2), 1 << 2);
     assert_eq!(entry.raw() & (1 << 3), 1 << 3);
     assert_eq!(entry.raw() & (1 << 4), 1 << 4);

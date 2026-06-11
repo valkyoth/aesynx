@@ -551,6 +551,8 @@ Deliverables:
 - Map/unmap plus fail-closed single-address and contiguous byte-range
   translation, audit-backed read-only mapping lookup, and checked permission
   changes for 4 KiB pages.
+- Generic page flag access and privilege fields are read-only through public
+  accessors, keeping callers on constructor/builder paths for flag changes.
 - Checked public page-mapping descriptor construction for callers that need to
   validate physical-address shape and flags before handing mappings to future
   activation code.

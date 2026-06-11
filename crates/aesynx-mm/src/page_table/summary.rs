@@ -8,7 +8,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         self.visit_mappings(|entry| {
             let flags = entry.mapping().flags();
             summary.total_pages = checked_increment(summary.total_pages)?;
-            match flags.privilege {
+            match flags.privilege() {
                 PagePrivilege::Kernel => {
                     summary.kernel_pages = checked_increment(summary.kernel_pages)?;
                 }
@@ -16,7 +16,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
                     summary.user_pages = checked_increment(summary.user_pages)?;
                 }
             }
-            match flags.access {
+            match flags.access() {
                 PageAccess::ReadOnly => {}
                 PageAccess::ReadWrite => {
                     summary.writable_pages = checked_increment(summary.writable_pages)?;

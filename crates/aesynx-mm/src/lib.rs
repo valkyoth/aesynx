@@ -50,8 +50,8 @@ impl AddressSpace {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GenericPageFlags {
-    pub access: PageAccess,
-    pub privilege: PagePrivilege,
+    access: PageAccess,
+    privilege: PagePrivilege,
     global: bool,
     device_memory: bool,
     cacheable: bool,
@@ -97,6 +97,16 @@ impl GenericPageFlags {
 
         self.global = true;
         Ok(self)
+    }
+
+    #[must_use]
+    pub const fn access(self) -> PageAccess {
+        self.access
+    }
+
+    #[must_use]
+    pub const fn privilege(self) -> PagePrivilege {
+        self.privilege
     }
 
     #[must_use]
@@ -190,8 +200,8 @@ mod tests {
     fn user_mapping_is_explicit() {
         let flags = GenericPageFlags::user(PageAccess::ReadOnly);
 
-        assert_eq!(flags.privilege, PagePrivilege::User);
-        assert_eq!(flags.access, PageAccess::ReadOnly);
+        assert_eq!(flags.privilege(), PagePrivilege::User);
+        assert_eq!(flags.access(), PageAccess::ReadOnly);
     }
 
     #[test]
@@ -214,6 +224,6 @@ mod tests {
 
         assert!(flags.is_device_memory());
         assert!(!flags.is_cacheable());
-        assert_eq!(flags.access, PageAccess::ReadOnly);
+        assert_eq!(flags.access(), PageAccess::ReadOnly);
     }
 }

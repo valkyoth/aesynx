@@ -21,7 +21,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut offset = 0u64;
         while offset < page_count {
             let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::Kernel) {
+            if !matches!(mapping.flags().privilege(), PagePrivilege::Kernel) {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;
@@ -42,7 +42,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut offset = 0u64;
         while offset < page_count {
             let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::User) {
+            if !matches!(mapping.flags().privilege(), PagePrivilege::User) {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;
@@ -63,7 +63,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut offset = 0u64;
         while offset < page_count {
             let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
-            if mapping.flags().access.writable() {
+            if mapping.flags().access().writable() {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;
@@ -84,7 +84,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut offset = 0u64;
         while offset < page_count {
             let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
-            if mapping.flags().access.executable() {
+            if mapping.flags().access().executable() {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;
@@ -105,7 +105,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut offset = 0u64;
         while offset < page_count {
             let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
-            if !mapping.flags().access.executable() {
+            if !mapping.flags().access().executable() {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;
@@ -169,7 +169,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut offset = 0u64;
         while offset < page_count {
             let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::Kernel) {
+            if !matches!(mapping.flags().privilege(), PagePrivilege::Kernel) {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;
@@ -191,7 +191,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let mut offset = 0u64;
         while offset < page_count {
             let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
-            if !matches!(mapping.flags().privilege, PagePrivilege::User) {
+            if !matches!(mapping.flags().privilege(), PagePrivilege::User) {
                 return Err(PageTableError::UnexpectedMappingFlags);
             }
             offset += 1;
