@@ -8,7 +8,7 @@ use super::address::validate_phys;
 use super::{PageMapping, PageTableError};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct X86_64PageTableEntry {
+pub(crate) struct X86_64PageTableEntry {
     raw: u64,
 }
 
@@ -43,7 +43,7 @@ impl X86_64PageTableEntry {
     const ALLOWED_NEXT_TABLE_BITS: u64 =
         Self::PRESENT | Self::SOFTWARE_NEXT_TABLE | Self::ADDRESS_MASK;
 
-    pub fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
+    pub(crate) fn from_mapping(mapping: PageMapping) -> Result<Self, PageTableError> {
         validate_phys(mapping.phys())?;
         if mapping.flags().is_device_memory() && mapping.flags().access().executable() {
             return Err(PageTableError::InvalidMappingFlags);
@@ -73,7 +73,7 @@ impl X86_64PageTableEntry {
     }
 
     #[must_use]
-    pub const fn raw(self) -> u64 {
+    pub(crate) const fn raw(self) -> u64 {
         self.raw
     }
 }

@@ -563,6 +563,8 @@ Deliverables:
 - Unchecked page-mapping descriptor construction is crate-private; external
   callers must use the checked constructor before comparing or passing mapping
   descriptors around.
+- Raw x86_64 page-table entry encoding stays crate-internal until real
+  activation code needs a reviewed export.
 - Single-page map/protect paths build mappings through the checked descriptor
   constructor instead of open-coding a separate validation shape.
 - Single-page map/protect/unmap operations validate caller input, audit existing

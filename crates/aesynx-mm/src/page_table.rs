@@ -22,8 +22,7 @@ mod types;
 mod walk;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
-use entry::PageTableSlot;
-pub use entry::X86_64PageTableEntry;
+use entry::{PageTableSlot, X86_64PageTableEntry};
 pub use outcome::{
     MapOutcome, MapRangeOutcome, ProtectOutcome, ProtectRangeOutcome, UnmapOutcome,
     UnmapRangeOutcome,
