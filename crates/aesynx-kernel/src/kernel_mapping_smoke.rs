@@ -15,11 +15,14 @@ pub struct KernelMappingSmokeStatus {
     pub hardware_image_ok: bool,
     pub hardware_arena_frames: u64,
     pub hardware_root_allocated: bool,
+    pub hardware_tables_copied: u64,
+    pub hardware_copied: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum KernelMappingSmokeError {
     Allocator(aesynx_mm::FrameAllocatorError),
+    Install(crate::page_table_install::PageTableInstallError),
     Mapper(aesynx_mm::PageTableError),
     Plan(aesynx_kernel::kernel_mapping_policy::KernelMappingPlanError),
     AddressOverflow,
@@ -32,6 +35,7 @@ const POLICY_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 const POLICY_MAPPED_FRAMES: usize = 256;
 const PAGE_TABLE_ALLOCATOR_WORDS: usize = 2;
 const PAGE_TABLE_ALLOCATOR_FRAMES: u64 = 128;
+const PAGE_TABLE_ALLOCATOR_MIN_PHYS: u64 = 0x0100_0000;
 const HEAP_RESERVED_PAGES: u64 = 2;
 const GUARD_PAGES: u64 = 1;
 
@@ -61,30 +65,27 @@ pub fn run(
 
     let mut mapper = aesynx_mm::PageTableMapper::<POLICY_TABLES, POLICY_MAPPED_FRAMES>::new()
         .map_err(KernelMappingSmokeError::Mapper)?;
-    mapper
-        .map_contiguous(
-            policy.text().start(),
-            text_phys,
-            policy.text().pages(),
-            aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadExecute),
-        )
-        .map_err(KernelMappingSmokeError::Mapper)?;
-    mapper
-        .map_contiguous(
-            policy.rodata().start(),
-            rodata_phys,
-            policy.rodata().pages(),
-            aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadOnly),
-        )
-        .map_err(KernelMappingSmokeError::Mapper)?;
-    mapper
-        .map_contiguous(
-            policy.data().start(),
-            data_phys,
-            policy.data().pages(),
-            aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite),
-        )
-        .map_err(KernelMappingSmokeError::Mapper)?;
+    map_section(
+        &mut mapper,
+        policy.text().start(),
+        text_phys,
+        policy.text().pages(),
+        aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadExecute),
+    )?;
+    map_section(
+        &mut mapper,
+        policy.rodata().start(),
+        rodata_phys,
+        policy.rodata().pages(),
+        aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadOnly),
+    )?;
+    map_section(
+        &mut mapper,
+        policy.data().start(),
+        data_phys,
+        policy.data().pages(),
+        aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite),
+    )?;
 
     let report = mapper
         .verify_kernel_mapping_policy(policy)
@@ -105,15 +106,18 @@ pub fn run(
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
     let arena = allocate_page_table_arena(info)?;
-    let root_phys = frame_to_phys(arena.start())?;
-    let image = mapper
-        .export_x86_64_hardware_image(root_phys)
+    let _allocated_root_phys = frame_to_phys(arena.start())?;
+    let root_phys = crate::page_table_install::activation_root_phys(info)
+        .map_err(KernelMappingSmokeError::Install)?;
+    if arena.count() != POLICY_TABLES as u64 {
+        return Err(KernelMappingSmokeError::UnexpectedPolicy);
+    }
+    let install = crate::page_table_install::copy_mapper_to_activation_arena(root_phys, &mapper)
+        .map_err(KernelMappingSmokeError::Install)?;
+    let status = mapper
+        .status_checked()
         .map_err(KernelMappingSmokeError::Mapper)?;
-    if image.root_phys() != root_phys
-        || image.mapped_pages() != report.mapped_pages()
-        || image.used_tables() == 0
-        || arena.count() != POLICY_TABLES as u64
-    {
+    if !install.root_copied || install.tables_copied != status.used_tables() {
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
 
@@ -133,13 +137,15 @@ pub fn run(
         hardware_image_ok: true,
         hardware_arena_frames: arena.count(),
         hardware_root_allocated: true,
+        hardware_tables_copied: install.tables_copied,
+        hardware_copied: true,
     })
 }
 
 fn allocate_page_table_arena(
     info: &aesynx_boot::BootInfo<'_>,
 ) -> Result<aesynx_mm::AllocatedFrames, KernelMappingSmokeError> {
-    let (base_frame, frame_count) = first_usable_allocator_window(info)?;
+    let (base_frame, frame_count) = low_direct_map_allocator_window(info)?;
     let mut allocator =
         aesynx_mm::BitmapFrameAllocator::<PAGE_TABLE_ALLOCATOR_WORDS>::new(base_frame, frame_count)
             .map_err(KernelMappingSmokeError::Allocator)?;
@@ -155,14 +161,17 @@ fn allocate_page_table_arena(
         .map_err(KernelMappingSmokeError::Allocator)
 }
 
-fn first_usable_allocator_window(
+fn low_direct_map_allocator_window(
     info: &aesynx_boot::BootInfo<'_>,
 ) -> Result<(aesynx_abi::PhysFrame, u64), KernelMappingSmokeError> {
     for region in info.memory_map.regions() {
         if region.kind != aesynx_boot::MemoryRegionKind::Usable {
             continue;
         }
-        let start = align_up_frame(region.start().get())?;
+        let start = max_u64(
+            align_up_frame(region.start().get())?,
+            PAGE_TABLE_ALLOCATOR_MIN_PHYS,
+        );
         let end = region
             .end()
             .ok_or(KernelMappingSmokeError::Allocator(
@@ -174,9 +183,10 @@ fn first_usable_allocator_window(
         }
         let frames = (end - start) / aesynx_mm::FRAME_SIZE;
         if frames >= POLICY_TABLES as u64 {
+            let window_frames = min_u64(frames, PAGE_TABLE_ALLOCATOR_FRAMES);
             return Ok((
                 aesynx_abi::PhysFrame::new(start / aesynx_mm::FRAME_SIZE),
-                min_u64(frames, PAGE_TABLE_ALLOCATOR_FRAMES),
+                window_frames,
             ));
         }
     }
@@ -190,6 +200,53 @@ fn frame_to_phys(
     frame
         .get()
         .checked_mul(aesynx_mm::FRAME_SIZE)
+        .map(aesynx_abi::PhysAddr::new)
+        .ok_or(KernelMappingSmokeError::AddressOverflow)
+}
+
+fn map_section<const TABLES: usize, const MAPPED_FRAMES: usize>(
+    mapper: &mut aesynx_mm::PageTableMapper<TABLES, MAPPED_FRAMES>,
+    virt: aesynx_abi::VirtAddr,
+    phys: aesynx_abi::PhysAddr,
+    pages: u64,
+    flags: aesynx_mm::GenericPageFlags,
+) -> Result<(), KernelMappingSmokeError> {
+    let mut offset = 0u64;
+    while offset < pages {
+        mapper
+            .map_page(
+                add_pages_to_virt(virt, offset)?,
+                add_pages_to_phys(phys, offset)?,
+                flags,
+            )
+            .map_err(KernelMappingSmokeError::Mapper)?;
+        offset += 1;
+    }
+    Ok(())
+}
+
+fn add_pages_to_virt(
+    virt: aesynx_abi::VirtAddr,
+    pages: u64,
+) -> Result<aesynx_abi::VirtAddr, KernelMappingSmokeError> {
+    let offset = pages
+        .checked_mul(aesynx_mm::FRAME_SIZE)
+        .ok_or(KernelMappingSmokeError::AddressOverflow)?;
+    virt.get()
+        .checked_add(offset)
+        .map(aesynx_abi::VirtAddr::new)
+        .ok_or(KernelMappingSmokeError::AddressOverflow)
+}
+
+fn add_pages_to_phys(
+    phys: aesynx_abi::PhysAddr,
+    pages: u64,
+) -> Result<aesynx_abi::PhysAddr, KernelMappingSmokeError> {
+    let offset = pages
+        .checked_mul(aesynx_mm::FRAME_SIZE)
+        .ok_or(KernelMappingSmokeError::AddressOverflow)?;
+    phys.get()
+        .checked_add(offset)
         .map(aesynx_abi::PhysAddr::new)
         .ok_or(KernelMappingSmokeError::AddressOverflow)
 }
@@ -222,4 +279,8 @@ const fn align_down_frame(value: u64) -> u64 {
 
 const fn min_u64(left: u64, right: u64) -> u64 {
     if left < right { left } else { right }
+}
+
+const fn max_u64(left: u64, right: u64) -> u64 {
+    if left > right { left } else { right }
 }

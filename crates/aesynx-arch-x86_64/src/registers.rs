@@ -1,5 +1,7 @@
 use core::fmt;
 
+use aesynx_abi::PhysAddr;
+
 use crate::RFLAGS_PUBLIC_MASK;
 
 const PAGE_OFFSET_MASK: u64 = 0xfff;
@@ -76,6 +78,11 @@ impl EarlyRegisterSnapshot {
     #[must_use]
     pub const fn cr3_page_offset(self) -> u16 {
         (self.cr3 & PAGE_OFFSET_MASK) as u16
+    }
+
+    #[must_use]
+    pub const fn cr3_page_matches(self, phys: PhysAddr) -> bool {
+        (self.cr3 & !PAGE_OFFSET_MASK) == (phys.get() & !PAGE_OFFSET_MASK)
     }
 }
 
@@ -175,6 +182,11 @@ impl FaultRegisterSnapshot {
     pub const fn cr3_page_offset(self) -> u16 {
         (self.cr3 & PAGE_OFFSET_MASK) as u16
     }
+
+    #[must_use]
+    pub const fn cr3_page_matches(self, phys: PhysAddr) -> bool {
+        (self.cr3 & !PAGE_OFFSET_MASK) == (phys.get() & !PAGE_OFFSET_MASK)
+    }
 }
 
 impl fmt::Debug for FaultRegisterSnapshot {
@@ -197,6 +209,8 @@ impl fmt::Debug for FaultRegisterSnapshot {
 #[cfg(test)]
 mod tests {
     use core::fmt::{self, Write};
+
+    use aesynx_abi::PhysAddr;
 
     use super::{EarlyRegisterSnapshot, FaultRegisterSnapshot};
 
@@ -233,6 +247,9 @@ mod tests {
         assert_eq!(snapshot.frame_pointer_alignment(), 0);
         assert_eq!(snapshot.public_rflags(), 0x0cd5);
         assert_eq!(snapshot.cr3_page_offset(), 0xabc);
+        assert!(snapshot.cr3_page_matches(PhysAddr::new(0x1234_5000)));
+        assert!(snapshot.cr3_page_matches(PhysAddr::new(0x1234_5fff)));
+        assert!(!snapshot.cr3_page_matches(PhysAddr::new(0x1234_6000)));
     }
 
     #[test]
@@ -266,6 +283,8 @@ mod tests {
         assert_eq!(snapshot.public_rflags(), 0x0cd5);
         assert!(snapshot.interrupts_enabled());
         assert_eq!(snapshot.cr3_page_offset(), 0xabc);
+        assert!(snapshot.cr3_page_matches(PhysAddr::new(0x1234_5000)));
+        assert!(!snapshot.cr3_page_matches(PhysAddr::new(0x1234_4000)));
         assert!(!output.contains("ffff"));
         assert!(!output.contains("dead"));
         assert!(!output.contains("12345"));

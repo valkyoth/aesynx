@@ -6,7 +6,9 @@ use crate::{FRAME_SIZE, PagePrivilege};
 
 use super::address::validate_phys;
 use super::entry::X86_64PageTableEntry;
-use super::{PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageTableError, PageTableMapper};
+use super::{
+    PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageTableError, PageTableMapper, PageTableSlot,
+};
 
 const HARDWARE_PRESENT: u64 = 1 << 0;
 const HARDWARE_WRITABLE: u64 = 1 << 1;
@@ -34,21 +36,31 @@ impl<const TABLES: usize> fmt::Debug for X86_64PageTableImage<TABLES> {
 
 impl<const TABLES: usize> X86_64PageTableImage<TABLES> {
     #[must_use]
-    pub const fn root_phys(self) -> PhysAddr {
+    pub const fn root_phys(&self) -> PhysAddr {
         self.root_phys
     }
 
     #[must_use]
-    pub const fn mapped_pages(self) -> u64 {
+    pub const fn mapped_pages(&self) -> u64 {
         self.mapped_pages
     }
 
     #[must_use]
-    pub fn used_tables(self) -> u64 {
+    pub const fn table_count(&self) -> usize {
+        TABLES
+    }
+
+    #[must_use]
+    pub fn used_tables(&self) -> u64 {
         count_used_tables(&self.used)
     }
 
-    pub fn table_phys(self, index: usize) -> Result<PhysAddr, PageTableError> {
+    #[must_use]
+    pub fn table_used(&self, index: usize) -> bool {
+        index < TABLES && self.used[index]
+    }
+
+    pub fn table_phys(&self, index: usize) -> Result<PhysAddr, PageTableError> {
         if index >= TABLES || !self.used[index] {
             return Err(PageTableError::CorruptTable);
         }
@@ -56,7 +68,7 @@ impl<const TABLES: usize> X86_64PageTableImage<TABLES> {
     }
 
     pub fn copy_table_entries(
-        self,
+        &self,
         index: usize,
         output: &mut [u64; PAGE_TABLE_ENTRIES],
     ) -> Result<(), PageTableError> {
@@ -69,6 +81,33 @@ impl<const TABLES: usize> X86_64PageTableImage<TABLES> {
 }
 
 impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
+    pub fn export_x86_64_hardware_table_entries(
+        &self,
+        root_phys: PhysAddr,
+        index: usize,
+        output: &mut [u64; PAGE_TABLE_ENTRIES],
+    ) -> Result<bool, PageTableError> {
+        validate_phys(root_phys)?;
+        self.audit()?;
+        validate_table_arena_phys(root_phys, TABLES)?;
+
+        if index >= TABLES {
+            return Err(PageTableError::CorruptTable);
+        }
+        if !self.used[index] {
+            output.fill(0);
+            return Ok(false);
+        }
+
+        let mut slot = 0usize;
+        while slot < PAGE_TABLE_ENTRIES {
+            let model_slot = self.tables[index].slots[slot];
+            output[slot] = self.hardware_slot(root_phys, model_slot)?;
+            slot += 1;
+        }
+        Ok(true)
+    }
+
     pub fn export_x86_64_hardware_image(
         &self,
         root_phys: PhysAddr,
@@ -84,19 +123,7 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
                 let mut slot = 0usize;
                 while slot < PAGE_TABLE_ENTRIES {
                     let model_slot = self.tables[table].slots[slot];
-                    entries[table][slot] = if model_slot.is_empty() {
-                        0
-                    } else if model_slot.is_next() {
-                        let next = model_slot.next_index()?;
-                        if next >= TABLES || !self.used[next] {
-                            return Err(PageTableError::CorruptTable);
-                        }
-                        let permissions = self.subtree_permissions(next, 1)?;
-                        hardware_next_entry(table_phys(root_phys, next)?, permissions)
-                    } else {
-                        model_slot.leaf_mapping()?;
-                        model_slot.raw
-                    };
+                    entries[table][slot] = self.hardware_slot(root_phys, model_slot)?;
                     slot += 1;
                 }
             }
@@ -109,6 +136,29 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
             used: self.used,
             mapped_pages: self.mapped_pages,
         })
+    }
+
+    fn hardware_slot(
+        &self,
+        root_phys: PhysAddr,
+        model_slot: PageTableSlot,
+    ) -> Result<u64, PageTableError> {
+        if model_slot.is_empty() {
+            Ok(0)
+        } else if model_slot.is_next() {
+            let next = model_slot.next_index()?;
+            if next >= TABLES || !self.used[next] {
+                return Err(PageTableError::CorruptTable);
+            }
+            let permissions = self.subtree_permissions(next, 1)?;
+            Ok(hardware_next_entry(
+                table_phys(root_phys, next)?,
+                permissions,
+            ))
+        } else {
+            model_slot.leaf_mapping()?;
+            Ok(model_slot.raw)
+        }
     }
 
     fn subtree_permissions(

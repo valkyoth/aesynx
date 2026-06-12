@@ -68,8 +68,10 @@ pub const PAGING_POLICY_MODEL_FAIL_MARKER: &str = "[TEST] paging-policy-model=fa
 pub const PAGING_POLICY_MODEL_DATA_RW_NX_MARKER: &str = "data_rw_nx_ok=true";
 pub const PAGING_POLICY_MODEL_GUARD_PAGE_MARKER: &str = "guard_page_ok=true";
 pub const PAGING_POLICY_MODEL_HARDWARE_ARENA_MARKER: &str = "hardware_arena_frames=";
+pub const PAGING_POLICY_MODEL_HARDWARE_COPIED_MARKER: &str = "hardware_copied=true";
 pub const PAGING_POLICY_MODEL_HARDWARE_IMAGE_MARKER: &str = "hardware_image_ok=true";
 pub const PAGING_POLICY_MODEL_HARDWARE_ROOT_MARKER: &str = "hardware_root_allocated=true";
+pub const PAGING_POLICY_MODEL_HARDWARE_TABLES_MARKER: &str = "hardware_tables_copied=";
 pub const PAGING_POLICY_MODEL_HEAP_RESERVED_MARKER: &str = "heap_reserved_ok=true";
 pub const PAGING_POLICY_MODEL_MARKER: &str = "[TEST] paging-policy-model=ok";
 pub const PAGING_POLICY_MODEL_NULL_PAGE_MARKER: &str = "null_page_ok=true";
@@ -152,6 +154,8 @@ const BOOT_REQUIRED_MARKERS: &[&str] = &[
     PAGING_POLICY_MODEL_HARDWARE_IMAGE_MARKER,
     PAGING_POLICY_MODEL_HARDWARE_ARENA_MARKER,
     PAGING_POLICY_MODEL_HARDWARE_ROOT_MARKER,
+    PAGING_POLICY_MODEL_HARDWARE_TABLES_MARKER,
+    PAGING_POLICY_MODEL_HARDWARE_COPIED_MARKER,
     PAGING_POLICY_MODEL_MARKER,
     BOOTINFO_MARKER,
     SERIAL_MARKER,
@@ -224,7 +228,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, hardware_tables_copied=, hardware_copied=true, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"

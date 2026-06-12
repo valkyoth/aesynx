@@ -53,6 +53,14 @@ impl<'a> BootInfo<'a> {
     pub const fn hhdm_present(self) -> bool {
         self.hhdm.is_some()
     }
+
+    #[must_use]
+    pub const fn hhdm_offset(self) -> Option<VirtAddr> {
+        match self.hhdm {
+            Some(hhdm) => Some(hhdm.offset),
+            None => None,
+        }
+    }
 }
 
 pub(crate) struct BootInfoParts<'a> {
@@ -462,42 +470,4 @@ impl fmt::Debug for KernelImageInfo {
 }
 
 #[cfg(test)]
-mod tests {
-    use alloc::format;
-
-    use aesynx_abi::{PhysAddr, VirtAddr};
-
-    use super::KernelImageInfo;
-
-    #[test]
-    fn kernel_image_translates_virtual_address_to_physical_offset() {
-        let image = KernelImageInfo::new(
-            VirtAddr::new(0xffff_ffff_8000_0000),
-            VirtAddr::new(0xffff_ffff_8001_0000),
-            PhysAddr::new(0x0040_0000),
-        );
-
-        assert_eq!(
-            image.phys_for_virt(VirtAddr::new(0xffff_ffff_8000_3000)),
-            Some(PhysAddr::new(0x0040_3000))
-        );
-        assert_eq!(
-            image.phys_for_virt(VirtAddr::new(0xffff_ffff_8001_0000)),
-            None
-        );
-    }
-
-    #[test]
-    fn kernel_image_debug_remains_redacted() {
-        let image = KernelImageInfo::new(
-            VirtAddr::new(0xffff_ffff_8000_0000),
-            VirtAddr::new(0xffff_ffff_8001_0000),
-            PhysAddr::new(0x0040_0000),
-        );
-        let debug = format!("{image:?}");
-
-        assert_eq!(debug, "KernelImageInfo(redacted)");
-        assert!(!debug.contains("8000"));
-        assert!(!debug.contains("0040"));
-    }
-}
+mod tests;

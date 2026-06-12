@@ -30,7 +30,13 @@ fn hardware_image_reencodes_model_next_slots_as_physical_entries() -> Result<(),
 
     assert_eq!(image.root_phys(), ROOT_PHYS);
     assert_eq!(image.mapped_pages(), 1);
+    assert_eq!(image.table_count(), 8);
     assert_eq!(image.used_tables(), 4);
+    assert!(image.table_used(0));
+    assert!(image.table_used(1));
+    assert!(image.table_used(2));
+    assert!(image.table_used(3));
+    assert!(!image.table_used(4));
     assert_eq!(next & PRESENT, PRESENT);
     assert_eq!(next & WRITABLE, WRITABLE);
     assert_eq!(next & USER, 0);
@@ -56,6 +62,29 @@ fn hardware_image_sets_user_permission_on_user_subtrees() -> Result<(), PageTabl
 
     assert_eq!(next & USER, USER);
     assert_eq!(next & WRITABLE, 0);
+    Ok(())
+}
+
+#[test]
+fn hardware_table_streaming_export_matches_image_table() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadWrite),
+    )?;
+
+    let image = mapper.export_x86_64_hardware_image(ROOT_PHYS)?;
+    let mut image_root = [0u64; PAGE_TABLE_ENTRIES];
+    let mut streamed_root = [0u64; PAGE_TABLE_ENTRIES];
+    let mut unused = [1u64; PAGE_TABLE_ENTRIES];
+
+    image.copy_table_entries(0, &mut image_root)?;
+    assert!(mapper.export_x86_64_hardware_table_entries(ROOT_PHYS, 0, &mut streamed_root)?);
+    assert!(!mapper.export_x86_64_hardware_table_entries(ROOT_PHYS, 4, &mut unused)?);
+
+    assert_eq!(streamed_root, image_root);
+    assert_eq!(unused, [0u64; PAGE_TABLE_ENTRIES]);
     Ok(())
 }
 

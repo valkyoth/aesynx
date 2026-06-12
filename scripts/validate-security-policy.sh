@@ -77,6 +77,7 @@ crates/aesynx-arch-x86_64/src/timer.rs
 crates/aesynx-kernel/src/kernel_sections.rs
 crates/aesynx-kernel/src/limine.rs
 crates/aesynx-kernel/src/main.rs
+crates/aesynx-kernel/src/page_table_install.rs
 EOF
 )"
 

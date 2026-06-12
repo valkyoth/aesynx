@@ -170,6 +170,17 @@ Limitations: linker-symbol model only; it does not replace Limine's active CR3, 
 ```
 
 ```text
+Location: crates/aesynx-kernel/src/page_table_install.rs
+Status: active candidate in v0.16.2
+Purpose: stream audited x86_64 hardware-shaped page-table entries into a page-aligned static kernel activation arena
+Preconditions: BootInfo normalization has accepted Limine's executable-address response; the static activation arena is part of the kernel data/BSS image and has a physical address derivable from KernelImageInfo; the mapper has passed kernel mapping policy verification; the destination arena is not exposed through Rust references during installation
+Unsafe operation: raw address capture for the static arena and volatile writes through raw pointers into that arena
+Safety argument: the installer derives the activation root physical address from the arena's kernel virtual address through BootInfo's redacted KernelImageInfo translation helper, rejects active-CR3 overlap before zeroing the arena, forces the arena pointer through a runtime register to avoid fragile high-half absolute stores, writes only the fixed ACTIVATION_TABLES * PAGE_TABLE_ENTRIES area with volatile stores, streams one table at a time from the audited mapper to avoid boot-stack pressure, and publishes a release compiler fence before reporting success; serial output reports only counts and booleans
+Tests/evidence: aesynx-mm hardware-image tests verify streaming table export matches full image export and redacted image metadata; cargo xtask qemu-suite observes hardware_tables_copied=<n>, hardware_copied=true, and [TEST] paging-policy-model=ok
+Limitations: early single-core boot only; no CR3 load yet, no post-switch validation yet, no TLB/PCID handling yet, and no reclamation of Limine page tables yet
+```
+
+```text
 Location: crates/aesynx-kernel/src/main.rs
 Status: active in v0.5
 Purpose: export the architecture entry symbol consumed by the bootloader

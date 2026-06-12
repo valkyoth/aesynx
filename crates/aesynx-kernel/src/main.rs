@@ -48,18 +48,19 @@ mod page_table_smoke;
 
 #[cfg(all(
     target_os = "none",
-    feature = "timer-smoke",
     not(feature = "panic-smoke"),
-    not(feature = "exception-smoke")
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
 ))]
-const TIMER_SMOKE_MAX_SPINS: u64 = 100_000_000;
+mod page_table_install;
+
 #[cfg(all(
     target_os = "none",
     feature = "timer-smoke",
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke")
 ))]
-const TIMER_SMOKE_DELAY_TICKS: u64 = 2;
+mod timer_smoke_entry;
 
 #[cfg(all(
     target_os = "none",
@@ -147,7 +148,7 @@ fn kernel_entry() -> ! {
     not(feature = "exception-smoke")
 ))]
 fn kernel_entry() -> ! {
-    timer_smoke_entry()
+    timer_smoke_entry::run()
 }
 
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
@@ -165,93 +166,6 @@ fn exception_smoke_entry() -> ! {
     diagnostics::set_boot_phase(BootPhase::ExceptionSmoke);
     write_diagnostic(LogLevel::Info, "exception smoke starting");
     aesynx_arch_x86_64::exceptions::trigger_page_fault_smoke()
-}
-
-#[cfg(all(
-    target_os = "none",
-    feature = "timer-smoke",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke")
-))]
-fn timer_smoke_entry() -> ! {
-    diagnostics::set_boot_phase(BootPhase::TimerSmoke);
-    write_diagnostic(LogLevel::Info, "timer smoke starting");
-    match aesynx_arch_x86_64::timer::init_smoke_timer() {
-        Ok(status) => {
-            let rate = match aesynx_time::TickRate::new(status.tick_rate_hz) {
-                Ok(rate) => rate,
-                Err(error) => {
-                    aesynx_arch_x86_64::serial_println!("timer setup=fail error={:?}", error);
-                    aesynx_arch_x86_64::X86_64::halt_forever();
-                }
-            };
-            let mut sleep_queue = aesynx_time::SleepQueue::<1>::new();
-            let deadline = match rate.ticks_to_nanos(TIMER_SMOKE_DELAY_TICKS) {
-                Ok(deadline) => deadline,
-                Err(error) => {
-                    aesynx_arch_x86_64::serial_println!("timer setup=fail error={:?}", error);
-                    aesynx_arch_x86_64::X86_64::halt_forever();
-                }
-            };
-            let sleep = aesynx_time::SleepRequest::new(
-                aesynx_abi::TaskId::new(0),
-                deadline,
-                aesynx_time::WakeId::new(1),
-            );
-            if let Err(error) = sleep_queue.schedule(sleep) {
-                aesynx_arch_x86_64::serial_println!("timer setup=fail error={:?}", error);
-                aesynx_arch_x86_64::X86_64::halt_forever();
-            }
-            aesynx_arch_x86_64::serial_println!(
-                "timer setup=pit irq={} vector=0x{:x} target_ticks={} hz={}",
-                status.irq.get(),
-                status.vector,
-                status.target_ticks,
-                rate.hz()
-            );
-            let _ = aesynx_arch_x86_64::X86_64::enable_interrupts();
-            let mut spins = 0u64;
-            while aesynx_arch_x86_64::timer::ticks() < aesynx_arch_x86_64::timer::target_ticks() {
-                aesynx_arch_x86_64::X86_64::wait_for_interrupt();
-                let ticks = aesynx_arch_x86_64::timer::ticks();
-                match rate.ticks_to_nanos(ticks) {
-                    Ok(now) => {
-                        if let Some(wake) = sleep_queue.pop_due(now) {
-                            aesynx_arch_x86_64::serial_println!(
-                                "timer delayed-log task={} wake_id={} at_ns={} ticks={}",
-                                wake.task().get(),
-                                wake.wake_id().get(),
-                                now.nanos(),
-                                ticks
-                            );
-                            aesynx_arch_x86_64::serial::write_str("[TEST] sleep=ok\n");
-                        }
-                    }
-                    Err(error) => {
-                        aesynx_arch_x86_64::serial_println!(
-                            "timer monotonic=fail error={:?}",
-                            error
-                        );
-                    }
-                }
-                spins = spins.saturating_add(1);
-                if spins >= TIMER_SMOKE_MAX_SPINS {
-                    aesynx_arch_x86_64::serial_println!(
-                        "timer timeout ticks={} target_ticks={} spins={}",
-                        aesynx_arch_x86_64::timer::ticks(),
-                        aesynx_arch_x86_64::timer::target_ticks(),
-                        spins
-                    );
-                    break;
-                }
-            }
-            let _ = aesynx_arch_x86_64::X86_64::disable_interrupts();
-        }
-        Err(error) => {
-            aesynx_arch_x86_64::serial_println!("timer setup=fail error={:?}", error);
-        }
-    }
-    aesynx_arch_x86_64::X86_64::halt_forever()
 }
 
 #[cfg(all(
@@ -384,7 +298,7 @@ fn boot_entry() -> ! {
                     match kernel_mapping_smoke::run(&info, kernel_sections::layout()) {
                         Ok(status) => {
                             aesynx_arch_x86_64::serial_println!(
-                                "paging-policy-model mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={} hardware_image_ok={} hardware_arena_frames={} hardware_root_allocated={}",
+                                "paging-policy-model mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={} hardware_image_ok={} hardware_arena_frames={} hardware_root_allocated={} hardware_tables_copied={} hardware_copied={}",
                                 status.mapped_pages,
                                 status.reserved_pages,
                                 status.text_pages,
@@ -399,7 +313,9 @@ fn boot_entry() -> ! {
                                 status.null_page_ok,
                                 status.hardware_image_ok,
                                 status.hardware_arena_frames,
-                                status.hardware_root_allocated
+                                status.hardware_root_allocated,
+                                status.hardware_tables_copied,
+                                status.hardware_copied
                             );
                             aesynx_arch_x86_64::serial::write_str(
                                 "[TEST] paging-policy-model=ok\n",
