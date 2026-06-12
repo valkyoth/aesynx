@@ -263,6 +263,44 @@ fn kernel_mapping_policy_rejects_overflowing_ranges() -> Result<(), PageTableErr
 }
 
 #[test]
+fn kernel_mapping_policy_rejects_unaligned_text_range() -> Result<(), PageTableError> {
+    let mapper = mapper_with_policy()?;
+    let unaligned_text = KernelMappingPolicy::new(
+        KernelVirtualRange::new(VirtAddr::new(TEXT.get() + 0x0001_0001), 1),
+        KernelVirtualRange::new(RODATA, 2),
+        KernelVirtualRange::new(DATA, 2),
+        KernelVirtualRange::new(HEAP, 2),
+        KernelVirtualRange::new(GUARD, 1),
+        KernelVirtualRange::new(VirtAddr::new(0), 1),
+    );
+
+    assert_eq!(
+        mapper.verify_kernel_mapping_policy(unaligned_text),
+        Err(PageTableError::UnalignedVirtualAddress)
+    );
+    Ok(())
+}
+
+#[test]
+fn kernel_mapping_policy_rejects_noncanonical_text_range() -> Result<(), PageTableError> {
+    let mapper = mapper_with_policy()?;
+    let noncanonical_text = KernelMappingPolicy::new(
+        KernelVirtualRange::new(VirtAddr::new(0x0000_8000_0000_0000), 1),
+        KernelVirtualRange::new(RODATA, 2),
+        KernelVirtualRange::new(DATA, 2),
+        KernelVirtualRange::new(HEAP, 2),
+        KernelVirtualRange::new(GUARD, 1),
+        KernelVirtualRange::new(VirtAddr::new(0), 1),
+    );
+
+    assert_eq!(
+        mapper.verify_kernel_mapping_policy(noncanonical_text),
+        Err(PageTableError::InvalidVirtualAddress)
+    );
+    Ok(())
+}
+
+#[test]
 fn kernel_mapping_policy_rejects_low_half_reserved_heap() -> Result<(), PageTableError> {
     let mapper = mapper_with_policy()?;
     let low_heap = KernelMappingPolicy::new(
@@ -277,6 +315,44 @@ fn kernel_mapping_policy_rejects_low_half_reserved_heap() -> Result<(), PageTabl
     assert_eq!(
         mapper.verify_kernel_mapping_policy(low_heap),
         Err(PageTableError::UnexpectedVirtualAddressSpace)
+    );
+    Ok(())
+}
+
+#[test]
+fn kernel_mapping_policy_rejects_unaligned_reserved_heap() -> Result<(), PageTableError> {
+    let mapper = mapper_with_policy()?;
+    let unaligned_heap = KernelMappingPolicy::new(
+        KernelVirtualRange::new(TEXT, 2),
+        KernelVirtualRange::new(RODATA, 2),
+        KernelVirtualRange::new(DATA, 2),
+        KernelVirtualRange::new(VirtAddr::new(HEAP.get() + 1), 1),
+        KernelVirtualRange::new(GUARD, 1),
+        KernelVirtualRange::new(VirtAddr::new(0), 1),
+    );
+
+    assert_eq!(
+        mapper.verify_kernel_mapping_policy(unaligned_heap),
+        Err(PageTableError::UnalignedVirtualAddress)
+    );
+    Ok(())
+}
+
+#[test]
+fn kernel_mapping_policy_rejects_noncanonical_guard_page() -> Result<(), PageTableError> {
+    let mapper = mapper_with_policy()?;
+    let noncanonical_guard = KernelMappingPolicy::new(
+        KernelVirtualRange::new(TEXT, 2),
+        KernelVirtualRange::new(RODATA, 2),
+        KernelVirtualRange::new(DATA, 2),
+        KernelVirtualRange::new(HEAP, 2),
+        KernelVirtualRange::new(VirtAddr::new(0xffff_7fff_ffff_f000), 1),
+        KernelVirtualRange::new(VirtAddr::new(0), 1),
+    );
+
+    assert_eq!(
+        mapper.verify_kernel_mapping_policy(noncanonical_guard),
+        Err(PageTableError::InvalidVirtualAddress)
     );
     Ok(())
 }
@@ -307,4 +383,31 @@ fn kernel_virtual_range_debug_redacts_start_address() {
     assert!(debug.contains("KernelVirtualRange"));
     assert!(debug.contains("pages: 2"));
     assert!(!debug.contains("ffff_9000"));
+}
+
+#[test]
+fn kernel_mapping_policy_debug_redacts_all_range_addresses() {
+    let debug = format!("{:?}", policy());
+
+    assert!(debug.contains("KernelMappingPolicy"));
+    assert!(debug.contains("text"));
+    assert!(debug.contains("rodata"));
+    assert!(debug.contains("data"));
+    assert!(!debug.contains("ffff_9000"));
+    assert!(!debug.contains("0000_6000"));
+}
+
+#[test]
+fn policy_report_debug_exposes_status_without_addresses() -> Result<(), PageTableError> {
+    let mapper = mapper_with_policy()?;
+    let report = mapper.verify_kernel_mapping_policy(policy())?;
+    let debug = format!("{report:?}");
+
+    assert!(debug.contains("KernelMappingPolicyReport"));
+    assert!(debug.contains("mapped_pages"));
+    assert!(debug.contains("text_rx: true"));
+    assert!(debug.contains("null_page_unmapped: true"));
+    assert!(!debug.contains("ffff_9000"));
+    assert!(!debug.contains("0020_"));
+    Ok(())
 }
