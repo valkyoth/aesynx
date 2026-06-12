@@ -428,6 +428,18 @@ impl KernelImageInfo {
     }
 
     #[must_use]
+    pub fn phys_for_virt(self, virt: VirtAddr) -> Option<PhysAddr> {
+        let virt = virt.get();
+        if virt < self.virt_start.get() || virt >= self.virt_end.get() {
+            return None;
+        }
+
+        virt.checked_sub(self.virt_start.get())
+            .and_then(|offset| self.phys_start.get().checked_add(offset))
+            .map(PhysAddr::new)
+    }
+
+    #[must_use]
     pub(crate) const fn virt_start(self) -> VirtAddr {
         self.virt_start
     }
@@ -446,5 +458,46 @@ impl KernelImageInfo {
 impl fmt::Debug for KernelImageInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("KernelImageInfo(redacted)")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::format;
+
+    use aesynx_abi::{PhysAddr, VirtAddr};
+
+    use super::KernelImageInfo;
+
+    #[test]
+    fn kernel_image_translates_virtual_address_to_physical_offset() {
+        let image = KernelImageInfo::new(
+            VirtAddr::new(0xffff_ffff_8000_0000),
+            VirtAddr::new(0xffff_ffff_8001_0000),
+            PhysAddr::new(0x0040_0000),
+        );
+
+        assert_eq!(
+            image.phys_for_virt(VirtAddr::new(0xffff_ffff_8000_3000)),
+            Some(PhysAddr::new(0x0040_3000))
+        );
+        assert_eq!(
+            image.phys_for_virt(VirtAddr::new(0xffff_ffff_8001_0000)),
+            None
+        );
+    }
+
+    #[test]
+    fn kernel_image_debug_remains_redacted() {
+        let image = KernelImageInfo::new(
+            VirtAddr::new(0xffff_ffff_8000_0000),
+            VirtAddr::new(0xffff_ffff_8001_0000),
+            PhysAddr::new(0x0040_0000),
+        );
+        let debug = format!("{image:?}");
+
+        assert_eq!(debug, "KernelImageInfo(redacted)");
+        assert!(!debug.contains("8000"));
+        assert!(!debug.contains("0040"));
     }
 }

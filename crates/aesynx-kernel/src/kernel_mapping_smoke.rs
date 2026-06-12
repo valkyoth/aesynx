@@ -23,11 +23,11 @@ pub enum KernelMappingSmokeError {
     Mapper(aesynx_mm::PageTableError),
     Plan(aesynx_kernel::kernel_mapping_policy::KernelMappingPlanError),
     AddressOverflow,
+    KernelImageRange,
     NoUsableWindow,
     UnexpectedPolicy,
 }
 
-const TEXT_PHYS: aesynx_abi::PhysAddr = aesynx_abi::PhysAddr::new(0x0030_0000);
 const POLICY_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 const POLICY_MAPPED_FRAMES: usize = 256;
 const PAGE_TABLE_ALLOCATOR_WORDS: usize = 2;
@@ -46,15 +46,25 @@ pub fn run(
     )
     .map_err(KernelMappingSmokeError::Plan)?;
     let policy = plan.policy();
-    let rodata_phys = add_pages_to_phys(TEXT_PHYS, plan.text_pages())?;
-    let data_phys = add_pages_to_phys(rodata_phys, plan.rodata_pages())?;
+    let text_phys = info
+        .kernel_image
+        .phys_for_virt(layout.text_start)
+        .ok_or(KernelMappingSmokeError::KernelImageRange)?;
+    let rodata_phys = info
+        .kernel_image
+        .phys_for_virt(layout.rodata_start)
+        .ok_or(KernelMappingSmokeError::KernelImageRange)?;
+    let data_phys = info
+        .kernel_image
+        .phys_for_virt(layout.data_start)
+        .ok_or(KernelMappingSmokeError::KernelImageRange)?;
 
     let mut mapper = aesynx_mm::PageTableMapper::<POLICY_TABLES, POLICY_MAPPED_FRAMES>::new()
         .map_err(KernelMappingSmokeError::Mapper)?;
     mapper
         .map_contiguous(
             policy.text().start(),
-            TEXT_PHYS,
+            text_phys,
             policy.text().pages(),
             aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadExecute),
         )
@@ -172,19 +182,6 @@ fn first_usable_allocator_window(
     }
 
     Err(KernelMappingSmokeError::NoUsableWindow)
-}
-
-fn add_pages_to_phys(
-    phys: aesynx_abi::PhysAddr,
-    pages: u64,
-) -> Result<aesynx_abi::PhysAddr, KernelMappingSmokeError> {
-    let offset = pages
-        .checked_mul(aesynx_mm::FRAME_SIZE)
-        .ok_or(KernelMappingSmokeError::AddressOverflow)?;
-    phys.get()
-        .checked_add(offset)
-        .map(aesynx_abi::PhysAddr::new)
-        .ok_or(KernelMappingSmokeError::AddressOverflow)
 }
 
 fn frame_to_phys(
