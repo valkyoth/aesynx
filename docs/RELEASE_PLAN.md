@@ -614,6 +614,9 @@ Deliverables:
   the internal model table index, physical root, or CR3 claims.
 - Mapping visitors run structural audit before invoking callbacks, so corrupt
   mapper state fails closed before emitting mapping records.
+- Single-address read-only lookup, presence, and checked-translation failures
+  preserve mapper state for invalid addresses, unmapped pages, and corrupt
+  mapper accounting.
 - Single-address policy rejection paths preserve mapper state when mappings
   violate address-space, privilege, executable, writable, device-memory, or
   global-bit policy.

@@ -60,6 +60,7 @@ fn mapper_lookup_and_presence_reject_accounting_drift() -> Result<(), PageTableE
 #[test]
 fn mapper_page_presence_rejects_invalid_virtual_addresses() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
 
     assert_eq!(
         mapper.is_page_mapped(VirtAddr::new(0x0000_8000_0000_0000)),
@@ -69,6 +70,7 @@ fn mapper_page_presence_rejects_invalid_virtual_addresses() -> Result<(), PageTa
         mapper.is_page_mapped(VirtAddr::new(KERNEL_VIRT.get() + 1)),
         Err(PageTableError::UnalignedVirtualAddress)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -77,10 +79,12 @@ fn mapper_page_presence_rejects_corrupt_intermediate_leaf() -> Result<(), PageTa
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.is_page_mapped(VirtAddr::new(0)),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }

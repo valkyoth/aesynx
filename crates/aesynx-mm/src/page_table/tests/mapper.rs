@@ -162,6 +162,7 @@ fn mapper_reports_mapping_flags_without_mutation() -> Result<(), PageTableError>
 #[test]
 fn mapper_mapping_lookup_rejects_invalid_or_unmapped_pages() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
 
     assert_eq!(
         mapper.mapping_for_page(VirtAddr::new(0x0000_8000_0000_0000)),
@@ -179,6 +180,7 @@ fn mapper_mapping_lookup_rejects_invalid_or_unmapped_pages() -> Result<(), PageT
         mapper.translate_checked(KERNEL_VIRT),
         Err(PageTableError::NotMapped)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -191,11 +193,13 @@ fn mapper_checked_translation_rejects_accounting_drift() -> Result<(), PageTable
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.mapped_pages = 2;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.translate_checked(KERNEL_VIRT),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
