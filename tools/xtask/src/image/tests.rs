@@ -165,22 +165,21 @@ fn qemu_args_select_smoke_kind() {
 
 #[test]
 fn boot_smoke_requires_full_v0_15_page_table_marker_set() {
+    assert_smoke_contract_requires_each_marker(SmokeKind::Boot);
+
     let valid = SmokeKind::Boot.markers();
-    assert!(serial_log_contents_match(valid, SmokeKind::Boot));
-
-    for marker in valid.split(", ") {
-        let missing = valid.replace(marker, "");
-        assert!(
-            !serial_log_contents_match(&missing, SmokeKind::Boot),
-            "boot smoke accepted output without marker {marker}"
-        );
-    }
-
     let missing_root_only = valid.replacen("root_ok=true, ", "", 1);
     assert!(!serial_log_contents_match(
         &missing_root_only,
         SmokeKind::Boot
     ));
+}
+
+#[test]
+fn diagnostic_smokes_require_each_declared_marker() {
+    assert_smoke_contract_requires_each_marker(SmokeKind::Panic);
+    assert_smoke_contract_requires_each_marker(SmokeKind::Exception);
+    assert_smoke_contract_requires_each_marker(SmokeKind::Timer);
 }
 
 #[test]
@@ -205,4 +204,22 @@ fn boot_config_markers_cover_limine_kernel_path() {
             .iter()
             .any(|marker| marker.contains("path: boot():/boot/aesynx-kernel"))
     );
+}
+
+fn assert_smoke_contract_requires_each_marker(smoke: SmokeKind) {
+    let valid = smoke.markers();
+    assert!(
+        serial_log_contents_match(valid, smoke),
+        "{} smoke marker string is not accepted by its validator",
+        smoke.name()
+    );
+
+    for marker in valid.split(", ") {
+        let missing = valid.replace(marker, "");
+        assert!(
+            !serial_log_contents_match(&missing, smoke),
+            "{} smoke accepted output without marker {marker}",
+            smoke.name()
+        );
+    }
 }
