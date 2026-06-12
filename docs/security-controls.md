@@ -10,7 +10,7 @@ claim that the controls are implemented today.
 | Project naming | Single project name, no retired names | Active | `scripts/validate-security-policy.sh` |
 | Dependency policy | License, source, advisory, and duplicate-version checks | Configured | `deny.toml` |
 | Security reporting | Private-first vulnerability process | Configured | `SECURITY.md` |
-| Unsafe code | Unsafe confined to documented boundaries | Active boundaries documented | `docs/unsafe-policy.md`, `crates/aesynx-arch-x86_64/src/port.rs`, `crates/aesynx-kernel/src/limine.rs` |
+| Unsafe code | Unsafe confined to documented boundaries and new unsafe-bearing files block the security gate until admitted in the unsafe inventory | Active and enforced | `docs/unsafe-policy.md`, `scripts/validate-security-policy.sh`, `crates/aesynx-arch-x86_64/src/port.rs`, `crates/aesynx-kernel/src/limine.rs` |
 | Kernel engineering | `no_std`, internal primitives, minimal unsafe, external dependency exceptions | Configured | `docs/kernel-engineering-policy.md`, `scripts/validate-kernel-policy.sh` |
 | Modularity | Focused crates/modules, no giant source files | Configured | `docs/modularity-policy.md`, `scripts/validate-modularity-policy.sh` |
 | Componentization | System must not collapse into one huge OS binary; components remain independently versioned and rollback-capable | Policy active | `docs/modularity-policy.md`, `docs/ARCHITECTURE_DECISIONS.md` |

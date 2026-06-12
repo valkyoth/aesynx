@@ -115,6 +115,17 @@ Limitations: early single-core setup only; no page-table walk, page-fault recove
 ```
 
 ```text
+Location: crates/aesynx-arch-x86_64/src/exceptions/tests.rs
+Status: test-only in v0.15
+Purpose: provide an unsafe extern "C" handler signature for IDT gate encoding tests
+Preconditions: compiled only for architecture crate unit tests
+Unsafe operation: declares a zero-body unsafe extern "C" handler fixture; the fixture is never called
+Safety argument: the test needs a function item with the same ABI and type shape as real IDT handlers so descriptor encoding can be verified; no unsafe call is performed, no interrupt frame is fabricated through the fixture, and the handler body is empty
+Tests/evidence: IDT gate encoding tests compare the encoded address, selector, IST slot, options, and reserved fields
+Limitations: test-only; does not install a live gate or exercise hardware exception delivery
+```
+
+```text
 Location: crates/aesynx-arch-x86_64/src/interrupts.rs and crates/aesynx-arch-x86_64/src/port.rs
 Status: active in v0.10
 Purpose: establish the early x86_64 interrupt-controller baseline
@@ -184,9 +195,10 @@ Limitations:
 
 ## Release Gate
 
-Before 1.0, add a script that fails when:
+The security policy gate now fails when the unsafe file inventory changes
+without updating this document and `scripts/validate-security-policy.sh`
+together. Before 1.0, extend that gate so it also fails when:
 
-- New unsafe appears outside admitted modules.
 - An unsafe block lacks a nearby `SAFETY:` comment.
 - Architecture-specific intrinsics appear outside architecture crates.
 - MMIO volatile access appears outside driver/arch MMIO wrappers.

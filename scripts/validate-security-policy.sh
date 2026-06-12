@@ -59,4 +59,39 @@ if ! grep -q 'unsafe' docs/unsafe-policy.md; then
     exit 1
 fi
 
+allowed_unsafe_files="$(cat <<'EOF'
+crates/aesynx-arch-aarch64/src/lib.rs
+crates/aesynx-arch-x86_64/src/descriptors.rs
+crates/aesynx-arch-x86_64/src/exceptions.rs
+crates/aesynx-arch-x86_64/src/exceptions/tests.rs
+crates/aesynx-arch-x86_64/src/lib.rs
+crates/aesynx-arch-x86_64/src/port.rs
+crates/aesynx-arch-x86_64/src/registers.rs
+crates/aesynx-arch-x86_64/src/timer.rs
+crates/aesynx-kernel/src/limine.rs
+crates/aesynx-kernel/src/main.rs
+EOF
+)"
+
+actual_unsafe_files="$(
+    find crates -type f -name '*.rs' -exec grep -IlE 'unsafe[[:space:]]*\{|unsafe[[:space:]]+fn|unsafe[[:space:]]+extern|#\[unsafe|allow\(unsafe_code\)|global_asm!|asm!' {} + \
+        | LC_ALL=C sort
+)"
+
+if [ "$actual_unsafe_files" != "$allowed_unsafe_files" ]; then
+    echo "security policy: unsafe file inventory changed; update docs/unsafe-policy.md and validate-security-policy.sh together" >&2
+    echo "security policy: expected unsafe files:" >&2
+    printf '%s\n' "$allowed_unsafe_files" >&2
+    echo "security policy: actual unsafe files:" >&2
+    printf '%s\n' "$actual_unsafe_files" >&2
+    exit 1
+fi
+
+for file in $allowed_unsafe_files; do
+    if ! grep -Fq "Location: $file" docs/unsafe-policy.md; then
+        echo "security policy: unsafe file missing from docs/unsafe-policy.md: $file" >&2
+        exit 1
+    fi
+done
+
 echo "security policy: ok"
