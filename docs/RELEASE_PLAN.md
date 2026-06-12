@@ -805,6 +805,8 @@ Verification:
   null pages, and overlapping policy ranges.
 - Linker script exports page-granular text, rodata, and data/BSS boundaries
   consumed by the policy smoke.
+- Host unit tests cover section-plan derivation, malformed ordering, unaligned
+  boundaries, empty reserved heap/guard ranges, and arithmetic overflow.
 - QEMU boot requires both the policy status line and `[TEST] paging-policy=ok`.
 - Release notes must state that this is a policy model and smoke gate, not live
   replacement of Limine's active CR3.

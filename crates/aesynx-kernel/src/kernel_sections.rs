@@ -1,14 +1,5 @@
 use aesynx_abi::VirtAddr;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct KernelSectionLayout {
-    pub text_start: VirtAddr,
-    pub text_end: VirtAddr,
-    pub rodata_start: VirtAddr,
-    pub rodata_end: VirtAddr,
-    pub data_start: VirtAddr,
-    pub data_end: VirtAddr,
-}
+use aesynx_kernel::kernel_mapping_policy::KernelSectionLayout;
 
 pub fn layout() -> KernelSectionLayout {
     unsafe extern "C" {

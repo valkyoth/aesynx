@@ -2,6 +2,7 @@
 #![deny(unsafe_code)]
 
 pub mod diagnostics;
+pub mod kernel_mapping_policy;
 
 use aesynx_boot::{BootInfo, MemoryAccountingError};
 
