@@ -8,6 +8,8 @@
   |
   <a href="docs/RELEASE_PLAN.md">Release Plan</a>
   |
+  <a href="docs/releases/README.md">Release Notes</a>
+  |
   <a href="docs/security-controls.md">Security Controls</a>
   |
   <a href="SECURITY.md">Security</a>
@@ -46,47 +48,51 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.16.0` is the current kernel-mapping-policy implementation candidate. It builds a
-release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
-a Limine ISO, records build and boot tool versions in the image manifest, boots
-it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
-kernel-owned serial markers, installs basic x86_64 descriptor and interrupt
-tables, remaps and masks the legacy PIC, detects whether the local APIC is present,
-publishes checked IRQ vector allocation, handles a returning breakpoint
-exception, and can run opt-in deliberate panic and page-fault smoke tests with
-redacted CR2 presence/page-offset, CR3 low-bit, RFLAGS, interrupt-state, and
-decoded page-fault diagnostics. Normal boot now emits a checked physical memory
-report with total, usable, reserved, kernel, bootloader, framebuffer, ACPI, bad,
-and frame-count accounting before `[TEST] memory-map=ok`, then initializes a
-bounded early bitmap frame allocator from a usable boot-map window and verifies
-one-frame allocation/free, contiguous allocation/free, debug state, and
-double-free detection before `[TEST] frame-allocator=ok`, then exercises a
-bounded x86_64-shaped page-table mapper model with map, contiguous range
-map/protect/unmap, typed and checked root-table identity, audit-backed
-permission lookup, contiguous range lookup, audit-backed permission change,
-audit-backed unmapped/mapped range checks, read-only mapping visit, checked
-status accounting, checked byte-range
-translation, fail-closed single-address translation, virtual range permission
-verification, page-presence checks,
-mapped-range checks, kernel-only policy checks, kernel high-half user-access
-guard checks, user low-half kernel-privilege guard checks, kernel/user
-non-empty address-space candidate preflights, audit-backed kernel-range policy
-checks, user-range policy checks, write-protected range checks,
-non-executable range checks, executable range checks, normal-memory range
-checks, no-executable address-space policy checks, no-writable address-space
-policy checks, no-device address-space policy checks, no-global address-space
-policy checks, map-time no-physical-alias policy checks, redacted mapping summaries,
-redacted page-table debug output, fail-closed leaf decoding for
-lookup/protect/unmap, consistency audit, empty-table reclamation, and explicit
-TLB flush targets before `[TEST] page-table=ok`. Single-address translation
-returns typed errors for unmapped, invalid, or corrupt mapper state. Normal boot
-then validates the linker-derived kernel mapping policy for text RX, rodata
-R/NX, data RW/NX, a reserved high-half heap window, an unmapped guard page, and
-an unmapped null page before `[TEST] paging-policy=ok`. The opt-in timer smoke
-path installs a checked IRQ0 handler, programs the legacy PIT for QEMU, observes
-three controlled timer ticks, converts ticks into monotonic nanosecond values,
-wakes a bounded sleep request for a delayed log event, acknowledges each
-interrupt, and then disables the smoke IRQ.
+`v0.16.0` is the current kernel-mapping-policy implementation candidate.
+
+Current boot path:
+
+- Builds a release-profile freestanding `x86_64-unknown-none` kernel ELF.
+- Packages the kernel into a Limine ISO and records Rust, Limine, xorriso, and
+  QEMU versions in the image manifest.
+- Boots in QEMU and validates kernel-owned serial markers.
+- Normalizes Limine handoff metadata into Aesynx `BootInfo`.
+- Installs basic x86_64 GDT/TSS/IDT state, remaps and masks the legacy PIC,
+  detects local APIC presence, and publishes checked IRQ vector allocation.
+- Handles a returning breakpoint exception.
+
+Diagnostics and timer smoke:
+
+- Panic smoke emits bounded, escaped, redacted panic diagnostics.
+- Exception smoke emits redacted CR2 presence/page-offset, CR3 low bits,
+  public RFLAGS, interrupt state, and decoded page-fault bits.
+- Timer smoke programs PIT IRQ0 in QEMU, observes three controlled ticks,
+  converts ticks into monotonic nanosecond values, wakes one bounded sleep
+  request, acknowledges each interrupt, and disables the smoke IRQ.
+
+Memory and mapping model:
+
+- Boot memory accounting reports checked total, usable, reserved, kernel,
+  bootloader, framebuffer, ACPI, bad, and frame-count values before
+  `[TEST] memory-map=ok`.
+- The bounded bitmap frame allocator smoke verifies one-frame allocation/free,
+  contiguous allocation/free, debug state, double-free detection, and atomic
+  failure behavior before `[TEST] frame-allocator=ok`.
+- The bounded x86_64-shaped page-table mapper model covers map, unmap, protect,
+  contiguous range map/protect/unmap, typed and checked root-table identity,
+  checked status accounting, fail-closed translation, checked byte-range
+  translation, permission lookup/change, mapped/unmapped range checks,
+  candidate kernel/user address-space checks, physical-alias prevention,
+  redacted debug output, consistency audit, empty-table reclamation, and
+  explicit TLB flush targets before `[TEST] page-table=ok`.
+
+Kernel mapping policy:
+
+- Linker-exported section boundaries feed a safe `aesynx-mm` policy descriptor.
+- QEMU validates section layout, text RX, rodata read-only/NX, data RW/NX,
+  reserved heap, guard page, and null-page invariants.
+- Every v0.16 paging-policy `*_ok=true` marker plus `[TEST] paging-policy=ok`
+  is required before normal boot success.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -226,15 +232,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [First Serial Boot](docs/first-serial-boot.md)
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
-- [v0.7.0 Release Candidate Notes](docs/releases/v0.7.0-rc.md)
-- [v0.8.0 Release Candidate Notes](docs/releases/v0.8.0-rc.md)
-- [v0.9.0 Release Candidate Notes](docs/releases/v0.9.0-rc.md)
-- [v0.10.0 Release Candidate Notes](docs/releases/v0.10.0-rc.md)
-- [v0.11.0 Release Candidate Notes](docs/releases/v0.11.0-rc.md)
-- [v0.12.0 Release Candidate Notes](docs/releases/v0.12.0-rc.md)
-- [v0.13.0 Release Candidate Notes](docs/releases/v0.13.0-rc.md)
-- [v0.14.0 Release Candidate Notes](docs/releases/v0.14.0-rc.md)
-- [v0.15.0 Release Candidate Notes](docs/releases/v0.15.0-rc.md)
+- [Release Candidate Notes Archive](docs/releases/README.md)
 - [v0.16.0 Release Candidate Notes](docs/releases/v0.16.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
