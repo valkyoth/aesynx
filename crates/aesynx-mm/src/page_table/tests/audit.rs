@@ -6,6 +6,17 @@ use crate::page_table::{
 };
 
 #[test]
+fn mapper_audit_rejects_empty_arena() {
+    let mapper = PageTableMapper::<0> {
+        tables: [],
+        used: [],
+        mapped_pages: 0,
+    };
+
+    assert_eq!(mapper.audit(), Err(PageTableError::EmptyArena));
+}
+
+#[test]
 fn mapper_audit_reports_reachable_tables_and_mappings() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
 
