@@ -47,6 +47,21 @@ if ! grep -q '^Status: PASS$' "$report"; then
     exit 1
 fi
 
+if ! grep -Eq '^Tester: .+$' "$report"; then
+    echo "release readiness: report must contain non-empty Tester field" >&2
+    exit 1
+fi
+
+if ! grep -Eq '^Date: [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$report"; then
+    echo "release readiness: report must contain Date: YYYY-MM-DD" >&2
+    exit 1
+fi
+
+if ! grep -Eq '^Scope: .+$' "$report"; then
+    echo "release readiness: report must contain non-empty Scope field" >&2
+    exit 1
+fi
+
 if grep -qE 'TODO|TBD|Status: FAIL|Status: BLOCKED' "$report"; then
     echo "release readiness: report contains unresolved status text" >&2
     exit 1

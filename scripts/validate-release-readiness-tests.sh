@@ -54,6 +54,43 @@ if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
     exit 1
 fi
 
+cat >"$report" <<EOF
+Tag: $tag
+Commit: $head_commit
+Status: PASS
+Date: 2026-06-12
+Scope: self-test fixture
+EOF
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: missing tester did not block release" >&2
+    exit 1
+fi
+
+cat >"$report" <<EOF
+Tag: $tag
+Commit: $head_commit
+Status: PASS
+Tester: release-readiness self-test
+Date: 12-06-2026
+Scope: self-test fixture
+EOF
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: malformed date did not block release" >&2
+    exit 1
+fi
+
+cat >"$report" <<EOF
+Tag: $tag
+Commit: $head_commit
+Status: PASS
+Tester: release-readiness self-test
+Date: 2026-06-12
+EOF
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: missing scope did not block release" >&2
+    exit 1
+fi
+
 write_report "$head_commit" "PASS"
 git tag "$tag"
 if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
