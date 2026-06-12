@@ -65,8 +65,15 @@ pub const PAGE_TABLE_UNMAPPED_RANGE_MARKER: &str = "unmapped_range_ok=true";
 pub const PAGE_TABLE_VISIT_MARKER: &str = "visit_ok=true";
 pub const PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER: &str = "write_protected_range_ok=true";
 pub const PAGING_POLICY_FAIL_MARKER: &str = "[TEST] paging-policy=fail";
+pub const PAGING_POLICY_DATA_RW_NX_MARKER: &str = "data_rw_nx_ok=true";
+pub const PAGING_POLICY_GUARD_PAGE_MARKER: &str = "guard_page_ok=true";
+pub const PAGING_POLICY_HEAP_RESERVED_MARKER: &str = "heap_reserved_ok=true";
 pub const PAGING_POLICY_MARKER: &str = "[TEST] paging-policy=ok";
+pub const PAGING_POLICY_NULL_PAGE_MARKER: &str = "null_page_ok=true";
+pub const PAGING_POLICY_RODATA_READ_ONLY_MARKER: &str = "rodata_read_only_ok=true";
+pub const PAGING_POLICY_SECTION_LAYOUT_MARKER: &str = "section_layout_ok=true";
 pub const PAGING_POLICY_STATUS_MARKER: &str = "paging-policy mapped_pages=";
+pub const PAGING_POLICY_TEXT_RX_MARKER: &str = "text_rx_ok=true";
 pub const PANIC_DIAGNOSTIC_MARKER: &str = "[kernel][FATAL] panic handler entered";
 pub const PANIC_MARKER: &str = "[TEST] panic=ok";
 pub const PANIC_REGISTERS_MARKER: &str = "panic registers=";
@@ -132,6 +139,13 @@ const BOOT_REQUIRED_MARKERS: &[&str] = &[
     PAGE_TABLE_FLUSH_PAGE_MARKER,
     PAGE_TABLE_MARKER,
     PAGING_POLICY_STATUS_MARKER,
+    PAGING_POLICY_SECTION_LAYOUT_MARKER,
+    PAGING_POLICY_TEXT_RX_MARKER,
+    PAGING_POLICY_RODATA_READ_ONLY_MARKER,
+    PAGING_POLICY_DATA_RW_NX_MARKER,
+    PAGING_POLICY_HEAP_RESERVED_MARKER,
+    PAGING_POLICY_GUARD_PAGE_MARKER,
+    PAGING_POLICY_NULL_PAGE_MARKER,
     PAGING_POLICY_MARKER,
     BOOTINFO_MARKER,
     SERIAL_MARKER,
@@ -204,7 +218,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy mapped_pages=, [TEST] paging-policy=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, [TEST] paging-policy=ok, [TEST] bootinfo=ok, [TEST] boot=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"

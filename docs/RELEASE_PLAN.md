@@ -817,6 +817,8 @@ Verification:
 - QEMU status booleans must come from successful section-plan derivation and
   `KernelMappingPolicyReport` accessors, not from freestanding smoke-local
   constants.
+- Xtask marker tests and image manifests must track the status line, every
+  paging-policy `*_ok=true` boolean, and the final paging-policy ok marker.
 - Release notes must state that this is a policy model and smoke gate, not live
   replacement of Limine's active CR3.
 
