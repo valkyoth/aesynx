@@ -48,6 +48,9 @@ not tag-ready until:
 - A pentest report exists at `security/pentest/<tag>.md`.
 - The pentest report names the exact `Commit:` being tagged.
 - The pentest report has `Status: PASS`.
+- The pentest report has non-empty `Tester:` and `Scope:` fields and a
+  `Date: YYYY-MM-DD` field.
+- The tag does not already exist locally.
 - `scripts/validate-release-readiness.sh <tag>` passes.
 
 When a version's implementation criteria are done, say so explicitly and do not
@@ -67,9 +70,11 @@ Use this loop for every version:
 4. The maintainer either runs another follow-up pentest or requests a commit
    and waits for GitHub.
 5. When GitHub CI and CodeQL default setup are green, the maintainer updates
-   `security/pentest/<tag>.md` with the exact commit and `Status: PASS`.
+   `security/pentest/<tag>.md` with the exact commit, `Status: PASS`, tester,
+   date, and scope.
 6. `cargo xtask release-ready <tag>` must pass before tagging; it fails if the
-   root scratch `PENTEST.md` still exists.
+   root scratch `PENTEST.md` still exists, required report metadata is missing,
+   or the tag already exists locally.
 
 Never commit root `PENTEST.md`; it is a local scratch handoff file and is
 ignored by git.
