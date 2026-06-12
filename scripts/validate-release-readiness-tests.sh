@@ -17,6 +17,7 @@ git -c user.name='Aesynx Test' \
 head_commit="$(git rev-parse HEAD)"
 mkdir -p "security/pentest"
 report="security/pentest/$tag.md"
+release_notes="docs/releases/$tag-rc.md"
 
 write_report() {
     commit="$1"
@@ -33,8 +34,36 @@ $extra
 EOF
 }
 
+write_release_notes() {
+    mkdir -p "$(dirname "$release_notes")"
+    cat >"$release_notes" <<EOF
+# Aesynx $tag Release Candidate Notes
+
+Status: self-test fixture.
+EOF
+}
+
+write_release_notes
 write_report "$head_commit" "PASS"
 "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null
+
+rm "$release_notes"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: missing release notes did not block release" >&2
+    exit 1
+fi
+write_release_notes
+
+cat >"$release_notes" <<'EOF'
+# Aesynx v0.0.0 Release Candidate Notes
+
+Status: wrong title.
+EOF
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: mismatched release notes did not block release" >&2
+    exit 1
+fi
+write_release_notes
 
 write_report "0000000000000000000000000000000000000000" "PASS"
 if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then

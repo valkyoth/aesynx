@@ -45,6 +45,8 @@ not tag-ready until:
 - `cargo deny check` passes.
 - `cargo audit` passes.
 - `scripts/generate-sbom.sh` succeeds when release artifacts exist.
+- Release notes exist at `docs/releases/<tag>-rc.md` and identify the exact
+  tag.
 - A pentest report exists at `security/pentest/<tag>.md`.
 - The pentest report names the exact `Commit:` being tagged.
 - The pentest report has `Status: PASS`.
@@ -75,9 +77,9 @@ Use this loop for every version:
    `security/pentest/<tag>.md` with the exact commit, `Status: PASS`, tester,
    date, and scope.
 6. `cargo xtask release-ready <tag>` must pass before tagging; it fails if the
-   root scratch `PENTEST.md` still exists, required report metadata is missing,
-   SBOM evidence is missing for an active Rust workspace, or the tag already
-   exists locally.
+   root scratch `PENTEST.md` still exists, release notes are missing or do not
+   match the tag, required report metadata is missing, SBOM evidence is missing
+   for an active Rust workspace, or the tag already exists locally.
 
 Never commit root `PENTEST.md`; it is a local scratch handoff file and is
 ignored by git.

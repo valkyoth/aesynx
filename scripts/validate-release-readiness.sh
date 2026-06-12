@@ -24,9 +24,20 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
 fi
 
 report="security/pentest/$tag.md"
+release_notes="docs/releases/$tag-rc.md"
 
 if [ ! -s "$report" ]; then
     echo "release readiness: missing pentest report: $report" >&2
+    exit 1
+fi
+
+if [ ! -s "$release_notes" ]; then
+    echo "release readiness: missing release notes: $release_notes" >&2
+    exit 1
+fi
+
+if ! grep -Fxq "# Aesynx $tag Release Candidate Notes" "$release_notes"; then
+    echo "release readiness: release notes must contain exact title for $tag" >&2
     exit 1
 fi
 
