@@ -107,6 +107,7 @@ fn mapper_kernel_range_check_rejects_gaps_and_invalid_ranges() -> Result<(), Pag
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
+    let before = mapper;
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
 
     assert_eq!(
@@ -121,6 +122,7 @@ fn mapper_kernel_range_check_rejects_gaps_and_invalid_ranges() -> Result<(), Pag
         mapper.ensure_kernel_mapped_contiguous(KERNEL_VIRT, max_pages + 1),
         Err(PageTableError::RangeTooLarge)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -132,6 +134,7 @@ fn mapper_user_range_check_rejects_gaps_and_invalid_ranges() -> Result<(), PageT
         KERNEL_PHYS,
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
+    let before = mapper;
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
 
     assert_eq!(
@@ -146,6 +149,7 @@ fn mapper_user_range_check_rejects_gaps_and_invalid_ranges() -> Result<(), PageT
         mapper.ensure_user_mapped_contiguous(KERNEL_VIRT, max_pages + 1),
         Err(PageTableError::RangeTooLarge)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 

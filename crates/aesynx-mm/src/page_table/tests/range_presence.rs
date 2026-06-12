@@ -52,6 +52,7 @@ fn mapper_mapped_range_check_rejects_gaps_without_mutation() -> Result<(), PageT
 #[test]
 fn mapper_mapped_range_check_rejects_invalid_ranges() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
 
     assert_eq!(
@@ -66,6 +67,7 @@ fn mapper_mapped_range_check_rejects_invalid_ranges() -> Result<(), PageTableErr
         mapper.ensure_mapped_contiguous(VirtAddr::new(0xffff_ffff_ffff_f000), 2),
         Err(PageTableError::AddressOverflow)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 

@@ -616,6 +616,8 @@ Deliverables:
 - Read-only range and range-policy checks preserve mapper state after
   malformed table links, intermediate leaves, or accounting drift fail
   structural audit.
+- Contiguous range policy validators preserve mapper state when rejecting
+  gaps, zero-length ranges, oversized walks, and address-overflow ranges.
 - Address-space wrapper debug output redacts the root physical frame.
 - Mapper-produced status reports are inspectable but not externally
   constructible through public fields or constructors.
