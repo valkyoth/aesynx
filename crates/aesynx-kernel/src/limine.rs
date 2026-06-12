@@ -32,7 +32,9 @@ pub enum LimineError {
     MissingExecutableAddress,
     TooManyMemoryRegions,
     NullMemoryRegion,
+    InvalidHhdm,
     InvalidFramebuffer,
+    InvalidRsdp,
     AlreadyNormalized,
     BootInfoInvalid,
 }
@@ -92,9 +94,13 @@ fn read_memory_regions(
     // SAFETY: Limine fills `MEMMAP_REQUEST.response` before `_start`. The request
     // static lives in the retained Limine request section and is not mutated by
     // Aesynx after handoff.
-    let response =
-        unsafe { request_response::<LimineMemmapResponse>(core::ptr::addr_of!(MEMMAP_REQUEST)) }
-            .ok_or(LimineError::MissingMemoryMap)?;
+    let response = unsafe {
+        request_response::<LimineMemmapResponse>(
+            core::ptr::addr_of!(MEMMAP_REQUEST),
+            X86_64_KERNEL_VMA_MIN,
+        )
+    }
+    .ok_or(LimineError::MissingMemoryMap)?;
 
     if !limine_response_revision_compatible(response.revision, LIMINE_REQUEST_REVISION) {
         return Err(LimineError::UnsupportedMemoryMapRevision);
@@ -123,7 +129,7 @@ fn read_memory_regions(
         // SAFETY: Limine supplied this pointer through the bounded memmap
         // entries array. `limine_ref` performs null and alignment checks before
         // creating a reference.
-        let entry = if let Some(entry) = unsafe { limine_ref(entry_ptr) } {
+        let entry = if let Some(entry) = unsafe { limine_ref(entry_ptr, X86_64_KERNEL_VMA_MIN) } {
             entry
         } else {
             return Err(LimineError::NullMemoryRegion);
@@ -144,9 +150,10 @@ fn read_kernel_image() -> Result<KernelImageInfo, LimineError> {
     // SAFETY: Limine fills `EXECUTABLE_ADDRESS_REQUEST.response` before `_start`.
     // The response contains plain address values and is read-only after handoff.
     let response = unsafe {
-        request_response::<LimineExecutableAddressResponse>(core::ptr::addr_of!(
-            EXECUTABLE_ADDRESS_REQUEST
-        ))
+        request_response::<LimineExecutableAddressResponse>(
+            core::ptr::addr_of!(EXECUTABLE_ADDRESS_REQUEST),
+            X86_64_KERNEL_VMA_MIN,
+        )
     }
     .ok_or(LimineError::MissingExecutableAddress)?;
 
@@ -164,14 +171,21 @@ fn read_kernel_image() -> Result<KernelImageInfo, LimineError> {
 fn read_hhdm() -> Result<Option<HhdmInfo>, LimineError> {
     // SAFETY: Limine fills `HHDM_REQUEST.response` before `_start` when the
     // feature is available. A missing response is represented as null.
-    let Some(response) =
-        (unsafe { request_response::<LimineHhdmResponse>(core::ptr::addr_of!(HHDM_REQUEST)) })
-    else {
+    let Some(response) = (unsafe {
+        request_response::<LimineHhdmResponse>(
+            core::ptr::addr_of!(HHDM_REQUEST),
+            X86_64_KERNEL_VMA_MIN,
+        )
+    }) else {
         return Ok(None);
     };
 
     if !limine_response_revision_compatible(response.revision, LIMINE_REQUEST_REVISION) {
         return Err(LimineError::UnsupportedHhdmRevision);
+    }
+
+    if !valid_handoff_virt(response.offset, X86_64_KERNEL_VMA_MIN) {
+        return Err(LimineError::InvalidHhdm);
     }
 
     Ok(Some(HhdmInfo::new(VirtAddr::new(response.offset))))
@@ -181,7 +195,10 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     // SAFETY: Limine fills `FRAMEBUFFER_REQUEST.response` before `_start` when
     // the feature is available. A missing response is represented as null.
     let Some(response) = (unsafe {
-        request_response::<LimineFramebufferResponse>(core::ptr::addr_of!(FRAMEBUFFER_REQUEST))
+        request_response::<LimineFramebufferResponse>(
+            core::ptr::addr_of!(FRAMEBUFFER_REQUEST),
+            X86_64_KERNEL_VMA_MIN,
+        )
     }) else {
         return Ok(None);
     };
@@ -206,17 +223,21 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     // SAFETY: Limine supplied this pointer through the framebuffer array.
     // `limine_ref` performs null and alignment checks before creating a
     // reference.
-    let framebuffer = if let Some(framebuffer) = unsafe { limine_ref(framebuffer_ptr) } {
-        framebuffer
-    } else {
-        return Err(LimineError::InvalidFramebuffer);
-    };
+    let framebuffer =
+        if let Some(framebuffer) = unsafe { limine_ref(framebuffer_ptr, X86_64_KERNEL_VMA_MIN) } {
+            framebuffer
+        } else {
+            return Err(LimineError::InvalidFramebuffer);
+        };
 
     // Provenance is intentionally dropped here: the framebuffer is bootloader
     // MMIO memory, not a Rust allocation. Future framebuffer writes must
     // re-acquire a raw pointer at the MMIO access site with a local safety
     // contract for the mapping lifetime and cacheability.
     let base = framebuffer.address as usize as u64;
+    if !valid_handoff_virt(base, X86_64_KERNEL_VMA_MIN) {
+        return Err(LimineError::InvalidFramebuffer);
+    }
     let width =
         u32::try_from(framebuffer.width).map_err(|_error| LimineError::InvalidFramebuffer)?;
     let height =
@@ -235,9 +256,12 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
 fn read_rsdp() -> Result<Option<VirtAddr>, LimineError> {
     // SAFETY: Limine fills `RSDP_REQUEST.response` before `_start` when the
     // feature is available. A missing response is represented as null.
-    let Some(response) =
-        (unsafe { request_response::<LimineRsdpResponse>(core::ptr::addr_of!(RSDP_REQUEST)) })
-    else {
+    let Some(response) = (unsafe {
+        request_response::<LimineRsdpResponse>(
+            core::ptr::addr_of!(RSDP_REQUEST),
+            X86_64_KERNEL_VMA_MIN,
+        )
+    }) else {
         return Ok(None);
     };
 
@@ -253,7 +277,12 @@ fn read_rsdp() -> Result<Option<VirtAddr>, LimineError> {
     // physical/virtual address, not a Rust allocation. Future ACPI readers must
     // re-acquire a raw pointer at the read site with a documented firmware
     // table lifetime contract.
-    Ok(Some(VirtAddr::new(response.address as usize as u64)))
+    let address = response.address as usize as u64;
+    if !valid_handoff_virt(address, X86_64_KERNEL_VMA_MIN) {
+        return Err(LimineError::InvalidRsdp);
+    }
+
+    Ok(Some(VirtAddr::new(address)))
 }
 
 fn map_memory_region_kind(kind: u64) -> MemoryRegionKind {
@@ -276,7 +305,10 @@ const fn limine_response_revision_compatible(
     response_revision >= request_revision
 }
 
-unsafe fn request_response<T>(request: *const LimineRequest) -> Option<&'static T> {
+unsafe fn request_response<T>(
+    request: *const LimineRequest,
+    min_kernel_vma: u64,
+) -> Option<&'static T> {
     // SAFETY: The caller provides the address of a live Limine request static.
     // Reading the response word is volatile because the bootloader wrote it
     // outside Rust's aliasing model before transferring control to `_start`.
@@ -285,15 +317,15 @@ unsafe fn request_response<T>(request: *const LimineRequest) -> Option<&'static 
     // SAFETY: A non-null, aligned response pointer is owned by Limine and
     // remains valid in bootloader-reclaimable memory during this early boot
     // normalization phase.
-    unsafe { limine_ref(response) }
+    unsafe { limine_ref(response, min_kernel_vma) }
 }
 
-unsafe fn limine_ref<T>(ptr: *const T) -> Option<&'static T> {
+unsafe fn limine_ref<T>(ptr: *const T, min_kernel_vma: u64) -> Option<&'static T> {
     if ptr.is_null() || !ptr.is_aligned() {
         return None;
     }
 
-    if (ptr as usize as u64) < X86_64_KERNEL_VMA_MIN {
+    if !valid_handoff_virt(ptr as usize as u64, min_kernel_vma) {
         return None;
     }
 
@@ -302,6 +334,16 @@ unsafe fn limine_ref<T>(ptr: *const T) -> Option<&'static T> {
     // against null, misaligned, and lower-half pointers before creating a
     // reference.
     Some(unsafe { &*ptr })
+}
+
+const fn valid_handoff_virt(address: u64, min_kernel_vma: u64) -> bool {
+    address >= min_kernel_vma && is_canonical_address(address)
+}
+
+const fn is_canonical_address(address: u64) -> bool {
+    let sign_bit = (address >> 47) & 1;
+    let upper = address >> 48;
+    (sign_bit == 0 && upper == 0) || (sign_bit == 1 && upper == 0xffff)
 }
 
 fn kernel_virt_end() -> u64 {

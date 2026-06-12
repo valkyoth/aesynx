@@ -112,7 +112,7 @@ fn validate_kernel_image(arch: ArchKind, image: KernelImageInfo) -> Result<(), B
         ArchKind::Unknown => return Err(BootInfoError::KernelImageEmpty),
     };
 
-    if virt_start < min_kernel_vma {
+    if virt_start < min_kernel_vma || virt_end < min_kernel_vma {
         return Err(BootInfoError::KernelImageEmpty);
     }
 

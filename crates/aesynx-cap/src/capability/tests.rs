@@ -20,6 +20,19 @@ fn parent_cap(perms: CapPerms) -> Capability {
     })
 }
 
+fn unbounded_parent_cap(perms: CapPerms) -> Capability {
+    Capability::new_for_test(TestCapabilitySpec {
+        object_id: ObjectId::new(7),
+        base: None,
+        len: None,
+        perms,
+        owner: PrincipalId::new(1),
+        generation: 3,
+        revocation_epoch: 9,
+        kind: CapKind::Memory,
+    })
+}
+
 #[derive(Default)]
 struct TestAudit {
     last_event: Option<CapAuditEvent>,
@@ -45,7 +58,7 @@ fn audited_grant(parent: Capability, target_owner: PrincipalId) -> Result<Capabi
 }
 
 #[test]
-fn derive_reduces_authority_and_changes_owner() {
+fn derive_reduces_authority_for_same_owner() {
     let parent = parent_cap(
         CapPerms::READ
             .union(CapPerms::WRITE)
@@ -53,7 +66,7 @@ fn derive_reduces_authority_and_changes_owner() {
     );
     let request = DeriveRequest {
         perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
+        owner: parent.owner(),
         base: Some(VirtAddr::new(120)),
         len: Some(10),
     };
@@ -63,7 +76,7 @@ fn derive_reduces_authority_and_changes_owner() {
         base: Some(VirtAddr::new(120)),
         len: Some(10),
         perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
+        owner: parent.owner(),
         generation: parent.generation(),
         revocation_epoch: parent.revocation_epoch(),
         kind: parent.kind(),
@@ -73,8 +86,48 @@ fn derive_reduces_authority_and_changes_owner() {
 }
 
 #[test]
-fn derive_with_audit_records_chain_of_custody() {
+fn derive_cross_owner_requires_grant_permission() {
     let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
+    let request = DeriveRequest {
+        perms: CapPerms::READ,
+        owner: PrincipalId::new(2),
+        base: Some(VirtAddr::new(120)),
+        len: Some(10),
+    };
+
+    assert_eq!(
+        audited_derive(parent, request),
+        Err(DeriveError::MissingGrantPermission)
+    );
+}
+
+#[test]
+fn derive_cross_owner_succeeds_with_grant_permission() {
+    let parent = parent_cap(
+        CapPerms::READ
+            .union(CapPerms::DERIVE)
+            .union(CapPerms::GRANT),
+    );
+    let request = DeriveRequest {
+        perms: CapPerms::READ,
+        owner: PrincipalId::new(2),
+        base: Some(VirtAddr::new(120)),
+        len: Some(10),
+    };
+
+    assert_eq!(
+        audited_derive(parent, request).map(|cap| cap.owner()),
+        Ok(PrincipalId::new(2))
+    );
+}
+
+#[test]
+fn derive_with_audit_records_chain_of_custody() {
+    let parent = parent_cap(
+        CapPerms::READ
+            .union(CapPerms::DERIVE)
+            .union(CapPerms::GRANT),
+    );
     let request = DeriveRequest {
         perms: CapPerms::READ,
         owner: PrincipalId::new(2),
@@ -93,6 +146,62 @@ fn derive_with_audit_records_chain_of_custody() {
         audit.last_event.map(|event| event.action),
         Some(CapAuditAction::Derive)
     );
+}
+
+#[test]
+fn derive_live_rejects_stale_parent_before_audit() {
+    let parent = parent_cap(
+        CapPerms::READ
+            .union(CapPerms::DERIVE)
+            .union(CapPerms::GRANT),
+    );
+    let request = DeriveRequest {
+        perms: CapPerms::READ,
+        owner: PrincipalId::new(2),
+        base: Some(VirtAddr::new(120)),
+        len: Some(10),
+    };
+    let mut audit = TestAudit::default();
+
+    assert_eq!(
+        parent.derive_live_with_audit(request, 2, 9, &mut audit),
+        Err(DeriveError::ParentStaleGeneration)
+    );
+    assert_eq!(audit.last_event, None);
+}
+
+#[test]
+fn derive_live_rejects_revoked_parent_before_audit() {
+    let parent = parent_cap(
+        CapPerms::READ
+            .union(CapPerms::DERIVE)
+            .union(CapPerms::GRANT),
+    );
+    let request = DeriveRequest {
+        perms: CapPerms::READ,
+        owner: PrincipalId::new(2),
+        base: Some(VirtAddr::new(120)),
+        len: Some(10),
+    };
+    let mut audit = TestAudit::default();
+
+    assert_eq!(
+        parent.derive_live_with_audit(request, 3, 8, &mut audit),
+        Err(DeriveError::ParentRevoked)
+    );
+    assert_eq!(audit.last_event, None);
+}
+
+#[test]
+fn grant_live_rejects_revoked_parent_before_audit() {
+    let parent = parent_cap(CapPerms::READ.union(CapPerms::GRANT));
+    let mut audit = TestAudit::default();
+
+    assert_eq!(
+        parent.grant_live_with_audit(PrincipalId::new(2), 3, 8, &mut audit),
+        Err(DeriveError::ParentRevoked)
+    );
+    assert_eq!(audit.last_event, None);
 }
 
 #[test]
@@ -116,7 +225,7 @@ fn derive_rejects_permission_escalation() {
     let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
     let request = DeriveRequest {
         perms: CapPerms::READ.union(CapPerms::WRITE),
-        owner: PrincipalId::new(2),
+        owner: parent.owner(),
         base: Some(VirtAddr::new(120)),
         len: Some(10),
     };
@@ -132,7 +241,7 @@ fn derive_rejects_range_expansion() {
     let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
     let request = DeriveRequest {
         perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
+        owner: parent.owner(),
         base: Some(VirtAddr::new(120)),
         len: Some(40),
     };
@@ -148,9 +257,25 @@ fn derive_rejects_zero_length_range() {
     let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
     let request = DeriveRequest {
         perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
+        owner: parent.owner(),
         base: Some(VirtAddr::new(120)),
         len: Some(0),
+    };
+
+    assert_eq!(
+        audited_derive(parent, request),
+        Err(DeriveError::RangeEscalates)
+    );
+}
+
+#[test]
+fn derive_rejects_overflowing_child_range_from_unbounded_parent() {
+    let parent = unbounded_parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
+    let request = DeriveRequest {
+        perms: CapPerms::READ,
+        owner: parent.owner(),
+        base: Some(VirtAddr::new(u64::MAX - 3)),
+        len: Some(8),
     };
 
     assert_eq!(

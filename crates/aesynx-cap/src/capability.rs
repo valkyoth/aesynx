@@ -139,6 +139,25 @@ impl Capability {
         request: DeriveRequest,
         audit: &mut impl CapAuditLog,
     ) -> Result<Self, DeriveError> {
+        self.derive_prevalidated_with_audit(request, audit)
+    }
+
+    pub fn derive_live_with_audit(
+        self,
+        request: DeriveRequest,
+        current_generation: u32,
+        current_epoch: u64,
+        audit: &mut impl CapAuditLog,
+    ) -> Result<Self, DeriveError> {
+        self.validate_live_for_derivation(current_generation, current_epoch)?;
+        self.derive_prevalidated_with_audit(request, audit)
+    }
+
+    fn derive_prevalidated_with_audit(
+        self,
+        request: DeriveRequest,
+        audit: &mut impl CapAuditLog,
+    ) -> Result<Self, DeriveError> {
         let source_owner = self.owner;
         let child = self.derive_inner(request)?;
         audit
@@ -161,6 +180,25 @@ impl Capability {
         target_owner: PrincipalId,
         audit: &mut impl CapAuditLog,
     ) -> Result<Self, DeriveError> {
+        self.grant_prevalidated_with_audit(target_owner, audit)
+    }
+
+    pub fn grant_live_with_audit(
+        self,
+        target_owner: PrincipalId,
+        current_generation: u32,
+        current_epoch: u64,
+        audit: &mut impl CapAuditLog,
+    ) -> Result<Self, DeriveError> {
+        self.validate_live_for_derivation(current_generation, current_epoch)?;
+        self.grant_prevalidated_with_audit(target_owner, audit)
+    }
+
+    fn grant_prevalidated_with_audit(
+        self,
+        target_owner: PrincipalId,
+        audit: &mut impl CapAuditLog,
+    ) -> Result<Self, DeriveError> {
         let source_owner = self.owner;
         let child = self.grant_inner(target_owner)?;
         audit
@@ -178,9 +216,25 @@ impl Capability {
         Ok(child)
     }
 
+    const fn validate_live_for_derivation(
+        &self,
+        current_generation: u32,
+        current_epoch: u64,
+    ) -> Result<(), DeriveError> {
+        match self.validate_live(current_generation, current_epoch) {
+            Ok(()) => Ok(()),
+            Err(CapValidationError::Revoked) => Err(DeriveError::ParentRevoked),
+            Err(CapValidationError::StaleGeneration) => Err(DeriveError::ParentStaleGeneration),
+        }
+    }
+
     fn derive_inner(self, request: DeriveRequest) -> Result<Self, DeriveError> {
         if !self.perms.contains(CapPerms::DERIVE) {
             return Err(DeriveError::MissingDerivePermission);
+        }
+
+        if request.owner != self.owner && !self.perms.contains(CapPerms::GRANT) {
+            return Err(DeriveError::MissingGrantPermission);
         }
 
         if matches!(request.len, Some(0)) {
@@ -256,7 +310,9 @@ fn range_is_subset(
 ) -> bool {
     match (parent_base, parent_len, child_base, child_len) {
         (None, None, None, None) => true,
-        (None, None, Some(_), Some(_)) => true,
+        (None, None, Some(child_base), Some(child_len)) => {
+            child_base.get().checked_add(child_len).is_some()
+        }
         (Some(_), Some(_), None, None) => false,
         (Some(parent_base), Some(parent_len), Some(child_base), Some(child_len)) => {
             bounded_range_contains(parent_base.get(), parent_len, child_base.get(), child_len)

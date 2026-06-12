@@ -1412,6 +1412,9 @@ Deliverables:
 - Documented rule for which code may block, allocate, or log while holding a
   lock.
 - Per-core versus shared-state ownership checklist.
+- Explicit migration plan for current single-core `static mut` GDT/TSS/IDT
+  storage, including non-atomic IDT gate writes, before any secondary core can
+  observe or mutate descriptor state.
 - Tests for double-unlock prevention, nested interrupt guard behavior, and
   lock-order validation where feasible.
 

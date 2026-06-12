@@ -30,6 +30,11 @@ pub struct DescriptorTableStatus {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Ring0StackError {
+    InvalidStackTop,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SegmentSelector(u16);
 
 impl SegmentSelector {
@@ -97,26 +102,30 @@ pub fn init() -> DescriptorTableStatus {
 /// The caller must guarantee that `stack_top` is a canonical one-past-end
 /// pointer to a writable kernel stack that remains valid for the current CPU
 /// while ring 3 execution is enabled.
-pub unsafe fn set_ring0_stack(stack_top: u64) {
-    debug_assert_ne!(stack_top, 0, "RSP0 cannot be null");
-    debug_assert!(
-        stack_top >= X86_64_KERNEL_VMA_MIN,
-        "RSP0 must be in the kernel VMA"
-    );
-    debug_assert_eq!(stack_top & 0xf, 0, "RSP0 must be 16-byte aligned");
-    debug_assert!(is_canonical_address(stack_top), "RSP0 must be canonical");
+pub unsafe fn set_ring0_stack(stack_top: u64) -> Result<(), Ring0StackError> {
+    if !valid_ring0_stack_top(stack_top) {
+        return Err(Ring0StackError::InvalidStackTop);
+    }
 
     // SAFETY: The public unsafe contract above requires the caller to provide a
     // valid current-CPU kernel stack pointer before privilege transitions use it.
     unsafe {
         TSS.rsp[0] = stack_top;
     }
+    Ok(())
 }
 
 const fn is_canonical_address(address: u64) -> bool {
     let sign_bit = (address >> 47) & 1;
     let upper = address >> 48;
     (sign_bit == 0 && upper == 0) || (sign_bit == 1 && upper == 0xffff)
+}
+
+const fn valid_ring0_stack_top(stack_top: u64) -> bool {
+    stack_top != 0
+        && stack_top >= X86_64_KERNEL_VMA_MIN
+        && stack_top & 0xf == 0
+        && is_canonical_address(stack_top)
 }
 
 unsafe fn init_tables() {
@@ -268,7 +277,7 @@ mod tests {
     use super::{
         AlignedStack, DOUBLE_FAULT_IST_SLOT, DOUBLE_FAULT_STACK_BYTES, DescriptorTablePointer,
         GDT_ENTRIES, InterruptStackTableIndex, KERNEL_CODE_DESCRIPTOR, KERNEL_DATA_DESCRIPTOR,
-        SegmentSelector, TaskStateSegment, tss_descriptor,
+        SegmentSelector, TaskStateSegment, tss_descriptor, valid_ring0_stack_top,
     };
 
     #[test]
@@ -312,5 +321,18 @@ mod tests {
     fn tss_layout_matches_x86_64_size() {
         assert_eq!(size_of::<TaskStateSegment>(), 104);
         assert_eq!(size_of::<DescriptorTablePointer>(), 10);
+    }
+
+    #[test]
+    fn ring0_stack_validator_accepts_aligned_canonical_kernel_stack_top() {
+        assert!(valid_ring0_stack_top(0xffff_ffff_8000_1000));
+    }
+
+    #[test]
+    fn ring0_stack_validator_rejects_invalid_stack_tops() {
+        assert!(!valid_ring0_stack_top(0));
+        assert!(!valid_ring0_stack_top(0x0000_7fff_ffff_f000));
+        assert!(!valid_ring0_stack_top(0xffff_ffff_8000_1008));
+        assert!(!valid_ring0_stack_top(0x0000_8000_0000_0000));
     }
 }

@@ -14,6 +14,8 @@ pub struct DeriveRequest {
 pub enum DeriveError {
     MissingDerivePermission,
     MissingGrantPermission,
+    ParentRevoked,
+    ParentStaleGeneration,
     AuditRejected,
     PermissionsEscalate,
     RangeEscalates,

@@ -79,7 +79,13 @@ Hard gate:
 
 Current exceptions:
 
-- None.
+```text
+Path: crates/aesynx-kernel/src/limine.rs
+Reason: Concentrated early-boot Limine ABI boundary; v0.16.3 pentest fixes add payload-address validation without changing the bootloader request/link-section layout.
+Owner: kernel boot handoff
+Split plan: Move Limine protocol structs, constants, request statics, and ABI layout assertions into a private limine/abi.rs module; keep normalization flow in limine.rs.
+Removal deadline: v0.16.4
+```
 
 Exception format:
 
