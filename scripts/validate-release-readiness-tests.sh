@@ -16,17 +16,45 @@ git -c user.name='Aesynx Test' \
 
 head_commit="$(git rev-parse HEAD)"
 mkdir -p "security/pentest"
-cat >"security/pentest/$tag.md" <<EOF
+report="security/pentest/$tag.md"
+
+write_report() {
+    commit="$1"
+    status="$2"
+    extra="${3:-}"
+    cat >"$report" <<EOF
 Tag: $tag
-Commit: $head_commit
-Status: PASS
+Commit: $commit
+Status: $status
 Tester: release-readiness self-test
 Date: 2026-06-12
 Scope: self-test fixture
+$extra
 EOF
+}
 
+write_report "$head_commit" "PASS"
 "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null
 
+write_report "0000000000000000000000000000000000000000" "PASS"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: stale commit hash did not block release" >&2
+    exit 1
+fi
+
+write_report "$head_commit" "FAIL"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: failed status did not block release" >&2
+    exit 1
+fi
+
+write_report "$head_commit" "PASS" "TODO: unresolved finding"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: unresolved TODO did not block release" >&2
+    exit 1
+fi
+
+write_report "$head_commit" "PASS"
 cat >PENTEST.md <<'EOF'
 temporary findings must block release readiness
 EOF
