@@ -381,10 +381,10 @@ fn boot_entry() -> ! {
                             aesynx_arch_x86_64::X86_64::halt_forever();
                         }
                     }
-                    match kernel_mapping_smoke::run(kernel_sections::layout()) {
+                    match kernel_mapping_smoke::run(&info, kernel_sections::layout()) {
                         Ok(status) => {
                             aesynx_arch_x86_64::serial_println!(
-                                "paging-policy-model mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={} hardware_image_ok={}",
+                                "paging-policy-model mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={} hardware_image_ok={} hardware_arena_frames={} hardware_root_allocated={}",
                                 status.mapped_pages,
                                 status.reserved_pages,
                                 status.text_pages,
@@ -397,7 +397,9 @@ fn boot_entry() -> ! {
                                 status.heap_reserved_ok,
                                 status.guard_page_ok,
                                 status.null_page_ok,
-                                status.hardware_image_ok
+                                status.hardware_image_ok,
+                                status.hardware_arena_frames,
+                                status.hardware_root_allocated
                             );
                             aesynx_arch_x86_64::serial::write_str(
                                 "[TEST] paging-policy-model=ok\n",
