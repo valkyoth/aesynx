@@ -55,6 +55,14 @@ if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
 fi
 
 write_report "$head_commit" "PASS"
+git tag "$tag"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: existing local tag did not block release" >&2
+    exit 1
+fi
+git tag -d "$tag" >/dev/null
+
+write_report "$head_commit" "PASS"
 cat >PENTEST.md <<'EOF'
 temporary findings must block release readiness
 EOF

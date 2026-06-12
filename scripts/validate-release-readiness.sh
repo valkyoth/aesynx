@@ -18,6 +18,11 @@ if [ -e PENTEST.md ]; then
     exit 1
 fi
 
+if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+    echo "release readiness: tag already exists locally: $tag" >&2
+    exit 1
+fi
+
 report="security/pentest/$tag.md"
 
 if [ ! -s "$report" ]; then
