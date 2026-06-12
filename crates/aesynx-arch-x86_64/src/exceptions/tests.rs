@@ -2,7 +2,8 @@ use core::mem::size_of;
 
 use super::{
     DOUBLE_FAULT_VECTOR, ExceptionFrame, IDT_ENTRIES, INTERRUPT_GATE_PRESENT, IdtEntry,
-    PAGE_FAULT_VECTOR, PageFaultErrorCode, RawExceptionFrame,
+    PAGE_FAULT_VECTOR, PageFaultErrorCode, RETURNING_EXCEPTION_GPR_SAVE_BYTES,
+    RETURNING_EXCEPTION_GPR_SAVE_COUNT, RawExceptionFrame,
 };
 use crate::descriptors::{InterruptStackTableIndex, SegmentSelector};
 
@@ -32,6 +33,16 @@ fn idt_shape_matches_x86_64_descriptor_size() {
     assert_eq!(IDT_ENTRIES, 256);
     assert_eq!(DOUBLE_FAULT_VECTOR, 8);
     assert_eq!(PAGE_FAULT_VECTOR, 14);
+}
+
+#[test]
+fn returning_exception_frame_offset_tracks_saved_gprs() {
+    assert_eq!(RETURNING_EXCEPTION_GPR_SAVE_COUNT, 15);
+    assert_eq!(
+        RETURNING_EXCEPTION_GPR_SAVE_BYTES,
+        RETURNING_EXCEPTION_GPR_SAVE_COUNT * size_of::<u64>()
+    );
+    assert_eq!(RETURNING_EXCEPTION_GPR_SAVE_BYTES, 120);
 }
 
 #[test]

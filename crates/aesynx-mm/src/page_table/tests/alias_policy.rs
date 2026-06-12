@@ -1,4 +1,4 @@
-use aesynx_abi::VirtAddr;
+use aesynx_abi::{PhysAddr, VirtAddr};
 
 use crate::{GenericPageFlags, PageAccess};
 
@@ -29,25 +29,24 @@ fn mapper_alias_check_accepts_distinct_frames_without_mutation() -> Result<(), P
 }
 
 #[test]
-fn mapper_alias_check_rejects_duplicate_physical_frames() -> Result<(), PageTableError> {
+fn mapper_rejects_duplicate_physical_frames_at_map_time() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     let alias_virt = VirtAddr::new(KERNEL_VIRT.get() + 0x4000);
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
-    mapper.map_page(alias_virt, KERNEL_PHYS, flags)?;
     let before = mapper;
 
     assert_eq!(
-        mapper.ensure_no_physical_aliases(),
+        mapper.map_page(alias_virt, KERNEL_PHYS, flags),
         Err(PageTableError::PhysicalAlias)
     );
     assert_eq!(mapper, before);
-    assert_eq!(mapper.status().mapped_pages(), 2);
+    assert_eq!(mapper.status().mapped_pages(), 1);
     Ok(())
 }
 
 #[test]
-fn mapper_alias_check_rejects_aliases_with_different_flags() -> Result<(), PageTableError> {
+fn mapper_rejects_duplicate_physical_frames_with_different_flags() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     let alias_virt = VirtAddr::new(KERNEL_VIRT.get() + 0x4000);
     mapper.map_page(
@@ -55,16 +54,52 @@ fn mapper_alias_check_rejects_aliases_with_different_flags() -> Result<(), PageT
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    mapper.map_page(
-        alias_virt,
-        KERNEL_PHYS,
-        GenericPageFlags::kernel(PageAccess::ReadExecute),
-    )?;
+    let before = mapper;
 
     assert_eq!(
-        mapper.ensure_no_physical_aliases(),
+        mapper.map_page(
+            alias_virt,
+            KERNEL_PHYS,
+            GenericPageFlags::kernel(PageAccess::ReadExecute),
+        ),
         Err(PageTableError::PhysicalAlias)
     );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_rejects_contiguous_ranges_that_alias_existing_frames() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
+    let before = mapper;
+
+    assert_eq!(
+        mapper.map_contiguous(
+            VirtAddr::new(KERNEL_VIRT.get() + 0x4000),
+            KERNEL_PHYS,
+            2,
+            flags
+        ),
+        Err(PageTableError::PhysicalAlias)
+    );
+    assert_eq!(mapper, before);
+    Ok(())
+}
+
+#[test]
+fn mapper_alias_check_trusts_map_time_invariant() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
+    mapper.map_page(
+        VirtAddr::new(KERNEL_VIRT.get() + 0x4000),
+        PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
+        flags,
+    )?;
+
+    mapper.ensure_no_physical_aliases()?;
     Ok(())
 }
 
@@ -98,13 +133,11 @@ fn mapper_alias_check_rejects_accounting_drift() -> Result<(), PageTableError> {
 }
 
 #[test]
-fn mapper_alias_check_reports_corruption_before_alias() -> Result<(), PageTableError> {
+fn mapper_alias_check_reports_corruption_before_policy_success() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
-    let alias_virt = VirtAddr::new(KERNEL_VIRT.get() + 0x4000);
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
-    mapper.map_page(alias_virt, KERNEL_PHYS, flags)?;
-    mapper.mapped_pages = 1;
+    mapper.mapped_pages = 2;
 
     assert_eq!(
         mapper.ensure_no_physical_aliases(),

@@ -63,7 +63,8 @@ The design should enforce:
 - Generation and revocation checks for authority-bearing handles.
 - Explicit authority transfer through audited grant paths.
 - Deterministic fallback when AI-assisted policy is unavailable or rejected.
-- Structured telemetry redaction before data reaches assistive tools.
+- Structured telemetry redaction before data reaches assistive tools; raw
+  telemetry snapshots are not valid AI-policy inputs.
 - Small modules that can be reviewed, fuzzed, and model-tested.
 - Release tags blocked until checks and pentest evidence are complete.
 

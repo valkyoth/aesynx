@@ -5,11 +5,20 @@ use aesynx_abi::{CoreId, ModelId};
 
 pub const MAX_CONFIDENCE: u16 = 10_000;
 
+/// Policy engines may use heuristics or model advice, but their fallback path
+/// is part of the security contract.
+///
+/// `fallback` must be deterministic, side-effect-free, and fail closed for the
+/// policy domain. For scheduling this means returning a conservative local
+/// decision; for authority or admission policy this means denying or selecting
+/// the least-privileged outcome.
 pub trait PolicyEngine {
     type Input;
     type Output;
 
     fn evaluate(&self, input: Self::Input) -> PolicyDecision<Self::Output>;
+
+    /// Returns the deterministic fail-closed output for this policy.
     fn fallback(&self, input: Self::Input) -> Self::Output;
 }
 
@@ -36,6 +45,17 @@ impl<T> PolicyDecision<T> {
             confidence,
             fallback_used,
             reason,
+        }
+    }
+
+    #[must_use]
+    pub const fn deterministic_fallback(output: T) -> Self {
+        Self {
+            output,
+            model: None,
+            confidence: Confidence(0),
+            fallback_used: true,
+            reason: DecisionReason::DeterministicFallback,
         }
     }
 
@@ -168,6 +188,17 @@ mod tests {
         assert_eq!(*decision.output(), 7);
         assert_eq!(decision.confidence().get(), MAX_CONFIDENCE);
         assert!(!decision.fallback_used());
+    }
+
+    #[test]
+    fn deterministic_fallback_decision_is_marked_fail_closed() {
+        let decision = PolicyDecision::deterministic_fallback(3u8);
+
+        assert_eq!(*decision.output(), 3);
+        assert_eq!(decision.model(), None);
+        assert_eq!(decision.confidence().get(), 0);
+        assert!(decision.fallback_used());
+        assert_eq!(decision.reason(), DecisionReason::DeterministicFallback);
     }
 
     #[test]

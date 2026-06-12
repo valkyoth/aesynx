@@ -110,6 +110,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let leaf = PageTableSlot::leaf(mapping)?;
         self.audit()?;
         self.validate_map_capacity(virt)?;
+        self.ensure_physical_frame_unused(mapping.phys())?;
         let mapped_pages = self
             .mapped_pages
             .checked_add(1)

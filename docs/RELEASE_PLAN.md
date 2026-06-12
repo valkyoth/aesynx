@@ -549,13 +549,13 @@ Deliverables:
   the audit-backed checked status path.
 - Kernel address-space candidate preflight that combines audit, checked root,
   checked status, non-empty mapping state, no-user-space-mapping,
-  no-user-mapping, no-device, and no-physical-alias gates before future
-  activation code can consume a mapper.
+  no-user-mapping, no-device gates, and the map-time no-physical-alias
+  invariant before future activation code can consume a mapper.
 - User address-space candidate preflight that combines audit, checked root,
   checked status, non-empty mapping state, no-kernel-space-user-mapping,
   no-user-space-kernel-mapping, at least one low-half user mapping, no-device,
-  no-global, and no-physical-alias gates before future per-task address-space
-  code can consume a mapper.
+  no-global gates, and the map-time no-physical-alias invariant before future
+  per-task address-space code can consume a mapper.
 - Kernel and user address-space candidate preflight success and failure paths
   stay read-only against the mapper being verified.
 - Kernel and user address-space candidate preflights report structural mapper
@@ -677,7 +677,8 @@ Deliverables:
 - No-writable mapping policy check for candidate read-only address spaces.
 - No-device mapping policy check for candidate normal-RAM address spaces.
 - No-global mapping policy check for candidate local address spaces.
-- No-physical-alias policy check for candidate exclusive frame ownership.
+- Map-time no-physical-alias policy check for candidate exclusive frame
+  ownership.
 - Kernel-privileged virtual range policy check for mixed address spaces.
 - User-privileged virtual range policy check for future user address spaces.
 - Write-protected virtual range policy check for text and read-only data

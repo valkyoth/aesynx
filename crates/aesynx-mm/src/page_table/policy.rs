@@ -1,3 +1,5 @@
+use aesynx_abi::PhysAddr;
+
 use crate::PagePrivilege;
 
 use super::{PageTableError, PageTableMapper};
@@ -81,13 +83,17 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
 
     pub fn ensure_no_physical_aliases(&self) -> Result<(), PageTableError> {
         self.audit()?;
-        self.visit_mappings(|left| {
-            self.visit_mappings(|right| {
-                if left.virt() != right.virt() && left.mapping().phys() == right.mapping().phys() {
-                    return Err(PageTableError::PhysicalAlias);
-                }
-                Ok(())
-            })?;
+        Ok(())
+    }
+
+    pub(super) fn ensure_physical_frame_unused(
+        &self,
+        phys: PhysAddr,
+    ) -> Result<(), PageTableError> {
+        self.visit_mappings(|entry| {
+            if entry.mapping().phys() == phys {
+                return Err(PageTableError::PhysicalAlias);
+            }
             Ok(())
         })?;
         Ok(())

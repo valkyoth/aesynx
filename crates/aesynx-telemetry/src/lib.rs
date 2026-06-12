@@ -5,6 +5,12 @@ use core::cell::Cell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use aesynx_ai_policy::ScheduleFeatures;
+
+pub const MAX_SCHEDULE_QUEUE_FEATURE: u32 = 4096;
+pub const MAX_SCHEDULE_COUNTER_FEATURE: u32 = 1_000_000;
+pub const MAX_SCHEDULE_RATIO_FEATURE: u32 = 10_000;
+
 #[derive(Debug, Default)]
 pub struct CoreTelemetry {
     run_queue_len: AtomicU64,
@@ -105,6 +111,33 @@ pub struct CoreTelemetrySnapshot {
     pub service_queue_depth: u64,
 }
 
+impl CoreTelemetrySnapshot {
+    #[must_use]
+    pub const fn redacted_schedule_features(self) -> ScheduleFeatures {
+        ScheduleFeatures {
+            run_queue_len: clamp_u64_to_u32(self.run_queue_len, MAX_SCHEDULE_QUEUE_FEATURE),
+            ipc_depth: clamp_u64_to_u32(self.ipc_rx_depth, MAX_SCHEDULE_QUEUE_FEATURE),
+            queue_pressure: clamp_u64_to_u32(
+                max_u64(self.ipc_tx_pressure, self.service_queue_depth),
+                MAX_SCHEDULE_QUEUE_FEATURE,
+            ),
+            object_locality_score: 0,
+            cache_miss_rate: 0,
+            idle_ratio: idle_ratio_basis_points(self.idle_ticks, self.timer_ticks),
+            migration_cost: clamp_u64_to_u32(
+                self.migrations_in.saturating_add(self.migrations_out),
+                MAX_SCHEDULE_COUNTER_FEATURE,
+            ),
+            priority: 0,
+        }
+    }
+}
+
+#[must_use]
+pub const fn redacted_schedule_features(snapshot: CoreTelemetrySnapshot) -> ScheduleFeatures {
+    snapshot.redacted_schedule_features()
+}
+
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct TaskTelemetry {
     cpu_time_ns: u64,
@@ -201,9 +234,37 @@ fn increment_counter(value: u64) -> Result<u64, TelemetryError> {
     value.checked_add(1).ok_or(TelemetryError::CounterOverflow)
 }
 
+const fn max_u64(left: u64, right: u64) -> u64 {
+    if left > right { left } else { right }
+}
+
+const fn clamp_u64_to_u32(value: u64, max: u32) -> u32 {
+    if value > max as u64 {
+        max
+    } else {
+        value as u32
+    }
+}
+
+const fn idle_ratio_basis_points(idle_ticks: u64, timer_ticks: u64) -> u32 {
+    if timer_ticks == 0 {
+        return 0;
+    }
+
+    let capped_idle = if idle_ticks > timer_ticks {
+        timer_ticks
+    } else {
+        idle_ticks
+    };
+    ((capped_idle as u128 * MAX_SCHEDULE_RATIO_FEATURE as u128) / timer_ticks as u128) as u32
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{CoreTelemetry, TaskTelemetry, TelemetryError};
+    use super::{
+        CoreTelemetry, CoreTelemetrySnapshot, MAX_SCHEDULE_COUNTER_FEATURE,
+        MAX_SCHEDULE_QUEUE_FEATURE, MAX_SCHEDULE_RATIO_FEATURE, TaskTelemetry, TelemetryError,
+    };
 
     #[test]
     fn core_telemetry_records_counter_updates() {
@@ -233,6 +294,53 @@ mod tests {
         assert_eq!(snapshot.cap_faults, 1);
         assert_eq!(snapshot.page_faults, 1);
         assert_eq!(snapshot.driver_irqs, 1);
+    }
+
+    #[test]
+    fn core_telemetry_exports_redacted_schedule_features() {
+        let features = CoreTelemetrySnapshot {
+            run_queue_len: 7,
+            ipc_rx_depth: 8,
+            ipc_tx_pressure: 9,
+            timer_ticks: 100,
+            idle_ticks: 25,
+            migrations_in: 2,
+            migrations_out: 3,
+            service_queue_depth: 10,
+            ..CoreTelemetrySnapshot::default()
+        }
+        .redacted_schedule_features();
+
+        assert_eq!(features.run_queue_len, 7);
+        assert_eq!(features.ipc_depth, 8);
+        assert_eq!(features.queue_pressure, 10);
+        assert_eq!(features.idle_ratio, 2500);
+        assert_eq!(features.migration_cost, 5);
+        assert_eq!(features.object_locality_score, 0);
+        assert_eq!(features.cache_miss_rate, 0);
+        assert_eq!(features.priority, 0);
+    }
+
+    #[test]
+    fn core_telemetry_redaction_clamps_untrusted_counters() {
+        let features = CoreTelemetrySnapshot {
+            run_queue_len: u64::MAX,
+            ipc_rx_depth: u64::MAX,
+            ipc_tx_pressure: 1,
+            service_queue_depth: u64::MAX,
+            timer_ticks: 10,
+            idle_ticks: u64::MAX,
+            migrations_in: u64::MAX,
+            migrations_out: u64::MAX,
+            ..CoreTelemetrySnapshot::default()
+        }
+        .redacted_schedule_features();
+
+        assert_eq!(features.run_queue_len, MAX_SCHEDULE_QUEUE_FEATURE);
+        assert_eq!(features.ipc_depth, MAX_SCHEDULE_QUEUE_FEATURE);
+        assert_eq!(features.queue_pressure, MAX_SCHEDULE_QUEUE_FEATURE);
+        assert_eq!(features.idle_ratio, MAX_SCHEDULE_RATIO_FEATURE);
+        assert_eq!(features.migration_cost, MAX_SCHEDULE_COUNTER_FEATURE);
     }
 
     #[test]

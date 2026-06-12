@@ -134,6 +134,9 @@ dependencies = [
 [[package]]
 name = "aesynx-telemetry"
 version = "0.1.0"
+dependencies = [
+ "aesynx-ai-policy",
+]
 
 [[package]]
 name = "aesynx-time"

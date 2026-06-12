@@ -91,20 +91,23 @@ fn mapper_kernel_candidate_preflight_reports_low_half_before_user_flags()
 }
 
 #[test]
-fn mapper_kernel_candidate_preflight_rejects_physical_aliases() -> Result<(), PageTableError> {
+fn mapper_rejects_kernel_candidate_physical_aliases_at_map_time() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     mapper.map_page(
         KERNEL_VIRT,
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    mapper.map_page(
-        VirtAddr::new(KERNEL_VIRT.get() + crate::FRAME_SIZE),
-        KERNEL_PHYS,
-        GenericPageFlags::kernel(PageAccess::ReadOnly),
-    )?;
+    assert_eq!(
+        mapper.map_page(
+            VirtAddr::new(KERNEL_VIRT.get() + crate::FRAME_SIZE),
+            KERNEL_PHYS,
+            GenericPageFlags::kernel(PageAccess::ReadOnly),
+        ),
+        Err(PageTableError::PhysicalAlias)
+    );
 
-    assert_kernel_candidate_rejects_without_mutation(&mapper, PageTableError::PhysicalAlias);
+    mapper.verify_kernel_address_space_candidate()?;
     Ok(())
 }
 
@@ -239,20 +242,23 @@ fn mapper_user_candidate_preflight_rejects_low_half_kernel_mappings() -> Result<
 }
 
 #[test]
-fn mapper_user_candidate_preflight_rejects_physical_aliases() -> Result<(), PageTableError> {
+fn mapper_rejects_user_candidate_physical_aliases_at_map_time() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     mapper.map_page(
         KERNEL_VIRT,
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    mapper.map_page(
-        USER_VIRT,
-        KERNEL_PHYS,
-        GenericPageFlags::user(PageAccess::ReadOnly),
-    )?;
+    assert_eq!(
+        mapper.map_page(
+            USER_VIRT,
+            KERNEL_PHYS,
+            GenericPageFlags::user(PageAccess::ReadOnly),
+        ),
+        Err(PageTableError::PhysicalAlias)
+    );
 
-    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::PhysicalAlias);
+    assert_user_candidate_rejects_without_mutation(&mapper, PageTableError::IncompleteAddressSpace);
     Ok(())
 }
 

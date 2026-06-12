@@ -13,6 +13,9 @@ const BREAKPOINT_VECTOR: usize = 3;
 const DOUBLE_FAULT_VECTOR: usize = 8;
 const PAGE_FAULT_VECTOR: usize = 14;
 const INTERRUPT_GATE_PRESENT: u16 = 0x8e00;
+const RETURNING_EXCEPTION_GPR_SAVE_COUNT: usize = 15;
+const RETURNING_EXCEPTION_GPR_SAVE_BYTES: usize =
+    RETURNING_EXCEPTION_GPR_SAVE_COUNT * size_of::<u64>();
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -55,7 +58,7 @@ aesynx_exception_common_return:
     push r13
     push r14
     push r15
-    lea rdi, [rsp + 120]
+    lea rdi, [rsp + {return_frame_offset}]
     mov rbp, rsp
     and rsp, -16
     call aesynx_x86_64_exception_dispatch
@@ -85,7 +88,8 @@ aesynx_exception_common_halt:
 1:
     hlt
     jmp 1b
-    "#
+    "#,
+    return_frame_offset = const RETURNING_EXCEPTION_GPR_SAVE_BYTES,
 );
 
 unsafe extern "C" {
