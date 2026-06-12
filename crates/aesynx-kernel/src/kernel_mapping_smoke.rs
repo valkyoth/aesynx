@@ -76,7 +76,13 @@ pub fn run(
     {
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
-    if !report.null_page_unmapped() {
+    if !report.text_rx()
+        || !report.rodata_read_only()
+        || !report.data_rw_nx()
+        || !report.reserved_heap_unmapped()
+        || !report.guard_page_unmapped()
+        || !report.null_page_unmapped()
+    {
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
 
@@ -86,12 +92,12 @@ pub fn run(
         text_pages: plan.text_pages(),
         rodata_pages: plan.rodata_pages(),
         data_pages: plan.data_pages(),
-        text_rx_ok: true,
-        rodata_read_only_ok: true,
-        data_rw_nx_ok: true,
-        heap_reserved_ok: true,
-        guard_page_ok: true,
-        null_page_ok: true,
+        text_rx_ok: report.text_rx(),
+        rodata_read_only_ok: report.rodata_read_only(),
+        data_rw_nx_ok: report.data_rw_nx(),
+        heap_reserved_ok: report.reserved_heap_unmapped(),
+        guard_page_ok: report.guard_page_unmapped(),
+        null_page_ok: report.null_page_unmapped(),
     })
 }
 

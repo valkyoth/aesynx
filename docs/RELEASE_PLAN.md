@@ -810,6 +810,8 @@ Verification:
 - Host unit tests cover section-plan derivation, malformed ordering, unaligned
   boundaries, empty reserved heap/guard ranges, and arithmetic overflow.
 - QEMU boot requires both the policy status line and `[TEST] paging-policy=ok`.
+- QEMU status booleans must come from `KernelMappingPolicyReport` accessors,
+  not from freestanding smoke-local constants.
 - Release notes must state that this is a policy model and smoke gate, not live
   replacement of Limine's active CR3.
 

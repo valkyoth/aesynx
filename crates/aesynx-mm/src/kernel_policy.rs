@@ -102,6 +102,11 @@ impl KernelMappingPolicy {
 pub struct KernelMappingPolicyReport {
     mapped_pages: u64,
     reserved_pages: u64,
+    text_rx: bool,
+    rodata_read_only: bool,
+    data_rw_nx: bool,
+    reserved_heap_unmapped: bool,
+    guard_page_unmapped: bool,
     null_page_unmapped: bool,
 }
 
@@ -111,6 +116,11 @@ impl fmt::Debug for KernelMappingPolicyReport {
             .debug_struct("KernelMappingPolicyReport")
             .field("mapped_pages", &self.mapped_pages)
             .field("reserved_pages", &self.reserved_pages)
+            .field("text_rx", &self.text_rx)
+            .field("rodata_read_only", &self.rodata_read_only)
+            .field("data_rw_nx", &self.data_rw_nx)
+            .field("reserved_heap_unmapped", &self.reserved_heap_unmapped)
+            .field("guard_page_unmapped", &self.guard_page_unmapped)
             .field("null_page_unmapped", &self.null_page_unmapped)
             .finish()
     }
@@ -122,6 +132,11 @@ impl KernelMappingPolicyReport {
         Self {
             mapped_pages,
             reserved_pages,
+            text_rx: true,
+            rodata_read_only: true,
+            data_rw_nx: true,
+            reserved_heap_unmapped: true,
+            guard_page_unmapped: true,
             null_page_unmapped: true,
         }
     }
@@ -134,6 +149,31 @@ impl KernelMappingPolicyReport {
     #[must_use]
     pub const fn reserved_pages(self) -> u64 {
         self.reserved_pages
+    }
+
+    #[must_use]
+    pub const fn text_rx(self) -> bool {
+        self.text_rx
+    }
+
+    #[must_use]
+    pub const fn rodata_read_only(self) -> bool {
+        self.rodata_read_only
+    }
+
+    #[must_use]
+    pub const fn data_rw_nx(self) -> bool {
+        self.data_rw_nx
+    }
+
+    #[must_use]
+    pub const fn reserved_heap_unmapped(self) -> bool {
+        self.reserved_heap_unmapped
+    }
+
+    #[must_use]
+    pub const fn guard_page_unmapped(self) -> bool {
+        self.guard_page_unmapped
     }
 
     #[must_use]

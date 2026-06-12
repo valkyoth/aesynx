@@ -56,6 +56,11 @@ fn kernel_mapping_policy_accepts_expected_layout() -> Result<(), PageTableError>
 
     assert_eq!(report.mapped_pages(), 6);
     assert_eq!(report.reserved_pages(), 3);
+    assert!(report.text_rx());
+    assert!(report.rodata_read_only());
+    assert!(report.data_rw_nx());
+    assert!(report.reserved_heap_unmapped());
+    assert!(report.guard_page_unmapped());
     assert!(report.null_page_unmapped());
     Ok(())
 }
