@@ -618,6 +618,9 @@ Deliverables:
   structural audit.
 - Contiguous range policy validators preserve mapper state when rejecting
   gaps, zero-length ranges, oversized walks, and address-overflow ranges.
+- Contiguous range lookup and checked byte-range translation preserve mapper
+  state when rejecting malformed ranges, gaps, non-contiguous pages, flag
+  mismatches, and walk-bound failures.
 - Address-space wrapper debug output redacts the root physical frame.
 - Mapper-produced status reports are inspectable but not externally
   constructible through public fields or constructors.

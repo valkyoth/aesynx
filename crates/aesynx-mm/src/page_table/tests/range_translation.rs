@@ -46,6 +46,7 @@ fn mapper_translates_byte_range_across_contiguous_pages() -> Result<(), PageTabl
 #[test]
 fn mapper_translate_byte_range_rejects_malformed_ranges() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(KERNEL_VIRT, 0),
@@ -63,6 +64,7 @@ fn mapper_translate_byte_range_rejects_malformed_ranges() -> Result<(), PageTabl
         mapper.translate_contiguous_range_checked(VirtAddr::new(u64::MAX), 2),
         Err(PageTableError::AddressOverflow)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -172,6 +174,7 @@ fn mapper_translate_byte_range_rejects_corrupt_leaf() -> Result<(), PageTableErr
 #[test]
 fn mapper_translate_byte_range_is_walk_bounded() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
     let too_many_bytes = max_pages
         .checked_mul(FRAME_SIZE)
@@ -182,5 +185,6 @@ fn mapper_translate_byte_range_is_walk_bounded() -> Result<(), PageTableError> {
         mapper.translate_contiguous_range_checked(KERNEL_VIRT, too_many_bytes),
         Err(PageTableError::RangeTooLarge)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }

@@ -296,10 +296,12 @@ fn mapper_contiguous_range_lookup_rejects_gaps_or_mismatches() -> Result<(), Pag
     let mut gap = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     gap.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
+    let gap_before = gap;
     assert_eq!(
         gap.mapping_for_contiguous(KERNEL_VIRT, 2),
         Err(PageTableError::NotMapped)
     );
+    assert_eq!(gap, gap_before);
 
     let mut mismatched_phys = PageTableMapper::<4>::new()?;
     mismatched_phys.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
@@ -308,10 +310,12 @@ fn mapper_contiguous_range_lookup_rejects_gaps_or_mismatches() -> Result<(), Pag
         PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
         flags,
     )?;
+    let mismatched_phys_before = mismatched_phys;
     assert_eq!(
         mismatched_phys.mapping_for_contiguous(KERNEL_VIRT, 2),
         Err(PageTableError::NonContiguousRange)
     );
+    assert_eq!(mismatched_phys, mismatched_phys_before);
 
     let mut mismatched_flags = PageTableMapper::<4>::new()?;
     mismatched_flags.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
@@ -320,10 +324,12 @@ fn mapper_contiguous_range_lookup_rejects_gaps_or_mismatches() -> Result<(), Pag
         PhysAddr::new(KERNEL_PHYS.get() + 0x1000),
         GenericPageFlags::kernel(PageAccess::ReadWrite),
     )?;
+    let mismatched_flags_before = mismatched_flags;
     assert_eq!(
         mismatched_flags.mapping_for_contiguous(KERNEL_VIRT, 2),
         Err(PageTableError::NonContiguousRange)
     );
+    assert_eq!(mismatched_flags, mismatched_flags_before);
     Ok(())
 }
 
@@ -437,6 +443,7 @@ fn mapper_contiguous_unmap_failure_is_atomic() -> Result<(), PageTableError> {
 #[test]
 fn mapper_contiguous_ranges_reject_zero_pages() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
+    let before = mapper;
 
     assert_eq!(
         mapper.map_contiguous(
@@ -475,6 +482,7 @@ fn mapper_contiguous_ranges_reject_zero_pages() -> Result<(), PageTableError> {
         ),
         Err(PageTableError::InvalidPageCount)
     );
+    assert_eq!(mapper, before);
     assert_eq!(mapper.status().mapped_pages(), 0);
     Ok(())
 }
