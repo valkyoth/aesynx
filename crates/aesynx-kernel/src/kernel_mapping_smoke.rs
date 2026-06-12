@@ -17,6 +17,8 @@ pub struct KernelMappingSmokeStatus {
     pub hardware_root_allocated: bool,
     pub hardware_tables_copied: u64,
     pub hardware_copied: bool,
+    pub kernel_stack_pages: u64,
+    pub kernel_stack_guard_ok: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -43,12 +45,16 @@ pub fn run(
     info: &aesynx_boot::BootInfo<'_>,
     layout: aesynx_kernel::kernel_mapping_policy::KernelSectionLayout,
 ) -> Result<KernelMappingSmokeStatus, KernelMappingSmokeError> {
-    let plan = aesynx_kernel::kernel_mapping_policy::KernelMappingPlan::from_sections(
-        layout,
-        HEAP_RESERVED_PAGES,
-        GUARD_PAGES,
-    )
-    .map_err(KernelMappingSmokeError::Plan)?;
+    let stack_layout = crate::page_table_install::activation_stack_layout()
+        .map_err(KernelMappingSmokeError::Install)?;
+    let plan =
+        aesynx_kernel::kernel_mapping_policy::KernelMappingPlan::from_sections_with_reserved_start(
+            layout,
+            stack_layout.stack_end,
+            HEAP_RESERVED_PAGES,
+            GUARD_PAGES,
+        )
+        .map_err(KernelMappingSmokeError::Plan)?;
     let policy = plan.policy();
     let text_phys = info
         .kernel_image
@@ -61,6 +67,10 @@ pub fn run(
     let data_phys = info
         .kernel_image
         .phys_for_virt(layout.data_start)
+        .ok_or(KernelMappingSmokeError::KernelImageRange)?;
+    let stack_phys = info
+        .kernel_image
+        .phys_for_virt(stack_layout.stack_start)
         .ok_or(KernelMappingSmokeError::KernelImageRange)?;
 
     let mut mapper = aesynx_mm::PageTableMapper::<POLICY_TABLES, POLICY_MAPPED_FRAMES>::new()
@@ -86,6 +96,13 @@ pub fn run(
         policy.data().pages(),
         aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite),
     )?;
+    map_section(
+        &mut mapper,
+        stack_layout.stack_start,
+        stack_phys,
+        stack_layout.stack_pages,
+        aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite),
+    )?;
 
     let report = mapper
         .verify_kernel_mapping_policy(policy)
@@ -105,6 +122,7 @@ pub fn run(
     {
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
+    verify_activation_stack_guard(&mapper, stack_layout)?;
     let arena = allocate_page_table_arena(info)?;
     let allocated_root_phys = frame_to_phys(arena.start())?;
     let root_phys = crate::page_table_install::activation_root_phys(info)
@@ -145,7 +163,39 @@ pub fn run(
         hardware_root_allocated: true,
         hardware_tables_copied: install.tables_copied,
         hardware_copied: true,
+        kernel_stack_pages: stack_layout.stack_pages,
+        kernel_stack_guard_ok: true,
     })
+}
+
+fn verify_activation_stack_guard<const TABLES: usize, const MAPPED_FRAMES: usize>(
+    mapper: &aesynx_mm::PageTableMapper<TABLES, MAPPED_FRAMES>,
+    stack_layout: crate::page_table_install::ActivationStackLayout,
+) -> Result<(), KernelMappingSmokeError> {
+    let stack_flags = aesynx_mm::GenericPageFlags::kernel(aesynx_mm::PageAccess::ReadWrite);
+    mapper
+        .ensure_contiguous_flags(
+            stack_layout.stack_start,
+            stack_layout.stack_pages,
+            stack_flags,
+        )
+        .map_err(KernelMappingSmokeError::Mapper)?;
+    mapper
+        .ensure_kernel_space_contiguous(stack_layout.stack_start, stack_layout.stack_pages)
+        .map_err(KernelMappingSmokeError::Mapper)?;
+    mapper
+        .ensure_non_executable_contiguous(stack_layout.stack_start, stack_layout.stack_pages)
+        .map_err(KernelMappingSmokeError::Mapper)?;
+    mapper
+        .ensure_normal_memory_contiguous(stack_layout.stack_start, stack_layout.stack_pages)
+        .map_err(KernelMappingSmokeError::Mapper)?;
+    mapper
+        .ensure_local_contiguous(stack_layout.stack_start, stack_layout.stack_pages)
+        .map_err(KernelMappingSmokeError::Mapper)?;
+    mapper
+        .ensure_unmapped_contiguous(stack_layout.guard_start, stack_layout.guard_pages)
+        .map_err(KernelMappingSmokeError::Mapper)?;
+    Ok(())
 }
 
 fn allocate_page_table_arena(

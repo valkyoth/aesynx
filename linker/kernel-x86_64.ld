@@ -53,6 +53,22 @@ SECTIONS
 
     . = ALIGN(4K);
     __kernel_data_end = .;
+
+    . = ALIGN(4K);
+    __kernel_activation_stack_guard_start = .;
+    . += 4K;
+    __kernel_activation_stack_guard_end = .;
+
+    . = ALIGN(4K);
+    .aesynx_activation_stack (NOLOAD) : ALIGN(4K)
+    {
+        __kernel_activation_stack_start = .;
+        KEEP(*(.aesynx_activation_stack))
+        . = ALIGN(4K);
+        __kernel_activation_stack_end = .;
+    } :data
+
+    . = ALIGN(4K);
     __kernel_end = .;
 
     /DISCARD/ :

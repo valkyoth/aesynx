@@ -81,7 +81,8 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] page-table=ok`, `paging-policy-model mapped_pages=`,
 `section_layout_ok=true`, `text_rx_ok=true`, `rodata_read_only_ok=true`,
 `data_rw_nx_ok=true`, `heap_reserved_ok=true`, `guard_page_ok=true`,
-`null_page_ok=true`, `[TEST] paging-policy-model=ok`,
+`null_page_ok=true`, `kernel_stack_pages=`, `kernel_stack_guard_ok=true`,
+`[TEST] kernel-stack-guard=ok`, `[TEST] paging-policy-model=ok`,
 `[TEST] bootinfo=ok`, `[TEST] boot=ok`, `cpu-hardening nx=`,
 `[TEST] cpu-hardening=ok`, and `[TEST] kernel-cr3=ok`.
 

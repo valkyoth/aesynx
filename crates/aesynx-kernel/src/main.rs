@@ -298,7 +298,7 @@ fn boot_entry() -> ! {
                     match kernel_mapping_smoke::run(&info, kernel_sections::layout()) {
                         Ok(status) => {
                             aesynx_arch_x86_64::serial_println!(
-                                "paging-policy-model mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={} hardware_image_ok={} hardware_arena_frames={} hardware_root_allocated={} hardware_tables_copied={} hardware_copied={}",
+                                "paging-policy-model mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={} hardware_image_ok={} hardware_arena_frames={} hardware_root_allocated={} hardware_tables_copied={} hardware_copied={} kernel_stack_pages={} kernel_stack_guard_ok={}",
                                 status.mapped_pages,
                                 status.reserved_pages,
                                 status.text_pages,
@@ -315,8 +315,11 @@ fn boot_entry() -> ! {
                                 status.hardware_arena_frames,
                                 status.hardware_root_allocated,
                                 status.hardware_tables_copied,
-                                status.hardware_copied
+                                status.hardware_copied,
+                                status.kernel_stack_pages,
+                                status.kernel_stack_guard_ok
                             );
+                            aesynx_arch_x86_64::serial::write_str("[TEST] kernel-stack-guard=ok\n");
                             aesynx_arch_x86_64::serial::write_str(
                                 "[TEST] paging-policy-model=ok\n",
                             );

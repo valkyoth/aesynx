@@ -29,6 +29,20 @@ impl KernelMappingPlan {
         heap_reserved_pages: u64,
         guard_pages: u64,
     ) -> Result<Self, KernelMappingPlanError> {
+        Self::from_sections_with_reserved_start(
+            layout,
+            layout.data_end,
+            heap_reserved_pages,
+            guard_pages,
+        )
+    }
+
+    pub fn from_sections_with_reserved_start(
+        layout: KernelSectionLayout,
+        reserved_start: VirtAddr,
+        heap_reserved_pages: u64,
+        guard_pages: u64,
+    ) -> Result<Self, KernelMappingPlanError> {
         let text_pages = section_pages(layout.text_start, layout.text_end)?;
         let rodata_pages = section_pages(layout.rodata_start, layout.rodata_end)?;
         let data_pages = section_pages(layout.data_start, layout.data_end)?;
@@ -36,9 +50,10 @@ impl KernelMappingPlan {
         ensure_high_half_range(layout.text_start, text_pages)?;
         ensure_high_half_range(layout.rodata_start, rodata_pages)?;
         ensure_high_half_range(layout.data_start, data_pages)?;
+        ensure_reserved_start(layout, reserved_start)?;
         ensure_nonzero_reserved_pages(heap_reserved_pages, guard_pages)?;
 
-        let heap_start = add_pages_to_virt(layout.data_start, data_pages)?;
+        let heap_start = reserved_start;
         let guard_start = add_pages_to_virt(heap_start, heap_reserved_pages)?;
         ensure_high_half_range(heap_start, heap_reserved_pages)?;
         ensure_high_half_range(guard_start, guard_pages)?;
@@ -110,6 +125,16 @@ fn ensure_ordered_layout(layout: KernelSectionLayout) -> Result<(), KernelMappin
         || layout.data_start.get() >= layout.data_end.get()
     {
         return Err(KernelMappingPlanError::InvalidSectionLayout);
+    }
+    Ok(())
+}
+
+fn ensure_reserved_start(
+    layout: KernelSectionLayout,
+    reserved_start: VirtAddr,
+) -> Result<(), KernelMappingPlanError> {
+    if reserved_start.get() < layout.data_end.get() || !page_aligned(reserved_start.get()) {
+        return Err(KernelMappingPlanError::InvalidReservedRange);
     }
     Ok(())
 }
@@ -215,6 +240,44 @@ mod tests {
         assert_eq!(policy.null_page().start(), VirtAddr::new(0));
         assert_eq!(policy.null_page().pages(), 1);
         Ok(())
+    }
+
+    #[test]
+    fn plan_allows_explicit_reserved_start_after_private_kernel_area()
+    -> Result<(), KernelMappingPlanError> {
+        let reserved_start = VirtAddr::new(END.get() + 5 * aesynx_mm::FRAME_SIZE);
+        let plan =
+            KernelMappingPlan::from_sections_with_reserved_start(layout(), reserved_start, 2, 1)?;
+        let policy = plan.policy();
+
+        assert_eq!(policy.reserved_heap().start(), reserved_start);
+        assert_eq!(
+            policy.guard_page().start(),
+            VirtAddr::new(reserved_start.get() + 2 * aesynx_mm::FRAME_SIZE)
+        );
+        assert_eq!(plan.mapped_pages(), 13);
+        assert_eq!(plan.reserved_pages(), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn plan_rejects_reserved_start_before_data_end() {
+        let reserved_start = VirtAddr::new(END.get() - aesynx_mm::FRAME_SIZE);
+
+        assert_eq!(
+            KernelMappingPlan::from_sections_with_reserved_start(layout(), reserved_start, 2, 1),
+            Err(KernelMappingPlanError::InvalidReservedRange)
+        );
+    }
+
+    #[test]
+    fn plan_rejects_unaligned_reserved_start() {
+        let reserved_start = VirtAddr::new(END.get() + 1);
+
+        assert_eq!(
+            KernelMappingPlan::from_sections_with_reserved_start(layout(), reserved_start, 2, 1),
+            Err(KernelMappingPlanError::InvalidReservedRange)
+        );
     }
 
     #[test]

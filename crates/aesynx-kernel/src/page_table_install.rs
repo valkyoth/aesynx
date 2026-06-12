@@ -3,12 +3,22 @@ use core::sync::atomic::{Ordering, compiler_fence};
 
 pub const ACTIVATION_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 const ACTIVATION_STACK_BYTES: usize = 16 * 1024;
+const ACTIVATION_STACK_GUARD_PAGES: u64 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageTableInstallStatus {
     pub tables_copied: u64,
     pub entries_copied: u64,
     pub root_copied: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ActivationStackLayout {
+    pub guard_start: aesynx_abi::VirtAddr,
+    pub guard_pages: u64,
+    pub stack_start: aesynx_abi::VirtAddr,
+    pub stack_end: aesynx_abi::VirtAddr,
+    pub stack_pages: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,6 +37,40 @@ pub fn activation_root_phys(
     info.kernel_image
         .phys_for_virt(arena)
         .ok_or(PageTableInstallError::KernelImageRange)
+}
+
+pub fn activation_stack_layout() -> Result<ActivationStackLayout, PageTableInstallError> {
+    let guard_start = linker_symbol_virt(activation_stack_guard_start);
+    let guard_end = linker_symbol_virt(activation_stack_guard_end);
+    let stack_start = linker_symbol_virt(activation_stack_start);
+    let stack_end = linker_symbol_virt(activation_stack_end);
+    let guard_bytes = guard_end
+        .get()
+        .checked_sub(guard_start.get())
+        .ok_or(PageTableInstallError::ActivationStackRange)?;
+    let stack_bytes = stack_end
+        .get()
+        .checked_sub(stack_start.get())
+        .ok_or(PageTableInstallError::ActivationStackRange)?;
+
+    if !page_aligned(guard_start)
+        || !page_aligned(guard_end)
+        || !page_aligned(stack_start)
+        || !page_aligned(stack_end)
+        || guard_end != stack_start
+        || guard_bytes != aesynx_mm::FRAME_SIZE
+        || stack_bytes != ACTIVATION_STACK_BYTES as u64
+    {
+        return Err(PageTableInstallError::ActivationStackRange);
+    }
+
+    Ok(ActivationStackLayout {
+        guard_start,
+        guard_pages: ACTIVATION_STACK_GUARD_PAGES,
+        stack_start,
+        stack_end,
+        stack_pages: stack_bytes / aesynx_mm::FRAME_SIZE,
+    })
 }
 
 pub fn copy_mapper_to_activation_arena<const TABLES: usize, const MAPPED_FRAMES: usize>(
@@ -120,12 +164,60 @@ fn activation_arena_ptr() -> *mut u64 {
 }
 
 fn activation_stack_top_virt() -> Option<aesynx_abi::VirtAddr> {
-    // SAFETY: Taking the raw address of the private stack static does not read
-    // or write the stack bytes and does not create a Rust reference.
-    let stack = unsafe { core::ptr::addr_of_mut!(ACTIVATION_STACK.bytes) as *mut u8 };
-    let base = core::hint::black_box(stack) as u64;
-    base.checked_add(ACTIVATION_STACK_BYTES as u64)
+    let layout = activation_stack_layout().ok()?;
+    layout
+        .stack_start
+        .get()
+        .checked_add(ACTIVATION_STACK_BYTES as u64)
         .map(aesynx_abi::VirtAddr::new)
+}
+
+fn linker_symbol_virt(symbol: fn() -> *const u8) -> aesynx_abi::VirtAddr {
+    aesynx_abi::VirtAddr::new(core::hint::black_box(symbol() as u64))
+}
+
+fn page_aligned(virt: aesynx_abi::VirtAddr) -> bool {
+    virt.get() & (aesynx_mm::FRAME_SIZE - 1) == 0
+}
+
+fn activation_stack_guard_start() -> *const u8 {
+    unsafe extern "C" {
+        static __kernel_activation_stack_guard_start: u8;
+    }
+
+    // SAFETY: The symbol is provided by the kernel linker script. Taking its
+    // raw address does not read memory or create aliases.
+    core::ptr::addr_of!(__kernel_activation_stack_guard_start)
+}
+
+fn activation_stack_guard_end() -> *const u8 {
+    unsafe extern "C" {
+        static __kernel_activation_stack_guard_end: u8;
+    }
+
+    // SAFETY: The symbol is provided by the kernel linker script. Taking its
+    // raw address does not read memory or create aliases.
+    core::ptr::addr_of!(__kernel_activation_stack_guard_end)
+}
+
+fn activation_stack_start() -> *const u8 {
+    unsafe extern "C" {
+        static __kernel_activation_stack_start: u8;
+    }
+
+    // SAFETY: The symbol is provided by the kernel linker script. Taking its
+    // raw address does not read memory or create aliases.
+    core::ptr::addr_of!(__kernel_activation_stack_start)
+}
+
+fn activation_stack_end() -> *const u8 {
+    unsafe extern "C" {
+        static __kernel_activation_stack_end: u8;
+    }
+
+    // SAFETY: The symbol is provided by the kernel linker script. Taking its
+    // raw address does not read memory or create aliases.
+    core::ptr::addr_of!(__kernel_activation_stack_end)
 }
 
 unsafe fn switch_to_activation_stack(root_phys: u64, stack_top: u64) -> ! {
@@ -236,4 +328,6 @@ impl AlignedActivationStack {
     };
 }
 
+#[unsafe(link_section = ".aesynx_activation_stack")]
+#[used]
 static mut ACTIVATION_STACK: AlignedActivationStack = AlignedActivationStack::ZERO;
