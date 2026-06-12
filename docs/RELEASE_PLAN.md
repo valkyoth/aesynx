@@ -48,7 +48,7 @@ not tag-ready until:
 - A pentest report exists at `security/pentest/<tag>.md`.
 - The pentest report names the exact `Commit:` being tagged.
 - The pentest report has `Status: PASS`.
-- The pentest report has non-empty `Tester:` and `Scope:` fields and a
+- The pentest report has non-blank `Tester:` and `Scope:` fields and a
   `Date: YYYY-MM-DD` field.
 - `sbom/aesynx.spdx.json` exists and is non-empty when the Rust workspace is
   active.

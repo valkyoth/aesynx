@@ -66,6 +66,19 @@ if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
     exit 1
 fi
 
+{
+    printf 'Tag: %s\n' "$tag"
+    printf 'Commit: %s\n' "$head_commit"
+    printf 'Status: PASS\n'
+    printf 'Tester:   \n'
+    printf 'Date: 2026-06-12\n'
+    printf 'Scope: self-test fixture\n'
+} >"$report"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: blank tester did not block release" >&2
+    exit 1
+fi
+
 cat >"$report" <<EOF
 Tag: $tag
 Commit: $head_commit
@@ -88,6 +101,19 @@ Date: 2026-06-12
 EOF
 if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
     echo "release readiness tests: missing scope did not block release" >&2
+    exit 1
+fi
+
+{
+    printf 'Tag: %s\n' "$tag"
+    printf 'Commit: %s\n' "$head_commit"
+    printf 'Status: PASS\n'
+    printf 'Tester: release-readiness self-test\n'
+    printf 'Date: 2026-06-12\n'
+    printf 'Scope:   \n'
+} >"$report"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: blank scope did not block release" >&2
     exit 1
 fi
 
