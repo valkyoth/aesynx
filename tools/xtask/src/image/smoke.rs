@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::Path;
+
 pub const BOOTINFO_FAIL_MARKER: &str = "[TEST] bootinfo=fail";
 pub const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
 pub const BOOT_DIAGNOSTIC_MARKER: &str = "[kernel][INFO] bootinfo normalized";
@@ -116,6 +119,105 @@ impl SmokeKind {
             Self::Timer => Some("timer-smoke"),
         }
     }
+}
+
+pub fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
+    fs::read_to_string(path).is_ok_and(|contents| match smoke {
+        SmokeKind::Boot => {
+            !contents.contains(BOOTINFO_FAIL_MARKER)
+                && !contents.contains(MEMORY_MAP_FAIL_MARKER)
+                && !contents.contains(FRAME_ALLOCATOR_FAIL_MARKER)
+                && !contents.contains(PAGE_TABLE_FAIL_MARKER)
+                && contents.contains(CPU_SETUP_MARKER)
+                && contents.contains(EXCEPTION_SETUP_MARKER)
+                && contents.contains(IRQ_SETUP_MARKER)
+                && contents.contains(EXCEPTION_MARKER)
+                && contents.contains(BOOT_DIAGNOSTIC_MARKER)
+                && contents.contains(MEMORY_TOTAL_MARKER)
+                && contents.contains(MEMORY_USABLE_MARKER)
+                && contents.contains(MEMORY_RESERVED_MARKER)
+                && contents.contains(MEMORY_MAP_MARKER)
+                && contents.contains(FRAME_ALLOCATOR_STATUS_MARKER)
+                && contents.contains(FRAME_ALLOCATOR_MARKER)
+                && contents.contains(PAGE_TABLE_STATUS_MARKER)
+                && contents.contains(PAGE_TABLE_ROOT_MARKER)
+                && contents.contains(PAGE_TABLE_CHECKED_ROOT_MARKER)
+                && contents.contains(PAGE_TABLE_CHECKED_STATUS_MARKER)
+                && contents.contains(PAGE_TABLE_KERNEL_CANDIDATE_MARKER)
+                && contents.contains(PAGE_TABLE_USER_CANDIDATE_MARKER)
+                && contents.contains(PAGE_TABLE_TRANSLATE_OFFSET_MARKER)
+                && contents.contains(PAGE_TABLE_CHECKED_TRANSLATE_MARKER)
+                && contents.contains(PAGE_TABLE_LOOKUP_MARKER)
+                && contents.contains(PAGE_TABLE_PRESENCE_MARKER)
+                && contents.contains(PAGE_TABLE_PROTECT_MARKER)
+                && contents.contains(PAGE_TABLE_PROTECT_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_RANGE_LOOKUP_MARKER)
+                && contents.contains(PAGE_TABLE_RANGE_TRANSLATE_MARKER)
+                && contents.contains(PAGE_TABLE_MAPPED_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_UNMAPPED_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_KERNEL_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_USER_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_NON_EXECUTABLE_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_EXECUTABLE_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_NORMAL_MEMORY_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_LOCAL_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_KERNEL_SPACE_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_USER_SPACE_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_NO_USER_SPACE_MARKER)
+                && contents.contains(PAGE_TABLE_NO_EXECUTABLE_MARKER)
+                && contents.contains(PAGE_TABLE_NO_WRITABLE_MARKER)
+                && contents.contains(PAGE_TABLE_NO_DEVICE_MARKER)
+                && contents.contains(PAGE_TABLE_NO_GLOBAL_MARKER)
+                && contents.contains(PAGE_TABLE_NO_ALIAS_MARKER)
+                && contents.contains(PAGE_TABLE_KERNEL_USER_GUARD_MARKER)
+                && contents.contains(PAGE_TABLE_KERNEL_ONLY_MARKER)
+                && contents.contains(PAGE_TABLE_AUDIT_MARKER)
+                && contents.contains(PAGE_TABLE_VISIT_MARKER)
+                && contents.contains(PAGE_TABLE_FLAGS_MARKER)
+                && contents.contains(PAGE_TABLE_RECLAIM_MARKER)
+                && contents.contains(PAGE_TABLE_RANGE_MARKER)
+                && contents.contains(PAGE_TABLE_FLUSH_PAGE_MARKER)
+                && contents.contains(PAGE_TABLE_MARKER)
+                && contents.contains(BOOTINFO_MARKER)
+                && contents.contains(SERIAL_MARKER)
+        }
+        SmokeKind::Panic => {
+            contents.contains(CPU_SETUP_MARKER)
+                && contents.contains(EXCEPTION_SETUP_MARKER)
+                && contents.contains(IRQ_SETUP_MARKER)
+                && contents.contains(EXCEPTION_MARKER)
+                && contents.contains(PANIC_DIAGNOSTIC_MARKER)
+                && contents.contains(PANIC_MARKER)
+                && contents.contains(PANIC_REGISTERS_MARKER)
+        }
+        SmokeKind::Exception => {
+            contents.contains(CPU_SETUP_MARKER)
+                && contents.contains(EXCEPTION_SETUP_MARKER)
+                && contents.contains(IRQ_SETUP_MARKER)
+                && contents.contains(EXCEPTION_MARKER)
+                && contents.contains(FAULT_ADDRESS_PRESENT_MARKER)
+                && contents.contains(FAULT_ADDRESS_MARKER)
+                && contents.contains(FAULT_CR3_MARKER)
+                && contents.contains(FAULT_RFLAGS_MARKER)
+                && contents.contains(FAULT_INTERRUPTS_MARKER)
+                && contents.contains(FAULT_ERROR_DECODE_MARKER)
+                && contents.contains(PAGE_FAULT_MARKER)
+        }
+        SmokeKind::Timer => {
+            contents.contains(CPU_SETUP_MARKER)
+                && contents.contains(EXCEPTION_SETUP_MARKER)
+                && contents.contains(IRQ_SETUP_MARKER)
+                && contents.contains(EXCEPTION_MARKER)
+                && contents.contains(TIMER_SETUP_MARKER)
+                && contents.contains(TIMER_TICK_1_MARKER)
+                && contents.contains(TIMER_TICK_2_MARKER)
+                && contents.contains(TIMER_TICK_3_MARKER)
+                && contents.contains(TIMER_DELAYED_LOG_MARKER)
+                && contents.contains(SLEEP_MARKER)
+                && contents.contains(TIMER_MARKER)
+        }
+    })
 }
 
 pub fn parse_qemu_args(args: &[String]) -> Result<SmokeKind, &'static str> {

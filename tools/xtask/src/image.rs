@@ -8,21 +8,7 @@ use crate::workspace;
 use host_tools::validate_host_tools;
 use manifest::write_manifest;
 use names::image_names;
-use smoke::{
-    BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_SETUP_MARKER,
-    EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
-    FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
-    FRAME_ALLOCATOR_FAIL_MARKER, FRAME_ALLOCATOR_MARKER, FRAME_ALLOCATOR_STATUS_MARKER,
-    IRQ_SETUP_MARKER, MEMORY_MAP_FAIL_MARKER, MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER,
-    MEMORY_TOTAL_MARKER, MEMORY_USABLE_MARKER, PAGE_FAULT_MARKER, PAGE_TABLE_AUDIT_MARKER,
-    PAGE_TABLE_FAIL_MARKER, PAGE_TABLE_FLAGS_MARKER, PAGE_TABLE_LOOKUP_MARKER, PAGE_TABLE_MARKER,
-    PAGE_TABLE_PROTECT_MARKER, PAGE_TABLE_PROTECT_RANGE_MARKER, PAGE_TABLE_RANGE_LOOKUP_MARKER,
-    PAGE_TABLE_RANGE_MARKER, PAGE_TABLE_RECLAIM_MARKER, PAGE_TABLE_STATUS_MARKER,
-    PAGE_TABLE_UNMAPPED_RANGE_MARKER, PAGE_TABLE_VISIT_MARKER, PANIC_DIAGNOSTIC_MARKER,
-    PANIC_MARKER, PANIC_REGISTERS_MARKER, SERIAL_MARKER, SLEEP_MARKER, SmokeKind,
-    TIMER_DELAYED_LOG_MARKER, TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER,
-    TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER, parse_qemu_args,
-};
+use smoke::{SmokeKind, parse_qemu_args, serial_log_contains_marker};
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -362,77 +348,6 @@ fn run_qemu(paths: &ImagePaths, smoke: SmokeKind) -> Result<(), String> {
             paths.staging_dir.display()
         ))
     }
-}
-
-fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
-    fs::read_to_string(path).is_ok_and(|contents| match smoke {
-        SmokeKind::Boot => {
-            !contents.contains(BOOTINFO_FAIL_MARKER)
-                && !contents.contains(MEMORY_MAP_FAIL_MARKER)
-                && !contents.contains(FRAME_ALLOCATOR_FAIL_MARKER)
-                && !contents.contains(PAGE_TABLE_FAIL_MARKER)
-                && contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(BOOT_DIAGNOSTIC_MARKER)
-                && contents.contains(MEMORY_TOTAL_MARKER)
-                && contents.contains(MEMORY_USABLE_MARKER)
-                && contents.contains(MEMORY_RESERVED_MARKER)
-                && contents.contains(MEMORY_MAP_MARKER)
-                && contents.contains(FRAME_ALLOCATOR_STATUS_MARKER)
-                && contents.contains(FRAME_ALLOCATOR_MARKER)
-                && contents.contains(PAGE_TABLE_STATUS_MARKER)
-                && contents.contains(PAGE_TABLE_LOOKUP_MARKER)
-                && contents.contains(PAGE_TABLE_PROTECT_MARKER)
-                && contents.contains(PAGE_TABLE_PROTECT_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_RANGE_LOOKUP_MARKER)
-                && contents.contains(PAGE_TABLE_UNMAPPED_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_AUDIT_MARKER)
-                && contents.contains(PAGE_TABLE_VISIT_MARKER)
-                && contents.contains(PAGE_TABLE_FLAGS_MARKER)
-                && contents.contains(PAGE_TABLE_RECLAIM_MARKER)
-                && contents.contains(PAGE_TABLE_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_MARKER)
-                && contents.contains(BOOTINFO_MARKER)
-                && contents.contains(SERIAL_MARKER)
-        }
-        SmokeKind::Panic => {
-            contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(PANIC_DIAGNOSTIC_MARKER)
-                && contents.contains(PANIC_MARKER)
-                && contents.contains(PANIC_REGISTERS_MARKER)
-        }
-        SmokeKind::Exception => {
-            contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(FAULT_ADDRESS_PRESENT_MARKER)
-                && contents.contains(FAULT_ADDRESS_MARKER)
-                && contents.contains(FAULT_CR3_MARKER)
-                && contents.contains(FAULT_RFLAGS_MARKER)
-                && contents.contains(FAULT_INTERRUPTS_MARKER)
-                && contents.contains(FAULT_ERROR_DECODE_MARKER)
-                && contents.contains(PAGE_FAULT_MARKER)
-        }
-        SmokeKind::Timer => {
-            contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(TIMER_SETUP_MARKER)
-                && contents.contains(TIMER_TICK_1_MARKER)
-                && contents.contains(TIMER_TICK_2_MARKER)
-                && contents.contains(TIMER_TICK_3_MARKER)
-                && contents.contains(TIMER_DELAYED_LOG_MARKER)
-                && contents.contains(SLEEP_MARKER)
-                && contents.contains(TIMER_MARKER)
-        }
-    })
 }
 
 fn copy_file(from: &Path, to: &Path, description: &str) -> Result<(), String> {
