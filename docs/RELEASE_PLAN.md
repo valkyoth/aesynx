@@ -746,6 +746,27 @@ Exit criteria:
 - Kernel can model intentional mappings without activating production page
   tables yet.
 
+Post-v0.15 page-table backlog:
+
+- Upgrade the v0.15 bounded sorted frame side index into a scalable `no_std`
+  frame index before exclusive-frame checks move onto hot syscall or
+  address-space activation paths. The current side index gives bounded binary
+  duplicate lookup and audit-time table/index agreement checks, but insertion
+  and removal still shift fixed-array entries.
+- Add typed 2 MiB and 1 GiB huge-page leaves only after the 4 KiB mapper is
+  stable. Huge pages must include strict alignment validation, mixed-size alias
+  detection, reviewed split/unmap behavior, and audit coverage.
+- Add property and model-checking coverage for mapper invariants, including
+  map/unmap round trips, failed-operation atomicity, duplicate physical-frame
+  exclusion, and audit detection of table/index drift. Prefer host property
+  tests first, then Kani/CBMC-style bounded proofs for pure mapper logic.
+- Keep hardware features behind explicit arch capability checks: PCID/INVPCID
+  for future address-space switching, SMEP/SMAP/UMIP for kernel/user hardening,
+  PKU/PKS for optional page-granularity compartments, confidential-computing
+  memory attributes for SEV-SNP/TDX-style backends, and LAM-style pointer tags
+  only as optional fast-path metadata that never replaces authoritative
+  capability generation checks.
+
 ### v0.16.0 - Kernel Mapping Policy
 
 Goal:

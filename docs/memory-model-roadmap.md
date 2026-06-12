@@ -103,6 +103,55 @@ These invariants should become release-gated as the memory subsystem matures:
 - WASM linear memory must stay bounded by the component's declared limits.
 - Memory accounting must fail closed on integer overflow.
 
+## Page-Table And Address-Space Roadmap
+
+The v0.15 mapper is intentionally a bounded model, not the final production
+address-space implementation. Future mapper work should preserve the strict
+audit-first shape while adding hardware features only when they have a clear
+security purpose and tests.
+
+Priority items:
+
+1. Replace the bounded sorted frame side index with a scalable `no_std`
+   structure once map/unmap volume grows. The v0.15 index gives bounded
+   duplicate-frame lookup and audit-time table/index agreement checks, but its
+   fixed array still shifts entries on insert/remove. A future intrusive tree
+   or fixed-capacity B-tree should make exclusive-frame checks fast enough for
+   syscall and address-space activation paths.
+2. Add typed huge-page support for 2 MiB and 1 GiB leaves. This must use
+   explicit page-size types, strict alignment checks, mixed-size alias checks,
+   and reviewed split/unmap semantics. Huge pages should reduce TLB pressure
+   and audit surface area, but they must not weaken the 4 KiB mapper
+   invariants.
+3. Add address-space identifiers with PCID and INVPCID support on x86_64 once
+   real address spaces exist. `TlbFlush::AddressSpace` is currently a
+   conservative whole-address-space shape; future arch code should map it to
+   tagged TLB invalidation instead of flushing more than necessary.
+4. Enable CR4 hardening features such as SMEP, SMAP, and UMIP when supported.
+   The mapper's `USER` flag plumbing is only the prerequisite. The arch crate
+   must still enforce that the kernel cannot execute user pages and cannot
+   access user pages without an explicit audited access window.
+5. Add optional protection-key support. PKU and PKS are page-granularity
+   hardware domains, not sub-page isolation, but they are a strong fit for fast
+   intra-address-space isolation between WASM linear memories, runtime
+   compartments, and kernel subsystems without rewriting page tables or
+   flushing the TLB.
+6. Add confidential-computing memory attributes without exposing raw
+   vendor-specific bits as the generic ABI. Aesynx should model attributes such
+   as private, shared, encrypted, or confidential, and let the arch/backend
+   translate those into AMD SEV-SNP C-bit handling, Intel TDX private/shared GPA
+   rules, or a no-op on unsupported hardware.
+7. Investigate Linear Address Masking and related pointer-tagging support only
+   as an optional fast-path hint. Pointer tags may carry capability-generation
+   or diagnostic metadata, but they must never become the sole security
+   boundary; authoritative capability/object generation checks remain the
+   source of truth.
+8. Add property-based and model-checked verification for mapper invariants.
+   The first proof targets should be map/unmap round trips, failed-operation
+   atomicity, duplicate-physical-frame exclusion, audit detection of raw table
+   corruption, and table/index agreement. Host property tests should come
+   first, then Kani/CBMC-style bounded proofs where practical.
+
 ## Copy-Free IPC
 
 Aesynx should prefer transferring memory object authority over copying bytes.
