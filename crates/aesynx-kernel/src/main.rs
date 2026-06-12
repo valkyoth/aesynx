@@ -382,12 +382,13 @@ fn boot_entry() -> ! {
                     match kernel_mapping_smoke::run(kernel_sections::layout()) {
                         Ok(status) => {
                             aesynx_arch_x86_64::serial_println!(
-                                "paging-policy mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok=true text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={}",
+                                "paging-policy mapped_pages={} reserved_pages={} text_pages={} rodata_pages={} data_pages={} section_layout_ok={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={}",
                                 status.mapped_pages,
                                 status.reserved_pages,
                                 status.text_pages,
                                 status.rodata_pages,
                                 status.data_pages,
+                                status.section_layout_ok,
                                 status.text_rx_ok,
                                 status.rodata_read_only_ok,
                                 status.data_rw_nx_ok,
