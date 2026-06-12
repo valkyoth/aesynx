@@ -14,6 +14,7 @@ mod mutation_audit;
 mod policy;
 mod preflight;
 mod presence;
+mod property;
 mod range;
 mod range_address_policy;
 mod range_audit;

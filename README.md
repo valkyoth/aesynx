@@ -48,7 +48,8 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.16.0` is the current kernel-mapping-policy implementation candidate.
+`v0.16.1` is the current BootInfo fuzzing and mapper-property implementation
+candidate.
 
 Current boot path:
 
@@ -94,6 +95,14 @@ Kernel mapping policy:
 - Every v0.16 paging-policy-model `*_ok=true` marker plus
   `[TEST] paging-policy-model=ok` is required before normal boot success.
 
+Fuzz and property gates:
+
+- `cargo xtask fuzz-smoke` runs bounded BootInfo normalization fuzz seeds and
+  deterministic byte-shaped mutations.
+- Mapper property tests sweep map/unmap round trips, failed-operation
+  atomicity, duplicate-frame rejection, range-walk bounds, and audit drift
+  detection.
+
 | Area | Status | Notes |
 | --- | --- | --- |
 | Rust workspace | Active | Modular crate layout with no root `src/` implementation pile. |
@@ -107,6 +116,7 @@ Kernel mapping policy:
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
 | QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
+| Fuzz/property smoke | Active candidate | `v0.16.1`; `cargo xtask fuzz-smoke` runs BootInfo fuzz seeds, deterministic BootInfo byte mutations, and mapper property sweeps before live CR3 activation. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
 | GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
@@ -118,7 +128,7 @@ Kernel mapping policy:
 | Physical memory map | Tagged | `v0.13.0`; rejects invalid/overlapping regions and reports checked total/usable/reserved bytes, frame counts, and kernel/bootloader reserved accounting with `[TEST] memory-map=ok`. |
 | Bitmap frame allocator | Tagged | `v0.14.0`; safe `aesynx-mm` bitmap allocator model plus QEMU smoke for bounded early alloc/free, contiguous allocation, debug states, double-free detection, and atomic failure behavior with `[TEST] frame-allocator=ok`. |
 | Page table mapper | Tagged | `v0.15.0`; safe bounded `aesynx-mm` page-table mapper model with x86_64-shaped tables, mapper-issued typed root-table identity, checked root-table identity, checked status accounting, non-empty kernel and user address-space candidate preflights, audit-backed map/unmap/protect, fail-closed translation, checked contiguous byte-range translation, audit-backed permission lookup, contiguous range map/protect/unmap plus lookup, upfront range validation, bounded range walks, audit-backed unmapped range checks, audit-backed mapped-range checks, page-presence checks, kernel-only policy checks, kernel high-half user-access guard checks, user low-half kernel-privilege guard checks, no-user-space policy checks, no-executable policy checks, no-writable policy checks, no-device policy checks, no-global policy checks, map-time no-physical-alias policy checks with const-capacity bounded side-index audit, audit-backed kernel-range policy checks, audit-backed user-range policy checks, write-protected range checks, non-executable range checks, executable range checks, normal-memory range checks, local range checks, high-half kernel-space checks, low-half user-space checks, read-only mapping visit, redacted mapping summaries, redacted page-table debug output, virtual range permission verification, fail-closed leaf decoding including hardware Accessed/Dirty bits, permission lookup/change, consistency audit, empty-table reclamation, explicit TLB flush targets, conservative TLB flush merging, and QEMU smoke with `[TEST] page-table=ok`. |
-| Kernel mapping policy | Active candidate | `v0.16.0`; linker-exported section boundaries feed a safe `aesynx-mm` policy descriptor that verifies section layout, text RX, rodata read-only/NX, data RW/NX, reserved heap, guard page, and null-page invariants before `[TEST] paging-policy-model=ok`. |
+| Kernel mapping policy | Tagged | `v0.16.0`; linker-exported section boundaries feed a safe `aesynx-mm` policy descriptor that verifies section layout, text RX, rodata read-only/NX, data RW/NX, reserved heap, guard page, and null-page invariants before `[TEST] paging-policy-model=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -130,7 +140,9 @@ Kernel mapping policy:
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Early heap | Planned | `v0.17.0`; add the first bounded kernel heap and `alloc` smoke. |
+| Kernel-owned address space | Planned | `v0.16.2`; build verified Aesynx-owned page tables, switch CR3, and survive boot under the new root. |
+| CPU hardening and stack guards | Planned | `v0.16.3`; enable NX/WP and gated SMEP/SMAP/UMIP where supported, then guard kernel stacks. |
+| Early heap | Planned | `v0.17.0`; add the first bounded kernel heap and `alloc` smoke after the memory enforcement gates. |
 | Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -203,7 +215,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.16.0
+cargo xtask release-ready v0.16.1
 ```
 
 ## Security Posture
@@ -233,7 +245,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.16.0 Release Candidate Notes](docs/releases/v0.16.0-rc.md)
+- [v0.16.1 Release Candidate Notes](docs/releases/v0.16.1-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

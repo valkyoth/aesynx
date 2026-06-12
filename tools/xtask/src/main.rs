@@ -5,6 +5,7 @@ mod process;
 mod workspace;
 
 use std::env;
+use std::process::Command;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -20,6 +21,7 @@ fn main() -> ExitCode {
     match command.as_str() {
         "build-kernel" => build_kernel::run(&rest),
         "check" => process::run_script("scripts/checks.sh"),
+        "fuzz-smoke" => fuzz_smoke(&rest),
         "image" => image::build(&rest),
         "qemu" => image::qemu(&rest),
         "qemu-suite" => image::qemu_suite(&rest),
@@ -49,6 +51,40 @@ fn release_ready(args: &[String]) -> ExitCode {
     }
 }
 
+fn fuzz_smoke(args: &[String]) -> ExitCode {
+    if !args.is_empty() {
+        eprintln!("xtask: fuzz-smoke does not accept arguments");
+        return ExitCode::from(2);
+    }
+    let root = match workspace::root() {
+        Ok(root) => root,
+        Err(error) => {
+            eprintln!("xtask: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let mut boot = Command::new("cargo");
+    boot.arg("test")
+        .arg("-p")
+        .arg("aesynx-boot")
+        .arg("bootinfo_fuzz")
+        .current_dir(&root);
+    let boot_status = process::run_command(&mut boot, "cargo test -p aesynx-boot bootinfo_fuzz");
+    if boot_status != ExitCode::SUCCESS {
+        return boot_status;
+    }
+
+    let mut mapper = Command::new("cargo");
+    mapper
+        .arg("test")
+        .arg("-p")
+        .arg("aesynx-mm")
+        .arg("mapper_property")
+        .current_dir(root);
+    process::run_command(&mut mapper, "cargo test -p aesynx-mm mapper_property")
+}
+
 fn print_status() {
     println!("Aesynx workspace foundation is active.");
 }
@@ -58,6 +94,9 @@ fn print_help() {
     println!("  build-kernel                         build and validate kernel boot path");
     println!("  build-kernel --custom-target-probe   try nightly build-std custom target probe");
     println!("  check                                run local repository checks");
+    println!(
+        "  fuzz-smoke                           run bounded BootInfo fuzz and mapper property tests"
+    );
     println!("  image                                create v0.16 Limine QEMU boot image");
     println!("  qemu                                 run v0.16 QEMU boot smoke");
     println!("  qemu --panic-smoke                   run v0.16 QEMU panic diagnostics smoke");

@@ -106,6 +106,13 @@ bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
 `cargo xtask qemu-suite` runs the boot, panic, exception, and timer smoke paths
 in sequence and is the GitHub CI QEMU gate for v0.16.
 
+`cargo xtask fuzz-smoke` runs the bounded v0.16.1 host fuzz/property gate. It
+executes the BootInfo normalization fuzz seeds and deterministic byte-mutation
+sweep, then runs mapper property tests for map/unmap round trips,
+failed-operation atomicity, duplicate physical-frame rejection, bounded range
+walks, and audit drift detection. This is a host gate; it does not boot QEMU or
+claim live CR3 enforcement.
+
 The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that
 computes the workspace root dynamically and passes
 `--remap-path-prefix <workspace>=.` for direct workspace builds. Xtask kernel

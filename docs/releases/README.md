@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.16.0 - Kernel Mapping Policy](v0.16.0-rc.md)
+- [v0.16.1 - BootInfo Fuzzing And Mapper Properties](v0.16.1-rc.md)
 
 ## History
 
+- [v0.16.0 - Kernel Mapping Policy](v0.16.0-rc.md)
 - [v0.15.0 - Page Table Mapper](v0.15.0-rc.md)
 - [v0.14.0 - Bitmap Frame Allocator](v0.14.0-rc.md)
 - [v0.13.0 - Physical Memory Map](v0.13.0-rc.md)

@@ -850,6 +850,7 @@ Deliverables:
 
 Verification:
 
+- `cargo xtask fuzz-smoke` runs the bounded host fuzz/property gate.
 - Fuzz target builds and runs for a bounded CI-safe smoke duration.
 - Host property tests pass under `cargo test`.
 - Existing QEMU suite remains green.

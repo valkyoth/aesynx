@@ -41,6 +41,9 @@ if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
     echo "checks: tests"
     cargo test --workspace
 
+    echo "checks: fuzz/property smoke"
+    cargo xtask fuzz-smoke
+
     echo "checks: dependency policy"
     if cargo deny --version >/dev/null 2>&1; then
         cargo deny check
