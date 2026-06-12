@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.15 page-table-mapper implementation candidate
+Status: v0.15 tagged page-table-mapper milestone
 
 The repository contains the first x86_64 kernel build shape:
 
