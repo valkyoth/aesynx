@@ -606,6 +606,8 @@ Deliverables:
   dump raw table slots or address-bearing fields.
 - Range operation outcome debug output is aggregate-only and reports page
   counts plus flush class without exposing page mappings or addresses.
+- MM debug redaction coverage includes mapper summaries and frame allocator
+  status reports without exposing raw bitmaps or address-bearing frame values.
 - Mapper-produced status, audit, and mapping-summary debug output reports only
   aggregate counters.
 - Page-table root debug output reports only model-root wording without exposing

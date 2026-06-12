@@ -269,6 +269,37 @@ fn allocator_status_counts_state_classes() -> Result<(), FrameAllocatorError> {
 }
 
 #[test]
+fn allocator_status_debug_is_aggregate_only() -> Result<(), FrameAllocatorError> {
+    let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
+    allocator.mark_region(
+        PhysAddr::new(FRAME_SIZE),
+        4 * FRAME_SIZE,
+        FrameRegionKind::Free,
+    )?;
+    allocator.mark_region(
+        PhysAddr::new(5 * FRAME_SIZE),
+        2 * FRAME_SIZE,
+        FrameRegionKind::Reserved,
+    )?;
+    let _frame = allocator.allocate_one()?;
+
+    let debug = format!("{:?}", allocator.status_checked()?);
+
+    assert!(debug.contains("FrameAllocatorStatus"));
+    assert!(debug.contains("total_frames"));
+    assert!(debug.contains("known_frames"));
+    assert!(debug.contains("free_frames"));
+    assert!(debug.contains("used_frames"));
+    assert!(debug.contains("reserved_frames"));
+    assert!(debug.contains("unknown_frames"));
+    assert!(!debug.contains("PhysFrame"));
+    assert!(!debug.contains("base_frame"));
+    assert!(!debug.contains("FrameBitmap"));
+    assert!(!debug.contains("words"));
+    Ok(())
+}
+
+#[test]
 fn allocator_checked_status_rejects_unknown_classification() -> Result<(), FrameAllocatorError> {
     let mut allocator = BitmapFrameAllocator::<1>::new(PhysFrame::new(1), 8)?;
     allocator.free.set(0, true)?;

@@ -26,7 +26,7 @@ fn mapper_debug_redacts_page_table_contents() -> Result<(), PageTableError> {
     assert!(debug.contains("audit_ok: true"));
     assert!(!debug.contains("slots"));
     assert!(!debug.contains("raw"));
-    assert!(!debug.contains(&KERNEL_PHYS.get().to_string()));
+    assert_debug_hides_addresses(&debug);
     Ok(())
 }
 
@@ -45,7 +45,7 @@ fn mapper_debug_reports_corruption_without_dumping_tables() -> Result<(), PageTa
     assert!(debug.contains("audit_ok: false"));
     assert!(!debug.contains("slots"));
     assert!(!debug.contains("raw"));
-    assert!(!debug.contains(&KERNEL_PHYS.get().to_string()));
+    assert_debug_hides_addresses(&debug);
     Ok(())
 }
 
