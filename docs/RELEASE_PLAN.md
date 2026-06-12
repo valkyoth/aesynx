@@ -612,6 +612,9 @@ Deliverables:
   aggregate counters.
 - Page-table root debug output reports only model-root wording without exposing
   the internal model table index, physical root, or CR3 claims.
+- Checked root and checked status gates reject multiple corrupt mapper shapes
+  without mutating mapper state, including unreachable used tables and
+  duplicate table-parent links.
 - Mapping visitors run structural audit before invoking callbacks, so corrupt
   mapper state fails closed before emitting mapping records.
 - Single-address read-only lookup, presence, and checked-translation failures
