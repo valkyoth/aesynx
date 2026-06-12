@@ -604,6 +604,8 @@ Deliverables:
 - Page-table debug output for mapper, mapping, translation, flush, outcome,
   root-token, raw-entry, internal raw-slot, and validated-range types does not
   dump raw table slots or address-bearing fields.
+- Range operation outcome debug output is aggregate-only and reports page
+  counts plus flush class without exposing page mappings or addresses.
 - Mapper-produced status, audit, and mapping-summary debug output reports only
   aggregate counters.
 - Page-table root debug output reports only model-root wording without exposing

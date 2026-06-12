@@ -104,6 +104,32 @@ fn outcome_debug_outputs_redact_mapping_addresses() -> Result<(), PageTableError
 }
 
 #[test]
+fn range_outcome_debug_outputs_are_aggregate_only() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    let initial = GenericPageFlags::kernel(PageAccess::ReadWrite);
+    let protected = GenericPageFlags::kernel(PageAccess::ReadOnly);
+
+    let map = mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, initial)?;
+    let protect = mapper.protect_contiguous(KERNEL_VIRT, 2, protected)?;
+    let unmap = mapper.unmap_contiguous(KERNEL_VIRT, 2)?;
+
+    for debug in [
+        format!("{map:?}"),
+        format!("{protect:?}"),
+        format!("{unmap:?}"),
+    ] {
+        assert!(debug.contains("pages"));
+        assert!(debug.contains("flush"));
+        assert!(!debug.contains("<redacted>"));
+        assert!(!debug.contains("PageMapping"));
+        assert!(!debug.contains("PhysAddr"));
+        assert!(!debug.contains("VirtAddr"));
+        assert_debug_hides_addresses(&debug);
+    }
+    Ok(())
+}
+
+#[test]
 fn mapper_report_debug_outputs_are_aggregate_only() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.map_page(
