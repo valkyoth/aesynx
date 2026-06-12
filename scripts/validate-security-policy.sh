@@ -67,6 +67,7 @@ fi
 
 allowed_unsafe_files="$(cat <<'EOF'
 crates/aesynx-arch-aarch64/src/lib.rs
+crates/aesynx-arch-x86_64/src/cpu_hardening.rs
 crates/aesynx-arch-x86_64/src/descriptors.rs
 crates/aesynx-arch-x86_64/src/exceptions.rs
 crates/aesynx-arch-x86_64/src/exceptions/tests.rs

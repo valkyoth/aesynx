@@ -160,6 +160,24 @@ extern "C" fn activate_on_kernel_stack(root_phys: u64) -> ! {
         aesynx_arch_x86_64::X86_64::halt_forever()
     }
     compiler_fence(Ordering::SeqCst);
+    match aesynx_arch_x86_64::cpu_hardening::init() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "cpu-hardening nx={} wp={} smep={} smap={} umip={}",
+                status.nx_enabled,
+                status.wp_enabled,
+                status.smep_enabled,
+                status.smap_enabled,
+                status.umip_enabled
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] cpu-hardening=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("cpu-hardening error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] cpu-hardening=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
     aesynx_arch_x86_64::serial::write_str("kernel-cr3 active=true stack=kernel\n");
     aesynx_arch_x86_64::serial::write_str("[TEST] kernel-cr3=ok\n");
     aesynx_arch_x86_64::X86_64::halt_forever()

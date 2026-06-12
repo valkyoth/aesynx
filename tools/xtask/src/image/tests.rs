@@ -1,7 +1,8 @@
 use super::smoke::{
-    BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_SETUP_MARKER,
-    EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
-    FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
+    BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_HARDENING_FAIL_MARKER,
+    CPU_HARDENING_MARKER, CPU_HARDENING_STATUS_MARKER, CPU_SETUP_MARKER, EXCEPTION_MARKER,
+    EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER, FAULT_CR3_MARKER,
+    FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
     FRAME_ALLOCATOR_FAIL_MARKER, FRAME_ALLOCATOR_MARKER, FRAME_ALLOCATOR_STATUS_MARKER,
     IRQ_SETUP_MARKER, KERNEL_CR3_ACTIVE_MARKER, KERNEL_CR3_FAIL_MARKER, KERNEL_CR3_MARKER,
     MEMORY_MAP_FAIL_MARKER, MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER, MEMORY_TOTAL_MARKER,
@@ -46,6 +47,9 @@ fn qemu_markers_track_v0_16_contracts() {
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
     assert_eq!(CPU_SETUP_MARKER, "[TEST] gdt=ok");
+    assert_eq!(CPU_HARDENING_FAIL_MARKER, "[TEST] cpu-hardening=fail");
+    assert_eq!(CPU_HARDENING_MARKER, "[TEST] cpu-hardening=ok");
+    assert_eq!(CPU_HARDENING_STATUS_MARKER, "cpu-hardening nx=");
     assert_eq!(EXCEPTION_SETUP_MARKER, "[TEST] idt=ok");
     assert_eq!(EXCEPTION_MARKER, "[TEST] exception=ok");
     assert_eq!(FRAME_ALLOCATOR_FAIL_MARKER, "[TEST] frame-allocator=fail");
@@ -241,6 +245,16 @@ fn boot_smoke_requires_full_v0_16_marker_set() {
     let failed_kernel_cr3 = format!("{valid}, [TEST] kernel-cr3=fail");
     assert!(!serial_log_contents_match(
         &failed_kernel_cr3,
+        SmokeKind::Boot
+    ));
+    let missing_cpu_hardening = valid.replacen("[TEST] cpu-hardening=ok", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_cpu_hardening,
+        SmokeKind::Boot
+    ));
+    let failed_cpu_hardening = format!("{valid}, [TEST] cpu-hardening=fail");
+    assert!(!serial_log_contents_match(
+        &failed_cpu_hardening,
         SmokeKind::Boot
     ));
 }

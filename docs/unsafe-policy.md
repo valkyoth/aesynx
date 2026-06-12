@@ -60,6 +60,17 @@ Every unsafe module must be documented here before release.
 ## Current Unsafe Inventory
 
 ```text
+Location: crates/aesynx-arch-x86_64/src/cpu_hardening.rs
+Status: active candidate in v0.16.3
+Purpose: enable early x86_64 CPU hardening bits after Aesynx owns CR3
+Preconditions: called during the terminal single-core normal boot smoke after the Aesynx-owned page table root has been loaded; CPUID capability detection has produced the hardening plan; NX support is required for this release path
+Unsafe operation: reads/writes EFER through rdmsr/wrmsr and reads/writes CR0 and CR4
+Safety argument: CPUID capability reads are non-privileged safe Rust calls that only copy CPU feature values; the hardening plan is host-testable and fail-closed when NX is unavailable; EFER.NXE is written only after CPUID reports NX; CR0 writes preserve existing bits and only force WP on; CR4 writes preserve existing bits and only enable SMEP, SMAP, and UMIP when CPUID reports support; serial output reports booleans only and never dumps raw control-register values
+Tests/evidence: host unit tests cover the NX-required policy, optional feature gating, and redacted status projection; cargo xtask qemu observes cpu-hardening nx=<bool> wp=<bool> smep=<bool> smap=<bool> umip=<bool> and [TEST] cpu-hardening=ok
+Limitations: early single-core terminal smoke only; no SMAP usercopy access-window helpers yet, no per-core policy yet, no PCID/INVPCID handling yet, and no live userspace transitions yet
+```
+
+```text
 Location: crates/aesynx-arch-x86_64/src/port.rs
 Status: active in v0.4
 Purpose: early x86_64 COM1 port I/O for serial boot diagnostics
