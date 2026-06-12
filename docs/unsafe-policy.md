@@ -83,13 +83,13 @@ Limitations: interrupt-state control is still unsupported; early boot currently 
 
 ```text
 Location: crates/aesynx-arch-x86_64/src/registers.rs
-Status: active in v0.6
-Purpose: capture a redacted early x86_64 register summary for panic diagnostics
+Status: active in v0.6; expanded in v0.16.2
+Purpose: capture a redacted early x86_64 register summary for panic diagnostics and expose the reviewed CR3 load primitive used by kernel-owned address-space activation
 Preconditions: called during early kernel execution on x86_64 after Limine transfers control to the kernel
-Unsafe operation: core::arch::asm! reads rsp, rbp, rflags, and cr3
-Safety argument: the instructions copy architectural register values into general-purpose outputs and do not create Rust references; pushfq/pop temporarily use the current stack to read RFLAGS and restore stack position before returning; raw address-bearing values remain private and serial output exposes only redacted alignment summaries, CR3 low flag/PCID bits, and arithmetic/status RFLAGS bits under mask 0x0cd5; the RFLAGS mask intentionally excludes trap/debug, interrupt-enable, I/O privilege, alignment, virtualization, and CPU-identification state
-Tests/evidence: register snapshot unit tests verify Debug redaction and summary accessors; cargo xtask qemu --panic-smoke observes the panic register-summary line
-Limitations: not a full interrupt-frame dump, does not capture fault address, does not expose raw KASLR-sensitive register values, and is x86_64-only
+Unsafe operation: core::arch::asm! reads rsp, rbp, rflags, and cr3; the unsafe load_cr3 API writes cr3
+Safety argument: the read instructions copy architectural register values into general-purpose outputs and do not create Rust references; pushfq/pop temporarily use the current stack to read RFLAGS and restore stack position before returning; raw address-bearing values remain private and serial output exposes only redacted alignment summaries, CR3 low flag/PCID bits, and arithmetic/status RFLAGS bits under mask 0x0cd5; the RFLAGS mask intentionally excludes trap/debug, interrupt-enable, I/O privilege, alignment, virtualization, and CPU-identification state; load_cr3 is unsafe because callers must prove the root is page-aligned, points at a valid live level-4 table, and maps the current instruction stream, active stack, and every static/data object touched after the switch
+Tests/evidence: register snapshot unit tests verify Debug redaction and summary accessors; cargo xtask qemu --panic-smoke observes the panic register-summary line; cargo xtask qemu observes [TEST] kernel-cr3=ok after loading the Aesynx-owned root
+Limitations: not a full interrupt-frame dump, does not capture fault address, does not expose raw KASLR-sensitive register values, and is x86_64-only; load_cr3 has no PCID/INVPCID handling or TLB shootdown policy yet
 ```
 
 ```text
@@ -172,12 +172,12 @@ Limitations: linker-symbol model only; it does not replace Limine's active CR3, 
 ```text
 Location: crates/aesynx-kernel/src/page_table_install.rs
 Status: active candidate in v0.16.2
-Purpose: stream audited x86_64 hardware-shaped page-table entries into a page-aligned static kernel activation arena
-Preconditions: BootInfo normalization has accepted Limine's executable-address response; the static activation arena is part of the kernel data/BSS image and has a physical address derivable from KernelImageInfo; the mapper has passed kernel mapping policy verification; the destination arena is not exposed through Rust references during installation
-Unsafe operation: raw address capture for the static arena and volatile writes through raw pointers into that arena
-Safety argument: the installer derives the activation root physical address from the arena's kernel virtual address through BootInfo's redacted KernelImageInfo translation helper, rejects active-CR3 overlap before zeroing the arena, forces the arena pointer through a runtime register to avoid fragile high-half absolute stores, writes only the fixed ACTIVATION_TABLES * PAGE_TABLE_ENTRIES area with volatile stores, streams one table at a time from the audited mapper to avoid boot-stack pressure, and publishes a release compiler fence before reporting success; serial output reports only counts and booleans
-Tests/evidence: aesynx-mm hardware-image tests verify streaming table export matches full image export and redacted image metadata; cargo xtask qemu-suite observes hardware_tables_copied=<n>, hardware_copied=true, and [TEST] paging-policy-model=ok
-Limitations: early single-core boot only; no CR3 load yet, no post-switch validation yet, no TLB/PCID handling yet, and no reclamation of Limine page tables yet
+Purpose: stream audited x86_64 hardware-shaped page-table entries into a page-aligned static kernel activation arena, switch to a private activation stack, and terminally activate the Aesynx-owned CR3 root
+Preconditions: BootInfo normalization has accepted Limine's executable-address response; the static activation arena and activation stack are part of the kernel data/BSS image and have physical addresses covered by KernelImageInfo; the mapper has passed kernel mapping policy verification; the destination arena is not exposed through Rust references during installation; the terminal activation path runs only after normal boot evidence has been emitted
+Unsafe operation: raw address capture for the static arena and stack, volatile writes through raw pointers into the arena, inline assembly to switch RSP to the private activation stack, and a terminal jump into the CR3 activation continuation
+Safety argument: the installer derives the activation root physical address from the arena's kernel virtual address through BootInfo's redacted KernelImageInfo translation helper, rejects active-CR3 overlap before zeroing the arena and again before terminal activation, forces static pointers through runtime registers to avoid fragile high-half absolute stores, writes only the fixed ACTIVATION_TABLES * PAGE_TABLE_ENTRIES area with volatile stores, streams one table at a time from the audited mapper to avoid boot-stack pressure, aligns the private activation stack to the SysV function-entry convention before jumping to the terminal continuation, loads CR3 only after switching away from the Limine stack, and publishes compiler fences around installation/activation; serial output reports only counts, booleans, and the post-switch kernel-cr3 marker
+Tests/evidence: aesynx-mm hardware-image tests verify streaming table export matches full image export and redacted image metadata; cargo xtask qemu observes hardware_tables_copied=<n>, hardware_copied=true, kernel-cr3 active=true, and [TEST] kernel-cr3=ok; cargo xtask qemu-suite keeps boot, panic, exception, and timer smokes green
+Limitations: early single-core terminal boot smoke only; no return to general post-switch services yet, no TLB/PCID handling yet, no CPU hardening-bit enablement yet, no stack guard yet, and no reclamation of Limine page tables yet
 ```
 
 ```text

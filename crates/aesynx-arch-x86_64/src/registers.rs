@@ -86,6 +86,28 @@ impl EarlyRegisterSnapshot {
     }
 }
 
+/// Load CR3 with a page-aligned x86_64 page-table root.
+///
+/// # Safety
+///
+/// The caller must guarantee that `root` points to a valid level-4 x86_64 page
+/// table that maps the currently executing instruction stream, the active
+/// stack, and every static/data object touched after the switch. The table must
+/// remain live for as long as CR3 references it.
+pub unsafe fn load_cr3(root: PhysAddr) {
+    debug_assert_eq!(root.get() & PAGE_OFFSET_MASK, 0);
+    // SAFETY: The caller upholds the architectural validity and lifetime of
+    // the page-table root. This instruction changes address translation state
+    // but does not dereference Rust pointers directly.
+    unsafe {
+        core::arch::asm!(
+            "mov cr3, {root}",
+            root = in(reg) root.get(),
+            options(nostack, preserves_flags)
+        );
+    }
+}
+
 impl fmt::Debug for EarlyRegisterSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EarlyRegisterSnapshot")

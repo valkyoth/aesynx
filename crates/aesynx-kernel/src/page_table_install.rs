@@ -1,6 +1,8 @@
+use aesynx_arch::ArchCpu;
 use core::sync::atomic::{Ordering, compiler_fence};
 
 pub const ACTIVATION_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
+const ACTIVATION_STACK_BYTES: usize = 16 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PageTableInstallStatus {
@@ -12,6 +14,7 @@ pub struct PageTableInstallStatus {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PageTableInstallError {
     ActiveCr3Overlap,
+    ActivationStackRange,
     Mapper(aesynx_mm::PageTableError),
     KernelImageRange,
     UnexpectedImage,
@@ -81,6 +84,22 @@ pub fn copy_mapper_to_activation_arena<const TABLES: usize, const MAPPED_FRAMES:
     })
 }
 
+pub fn activate_kernel_address_space_and_halt(
+    root_phys: aesynx_abi::PhysAddr,
+) -> Result<core::convert::Infallible, PageTableInstallError> {
+    if aesynx_arch_x86_64::registers::EarlyRegisterSnapshot::capture().cr3_page_matches(root_phys) {
+        return Err(PageTableInstallError::ActiveCr3Overlap);
+    }
+    let stack_top =
+        activation_stack_top_virt().ok_or(PageTableInstallError::ActivationStackRange)?;
+    compiler_fence(Ordering::Release);
+
+    // SAFETY: The activation stack is a private kernel `.bss` object covered by
+    // the just-installed data/BSS mapping. `root_phys` identifies the copied
+    // static activation arena, which maps the current text and data sections.
+    unsafe { switch_to_activation_stack(root_phys.get(), stack_top.get()) }
+}
+
 fn activation_arena_virt() -> aesynx_abi::VirtAddr {
     // SAFETY: Taking the raw address of the private static does not create a
     // Rust reference or read/write the arena. The address is used only as a
@@ -98,6 +117,48 @@ fn activation_arena_ptr() -> *mut u64 {
     // absolute addressing forms for the high-half kernel.
     let arena = unsafe { core::ptr::addr_of_mut!(ACTIVATION_ARENA.tables) as *mut u64 };
     core::hint::black_box(arena)
+}
+
+fn activation_stack_top_virt() -> Option<aesynx_abi::VirtAddr> {
+    // SAFETY: Taking the raw address of the private stack static does not read
+    // or write the stack bytes and does not create a Rust reference.
+    let stack = unsafe { core::ptr::addr_of_mut!(ACTIVATION_STACK.bytes) as *mut u8 };
+    let base = core::hint::black_box(stack) as u64;
+    base.checked_add(ACTIVATION_STACK_BYTES as u64)
+        .map(aesynx_abi::VirtAddr::new)
+}
+
+unsafe fn switch_to_activation_stack(root_phys: u64, stack_top: u64) -> ! {
+    // SAFETY: The caller guarantees that `stack_top` is the one-past-end
+    // address of the private activation stack and that `root_phys` points to a
+    // page table that maps both this function's text and that stack. The stack
+    // is aligned to the SysV function-entry convention before jumping to the
+    // terminal activation continuation.
+    unsafe {
+        core::arch::asm!(
+            "mov rsp, {stack_top}",
+            "and rsp, -16",
+            "sub rsp, 8",
+            "jmp {entry}",
+            stack_top = in(reg) stack_top,
+            in("rdi") root_phys,
+            entry = sym activate_on_kernel_stack,
+            options(noreturn)
+        );
+    }
+}
+
+extern "C" fn activate_on_kernel_stack(root_phys: u64) -> ! {
+    // SAFETY: The caller switched to the private activation stack and passes
+    // the physical root of the static activation arena populated from the
+    // audited mapper immediately before this terminal handoff.
+    unsafe {
+        aesynx_arch_x86_64::registers::load_cr3(aesynx_abi::PhysAddr::new(root_phys));
+    }
+    compiler_fence(Ordering::SeqCst);
+    aesynx_arch_x86_64::serial::write_str("kernel-cr3 active=true stack=kernel\n");
+    aesynx_arch_x86_64::serial::write_str("[TEST] kernel-cr3=ok\n");
+    aesynx_arch_x86_64::X86_64::halt_forever()
 }
 
 unsafe fn zero_activation_arena(arena: *mut u64) {
@@ -141,3 +202,16 @@ impl AlignedActivationArena {
 }
 
 static mut ACTIVATION_ARENA: AlignedActivationArena = AlignedActivationArena::ZERO;
+
+#[repr(C, align(4096))]
+struct AlignedActivationStack {
+    bytes: [u8; ACTIVATION_STACK_BYTES],
+}
+
+impl AlignedActivationStack {
+    const ZERO: Self = Self {
+        bytes: [0; ACTIVATION_STACK_BYTES],
+    };
+}
+
+static mut ACTIVATION_STACK: AlignedActivationStack = AlignedActivationStack::ZERO;

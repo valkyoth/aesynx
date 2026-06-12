@@ -3,8 +3,9 @@ use super::smoke::{
     EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
     FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
     FRAME_ALLOCATOR_FAIL_MARKER, FRAME_ALLOCATOR_MARKER, FRAME_ALLOCATOR_STATUS_MARKER,
-    IRQ_SETUP_MARKER, MEMORY_MAP_FAIL_MARKER, MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER,
-    MEMORY_TOTAL_MARKER, MEMORY_USABLE_MARKER, PAGE_FAULT_MARKER, PAGE_TABLE_AUDIT_MARKER,
+    IRQ_SETUP_MARKER, KERNEL_CR3_ACTIVE_MARKER, KERNEL_CR3_FAIL_MARKER, KERNEL_CR3_MARKER,
+    MEMORY_MAP_FAIL_MARKER, MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER, MEMORY_TOTAL_MARKER,
+    MEMORY_USABLE_MARKER, PAGE_FAULT_MARKER, PAGE_TABLE_AUDIT_MARKER,
     PAGE_TABLE_CHECKED_ROOT_MARKER, PAGE_TABLE_CHECKED_STATUS_MARKER,
     PAGE_TABLE_CHECKED_TRANSLATE_MARKER, PAGE_TABLE_EXECUTABLE_RANGE_MARKER,
     PAGE_TABLE_FAIL_MARKER, PAGE_TABLE_FLAGS_MARKER, PAGE_TABLE_FLUSH_PAGE_MARKER,
@@ -54,6 +55,9 @@ fn qemu_markers_track_v0_16_contracts() {
         "frame-allocator total_frames="
     );
     assert_eq!(IRQ_SETUP_MARKER, "[TEST] irq=ok");
+    assert_eq!(KERNEL_CR3_ACTIVE_MARKER, "kernel-cr3 active=true");
+    assert_eq!(KERNEL_CR3_FAIL_MARKER, "[TEST] kernel-cr3=fail");
+    assert_eq!(KERNEL_CR3_MARKER, "[TEST] kernel-cr3=ok");
     assert_eq!(MEMORY_MAP_FAIL_MARKER, "[TEST] memory-map=fail");
     assert_eq!(MEMORY_MAP_MARKER, "[TEST] memory-map=ok");
     assert_eq!(MEMORY_RESERVED_MARKER, "memory reserved_bytes=");
@@ -227,6 +231,16 @@ fn boot_smoke_requires_full_v0_16_marker_set() {
     let missing_root_only = valid.replacen("root_ok=true, ", "", 1);
     assert!(!serial_log_contents_match(
         &missing_root_only,
+        SmokeKind::Boot
+    ));
+    let missing_kernel_cr3 = valid.replacen("[TEST] kernel-cr3=ok", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_kernel_cr3,
+        SmokeKind::Boot
+    ));
+    let failed_kernel_cr3 = format!("{valid}, [TEST] kernel-cr3=fail");
+    assert!(!serial_log_contents_match(
+        &failed_kernel_cr3,
         SmokeKind::Boot
     ));
 }

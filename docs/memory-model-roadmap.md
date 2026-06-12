@@ -237,16 +237,16 @@ claim.
 ## Non-Claims
 
 This document does not claim that Aesynx already has a production allocator,
-active hardware page tables, address spaces, object-memory integration, IOMMU
-support, or snapshot-aware memory. `v0.16.2` builds on checked boot memory-map
-accounting, a bounded bitmap frame allocator model, a bounded page-table mapper
-model, BootInfo fuzz/property evidence, and the v0.16 kernel mapping policy by
-adding an audited x86_64 hardware-shaped page-table image export with an
-allocator-issued root-frame proof and streaming the used tables into a
-page-aligned static kernel activation arena. It still does not replace Limine's
-active CR3 or claim live hardware fault enforcement for final kernel segments.
-The required next step is explicit: switch CR3 to the copied verified image,
-then enable CPU hardening and stack guards before treating heap and later
-address-space work as live hardware-enforced memory isolation. The roadmap
-exists so the next allocator and mapper decisions move toward the clean-slate
-Aesynx model instead of copying old process/file assumptions by default.
+general post-switch kernel services, process address spaces, object-memory
+integration, IOMMU support, or snapshot-aware memory. `v0.16.2` builds on
+checked boot memory-map accounting, a bounded bitmap frame allocator model, a
+bounded page-table mapper model, BootInfo fuzz/property evidence, and the v0.16
+kernel mapping policy by adding an audited x86_64 hardware-shaped page-table
+image export, streaming the used tables into a page-aligned static kernel
+activation arena, switching to a private kernel activation stack, loading the
+Aesynx-owned CR3 root, and requiring post-switch QEMU evidence. The required
+next step is explicit: enable CPU hardening and stack guards, then keep moving
+heap and later address-space work behind live hardware-enforced memory
+isolation. The roadmap exists so the next allocator and mapper decisions move
+toward the clean-slate Aesynx model instead of copying old process/file
+assumptions by default.

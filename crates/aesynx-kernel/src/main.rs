@@ -342,6 +342,16 @@ fn boot_entry() -> ! {
             aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=ok\n");
             aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
             diagnostics::set_boot_phase(BootPhase::Running);
+            match page_table_install::activation_root_phys(&info)
+                .and_then(page_table_install::activate_kernel_address_space_and_halt)
+            {
+                Ok(never) => match never {},
+                Err(error) => {
+                    aesynx_arch_x86_64::serial_println!("kernel-cr3 error={:?}", error);
+                    aesynx_arch_x86_64::serial::write_str("[TEST] kernel-cr3=fail\n");
+                    aesynx_arch_x86_64::X86_64::halt_forever();
+                }
+            }
         }
         Err(error) => {
             aesynx_arch_x86_64::serial::write_str("Aesynx: booting\n");
