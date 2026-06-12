@@ -154,6 +154,7 @@ Fuzz and property gates:
 
 | Area | Status | Target |
 | --- | --- | --- |
+| Limine handoff module split | Planned | `v0.16.4`; remove the temporary modularity exception by splitting Limine ABI structs/request statics from normalization flow. |
 | Early heap | Planned | `v0.17.0`; add the first bounded kernel heap and `alloc` smoke after the memory enforcement gates. |
 | Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |

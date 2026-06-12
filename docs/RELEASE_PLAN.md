@@ -942,6 +942,48 @@ Exit criteria:
   by hardware, and kernel stack overflow is intended to fault instead of
   silently corrupting adjacent memory.
 
+### v0.16.4 - Limine Handoff Module Split
+
+Goal:
+
+Remove the temporary modularity exception introduced during v0.16.3 pentest
+follow-up without changing boot behavior.
+
+Deliverables:
+
+- Split `crates/aesynx-kernel/src/limine.rs` into a focused normalization
+  module plus a private Limine ABI module.
+- Move Limine protocol structs, constants, request statics, link-section
+  markers, and ABI layout assertions into the private ABI module.
+- Keep the safe public handoff API and `EarlyBootScratch` flow unchanged.
+- Preserve all existing pointer validation, payload-address validation,
+  one-shot normalization, response revision policy, and high-half VMA checks.
+- Remove the `limine.rs` temporary exception from
+  `docs/modularity-policy.md` once the file-size gate passes without it.
+
+Expected serial:
+
+```text
+[TEST] bootinfo=ok
+[TEST] boot=ok
+```
+
+Verification:
+
+- `scripts/validate-modularity-policy.sh` passes without a `limine.rs`
+  exception.
+- Limine unit tests continue to cover response revisions, one-shot
+  normalization, and high-half payload address validation.
+- Normal QEMU boot, panic smoke, exception smoke, and timer smoke remain green.
+- Release notes explicitly state that this is a structure-preserving split, not
+  a boot protocol change.
+
+Exit criteria:
+
+- The bootloader handoff boundary remains auditable without a >500-line
+  exception, and v0.17 heap work can start without carrying known modularity
+  debt.
+
 ### v0.17.0 - Early Heap
 
 Goal:
