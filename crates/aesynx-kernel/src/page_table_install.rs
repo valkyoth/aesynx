@@ -152,8 +152,12 @@ extern "C" fn activate_on_kernel_stack(root_phys: u64) -> ! {
     // SAFETY: The caller switched to the private activation stack and passes
     // the physical root of the static activation arena populated from the
     // audited mapper immediately before this terminal handoff.
-    unsafe {
-        aesynx_arch_x86_64::registers::load_cr3(aesynx_abi::PhysAddr::new(root_phys));
+    if let Err(error) =
+        unsafe { aesynx_arch_x86_64::registers::load_cr3(aesynx_abi::PhysAddr::new(root_phys)) }
+    {
+        aesynx_arch_x86_64::serial_println!("kernel-cr3 load_error={:?}", error);
+        aesynx_arch_x86_64::serial::write_str("[TEST] kernel-cr3=fail\n");
+        aesynx_arch_x86_64::X86_64::halt_forever()
     }
     compiler_fence(Ordering::SeqCst);
     aesynx_arch_x86_64::serial::write_str("kernel-cr3 active=true stack=kernel\n");

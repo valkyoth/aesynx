@@ -86,6 +86,11 @@ impl EarlyRegisterSnapshot {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Cr3LoadError {
+    MisalignedRoot,
+}
+
 /// Load CR3 with a page-aligned x86_64 page-table root.
 ///
 /// # Safety
@@ -94,8 +99,10 @@ impl EarlyRegisterSnapshot {
 /// table that maps the currently executing instruction stream, the active
 /// stack, and every static/data object touched after the switch. The table must
 /// remain live for as long as CR3 references it.
-pub unsafe fn load_cr3(root: PhysAddr) {
-    debug_assert_eq!(root.get() & PAGE_OFFSET_MASK, 0);
+pub unsafe fn load_cr3(root: PhysAddr) -> Result<(), Cr3LoadError> {
+    if root.get() & PAGE_OFFSET_MASK != 0 {
+        return Err(Cr3LoadError::MisalignedRoot);
+    }
     // SAFETY: The caller upholds the architectural validity and lifetime of
     // the page-table root. This instruction changes address translation state
     // but does not dereference Rust pointers directly.
@@ -106,6 +113,7 @@ pub unsafe fn load_cr3(root: PhysAddr) {
             options(nostack, preserves_flags)
         );
     }
+    Ok(())
 }
 
 impl fmt::Debug for EarlyRegisterSnapshot {
@@ -234,7 +242,7 @@ mod tests {
 
     use aesynx_abi::PhysAddr;
 
-    use super::{EarlyRegisterSnapshot, FaultRegisterSnapshot};
+    use super::{Cr3LoadError, EarlyRegisterSnapshot, FaultRegisterSnapshot};
 
     #[test]
     fn register_snapshot_debug_redacts_address_values() {
@@ -272,6 +280,15 @@ mod tests {
         assert!(snapshot.cr3_page_matches(PhysAddr::new(0x1234_5000)));
         assert!(snapshot.cr3_page_matches(PhysAddr::new(0x1234_5fff)));
         assert!(!snapshot.cr3_page_matches(PhysAddr::new(0x1234_6000)));
+    }
+
+    #[test]
+    fn cr3_load_error_reports_misaligned_roots() {
+        // SAFETY: The misaligned input is rejected before the privileged CR3
+        // write instruction is reached, so this host test exercises only the
+        // release-mode validation branch.
+        let result = unsafe { super::load_cr3(PhysAddr::new(0x1234_5001)) };
+        assert_eq!(result, Err(Cr3LoadError::MisalignedRoot));
     }
 
     #[test]

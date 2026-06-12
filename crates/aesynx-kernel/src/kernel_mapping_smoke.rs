@@ -106,10 +106,16 @@ pub fn run(
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
     let arena = allocate_page_table_arena(info)?;
-    let _allocated_root_phys = frame_to_phys(arena.start())?;
+    let allocated_root_phys = frame_to_phys(arena.start())?;
     let root_phys = crate::page_table_install::activation_root_phys(info)
         .map_err(KernelMappingSmokeError::Install)?;
     if arena.count() != POLICY_TABLES as u64 {
+        return Err(KernelMappingSmokeError::UnexpectedPolicy);
+    }
+    // The bitmap allocation is v0.16.2 evidence that the allocator path can
+    // issue page-table-sized frame runs. The live CR3 root is still the static
+    // activation arena, so these must not alias.
+    if allocated_root_phys == root_phys {
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
     let install = crate::page_table_install::copy_mapper_to_activation_arena(root_phys, &mapper)
