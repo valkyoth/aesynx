@@ -52,6 +52,8 @@ impl MessageHeader {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MessageRequest {
+    /// Destination requested by the sender. Routers must validate this value
+    /// against the live core set before using it as an index or queue selector.
     pub dst: CoreId,
     pub kind: MessageKind,
     pub reply_to: Option<MessageId>,
@@ -106,11 +108,9 @@ impl InlineBytes {
 
         let mut bytes = [0u8; MAX_INLINE_PAYLOAD_LEN];
         bytes[..src.len()].copy_from_slice(src);
+        let len = u8::try_from(src.len()).map_err(|_| IpcError::PayloadTooLarge)?;
 
-        Ok(Self {
-            len: src.len() as u8,
-            bytes,
-        })
+        Ok(Self { len, bytes })
     }
 
     #[must_use]

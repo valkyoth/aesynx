@@ -98,6 +98,9 @@ const fn device_transition_allowed(current: DeviceState, next: DeviceState) -> b
             | (DeviceState::Running, DeviceState::Quiescing)
             | (DeviceState::Quiescing, DeviceState::Draining)
             | (DeviceState::Draining, DeviceState::Stopped)
+            // Stopped -> Running is an explicit resume path for a device that
+            // remains bound to the same driver and IOMMU/DMA authority. Future
+            // hotplug or rebind flows must use a separate re-probe transition.
             | (DeviceState::Stopped, DeviceState::Running)
             | (_, DeviceState::Revoked)
             | (_, DeviceState::Crashed)

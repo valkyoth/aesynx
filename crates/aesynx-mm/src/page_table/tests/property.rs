@@ -7,6 +7,7 @@ use crate::{FRAME_SIZE, GenericPageFlags, PageAccess};
 use super::{KERNEL_PHYS, KERNEL_VIRT};
 
 const PROPERTY_PAGES: u64 = 24;
+const PROPERTY_BOUNDARY_PAGES: u64 = 32;
 
 #[test]
 fn mapper_property_map_unmap_round_trip_restores_empty_state() -> Result<(), PageTableError> {
@@ -131,9 +132,30 @@ fn mapper_property_contiguous_range_round_trips_and_walk_bounds() -> Result<(), 
         pages += 1;
     }
 
+    Ok(())
+}
+
+#[test]
+fn mapper_property_contiguous_range_boundary_is_explicit() -> Result<(), PageTableError> {
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    let mut mapper = PageTableMapper::<8, 32>::new()?;
+    let before = mapper;
+
+    let mapped = mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, PROPERTY_BOUNDARY_PAGES, flags)?;
+    assert_eq!(mapped.pages(), PROPERTY_BOUNDARY_PAGES);
+    assert_eq!(mapper.audit()?.mapped_pages(), PROPERTY_BOUNDARY_PAGES);
+    let unmapped = mapper.unmap_contiguous(KERNEL_VIRT, PROPERTY_BOUNDARY_PAGES)?;
+    assert_eq!(unmapped.pages(), PROPERTY_BOUNDARY_PAGES);
+    assert_eq!(mapper, before);
+
+    Ok(())
+}
+
+#[test]
+fn mapper_property_contiguous_range_rejects_over_capacity() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<8, 32>::new()?;
     assert_eq!(
-        mapper.ensure_unmapped_contiguous(KERNEL_VIRT, 33),
+        mapper.ensure_unmapped_contiguous(KERNEL_VIRT, PROPERTY_BOUNDARY_PAGES + 1),
         Err(PageTableError::RangeTooLarge)
     );
 

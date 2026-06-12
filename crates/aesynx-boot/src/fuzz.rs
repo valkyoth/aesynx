@@ -192,6 +192,12 @@ fn push_u64(output: &mut [u8], len: &mut usize, value: u64) {
     }
 }
 
+fn push_u32(output: &mut [u8], len: &mut usize, value: u32) {
+    for byte in value.to_le_bytes() {
+        push_u8(output, len, byte);
+    }
+}
+
 fn encoded_region_case(
     regions: &[(u64, u64, MemoryRegionKind)],
     arch: ArchKind,
@@ -214,6 +220,21 @@ fn encoded_region_case(
     push_u64(&mut output, &mut len, kernel_virt);
     push_u64(&mut output, &mut len, kernel_len);
     push_u64(&mut output, &mut len, kernel_phys);
+    if metadata_flags & 0b0000_0001 != 0 {
+        push_u64(&mut output, &mut len, DEFAULT_HIGH_VIRT + 0xb800);
+        push_u32(&mut output, &mut len, 1024);
+        push_u32(&mut output, &mut len, 768);
+        push_u32(&mut output, &mut len, 4096);
+    }
+    if metadata_flags & 0b0000_0010 != 0 {
+        push_u64(&mut output, &mut len, DEFAULT_HIGH_VIRT + 0x7000);
+    }
+    if metadata_flags & 0b0000_0100 != 0 {
+        push_u64(&mut output, &mut len, DEFAULT_HIGH_VIRT + 0x8000);
+    }
+    if metadata_flags & 0b0000_1000 != 0 {
+        push_u64(&mut output, &mut len, DEFAULT_HIGH_VIRT);
+    }
     (output, len)
 }
 
@@ -252,7 +273,7 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 DEFAULT_KERNEL_PHYS,
                 0b0000_1011,
             ),
-            true,
+            None,
         ),
         (
             encoded_region_case(
@@ -263,7 +284,18 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 DEFAULT_KERNEL_PHYS,
                 0,
             ),
-            false,
+            Some(BootInfoError::EmptyMemoryMap),
+        ),
+        (
+            encoded_region_case(
+                &[(0x1000, 0, MemoryRegionKind::Usable)],
+                ArchKind::X86_64,
+                DEFAULT_X86_KERNEL_VIRT,
+                DEFAULT_KERNEL_LEN,
+                DEFAULT_KERNEL_PHYS,
+                0,
+            ),
+            Some(BootInfoError::InvalidMemoryRegion),
         ),
         (
             encoded_region_case(
@@ -277,7 +309,7 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 DEFAULT_KERNEL_PHYS,
                 0,
             ),
-            false,
+            Some(BootInfoError::OverlappingMemoryRegion),
         ),
         (
             encoded_region_case(
@@ -291,18 +323,23 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 DEFAULT_KERNEL_PHYS,
                 0,
             ),
-            true,
+            None,
         ),
         (
             encoded_region_case(
-                &[(u64::MAX - 1, 2, MemoryRegionKind::Usable)],
+                &[
+                    (0, u64::MAX - 1, MemoryRegionKind::Usable),
+                    (u64::MAX - 1, 1, MemoryRegionKind::Usable),
+                ],
                 ArchKind::X86_64,
                 DEFAULT_X86_KERNEL_VIRT,
                 DEFAULT_KERNEL_LEN,
                 DEFAULT_KERNEL_PHYS,
                 0,
             ),
-            false,
+            Some(BootInfoError::MemoryAccounting(
+                crate::MemoryAccountingError::Overflow,
+            )),
         ),
         (
             encoded_region_case(
@@ -313,7 +350,7 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 DEFAULT_KERNEL_PHYS,
                 0,
             ),
-            false,
+            Some(BootInfoError::KernelImageEmpty),
         ),
         (
             encoded_region_case(
@@ -324,7 +361,18 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 DEFAULT_KERNEL_PHYS,
                 0b0000_1000,
             ),
-            true,
+            None,
+        ),
+        (
+            encoded_region_case(
+                &[(0x1000, 0x9000, MemoryRegionKind::Usable)],
+                ArchKind::X86_64,
+                DEFAULT_X86_KERNEL_VIRT,
+                DEFAULT_KERNEL_LEN,
+                DEFAULT_KERNEL_PHYS,
+                0b0000_0100,
+            ),
+            None,
         ),
         (
             encoded_region_case(
@@ -335,15 +383,16 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 DEFAULT_KERNEL_PHYS,
                 0,
             ),
-            false,
+            Some(BootInfoError::KernelImageEmpty),
         ),
     ];
 
     let mut accepted = 0usize;
     let mut rejected = 0usize;
-    for ((bytes, len), expected_accepted) in seeds {
+    for ((bytes, len), expected_error) in seeds {
         let outcome = run_bootinfo_normalize_fuzz_target(&bytes[..len]);
-        assert_eq!(outcome.accepted, expected_accepted);
+        assert_eq!(outcome.error, expected_error);
+        assert_eq!(outcome.accepted, expected_error.is_none());
         if outcome.accepted {
             accepted += 1;
         } else {
@@ -371,7 +420,15 @@ fn bootinfo_fuzz_target_runs_deterministic_mutation_sweep() {
             index += 1;
         }
         let outcome = run_bootinfo_normalize_fuzz_target(&bytes);
-        assert!(outcome.accepted || outcome.error.is_some());
+        let outcome_again = run_bootinfo_normalize_fuzz_target(&bytes);
+        assert_eq!(
+            outcome.accepted, outcome_again.accepted,
+            "normalize fuzz target must be deterministic"
+        );
+        assert_eq!(
+            outcome.error, outcome_again.error,
+            "normalize fuzz target error variant must be deterministic"
+        );
         if outcome.accepted {
             accepted += 1;
         } else {
