@@ -38,11 +38,13 @@ fn mapper_no_user_space_check_rejects_low_half_mappings() -> Result<(), PageTabl
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
+    let before = mapper;
 
     assert_eq!(
         mapper.ensure_no_user_space_mappings(),
         Err(PageTableError::UnexpectedVirtualAddressSpace)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -52,11 +54,13 @@ fn mapper_no_user_space_check_rejects_corrupt_tables() -> Result<(), PageTableEr
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
     mapper.mapped_pages = 1;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_no_user_space_mappings(),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -89,11 +93,13 @@ fn mapper_kernel_only_check_rejects_user_mappings() -> Result<(), PageTableError
         KERNEL_PHYS,
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
+    let before = mapper;
 
     assert_eq!(
         mapper.ensure_no_user_mappings(),
         Err(PageTableError::UnexpectedMappingFlags)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -103,6 +109,7 @@ fn mapper_kernel_only_check_rejects_corrupt_tables() -> Result<(), PageTableErro
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
     mapper.mapped_pages = 1;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_no_user_mappings(),
@@ -112,6 +119,7 @@ fn mapper_kernel_only_check_rejects_corrupt_tables() -> Result<(), PageTableErro
         mapper.mapping_for_page(VirtAddr::new(0)),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -165,11 +173,13 @@ fn mapper_kernel_user_guard_rejects_high_half_user_mappings() -> Result<(), Page
         KERNEL_PHYS,
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
+    let before = mapper;
 
     assert_eq!(
         mapper.ensure_no_kernel_space_user_mappings(),
         Err(PageTableError::UnexpectedMappingFlags)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -179,11 +189,13 @@ fn mapper_kernel_user_guard_rejects_corrupt_tables() -> Result<(), PageTableErro
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
     mapper.mapped_pages = 1;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_no_kernel_space_user_mappings(),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
 
@@ -237,11 +249,13 @@ fn mapper_user_kernel_guard_rejects_low_half_kernel_mappings() -> Result<(), Pag
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
+    let before = mapper;
 
     assert_eq!(
         mapper.ensure_no_user_space_kernel_mappings(),
         Err(PageTableError::UnexpectedMappingFlags)
     );
+    assert_eq!(mapper, before);
     Ok(())
 }
 
@@ -251,10 +265,12 @@ fn mapper_user_kernel_guard_rejects_corrupt_tables() -> Result<(), PageTableErro
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
     mapper.mapped_pages = 1;
+    let corrupt = mapper;
 
     assert_eq!(
         mapper.ensure_no_user_space_kernel_mappings(),
         Err(PageTableError::CorruptTable)
     );
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
