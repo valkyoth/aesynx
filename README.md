@@ -80,9 +80,9 @@ redacted page-table debug output, fail-closed leaf decoding for
 lookup/protect/unmap, consistency audit, empty-table reclamation, and explicit
 TLB flush targets before `[TEST] page-table=ok`. Single-address translation
 returns typed errors for unmapped, invalid, or corrupt mapper state. Normal boot
-then validates the intended kernel mapping policy for text RX, rodata R/NX,
-data RW/NX, a reserved high-half heap window, an unmapped guard page, and an
-unmapped null page before `[TEST] paging-policy=ok`. The opt-in timer smoke
+then validates the linker-derived kernel mapping policy for text RX, rodata
+R/NX, data RW/NX, a reserved high-half heap window, an unmapped guard page, and
+an unmapped null page before `[TEST] paging-policy=ok`. The opt-in timer smoke
 path installs a checked IRQ0 handler, programs the legacy PIT for QEMU, observes
 three controlled timer ticks, converts ticks into monotonic nanosecond values,
 wakes a bounded sleep request for a delayed log event, acknowledges each
@@ -112,7 +112,7 @@ interrupt, and then disables the smoke IRQ.
 | Physical memory map | Tagged | `v0.13.0`; rejects invalid/overlapping regions and reports checked total/usable/reserved bytes, frame counts, and kernel/bootloader reserved accounting with `[TEST] memory-map=ok`. |
 | Bitmap frame allocator | Tagged | `v0.14.0`; safe `aesynx-mm` bitmap allocator model plus QEMU smoke for bounded early alloc/free, contiguous allocation, debug states, double-free detection, and atomic failure behavior with `[TEST] frame-allocator=ok`. |
 | Page table mapper | Tagged | `v0.15.0`; safe bounded `aesynx-mm` page-table mapper model with x86_64-shaped tables, mapper-issued typed root-table identity, checked root-table identity, checked status accounting, non-empty kernel and user address-space candidate preflights, audit-backed map/unmap/protect, fail-closed translation, checked contiguous byte-range translation, audit-backed permission lookup, contiguous range map/protect/unmap plus lookup, upfront range validation, bounded range walks, audit-backed unmapped range checks, audit-backed mapped-range checks, page-presence checks, kernel-only policy checks, kernel high-half user-access guard checks, user low-half kernel-privilege guard checks, no-user-space policy checks, no-executable policy checks, no-writable policy checks, no-device policy checks, no-global policy checks, map-time no-physical-alias policy checks with const-capacity bounded side-index audit, audit-backed kernel-range policy checks, audit-backed user-range policy checks, write-protected range checks, non-executable range checks, executable range checks, normal-memory range checks, local range checks, high-half kernel-space checks, low-half user-space checks, read-only mapping visit, redacted mapping summaries, redacted page-table debug output, virtual range permission verification, fail-closed leaf decoding including hardware Accessed/Dirty bits, permission lookup/change, consistency audit, empty-table reclamation, explicit TLB flush targets, conservative TLB flush merging, and QEMU smoke with `[TEST] page-table=ok`. |
-| Kernel mapping policy | Active candidate | `v0.16.0`; safe `aesynx-mm` policy descriptor verifies text RX, rodata read-only/NX, data RW/NX, reserved heap, guard page, and null-page invariants before `[TEST] paging-policy=ok`. |
+| Kernel mapping policy | Active candidate | `v0.16.0`; linker-exported section boundaries feed a safe `aesynx-mm` policy descriptor that verifies text RX, rodata read-only/NX, data RW/NX, reserved heap, guard page, and null-page invariants before `[TEST] paging-policy=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |

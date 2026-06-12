@@ -788,12 +788,14 @@ Deliverables:
   unmapped.
 - Null page must be exactly page zero and remain unmapped.
 - Policy ranges must be non-empty, checked for overflow, and non-overlapping.
+- The normal-boot smoke must derive text, rodata, and data/BSS ranges from
+  linker-exported section boundary symbols rather than hardcoded section sizes.
 - Normal QEMU boot must validate the policy after the page-table mapper smoke.
 
 Expected serial:
 
 ```text
-paging-policy mapped_pages=<n> reserved_pages=<n> text_rx_ok=true rodata_read_only_ok=true data_rw_nx_ok=true heap_reserved_ok=true guard_page_ok=true null_page_ok=true
+paging-policy mapped_pages=<n> reserved_pages=<n> text_pages=<n> rodata_pages=<n> data_pages=<n> section_layout_ok=true text_rx_ok=true rodata_read_only_ok=true data_rw_nx_ok=true heap_reserved_ok=true guard_page_ok=true null_page_ok=true
 [TEST] paging-policy=ok
 ```
 
@@ -801,6 +803,8 @@ Verification:
 
 - Unit tests reject writable text, executable data, mapped guard pages, mapped
   null pages, and overlapping policy ranges.
+- Linker script exports page-granular text, rodata, and data/BSS boundaries
+  consumed by the policy smoke.
 - QEMU boot requires both the policy status line and `[TEST] paging-policy=ok`.
 - Release notes must state that this is a policy model and smoke gate, not live
   replacement of Limine's active CR3.

@@ -159,6 +159,17 @@ Limitations: no AArch64 QEMU boot target exists yet; host builds use spin_loop a
 ```
 
 ```text
+Location: crates/aesynx-kernel/src/kernel_sections.rs
+Status: active candidate in v0.16
+Purpose: expose linker-provided page-granular kernel text, rodata, and data/BSS section boundaries for the kernel mapping policy smoke
+Preconditions: the kernel is linked with linker/kernel-x86_64.ld, which defines the section boundary symbols consumed by this module
+Unsafe operation: unsafe extern "C" declarations for linker-defined section boundary symbols
+Safety argument: the module only takes symbol addresses with core::ptr::addr_of!, which does not read memory, construct references, or create mutable aliases; the resulting values are wrapped as raw virtual-address values and later validated for ordering, page alignment, and non-overlap before the policy smoke accepts them
+Tests/evidence: cargo xtask qemu observes the paging-policy status line with text_pages, rodata_pages, data_pages, section_layout_ok=true, and [TEST] paging-policy=ok
+Limitations: linker-symbol model only; it does not replace Limine's active CR3, does not prove hardware faults on live text/rodata/data pages, and is x86_64 linker-script specific
+```
+
+```text
 Location: crates/aesynx-kernel/src/main.rs
 Status: active in v0.5
 Purpose: export the architecture entry symbol consumed by the bootloader

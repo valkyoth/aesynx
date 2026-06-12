@@ -132,9 +132,9 @@ kernel user-access guard policy, low-half user kernel-privilege guard policy,
 non-empty kernel/user address-space candidate preflights, no-alias policy,
 fail-closed malformed leaf decoding, unmap, consistency audit,
 empty-table reclamation, and explicit TLB flush targets. Normal boot then
-validates the intended kernel mapping policy for text RX, rodata read-only/NX,
-data RW/NX, a reserved high-half heap window, an unmapped guard page, and an
-unmapped null page. It does not claim active CR3 replacement, production
+validates the linker-derived kernel mapping policy for text RX, rodata
+read-only/NX, data RW/NX, a reserved high-half heap window, an unmapped guard
+page, and an unmapped null page. It does not claim active CR3 replacement, production
 page-table ownership, live hardware fault enforcement for text/rodata/data
 segments, APIC MMIO activation, global physical-memory ownership, heap
 allocation, page-fault recovery, a calibrated production clock service,

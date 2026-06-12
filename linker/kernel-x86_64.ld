@@ -16,17 +16,24 @@ SECTIONS
     . = ALIGN(4K);
     .text : ALIGN(4K)
     {
+        __kernel_text_start = .;
         *(.text .text.*)
+        . = ALIGN(4K);
+        __kernel_text_end = .;
     } :text
 
     . = ALIGN(4K);
     .rodata : ALIGN(4K)
     {
+        __kernel_rodata_start = .;
         *(.rodata .rodata.*)
         *(.got .got.*)
+        . = ALIGN(4K);
+        __kernel_rodata_end = .;
     } :rodata
 
     . = ALIGN(4K);
+    __kernel_data_start = .;
     .data : ALIGN(4K)
     {
         . = ALIGN(8);
@@ -44,6 +51,8 @@ SECTIONS
         *(.bss .bss.*)
     } :data
 
+    . = ALIGN(4K);
+    __kernel_data_end = .;
     __kernel_end = .;
 
     /DISCARD/ :
