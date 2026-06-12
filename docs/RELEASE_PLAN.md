@@ -827,6 +827,117 @@ Exit criteria:
 - Kernel mapping policy invariants are represented in safe `no_std` code and
   release-gated by host tests plus QEMU smoke.
 
+### v0.16.1 - BootInfo Fuzzing And Mapper Properties
+
+Goal:
+
+Close the first parser and mapper proof gaps before model state starts driving
+hardware state.
+
+Deliverables:
+
+- Host fuzz target for `aesynx-boot` normalization with synthetic Limine-shaped
+  memory maps, kernel image metadata, HHDM metadata, RSDP metadata, and
+  framebuffer metadata.
+- Seed corpus for valid maps, empty maps, overlapping maps, adjacent maps,
+  overflowing ranges, malformed kernel image windows, bad HHDM values, and
+  redaction-sensitive metadata.
+- Property tests for mapper map/unmap round trips, failed-operation atomicity,
+  duplicate physical-frame exclusion, range-walk bounds, table/index agreement,
+  and audit detection of raw table corruption.
+- Document which properties remain host-only and which are expected to become
+  Kani/CBMC proof targets later.
+
+Verification:
+
+- Fuzz target builds and runs for a bounded CI-safe smoke duration.
+- Host property tests pass under `cargo test`.
+- Existing QEMU suite remains green.
+
+Exit criteria:
+
+- Bootloader-shaped input has fuzz coverage, and mapper invariants have
+  repeatable host property evidence before live CR3 activation.
+
+### v0.16.2 - Kernel-Owned Address Space Activation
+
+Goal:
+
+Turn the v0.16 kernel mapping policy from a verified model into the active
+kernel address space.
+
+Deliverables:
+
+- Construct real x86_64 page tables from the verified kernel mapping policy.
+- Allocate and zero page-table frames through the checked frame allocator path.
+- Map kernel text as RX/write-protected, rodata as read-only/NX, data/BSS as
+  RW/NX, and required boot/diagnostic mappings with explicit flags.
+- Keep null page, guard page, and reserved heap windows unmapped.
+- Re-run the kernel mapping policy verifier against the hardware-shaped table
+  image before loading CR3.
+- Switch CR3 to the Aesynx-owned root table.
+- Read back CR3 in redacted form and verify that execution continues under the
+  Aesynx-owned address space.
+- Keep Limine's active mappings as an input to the transition, not as the final
+  security claim.
+
+Expected serial:
+
+```text
+[TEST] kernel-cr3=ok
+```
+
+Verification:
+
+- QEMU normal boot survives the CR3 switch and still emits all prior boot
+  markers.
+- Fault smoke proves that the page-fault path still works after the switch.
+- Release notes clearly distinguish "Aesynx-owned CR3 active" from full
+  process isolation or userspace enforcement.
+
+Exit criteria:
+
+- Normal boot runs on kernel-owned page tables, and v0.16 mapping policy checks
+  describe live kernel page-table state rather than only a synthetic mapper
+  model.
+
+### v0.16.3 - CPU Hardening And Kernel Stack Guards
+
+Goal:
+
+Enable cheap hardware hardening once Aesynx owns the active page tables.
+
+Deliverables:
+
+- CPUID-gated EFER.NXE enablement with a fail-closed path if NX is unavailable
+  for a release that requires it.
+- CR0.WP enablement so supervisor writes respect read-only page permissions.
+- CPUID-gated SMEP, SMAP, and UMIP detection and enablement when supported.
+- Explicit SMAP access-window policy placeholder; no direct user-memory access
+  is allowed outside audited helpers once userspace exists.
+- Guard-page-backed boot stack and kernel stack layout for the active core.
+- Redacted status reporting for enabled hardening bits without dumping full
+  control-register state.
+
+Expected serial:
+
+```text
+[TEST] cpu-hardening=ok
+[TEST] kernel-stack-guard=ok
+```
+
+Verification:
+
+- QEMU smoke reports the expected hardening-bit status.
+- Host tests cover the CPUID policy matrix and fail-closed unsupported cases.
+- Exception smoke remains operational after stack guards are present.
+
+Exit criteria:
+
+- NX/write-protect and available supervisor/user separation bits are enforced
+  by hardware, and kernel stack overflow is intended to fault instead of
+  silently corrupting adjacent memory.
+
 ### v0.17.0 - Early Heap
 
 Goal:
@@ -874,6 +985,42 @@ Verification:
 Exit criteria:
 
 - Heap is suitable for capability/object structures.
+
+### v0.18.1 - Early Entropy And Generation Semantics
+
+Goal:
+
+Make early identity-generation assumptions explicit before capability and
+object identifiers become security-relevant.
+
+Deliverables:
+
+- Early entropy service interface with explicit sources and quality labels.
+- x86_64 RDRAND/RDSEED probing behind CPUID checks, treated as one input and
+  not as a sole trust anchor.
+- Deterministic boot-local monotonic fallback for identifiers that are
+  anti-confusion only.
+- Clear distinction between generation counters used to reject stale authority
+  and random tokens used to resist guessing.
+- Redacted entropy status telemetry that never logs raw random material.
+
+Expected serial:
+
+```text
+[TEST] entropy-policy=ok
+```
+
+Verification:
+
+- Host tests cover source classification, fallback behavior, counter overflow,
+  and non-claims.
+- QEMU smoke reports whether hardware entropy was present and whether fallback
+  mode was used.
+
+Exit criteria:
+
+- Later capability and object milestones can state whether an identifier is
+  anti-confusion, anti-replay, or attacker-unpredictable.
 
 ## Phase 5: Capabilities
 
@@ -1249,6 +1396,36 @@ Exit criteria:
 
 - AI pathway is structurally present but safe.
 
+### v0.33.1 - Concurrency Discipline
+
+Goal:
+
+Define synchronization rules before SMP makes global single-core assumptions
+dangerous.
+
+Deliverables:
+
+- IRQ-safe spinlock primitive or deliberately narrower early-lock primitive.
+- Interrupt-disable guard with non-forgeable lifetime semantics.
+- Lock-ordering policy for core kernel subsystems.
+- Documented rule for which code may block, allocate, or log while holding a
+  lock.
+- Per-core versus shared-state ownership checklist.
+- Tests for double-unlock prevention, nested interrupt guard behavior, and
+  lock-order validation where feasible.
+
+Verification:
+
+- Host tests cover lock/guard state transitions.
+- QEMU single-core boot remains green with the new primitives compiled in.
+- SMP milestones cannot graduate until the concurrency policy is referenced by
+  their release notes.
+
+Exit criteria:
+
+- SMP work has an explicit synchronization contract instead of inheriting
+  accidental single-core behavior.
+
 ## Phase 9: SMP And Aesynx Fabric
 
 ### v0.34.0 - SMP Data Structures
@@ -1522,6 +1699,43 @@ Verification:
 Exit criteria:
 
 - Network device path exists.
+
+### v0.44.1 - Usercopy And User Memory Access Discipline
+
+Goal:
+
+Define how the kernel may touch user memory before ring 3 and the native ABI
+make user pointers real inputs.
+
+Deliverables:
+
+- Checked user-memory accessor API for copy-in, copy-out, and bounded string or
+  byte-slice reads.
+- Copy-then-validate rule for syscall arguments that must not be re-read from
+  user memory after validation.
+- Page-table permission checks before every user-memory access.
+- SMAP `stac`/`clac` access-window design for x86_64 when SMAP is enabled.
+- TOCTOU guidance for shared service queues and memory objects.
+- Fault containment path for failed user copies.
+- Redacted audit events for rejected user memory access.
+
+Expected serial:
+
+```text
+[TEST] usercopy=ok
+```
+
+Verification:
+
+- Host tests cover valid copy, invalid pointer, cross-page copy, noncanonical
+  pointer, overflow, unmapped page, and permission mismatch cases.
+- QEMU smoke exercises at least one rejected user-memory access without
+  corrupting kernel state.
+
+Exit criteria:
+
+- The kernel has one reviewed path for user memory access before userspace can
+  pass pointers into kernel services.
 
 ## Phase 11: Native Userspace
 

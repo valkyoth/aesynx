@@ -215,17 +215,21 @@ The memory roadmap should advance in narrow, testable layers:
 2. Bitmap frame allocator.
 3. Page-table mapper.
 4. Kernel mapping policy.
-5. Kernel memory-object type.
-6. Address-space type.
-7. Capability-controlled map/unmap.
-8. Purpose-tagged allocation classes.
-9. Revocable mappings with epoch validation.
-10. Secret memory class.
-11. IOMMU-backed DMA memory class.
-12. Shared-memory IPC transfer.
-13. Snapshot-aware memory classification.
-14. WASM linear-memory object integration.
-15. Memory pressure and self-healing policy.
+5. BootInfo fuzzing and mapper property tests.
+6. Kernel-owned page-table activation and CR3 switch.
+7. CPU hardening bits and kernel stack guards.
+8. Kernel memory-object type.
+9. Address-space type.
+10. Capability-controlled map/unmap.
+11. Purpose-tagged allocation classes.
+12. Revocable mappings with epoch validation.
+13. Secret memory class.
+14. Usercopy discipline before ring-3 syscall pointers.
+15. IOMMU-backed DMA memory class.
+16. Shared-memory IPC transfer.
+17. Snapshot-aware memory classification.
+18. WASM linear-memory object integration.
+19. Memory pressure and self-healing policy.
 
 Each step should add tests or QEMU smoke evidence before becoming a release
 claim.
@@ -239,6 +243,9 @@ accounting, a bounded bitmap frame allocator model, and a bounded page-table
 mapper model by adding linker-exported kernel section boundaries, a safe kernel
 mapping policy descriptor, and QEMU smoke. It still does not replace Limine's
 active CR3 or claim live hardware fault enforcement for final kernel segments.
-The roadmap exists so the next allocator and mapper decisions move toward the
-clean-slate Aesynx model instead of copying old process/file assumptions by
-default.
+The required next step is explicit: fuzz the BootInfo normalizer, add mapper
+property evidence, build and verify Aesynx-owned page tables, switch CR3, and
+then enable CPU hardening and stack guards before treating heap and later
+address-space work as live hardware-enforced memory isolation. The roadmap
+exists so the next allocator and mapper decisions move toward the clean-slate
+Aesynx model instead of copying old process/file assumptions by default.
