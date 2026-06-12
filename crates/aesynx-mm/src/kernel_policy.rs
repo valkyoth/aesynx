@@ -102,6 +102,11 @@ impl KernelMappingPolicy {
 pub struct KernelMappingPolicyReport {
     mapped_pages: u64,
     reserved_pages: u64,
+    status: KernelMappingPolicyStatus,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+struct KernelMappingPolicyStatus {
     text_rx: bool,
     rodata_read_only: bool,
     data_rw_nx: bool,
@@ -110,34 +115,56 @@ pub struct KernelMappingPolicyReport {
     null_page_unmapped: bool,
 }
 
+impl KernelMappingPolicyStatus {
+    const fn new(
+        text_rx: bool,
+        rodata_read_only: bool,
+        data_rw_nx: bool,
+        reserved_heap_unmapped: bool,
+        guard_page_unmapped: bool,
+        null_page_unmapped: bool,
+    ) -> Self {
+        Self {
+            text_rx,
+            rodata_read_only,
+            data_rw_nx,
+            reserved_heap_unmapped,
+            guard_page_unmapped,
+            null_page_unmapped,
+        }
+    }
+}
+
 impl fmt::Debug for KernelMappingPolicyReport {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("KernelMappingPolicyReport")
             .field("mapped_pages", &self.mapped_pages)
             .field("reserved_pages", &self.reserved_pages)
-            .field("text_rx", &self.text_rx)
-            .field("rodata_read_only", &self.rodata_read_only)
-            .field("data_rw_nx", &self.data_rw_nx)
-            .field("reserved_heap_unmapped", &self.reserved_heap_unmapped)
-            .field("guard_page_unmapped", &self.guard_page_unmapped)
-            .field("null_page_unmapped", &self.null_page_unmapped)
+            .field("text_rx", &self.status.text_rx)
+            .field("rodata_read_only", &self.status.rodata_read_only)
+            .field("data_rw_nx", &self.status.data_rw_nx)
+            .field(
+                "reserved_heap_unmapped",
+                &self.status.reserved_heap_unmapped,
+            )
+            .field("guard_page_unmapped", &self.status.guard_page_unmapped)
+            .field("null_page_unmapped", &self.status.null_page_unmapped)
             .finish()
     }
 }
 
 impl KernelMappingPolicyReport {
     #[must_use]
-    pub(crate) const fn new(mapped_pages: u64, reserved_pages: u64) -> Self {
+    const fn new(
+        mapped_pages: u64,
+        reserved_pages: u64,
+        status: KernelMappingPolicyStatus,
+    ) -> Self {
         Self {
             mapped_pages,
             reserved_pages,
-            text_rx: true,
-            rodata_read_only: true,
-            data_rw_nx: true,
-            reserved_heap_unmapped: true,
-            guard_page_unmapped: true,
-            null_page_unmapped: true,
+            status,
         }
     }
 
@@ -153,32 +180,32 @@ impl KernelMappingPolicyReport {
 
     #[must_use]
     pub const fn text_rx(self) -> bool {
-        self.text_rx
+        self.status.text_rx
     }
 
     #[must_use]
     pub const fn rodata_read_only(self) -> bool {
-        self.rodata_read_only
+        self.status.rodata_read_only
     }
 
     #[must_use]
     pub const fn data_rw_nx(self) -> bool {
-        self.data_rw_nx
+        self.status.data_rw_nx
     }
 
     #[must_use]
     pub const fn reserved_heap_unmapped(self) -> bool {
-        self.reserved_heap_unmapped
+        self.status.reserved_heap_unmapped
     }
 
     #[must_use]
     pub const fn guard_page_unmapped(self) -> bool {
-        self.guard_page_unmapped
+        self.status.guard_page_unmapped
     }
 
     #[must_use]
     pub const fn null_page_unmapped(self) -> bool {
-        self.null_page_unmapped
+        self.status.null_page_unmapped
     }
 }
 
@@ -190,44 +217,83 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
         self.audit()?;
         validate_policy_ranges(policy)?;
 
-        let text_flags = GenericPageFlags::kernel(PageAccess::ReadExecute);
-        self.ensure_contiguous_flags(policy.text.start(), policy.text.pages(), text_flags)?;
-        self.ensure_kernel_space_contiguous(policy.text.start(), policy.text.pages())?;
-        self.ensure_write_protected_contiguous(policy.text.start(), policy.text.pages())?;
-        self.ensure_executable_contiguous(policy.text.start(), policy.text.pages())?;
-        self.ensure_normal_memory_contiguous(policy.text.start(), policy.text.pages())?;
-        self.ensure_local_contiguous(policy.text.start(), policy.text.pages())?;
-
-        let rodata_flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
-        self.ensure_contiguous_flags(policy.rodata.start(), policy.rodata.pages(), rodata_flags)?;
-        self.ensure_kernel_space_contiguous(policy.rodata.start(), policy.rodata.pages())?;
-        self.ensure_write_protected_contiguous(policy.rodata.start(), policy.rodata.pages())?;
-        self.ensure_non_executable_contiguous(policy.rodata.start(), policy.rodata.pages())?;
-        self.ensure_normal_memory_contiguous(policy.rodata.start(), policy.rodata.pages())?;
-        self.ensure_local_contiguous(policy.rodata.start(), policy.rodata.pages())?;
-
-        let data_flags = GenericPageFlags::kernel(PageAccess::ReadWrite);
-        self.ensure_contiguous_flags(policy.data.start(), policy.data.pages(), data_flags)?;
-        self.ensure_kernel_space_contiguous(policy.data.start(), policy.data.pages())?;
-        self.ensure_non_executable_contiguous(policy.data.start(), policy.data.pages())?;
-        self.ensure_normal_memory_contiguous(policy.data.start(), policy.data.pages())?;
-        self.ensure_local_contiguous(policy.data.start(), policy.data.pages())?;
-
-        ensure_high_half_range(policy.reserved_heap)?;
-        self.ensure_unmapped_contiguous(
-            policy.reserved_heap.start(),
-            policy.reserved_heap.pages(),
-        )?;
-        ensure_high_half_range(policy.guard_page)?;
-        self.ensure_unmapped_contiguous(policy.guard_page.start(), policy.guard_page.pages())?;
-        ensure_null_page(policy.null_page)?;
-        self.ensure_unmapped_contiguous(policy.null_page.start(), policy.null_page.pages())?;
+        let text_rx = self.verify_text_range(policy.text)?;
+        let rodata_read_only = self.verify_rodata_range(policy.rodata)?;
+        let data_rw_nx = self.verify_data_range(policy.data)?;
+        let reserved_heap_unmapped = self.verify_reserved_heap_range(policy.reserved_heap)?;
+        let guard_page_unmapped = self.verify_guard_page_range(policy.guard_page)?;
+        let null_page_unmapped = self.verify_null_page_range(policy.null_page)?;
 
         let mapped_pages = checked_add(policy.text.pages(), policy.rodata.pages())?;
         let mapped_pages = checked_add(mapped_pages, policy.data.pages())?;
         let reserved_pages = checked_add(policy.reserved_heap.pages(), policy.guard_page.pages())?;
+        let status = KernelMappingPolicyStatus::new(
+            text_rx,
+            rodata_read_only,
+            data_rw_nx,
+            reserved_heap_unmapped,
+            guard_page_unmapped,
+            null_page_unmapped,
+        );
 
-        Ok(KernelMappingPolicyReport::new(mapped_pages, reserved_pages))
+        Ok(KernelMappingPolicyReport::new(
+            mapped_pages,
+            reserved_pages,
+            status,
+        ))
+    }
+
+    fn verify_text_range(&self, range: KernelVirtualRange) -> Result<bool, PageTableError> {
+        let flags = GenericPageFlags::kernel(PageAccess::ReadExecute);
+        self.ensure_contiguous_flags(range.start(), range.pages(), flags)?;
+        self.ensure_kernel_space_contiguous(range.start(), range.pages())?;
+        self.ensure_write_protected_contiguous(range.start(), range.pages())?;
+        self.ensure_executable_contiguous(range.start(), range.pages())?;
+        self.ensure_normal_memory_contiguous(range.start(), range.pages())?;
+        self.ensure_local_contiguous(range.start(), range.pages())?;
+        Ok(true)
+    }
+
+    fn verify_rodata_range(&self, range: KernelVirtualRange) -> Result<bool, PageTableError> {
+        let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+        self.ensure_contiguous_flags(range.start(), range.pages(), flags)?;
+        self.ensure_kernel_space_contiguous(range.start(), range.pages())?;
+        self.ensure_write_protected_contiguous(range.start(), range.pages())?;
+        self.ensure_non_executable_contiguous(range.start(), range.pages())?;
+        self.ensure_normal_memory_contiguous(range.start(), range.pages())?;
+        self.ensure_local_contiguous(range.start(), range.pages())?;
+        Ok(true)
+    }
+
+    fn verify_data_range(&self, range: KernelVirtualRange) -> Result<bool, PageTableError> {
+        let flags = GenericPageFlags::kernel(PageAccess::ReadWrite);
+        self.ensure_contiguous_flags(range.start(), range.pages(), flags)?;
+        self.ensure_kernel_space_contiguous(range.start(), range.pages())?;
+        self.ensure_non_executable_contiguous(range.start(), range.pages())?;
+        self.ensure_normal_memory_contiguous(range.start(), range.pages())?;
+        self.ensure_local_contiguous(range.start(), range.pages())?;
+        Ok(true)
+    }
+
+    fn verify_reserved_heap_range(
+        &self,
+        range: KernelVirtualRange,
+    ) -> Result<bool, PageTableError> {
+        ensure_high_half_range(range)?;
+        self.ensure_unmapped_contiguous(range.start(), range.pages())?;
+        Ok(true)
+    }
+
+    fn verify_guard_page_range(&self, range: KernelVirtualRange) -> Result<bool, PageTableError> {
+        ensure_high_half_range(range)?;
+        self.ensure_unmapped_contiguous(range.start(), range.pages())?;
+        Ok(true)
+    }
+
+    fn verify_null_page_range(&self, range: KernelVirtualRange) -> Result<bool, PageTableError> {
+        ensure_null_page(range)?;
+        self.ensure_unmapped_contiguous(range.start(), range.pages())?;
+        Ok(true)
     }
 }
 
