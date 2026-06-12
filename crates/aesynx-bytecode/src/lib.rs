@@ -90,8 +90,30 @@ impl VerifiedOffset {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VerifiedRegister(u8);
+
+impl VerifiedRegister {
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VerifiedEndpoint(u8);
+
+impl VerifiedEndpoint {
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VerifyError {
+    EndpointOutOfRange,
     OffsetOutOfRange,
+    RegisterOutOfRange,
     TargetOutOfRange,
 }
 
@@ -121,6 +143,28 @@ impl Verifier {
         }
 
         Ok(VerifiedOffset(offset.get()))
+    }
+
+    pub const fn verify_register(
+        register: u8,
+        register_count: u8,
+    ) -> Result<VerifiedRegister, VerifyError> {
+        if register >= register_count {
+            return Err(VerifyError::RegisterOutOfRange);
+        }
+
+        Ok(VerifiedRegister(register))
+    }
+
+    pub const fn verify_endpoint(
+        endpoint: u8,
+        endpoint_count: u8,
+    ) -> Result<VerifiedEndpoint, VerifyError> {
+        if endpoint >= endpoint_count {
+            return Err(VerifyError::EndpointOutOfRange);
+        }
+
+        Ok(VerifiedEndpoint(endpoint))
     }
 }
 
@@ -210,6 +254,30 @@ mod tests {
         assert_eq!(
             Verifier::verify_offset(UncheckedOffset::new(u16::MAX), u16::MAX as u64),
             Err(VerifyError::OffsetOutOfRange)
+        );
+    }
+
+    #[test]
+    fn verifier_bounds_registers_before_execution() {
+        assert_eq!(
+            Verifier::verify_register(3, 4).map(|register| register.get()),
+            Ok(3)
+        );
+        assert_eq!(
+            Verifier::verify_register(4, 4),
+            Err(VerifyError::RegisterOutOfRange)
+        );
+    }
+
+    #[test]
+    fn verifier_bounds_endpoints_before_execution() {
+        assert_eq!(
+            Verifier::verify_endpoint(1, 2).map(|endpoint| endpoint.get()),
+            Ok(1)
+        );
+        assert_eq!(
+            Verifier::verify_endpoint(2, 2),
+            Err(VerifyError::EndpointOutOfRange)
         );
     }
 }

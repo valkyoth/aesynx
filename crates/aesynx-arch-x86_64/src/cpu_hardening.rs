@@ -41,6 +41,7 @@ pub struct CpuHardeningStatus {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CpuHardeningError {
+    HardeningWriteDidNotStick,
     NxUnavailable,
 }
 
@@ -51,7 +52,9 @@ pub fn init() -> Result<CpuHardeningStatus, CpuHardeningError> {
     // only when CPUID reports support. This function is called during the
     // terminal single-core boot smoke after Aesynx owns CR3.
     unsafe { apply_plan(plan) };
-    Ok(CpuHardeningStatus::from_plan(plan))
+    let status = read_status();
+    verify_applied(plan, status)?;
+    Ok(status)
 }
 
 pub fn detect_capabilities() -> CpuHardeningCapabilities {
@@ -90,15 +93,35 @@ impl CpuHardeningPlan {
 }
 
 impl CpuHardeningStatus {
-    const fn from_plan(plan: CpuHardeningPlan) -> Self {
+    const fn from_registers(efer: u64, cr0: u64, cr4: u64) -> Self {
         Self {
-            nx_enabled: plan.enable_nx,
-            wp_enabled: plan.enable_wp,
-            smep_enabled: plan.enable_smep,
-            smap_enabled: plan.enable_smap,
-            umip_enabled: plan.enable_umip,
+            nx_enabled: efer & EFER_NXE != 0,
+            wp_enabled: cr0 & CR0_WP != 0,
+            smep_enabled: cr4 & CR4_SMEP != 0,
+            smap_enabled: cr4 & CR4_SMAP != 0,
+            umip_enabled: cr4 & CR4_UMIP != 0,
         }
     }
+}
+
+fn read_status() -> CpuHardeningStatus {
+    CpuHardeningStatus::from_registers(read_msr(MSR_EFER), read_cr0(), read_cr4())
+}
+
+const fn verify_applied(
+    plan: CpuHardeningPlan,
+    status: CpuHardeningStatus,
+) -> Result<(), CpuHardeningError> {
+    if (plan.enable_nx && !status.nx_enabled)
+        || (plan.enable_wp && !status.wp_enabled)
+        || (plan.enable_smep && !status.smep_enabled)
+        || (plan.enable_smap && !status.smap_enabled)
+        || (plan.enable_umip && !status.umip_enabled)
+    {
+        return Err(CpuHardeningError::HardeningWriteDidNotStick);
+    }
+
+    Ok(())
 }
 
 unsafe fn apply_plan(plan: CpuHardeningPlan) {
@@ -250,7 +273,8 @@ const fn cpuid_edx(_leaf: u32, _subleaf: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        CpuHardeningCapabilities, CpuHardeningError, CpuHardeningPlan, CpuHardeningStatus,
+        CR0_WP, CR4_SMAP, CR4_SMEP, CR4_UMIP, CpuHardeningCapabilities, CpuHardeningError,
+        CpuHardeningPlan, CpuHardeningStatus, EFER_NXE, verify_applied,
     };
 
     #[test]
@@ -291,17 +315,9 @@ mod tests {
     }
 
     #[test]
-    fn hardening_status_matches_plan_without_register_values() {
-        let plan = CpuHardeningPlan {
-            enable_nx: true,
-            enable_wp: true,
-            enable_smep: false,
-            enable_smap: true,
-            enable_umip: false,
-        };
-
+    fn hardening_status_reports_read_back_register_bits() {
         assert_eq!(
-            CpuHardeningStatus::from_plan(plan),
+            CpuHardeningStatus::from_registers(EFER_NXE, CR0_WP, CR4_SMAP),
             CpuHardeningStatus {
                 nx_enabled: true,
                 wp_enabled: true,
@@ -310,5 +326,39 @@ mod tests {
                 umip_enabled: false,
             }
         );
+    }
+
+    #[test]
+    fn hardening_readback_verification_requires_requested_bits() {
+        let plan = CpuHardeningPlan {
+            enable_nx: true,
+            enable_wp: true,
+            enable_smep: true,
+            enable_smap: false,
+            enable_umip: true,
+        };
+        let missing_smep = CpuHardeningStatus::from_registers(EFER_NXE, CR0_WP, CR4_UMIP);
+        let applied = CpuHardeningStatus::from_registers(EFER_NXE, CR0_WP, CR4_SMEP | CR4_UMIP);
+
+        assert_eq!(
+            verify_applied(plan, missing_smep),
+            Err(CpuHardeningError::HardeningWriteDidNotStick)
+        );
+        assert_eq!(verify_applied(plan, applied), Ok(()));
+    }
+
+    #[test]
+    fn hardening_readback_allows_unrequested_extra_bits() {
+        let plan = CpuHardeningPlan {
+            enable_nx: true,
+            enable_wp: true,
+            enable_smep: false,
+            enable_smap: false,
+            enable_umip: false,
+        };
+        let status =
+            CpuHardeningStatus::from_registers(EFER_NXE, CR0_WP, CR4_SMEP | CR4_SMAP | CR4_UMIP);
+
+        assert_eq!(verify_applied(plan, status), Ok(()));
     }
 }

@@ -233,7 +233,8 @@ impl Capability {
             return Err(DeriveError::MissingDerivePermission);
         }
 
-        if request.owner != self.owner && !self.perms.contains(CapPerms::GRANT) {
+        let cross_owner = request.owner != self.owner;
+        if cross_owner && !self.perms.contains(CapPerms::GRANT) {
             return Err(DeriveError::MissingGrantPermission);
         }
 
@@ -249,11 +250,17 @@ impl Capability {
             return Err(DeriveError::RangeEscalates);
         }
 
+        let child_perms = if cross_owner {
+            request.perms.without(CapPerms::GRANT)
+        } else {
+            request.perms
+        };
+
         Ok(Self {
             object_id: self.object_id,
             base: request.base,
             len: request.len,
-            perms: request.perms,
+            perms: child_perms,
             owner: request.owner,
             generation: self.generation,
             revocation_epoch: self.revocation_epoch,

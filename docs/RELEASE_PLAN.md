@@ -1415,6 +1415,9 @@ Deliverables:
 - Explicit migration plan for current single-core `static mut` GDT/TSS/IDT
   storage, including non-atomic IDT gate writes, before any secondary core can
   observe or mutate descriptor state.
+- Static activation arenas/stacks must move to explicit interior mutability
+  such as `SyncUnsafeCell`, or to per-core owned storage, before multi-core
+  activation paths can use them.
 - Tests for double-unlock prevention, nested interrupt guard behavior, and
   lock-order validation where feasible.
 

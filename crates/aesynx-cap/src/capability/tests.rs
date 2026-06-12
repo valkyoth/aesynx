@@ -122,6 +122,46 @@ fn derive_cross_owner_succeeds_with_grant_permission() {
 }
 
 #[test]
+fn derive_cross_owner_strips_grant_permission_from_child() {
+    let parent = parent_cap(
+        CapPerms::READ
+            .union(CapPerms::DERIVE)
+            .union(CapPerms::GRANT),
+    );
+    let request = DeriveRequest {
+        perms: CapPerms::READ.union(CapPerms::GRANT),
+        owner: PrincipalId::new(2),
+        base: Some(VirtAddr::new(120)),
+        len: Some(10),
+    };
+
+    assert_eq!(
+        audited_derive(parent, request).map(|cap| cap.perms()),
+        Ok(CapPerms::READ)
+    );
+}
+
+#[test]
+fn derive_same_owner_may_retain_grant_permission() {
+    let parent = parent_cap(
+        CapPerms::READ
+            .union(CapPerms::DERIVE)
+            .union(CapPerms::GRANT),
+    );
+    let request = DeriveRequest {
+        perms: CapPerms::READ.union(CapPerms::GRANT),
+        owner: parent.owner(),
+        base: Some(VirtAddr::new(120)),
+        len: Some(10),
+    };
+
+    assert_eq!(
+        audited_derive(parent, request).map(|cap| cap.perms()),
+        Ok(CapPerms::READ.union(CapPerms::GRANT))
+    );
+}
+
+#[test]
 fn derive_with_audit_records_chain_of_custody() {
     let parent = parent_cap(
         CapPerms::READ
