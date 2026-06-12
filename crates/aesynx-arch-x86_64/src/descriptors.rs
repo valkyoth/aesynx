@@ -26,6 +26,7 @@ pub struct DescriptorTableStatus {
     pub tss_selector: SegmentSelector,
     pub double_fault_ist: InterruptStackTableIndex,
     pub double_fault_stack_bytes: usize,
+    pub initialized_this_call: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -59,7 +60,8 @@ impl InterruptStackTableIndex {
 
 #[must_use]
 pub fn init() -> DescriptorTableStatus {
-    if !INITIALIZED.swap(true, Ordering::AcqRel) {
+    let initialized_this_call = !INITIALIZED.swap(true, Ordering::AcqRel);
+    if initialized_this_call {
         // SAFETY: Descriptor-table initialization runs during early single-core
         // boot before interrupts are enabled by Aesynx. The statics are private
         // to this module, initialized once, and then treated as read-only CPU
@@ -77,6 +79,7 @@ pub fn init() -> DescriptorTableStatus {
         tss_selector: SegmentSelector::TSS,
         double_fault_ist: InterruptStackTableIndex::DOUBLE_FAULT,
         double_fault_stack_bytes: DOUBLE_FAULT_STACK_BYTES,
+        initialized_this_call,
     }
 }
 

@@ -3,12 +3,14 @@ use aesynx_boot::{
     ArchKind, BootInfo, BootMetadata, FramebufferInfo, HhdmInfo, KernelImageInfo,
     MAX_EARLY_MEMORY_REGIONS, MemoryRegion, MemoryRegionKind, PlatformKind,
 };
+use core::sync::atomic::{AtomicBool, Ordering};
 
 pub struct EarlyBootScratch {
     memory_regions: [MemoryRegion; MAX_EARLY_MEMORY_REGIONS],
 }
 
 const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
+static BOOTINFO_NORMALIZED: AtomicBool = AtomicBool::new(false);
 
 impl EarlyBootScratch {
     pub const fn new() -> Self {
@@ -31,10 +33,13 @@ pub enum LimineError {
     TooManyMemoryRegions,
     NullMemoryRegion,
     InvalidFramebuffer,
+    AlreadyNormalized,
     BootInfoInvalid,
 }
 
 pub fn normalize<'a>(scratch: &'a mut EarlyBootScratch) -> Result<BootInfo<'a>, LimineError> {
+    claim_bootinfo_normalization_once()?;
+
     if !base_revision_supported() {
         return Err(LimineError::UnsupportedBaseRevision);
     }
@@ -54,6 +59,18 @@ pub fn normalize<'a>(scratch: &'a mut EarlyBootScratch) -> Result<BootInfo<'a>, 
         hhdm: read_hhdm()?,
     })
     .map_err(|_error| LimineError::BootInfoInvalid)
+}
+
+fn claim_bootinfo_normalization_once() -> Result<(), LimineError> {
+    if BOOTINFO_NORMALIZED.swap(true, Ordering::AcqRel) {
+        return Err(LimineError::AlreadyNormalized);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn reset_bootinfo_normalization_for_test() {
+    BOOTINFO_NORMALIZED.store(false, Ordering::Release);
 }
 
 fn base_revision_supported() -> bool {
@@ -470,13 +487,4 @@ static mut RSDP_REQUEST: LimineRequest = LimineRequest {
 static REQUESTS_END: [u64; 2] = [0xadc0e0531bb10d03, 0x9572709f31764c62];
 
 #[cfg(test)]
-mod tests {
-    use super::limine_response_revision_compatible;
-
-    #[test]
-    fn limine_response_revision_policy_accepts_forward_compatible_revisions() {
-        assert!(limine_response_revision_compatible(0, 0));
-        assert!(limine_response_revision_compatible(1, 0));
-        assert!(!limine_response_revision_compatible(0, 1));
-    }
-}
+mod tests;

@@ -57,7 +57,7 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
             free_frames,
             used_frames,
             reserved_frames,
-            unknown_frames: self.total_frames - known_frames,
+            unknown_frames: self.total_frames.saturating_sub(known_frames),
         }
     }
 

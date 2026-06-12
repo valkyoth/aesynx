@@ -255,10 +255,12 @@ impl<const WORDS: usize> BitmapFrameAllocator<WORDS> {
                 run_len += 1;
                 if run_len == count {
                     self.claim_run(run_start, count)?;
-                    return Ok(AllocatedFrames::new(
-                        PhysFrame::new(self.base_frame.get() + run_start),
-                        count,
-                    ));
+                    let start = self
+                        .base_frame
+                        .get()
+                        .checked_add(run_start)
+                        .ok_or(FrameAllocatorError::AddressOverflow)?;
+                    return Ok(AllocatedFrames::new(PhysFrame::new(start), count));
                 }
             } else {
                 run_len = 0;

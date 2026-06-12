@@ -79,23 +79,25 @@ pub extern "C" fn _start() -> ! {
     diagnostics::set_boot_phase(BootPhase::CpuSetup);
     write_diagnostic(LogLevel::Info, "gdt and tss initialized");
     aesynx_arch_x86_64::serial_println!(
-        "cpu setup=gdt_tss entries={} tss=0x{:x} df_ist={} df_stack_bytes={}",
+        "cpu setup=gdt_tss entries={} tss=0x{:x} df_ist={} df_stack_bytes={} initialized_this_call={}",
         descriptor_status.gdt_entries,
         descriptor_status.tss_selector.bits(),
         descriptor_status.double_fault_ist.get(),
-        descriptor_status.double_fault_stack_bytes
+        descriptor_status.double_fault_stack_bytes,
+        descriptor_status.initialized_this_call
     );
     aesynx_arch_x86_64::serial::write_str("[TEST] gdt=ok\n");
     let exception_status = aesynx_arch_x86_64::exceptions::init(descriptor_status.double_fault_ist);
     diagnostics::set_boot_phase(BootPhase::ExceptionSetup);
     write_diagnostic(LogLevel::Info, "idt initialized");
     aesynx_arch_x86_64::serial_println!(
-        "exception setup=idt entries={} breakpoint={} page_fault={} double_fault={} df_ist={}",
+        "exception setup=idt entries={} breakpoint={} page_fault={} double_fault={} df_ist={} initialized_this_call={}",
         exception_status.idt_entries,
         exception_status.breakpoint_vector,
         exception_status.page_fault_vector,
         exception_status.double_fault_vector,
-        exception_status.double_fault_ist.get()
+        exception_status.double_fault_ist.get(),
+        exception_status.initialized_this_call
     );
     aesynx_arch_x86_64::serial::write_str("[TEST] idt=ok\n");
     let interrupt_status = aesynx_arch_x86_64::interrupts::init();
@@ -210,7 +212,7 @@ fn timer_smoke_entry() -> ! {
             let _ = aesynx_arch_x86_64::X86_64::enable_interrupts();
             let mut spins = 0u64;
             while aesynx_arch_x86_64::timer::ticks() < aesynx_arch_x86_64::timer::target_ticks() {
-                core::hint::spin_loop();
+                aesynx_arch_x86_64::X86_64::wait_for_interrupt();
                 let ticks = aesynx_arch_x86_64::timer::ticks();
                 match rate.ticks_to_nanos(ticks) {
                     Ok(now) => {

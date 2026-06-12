@@ -1,5 +1,5 @@
 use core::arch::global_asm;
-use core::mem::size_of;
+use core::mem::{offset_of, size_of};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use aesynx_arch::ArchCpu;
@@ -105,11 +105,13 @@ pub struct ExceptionTableStatus {
     pub page_fault_vector: u8,
     pub double_fault_vector: u8,
     pub double_fault_ist: InterruptStackTableIndex,
+    pub initialized_this_call: bool,
 }
 
 #[must_use]
 pub fn init(double_fault_ist: InterruptStackTableIndex) -> ExceptionTableStatus {
-    if !INITIALIZED.swap(true, Ordering::AcqRel) {
+    let initialized_this_call = !INITIALIZED.swap(true, Ordering::AcqRel);
+    if initialized_this_call {
         // SAFETY: IDT setup runs during early single-core boot before Aesynx
         // enables external interrupts. The IDT static is private and remains
         // valid after `lidt`; handler symbols are fixed assembly stubs in this
@@ -126,6 +128,7 @@ pub fn init(double_fault_ist: InterruptStackTableIndex) -> ExceptionTableStatus 
         page_fault_vector: PAGE_FAULT_VECTOR as u8,
         double_fault_vector: DOUBLE_FAULT_VECTOR as u8,
         double_fault_ist,
+        initialized_this_call,
     }
 }
 
@@ -154,22 +157,17 @@ pub(crate) fn install_interrupt_gate(
         "install_interrupt_gate called with interrupts enabled"
     );
     if interrupts_were_enabled {
-        crate::X86_64::disable_interrupts().map_err(|_| IdtError::CpuStateUnavailable)?;
+        return Err(IdtError::CpuStateUnavailable);
     }
 
     // SAFETY: The IDT is private static storage initialized during early boot
     // and this installer is limited to non-exception interrupt vectors. The
-    // 16-byte descriptor write is not architecturally atomic, so maskable
-    // interrupts are disabled around the update. NMIs are not suppressed by
-    // `cli`; future live IDT mutation on real hardware must either prove no
-    // NMI source can observe the partial entry or use a platform-specific NMI
-    // exclusion strategy before calling this function.
+    // 16-byte descriptor write is not architecturally atomic. This function
+    // therefore refuses to run once maskable interrupts are enabled; NMIs are
+    // still a future live-IDT-mutation concern and require a separate
+    // platform-specific exclusion strategy before drivers can update gates.
     unsafe {
         IDT[index] = IdtEntry::interrupt_gate(handler, 0);
-    }
-
-    if interrupts_were_enabled {
-        crate::X86_64::enable_interrupts().map_err(|_| IdtError::CpuStateUnavailable)?;
     }
     Ok(())
 }
@@ -383,6 +381,31 @@ struct RawExceptionFrame {
     code_segment: u64,
     rflags: u64,
 }
+
+const _: () = assert!(
+    size_of::<RawExceptionFrame>() == 40,
+    "RawExceptionFrame size must match exception assembly stubs"
+);
+const _: () = assert!(
+    offset_of!(RawExceptionFrame, vector) == 0,
+    "RawExceptionFrame.vector offset must match exception assembly stubs"
+);
+const _: () = assert!(
+    offset_of!(RawExceptionFrame, error_code) == 8,
+    "RawExceptionFrame.error_code offset must match exception assembly stubs"
+);
+const _: () = assert!(
+    offset_of!(RawExceptionFrame, instruction_pointer) == 16,
+    "RawExceptionFrame.instruction_pointer offset must match exception assembly stubs"
+);
+const _: () = assert!(
+    offset_of!(RawExceptionFrame, code_segment) == 24,
+    "RawExceptionFrame.code_segment offset must match exception assembly stubs"
+);
+const _: () = assert!(
+    offset_of!(RawExceptionFrame, rflags) == 32,
+    "RawExceptionFrame.rflags offset must match exception assembly stubs"
+);
 
 #[repr(C, packed)]
 struct DescriptorTablePointer {

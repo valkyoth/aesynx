@@ -303,7 +303,7 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
     }
 
     fn free_tables(&self) -> u64 {
-        TABLES as u64 - self.used_tables()
+        (TABLES as u64).saturating_sub(self.used_tables())
     }
 
     fn mapping_for_address(&self, virt: VirtAddr) -> Result<PageMapping, PageTableError> {

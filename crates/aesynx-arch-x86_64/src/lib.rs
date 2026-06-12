@@ -28,8 +28,14 @@ impl ArchCpu for X86_64 {
         "x86_64"
     }
 
+    #[allow(unsafe_code)]
     fn wait_for_interrupt() {
-        core::hint::spin_loop();
+        // SAFETY: `hlt` idles the current CPU until the next external
+        // interrupt, NMI, SMI, or reset. Callers must only use this when an
+        // interrupt source is expected or the CPU is intentionally idle.
+        unsafe {
+            core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+        }
     }
 
     #[allow(unsafe_code)]
@@ -75,7 +81,7 @@ impl ArchCpu for X86_64 {
                 "pushfq",
                 "pop {rflags}",
                 rflags = lateout(reg) rflags,
-                options(nomem, preserves_flags)
+                options(preserves_flags)
             );
         }
         Ok(rflags & (1 << 9) != 0)
