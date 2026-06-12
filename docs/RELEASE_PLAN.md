@@ -529,10 +529,11 @@ Deliverables:
   activation work without exposing raw physical addresses, model table indices,
   or allowing external root handle construction.
 - Checked root-table identity that runs mapper audit before reporting the model
-  root.
+  root and does not mutate mapper state on success or failure.
 - Unchecked page-table root reporting is test-only; external callers must use
   the audit-backed checked root path.
-- Checked status path that reports mapper counters only after audit validation.
+- Checked status path that reports mapper counters only after audit validation
+  and does not mutate mapper state on success or failure.
 - Unchecked page-table status reporting is test-only; external callers must use
   the audit-backed checked status path.
 - Kernel address-space candidate preflight that combines audit, checked root,

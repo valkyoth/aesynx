@@ -7,19 +7,23 @@ use crate::page_table::{PAGE_TABLE_LEVELS, PageTableError, PageTableMapper};
 fn mapper_checked_status_matches_valid_mapper() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
 
+    let empty = mapper;
     assert_eq!(mapper.status_checked()?, mapper.status());
+    assert_eq!(mapper, empty);
 
     mapper.map_page(
         KERNEL_VIRT,
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
+    let mapped = mapper;
 
     let status = mapper.status_checked()?;
     assert_eq!(status.total_tables(), 4);
     assert_eq!(status.used_tables(), PAGE_TABLE_LEVELS as u64);
     assert_eq!(status.mapped_pages(), 1);
     assert_eq!(status, mapper.status());
+    assert_eq!(mapper, mapped);
     Ok(())
 }
 
@@ -33,8 +37,10 @@ fn mapper_checked_status_rejects_accounting_drift() -> Result<(), PageTableError
     )?;
 
     mapper.mapped_pages = 0;
+    let corrupt = mapper;
 
     assert_eq!(mapper.status().mapped_pages(), 0);
     assert_eq!(mapper.status_checked(), Err(PageTableError::CorruptTable));
+    assert_eq!(mapper, corrupt);
     Ok(())
 }
