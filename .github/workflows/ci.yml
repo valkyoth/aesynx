@@ -59,8 +59,5 @@ jobs:
       - name: Generate SBOM
         run: scripts/generate-sbom.sh
 
-      - name: Run QEMU boot smoke
-        run: cargo xtask qemu
-
-      - name: Run QEMU panic smoke
-        run: cargo xtask qemu --panic-smoke
+      - name: Run QEMU smoke suite
+        run: cargo xtask qemu-suite

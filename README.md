@@ -155,6 +155,12 @@ cargo xtask image
 cargo xtask qemu
 ```
 
+Run the full v0.15 QEMU smoke suite:
+
+```bash
+cargo xtask qemu-suite
+```
+
 Run the deliberate panic diagnostics smoke:
 
 ```bash

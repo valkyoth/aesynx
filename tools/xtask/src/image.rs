@@ -76,11 +76,50 @@ pub fn qemu(args: &[String]) -> ExitCode {
         }
     };
 
-    let paths = match build_image(&root, smoke) {
-        Ok(paths) => paths,
+    match run_smoke(&root, smoke) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("xtask: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+pub fn qemu_suite(args: &[String]) -> ExitCode {
+    if !args.is_empty() {
+        eprintln!("xtask: qemu-suite accepts no arguments");
+        return ExitCode::from(2);
+    }
+
+    let root = match workspace::root() {
+        Ok(root) => root,
         Err(error) => {
             eprintln!("xtask: {error}");
             return ExitCode::FAILURE;
+        }
+    };
+
+    for smoke in [
+        SmokeKind::Boot,
+        SmokeKind::Panic,
+        SmokeKind::Exception,
+        SmokeKind::Timer,
+    ] {
+        if let Err(error) = run_smoke(&root, smoke) {
+            eprintln!("xtask: {error}");
+            return ExitCode::FAILURE;
+        }
+    }
+
+    println!("xtask: QEMU smoke suite passed");
+    ExitCode::SUCCESS
+}
+
+fn run_smoke(root: &Path, smoke: SmokeKind) -> Result<(), String> {
+    let paths = match build_image(root, smoke) {
+        Ok(paths) => paths,
+        Err(error) => {
+            return Err(error);
         }
     };
 
@@ -92,12 +131,9 @@ pub fn qemu(args: &[String]) -> ExitCode {
                 smoke.markers()
             );
             println!("xtask: serial log: {}", paths.serial_log.display());
-            ExitCode::SUCCESS
+            Ok(())
         }
-        Err(error) => {
-            eprintln!("xtask: {error}");
-            ExitCode::FAILURE
-        }
+        Err(error) => Err(error),
     }
 }
 

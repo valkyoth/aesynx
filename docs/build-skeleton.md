@@ -50,6 +50,7 @@ explicit probe for the future kernel-object path, not a stable requirement.
 ```bash
 cargo xtask image
 cargo xtask qemu
+cargo xtask qemu-suite
 cargo xtask qemu --panic-smoke
 cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
@@ -98,6 +99,9 @@ programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
 `timer delayed-log`, `[TEST] sleep=ok`, `timer tick 3`, and `[TEST] timer=ok`.
+
+`cargo xtask qemu-suite` runs the boot, panic, exception, and timer smoke paths
+in sequence and is the GitHub CI QEMU gate for v0.15.
 
 The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that
 computes the workspace root dynamically and passes

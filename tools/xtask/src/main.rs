@@ -22,6 +22,7 @@ fn main() -> ExitCode {
         "check" => process::run_script("scripts/checks.sh"),
         "image" => image::build(&rest),
         "qemu" => image::qemu(&rest),
+        "qemu-suite" => image::qemu_suite(&rest),
         "release-ready" => release_ready(&rest),
         "status" => {
             print_status();
@@ -62,6 +63,7 @@ fn print_help() {
     println!("  qemu --panic-smoke                   run v0.15 QEMU panic diagnostics smoke");
     println!("  qemu --exception-smoke               run v0.15 QEMU exception smoke");
     println!("  qemu --timer-smoke                   run v0.15 QEMU timer/sleep smoke");
+    println!("  qemu-suite                           run all v0.15 QEMU smoke paths");
     println!("  release-ready TAG                    validate release pentest gate for TAG");
     println!("  status                               print workspace status");
     println!("  help                                 print this help");
