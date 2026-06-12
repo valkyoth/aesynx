@@ -1,6 +1,8 @@
 use aesynx_abi::VirtAddr;
 use aesynx_mm::{FRAME_SIZE, KernelMappingPolicy, KernelVirtualRange};
 
+const CANONICAL_HIGH_START: u64 = 0xffff_8000_0000_0000;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct KernelSectionLayout {
     pub text_start: VirtAddr,
@@ -31,10 +33,15 @@ impl KernelMappingPlan {
         let rodata_pages = section_pages(layout.rodata_start, layout.rodata_end)?;
         let data_pages = section_pages(layout.data_start, layout.data_end)?;
         ensure_ordered_layout(layout)?;
+        ensure_high_half_range(layout.text_start, text_pages)?;
+        ensure_high_half_range(layout.rodata_start, rodata_pages)?;
+        ensure_high_half_range(layout.data_start, data_pages)?;
         ensure_nonzero_reserved_pages(heap_reserved_pages, guard_pages)?;
 
         let heap_start = add_pages_to_virt(layout.data_start, data_pages)?;
         let guard_start = add_pages_to_virt(heap_start, heap_reserved_pages)?;
+        ensure_high_half_range(heap_start, heap_reserved_pages)?;
+        ensure_high_half_range(guard_start, guard_pages)?;
         let mapped_pages = checked_add(checked_add(text_pages, rodata_pages)?, data_pages)?;
         let reserved_pages = checked_add(heap_reserved_pages, guard_pages)?;
         let policy = KernelMappingPolicy::new(
@@ -91,6 +98,7 @@ impl KernelMappingPlan {
 pub enum KernelMappingPlanError {
     AddressOverflow,
     InvalidSectionLayout,
+    InvalidVirtualAddressSpace,
     InvalidReservedRange,
 }
 
@@ -122,6 +130,24 @@ fn section_pages(start: VirtAddr, end: VirtAddr) -> Result<u64, KernelMappingPla
     }
 
     Ok((end.get() - start.get()) / FRAME_SIZE)
+}
+
+fn ensure_high_half_range(start: VirtAddr, pages: u64) -> Result<(), KernelMappingPlanError> {
+    let end = add_pages_to_virt(start, pages)?;
+    let last_byte = end
+        .get()
+        .checked_sub(1)
+        .ok_or(KernelMappingPlanError::AddressOverflow)?;
+
+    if !is_high_half_kernel_address(start.get()) || !is_high_half_kernel_address(last_byte) {
+        return Err(KernelMappingPlanError::InvalidVirtualAddressSpace);
+    }
+
+    Ok(())
+}
+
+const fn is_high_half_kernel_address(value: u64) -> bool {
+    value >= CANONICAL_HIGH_START
 }
 
 const fn page_aligned(value: u64) -> bool {
@@ -214,6 +240,40 @@ mod tests {
     }
 
     #[test]
+    fn plan_rejects_low_half_sections() {
+        let invalid = KernelSectionLayout {
+            text_start: VirtAddr::new(0x1000),
+            text_end: VirtAddr::new(0x5000),
+            rodata_start: VirtAddr::new(0x5000),
+            rodata_end: VirtAddr::new(0x7000),
+            data_start: VirtAddr::new(0x7000),
+            data_end: VirtAddr::new(0xe000),
+        };
+
+        assert_eq!(
+            KernelMappingPlan::from_sections(invalid, 2, 1),
+            Err(KernelMappingPlanError::InvalidVirtualAddressSpace)
+        );
+    }
+
+    #[test]
+    fn plan_rejects_noncanonical_sections() {
+        let invalid = KernelSectionLayout {
+            text_start: VirtAddr::new(0x0000_8000_0000_0000),
+            text_end: VirtAddr::new(0x0000_8000_0000_4000),
+            rodata_start: VirtAddr::new(0x0000_8000_0000_4000),
+            rodata_end: VirtAddr::new(0x0000_8000_0000_6000),
+            data_start: VirtAddr::new(0x0000_8000_0000_6000),
+            data_end: VirtAddr::new(0x0000_8000_0000_d000),
+        };
+
+        assert_eq!(
+            KernelMappingPlan::from_sections(invalid, 2, 1),
+            Err(KernelMappingPlanError::InvalidVirtualAddressSpace)
+        );
+    }
+
+    #[test]
     fn plan_rejects_empty_reserved_ranges() {
         assert_eq!(
             KernelMappingPlan::from_sections(layout(), 0, 1),
@@ -229,6 +289,14 @@ mod tests {
     fn plan_rejects_address_overflow() {
         assert_eq!(
             KernelMappingPlan::from_sections(layout(), u64::MAX / aesynx_mm::FRAME_SIZE, 1),
+            Err(KernelMappingPlanError::AddressOverflow)
+        );
+    }
+
+    #[test]
+    fn plan_rejects_guard_range_overflow() {
+        assert_eq!(
+            KernelMappingPlan::from_sections(layout(), 1, u64::MAX / aesynx_mm::FRAME_SIZE),
             Err(KernelMappingPlanError::AddressOverflow)
         );
     }

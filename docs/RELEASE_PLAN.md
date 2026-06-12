@@ -790,6 +790,9 @@ Deliverables:
 - Policy ranges must be non-empty, checked for overflow, and non-overlapping.
 - The normal-boot smoke must derive text, rodata, and data/BSS ranges from
   linker-exported section boundary symbols rather than hardcoded section sizes.
+- Safe planning must reject linker-derived section and reserved heap/guard
+  windows outside canonical high-half kernel virtual space before building a
+  policy descriptor.
 - Normal QEMU boot must validate the policy after the page-table mapper smoke.
 
 Expected serial:
@@ -808,7 +811,8 @@ Verification:
 - Linker script exports page-granular text, rodata, and data/BSS boundaries
   consumed by the policy smoke.
 - Host unit tests cover section-plan derivation, malformed ordering, unaligned
-  boundaries, empty reserved heap/guard ranges, and arithmetic overflow.
+  boundaries, low-half and noncanonical section ranges, empty reserved
+  heap/guard ranges, and arithmetic overflow.
 - QEMU boot requires both the policy status line and `[TEST] paging-policy=ok`.
 - QEMU status booleans must come from `KernelMappingPolicyReport` accessors,
   not from freestanding smoke-local constants.
