@@ -2,6 +2,7 @@
 set -eu
 
 required_files='
+.gitignore
 README.md
 SECURITY.md
 LICENSE
@@ -56,6 +57,11 @@ fi
 
 if ! grep -q 'unsafe' docs/unsafe-policy.md; then
     echo "security policy: unsafe policy must document unsafe-code handling" >&2
+    exit 1
+fi
+
+if ! grep -Fxq '/PENTEST.md' .gitignore; then
+    echo "security policy: root PENTEST.md must stay ignored" >&2
     exit 1
 fi
 
