@@ -94,4 +94,30 @@ for file in $allowed_unsafe_files; do
     fi
 done
 
+unsafe_block_failures="$(
+    find crates -type f -name '*.rs' -exec awk '
+        /unsafe[[:space:]]*\{/ {
+            if (previous_1 !~ /SAFETY:/ && previous_2 !~ /SAFETY:/ && previous_3 !~ /SAFETY:/ && previous_4 !~ /SAFETY:/ && previous_5 !~ /SAFETY:/ && previous_6 !~ /SAFETY:/ && previous_7 !~ /SAFETY:/ && previous_8 !~ /SAFETY:/) {
+                printf "%s:%d\n", FILENAME, FNR
+            }
+        }
+        {
+            previous_8 = previous_7
+            previous_7 = previous_6
+            previous_6 = previous_5
+            previous_5 = previous_4
+            previous_4 = previous_3
+            previous_3 = previous_2
+            previous_2 = previous_1
+            previous_1 = $0
+        }
+    ' {} +
+)"
+
+if [ -n "$unsafe_block_failures" ]; then
+    echo "security policy: unsafe block missing nearby SAFETY comment" >&2
+    printf '%s\n' "$unsafe_block_failures" >&2
+    exit 1
+fi
+
 echo "security policy: ok"

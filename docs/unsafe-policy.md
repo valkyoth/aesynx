@@ -197,9 +197,9 @@ Limitations:
 
 The security policy gate now fails when the unsafe file inventory changes
 without updating this document and `scripts/validate-security-policy.sh`
-together. Before 1.0, extend that gate so it also fails when:
+together. It also fails when an unsafe block is missing a local `SAFETY:`
+comment. Before 1.0, extend that gate so it also fails when:
 
-- An unsafe block lacks a nearby `SAFETY:` comment.
 - Architecture-specific intrinsics appear outside architecture crates.
 - MMIO volatile access appears outside driver/arch MMIO wrappers.
 - Panic-like macros appear in security-critical runtime paths without a
