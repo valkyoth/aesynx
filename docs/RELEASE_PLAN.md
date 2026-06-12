@@ -801,8 +801,10 @@ paging-policy mapped_pages=<n> reserved_pages=<n> text_pages=<n> rodata_pages=<n
 
 Verification:
 
-- Unit tests reject writable text, executable data, mapped guard pages, mapped
-  null pages, and overlapping policy ranges.
+- Unit tests reject writable text, writable/executable rodata, executable data,
+  user-accessible text, device/global data, mapped reserved heap, mapped guard
+  pages, mapped null pages, bad null-page descriptors, low-half reserved
+  ranges, zero-page ranges, overflowing ranges, and overlapping policy ranges.
 - Linker script exports page-granular text, rodata, and data/BSS boundaries
   consumed by the policy smoke.
 - Host unit tests cover section-plan derivation, malformed ordering, unaligned
