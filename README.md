@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.16.1` is the current BootInfo fuzzing and mapper-property implementation
+`v0.16.3` is the current CPU hardening and kernel stack guard release
 candidate.
 
 Current boot path:
@@ -95,6 +95,18 @@ Kernel mapping policy:
 - Every v0.16 paging-policy-model `*_ok=true` marker plus
   `[TEST] paging-policy-model=ok` is required before normal boot success.
 
+Address-space activation and CPU hardening:
+
+- Audited mapper state streams into x86_64 hardware-shaped page tables in a
+  static activation arena.
+- The kernel switches to a private activation stack and loads an Aesynx-owned
+  CR3 root before terminal boot success.
+- The activation stack is mapped RW/NX with an unmapped guard page and QEMU
+  requires `[TEST] kernel-stack-guard=ok`.
+- Post-CR3 CPU hardening enables NX, write-protect, and CPUID-gated
+  SMEP/SMAP/UMIP where supported, then reports read-back redacted booleans
+  before `[TEST] cpu-hardening=ok`.
+
 Fuzz and property gates:
 
 - `cargo xtask fuzz-smoke` runs bounded BootInfo normalization fuzz seeds and
@@ -115,7 +127,7 @@ Fuzz and property gates:
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, and `[TEST] cpu-hardening=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, and `[TEST] cpu-hardening=ok` from Rust `_start`. |
 | Fuzz/property smoke | Active candidate | `v0.16.1`; `cargo xtask fuzz-smoke` runs BootInfo fuzz seeds, deterministic BootInfo byte mutations, and mapper property sweeps before live CR3 activation. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
@@ -130,7 +142,7 @@ Fuzz and property gates:
 | Page table mapper | Tagged | `v0.15.0`; safe bounded `aesynx-mm` page-table mapper model with x86_64-shaped tables, mapper-issued typed root-table identity, checked root-table identity, checked status accounting, non-empty kernel and user address-space candidate preflights, audit-backed map/unmap/protect, fail-closed translation, checked contiguous byte-range translation, audit-backed permission lookup, contiguous range map/protect/unmap plus lookup, upfront range validation, bounded range walks, audit-backed unmapped range checks, audit-backed mapped-range checks, page-presence checks, kernel-only policy checks, kernel high-half user-access guard checks, user low-half kernel-privilege guard checks, no-user-space policy checks, no-executable policy checks, no-writable policy checks, no-device policy checks, no-global policy checks, map-time no-physical-alias policy checks with const-capacity bounded side-index audit, audit-backed kernel-range policy checks, audit-backed user-range policy checks, write-protected range checks, non-executable range checks, executable range checks, normal-memory range checks, local range checks, high-half kernel-space checks, low-half user-space checks, read-only mapping visit, redacted mapping summaries, redacted page-table debug output, virtual range permission verification, fail-closed leaf decoding including hardware Accessed/Dirty bits, permission lookup/change, consistency audit, empty-table reclamation, explicit TLB flush targets, conservative TLB flush merging, and QEMU smoke with `[TEST] page-table=ok`. |
 | Kernel mapping policy | Tagged | `v0.16.0`; linker-exported section boundaries feed a safe `aesynx-mm` policy descriptor that verifies section layout, text RX, rodata read-only/NX, data RW/NX, reserved heap, guard page, and null-page invariants before `[TEST] paging-policy-model=ok`. |
 | Kernel-owned address space | Tagged | `v0.16.2`; audited mapper state now streams redacted x86_64 hardware-shaped page-table entries using Limine's normalized kernel physical placement, copies used tables into a static activation arena, switches to a private kernel activation stack, loads an Aesynx-owned CR3 root, and QEMU requires `hardware_copied=true` plus `[TEST] kernel-cr3=ok`. |
-| CPU hardening and stack guards | In progress | `v0.16.3`; CPUID-gated EFER.NXE, CR0.WP, SMEP, SMAP, and UMIP policy is host-tested and QEMU-smoked with redacted `cpu-hardening` booleans; the terminal activation stack is mapped separately with an unmapped guard page and `[TEST] kernel-stack-guard=ok`. |
+| CPU hardening and stack guards | Release-ready candidate | `v0.16.3`; CPUID-gated EFER.NXE, CR0.WP, SMEP, SMAP, and UMIP policy is host-tested and QEMU-smoked with redacted read-back `cpu-hardening` booleans; the terminal activation stack is mapped separately with an unmapped guard page and `[TEST] kernel-stack-guard=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -142,7 +154,6 @@ Fuzz and property gates:
 
 | Area | Status | Target |
 | --- | --- | --- |
-| CPU hardening and stack guards | In progress | `v0.16.3`; complete final local gates, pentest review, GitHub checks, and release tag. |
 | Early heap | Planned | `v0.17.0`; add the first bounded kernel heap and `alloc` smoke after the memory enforcement gates. |
 | Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
@@ -216,7 +227,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.16.1
+cargo xtask release-ready v0.16.3
 ```
 
 ## Security Posture
@@ -246,7 +257,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.16.1 Release Candidate Notes](docs/releases/v0.16.1-rc.md)
+- [v0.16.3 Release Candidate Notes](docs/releases/v0.16.3-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

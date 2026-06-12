@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.16 kernel-mapping-policy implementation candidate
+Status: v0.16.3 CPU hardening and kernel-stack-guard release candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -145,11 +145,14 @@ fail-closed malformed leaf decoding, unmap, consistency audit,
 empty-table reclamation, and explicit TLB flush targets. Normal boot then
 validates the linker-derived kernel mapping policy for text RX, rodata
 read-only/NX, data RW/NX, a reserved high-half heap window, an unmapped guard
-page, and an unmapped null page. It does not claim active CR3 replacement, production
-page-table ownership, live hardware fault enforcement for text/rodata/data
-segments, APIC MMIO activation, global physical-memory ownership, heap
-allocation, page-fault recovery, a calibrated production clock service,
-scheduler preemption, or bootloader memory reclamation.
+page, and an unmapped null page. It then copies audited hardware-shaped tables
+into the activation arena, switches to the private activation stack, loads the
+Aesynx-owned CR3 root, verifies kernel-stack guard evidence, and reports
+read-back CPU hardening booleans. It does not claim process isolation, production
+page-table ownership for dynamic workloads, live recovery from hardware faults,
+APIC MMIO activation, global physical-memory ownership, heap allocation,
+page-fault recovery, a calibrated production clock service, scheduler
+preemption, or bootloader memory reclamation.
 
 ## Target Shape
 

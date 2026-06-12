@@ -914,6 +914,8 @@ Deliverables:
   for a release that requires it.
 - CR0.WP enablement so supervisor writes respect read-only page permissions.
 - CPUID-gated SMEP, SMAP, and UMIP detection and enablement when supported.
+- Read-back verification that requested EFER/CR0/CR4 hardening bits actually
+  stuck, while serial output remains boolean-only and redacted.
 - Explicit SMAP access-window policy placeholder; no direct user-memory access
   is allowed outside audited helpers once userspace exists.
 - Guard-page-backed boot stack and kernel stack layout for the active core.
@@ -930,7 +932,8 @@ Expected serial:
 Verification:
 
 - QEMU smoke reports the expected hardening-bit status.
-- Host tests cover the CPUID policy matrix and fail-closed unsupported cases.
+- Host tests cover the CPUID policy matrix, read-back status derivation, and
+  fail-closed unsupported or not-stuck cases.
 - Exception smoke remains operational after stack guards are present.
 
 Exit criteria:
