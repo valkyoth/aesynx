@@ -21,10 +21,11 @@ use super::smoke::{
     PAGE_TABLE_TRANSLATE_OFFSET_MARKER, PAGE_TABLE_UNMAPPED_RANGE_MARKER,
     PAGE_TABLE_USER_CANDIDATE_MARKER, PAGE_TABLE_USER_RANGE_MARKER,
     PAGE_TABLE_USER_SPACE_RANGE_MARKER, PAGE_TABLE_VISIT_MARKER,
-    PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER,
-    PANIC_REGISTERS_MARKER, SERIAL_MARKER, SLEEP_MARKER, SmokeKind, TIMER_DELAYED_LOG_MARKER,
-    TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER,
-    TIMER_TICK_3_MARKER, parse_qemu_args, serial_log_contents_match,
+    PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER, PAGING_POLICY_FAIL_MARKER, PAGING_POLICY_MARKER,
+    PAGING_POLICY_STATUS_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER, PANIC_REGISTERS_MARKER,
+    SERIAL_MARKER, SLEEP_MARKER, SmokeKind, TIMER_DELAYED_LOG_MARKER, TIMER_MARKER,
+    TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER,
+    parse_qemu_args, serial_log_contents_match,
 };
 use super::{BOOT_CONFIG_MARKERS, KERNEL_PROFILE, KERNEL_TARGET};
 use crate::image::host_tools::HostToolVersions;
@@ -33,7 +34,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn qemu_markers_track_v0_15_contracts() {
+fn qemu_markers_track_v0_16_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
@@ -130,6 +131,9 @@ fn qemu_markers_track_v0_15_contracts() {
     assert_eq!(PAGE_TABLE_FLUSH_PAGE_MARKER, "flush_page=true");
     assert_eq!(PAGE_TABLE_ROOT_MARKER, "root_ok=true");
     assert_eq!(PAGE_TABLE_STATUS_MARKER, "page-table total_tables=");
+    assert_eq!(PAGING_POLICY_FAIL_MARKER, "[TEST] paging-policy=fail");
+    assert_eq!(PAGING_POLICY_MARKER, "[TEST] paging-policy=ok");
+    assert_eq!(PAGING_POLICY_STATUS_MARKER, "paging-policy mapped_pages=");
     assert_eq!(
         PANIC_DIAGNOSTIC_MARKER,
         "[kernel][FATAL] panic handler entered"
@@ -168,7 +172,7 @@ fn qemu_args_select_smoke_kind() {
 }
 
 #[test]
-fn boot_smoke_requires_full_v0_15_page_table_marker_set() {
+fn boot_smoke_requires_full_v0_16_marker_set() {
     assert_smoke_contract_requires_each_marker(SmokeKind::Boot);
 
     let valid = SmokeKind::Boot.markers();

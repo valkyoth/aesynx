@@ -9,12 +9,14 @@ use core::fmt;
 use aesynx_abi::PhysFrame;
 
 mod frame_allocator;
+mod kernel_policy;
 mod page_table;
 
 pub use frame_allocator::{
     AllocatedFrames, BitmapFrameAllocator, FRAME_SIZE, FrameAllocatorError, FrameAllocatorStatus,
     FrameRegionKind, FrameState,
 };
+pub use kernel_policy::{KernelMappingPolicy, KernelMappingPolicyReport, KernelVirtualRange};
 pub use page_table::{
     MapOutcome, MapRangeOutcome, PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageMapping,
     PageRangeMapping, PageTableAudit, PageTableError, PageTableMapper, PageTableMapping,

@@ -772,32 +772,43 @@ Post-v0.15 page-table backlog:
 
 Goal:
 
-Apply real memory permissions.
+Define and smoke-test the kernel mapping policy before live CR3 activation.
 
 Deliverables:
 
-- Kernel text RX.
-- Rodata R.
-- Data/BSS RW NX.
-- Heap area reserved.
-- Guard page test.
-- Null page unmapped.
+- Safe `aesynx-mm` policy descriptor for kernel text, rodata, data, reserved
+  heap, guard page, and null-page ranges.
+- Text range must be kernel-space read/execute, write-protected, normal memory,
+  and local.
+- Rodata range must be kernel-space read-only, non-executable, normal memory,
+  and local.
+- Data/BSS range must be kernel-space read/write, non-executable, normal
+  memory, and local.
+- Reserved heap and guard ranges must be canonical high-half ranges that remain
+  unmapped.
+- Null page must be exactly page zero and remain unmapped.
+- Policy ranges must be non-empty, checked for overflow, and non-overlapping.
+- Normal QEMU boot must validate the policy after the page-table mapper smoke.
 
 Expected serial:
 
 ```text
+paging-policy mapped_pages=<n> reserved_pages=<n> text_rx_ok=true rodata_read_only_ok=true data_rw_nx_ok=true heap_reserved_ok=true guard_page_ok=true null_page_ok=true
 [TEST] paging-policy=ok
 ```
 
 Verification:
 
-- Fault when writing text.
-- Fault when executing NX page.
-- Fault on guard page.
+- Unit tests reject writable text, executable data, mapped guard pages, mapped
+  null pages, and overlapping policy ranges.
+- QEMU boot requires both the policy status line and `[TEST] paging-policy=ok`.
+- Release notes must state that this is a policy model and smoke gate, not live
+  replacement of Limine's active CR3.
 
 Exit criteria:
 
-- Page tables enforce basic safety.
+- Kernel mapping policy invariants are represented in safe `no_std` code and
+  release-gated by host tests plus QEMU smoke.
 
 ### v0.17.0 - Early Heap
 

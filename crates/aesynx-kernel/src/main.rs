@@ -28,6 +28,14 @@ mod frame_allocator_smoke;
     not(feature = "exception-smoke"),
     not(feature = "timer-smoke")
 ))]
+mod kernel_mapping_smoke;
+
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
+))]
 mod page_table_smoke;
 
 #[cfg(all(
@@ -363,6 +371,27 @@ fn boot_entry() -> ! {
                             aesynx_arch_x86_64::X86_64::halt_forever();
                         }
                     }
+                    match kernel_mapping_smoke::run() {
+                        Ok(status) => {
+                            aesynx_arch_x86_64::serial_println!(
+                                "paging-policy mapped_pages={} reserved_pages={} text_rx_ok={} rodata_read_only_ok={} data_rw_nx_ok={} heap_reserved_ok={} guard_page_ok={} null_page_ok={}",
+                                status.mapped_pages,
+                                status.reserved_pages,
+                                status.text_rx_ok,
+                                status.rodata_read_only_ok,
+                                status.data_rw_nx_ok,
+                                status.heap_reserved_ok,
+                                status.guard_page_ok,
+                                status.null_page_ok
+                            );
+                            aesynx_arch_x86_64::serial::write_str("[TEST] paging-policy=ok\n");
+                        }
+                        Err(error) => {
+                            aesynx_arch_x86_64::serial_println!("paging-policy error={:?}", error);
+                            aesynx_arch_x86_64::serial::write_str("[TEST] paging-policy=fail\n");
+                            aesynx_arch_x86_64::X86_64::halt_forever();
+                        }
+                    }
                 }
                 Err(error) => {
                     aesynx_arch_x86_64::serial_println!("memory-map error={:?}", error);
@@ -388,7 +417,7 @@ fn boot_entry() -> ! {
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
 #[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.15.0 panic smoke");
+    panic!("intentional v0.16.0 panic smoke");
 }
 
 #[cfg(target_os = "none")]

@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.15 tagged page-table-mapper milestone
+Status: v0.16 kernel-mapping-policy implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.15.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.16.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -78,30 +78,31 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `no_device_ok=true`, `no_global_ok=true`, `no_alias_ok=true`,
 `kernel_user_guard_ok=true`, `kernel_only_ok=true`, `visit_ok=true`,
 `flags_ok=true`, `reclaim_ok=true`, `range_ok=true`, `flush_page=true`,
-`[TEST] page-table=ok`,
+`[TEST] page-table=ok`, `paging-policy mapped_pages=`,
+`[TEST] paging-policy=ok`,
 `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.15.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.16.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.15.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.16.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.15.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.16.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
 `timer delayed-log`, `[TEST] sleep=ok`, `timer tick 3`, and `[TEST] timer=ok`.
 
 `cargo xtask qemu-suite` runs the boot, panic, exception, and timer smoke paths
-in sequence and is the GitHub CI QEMU gate for v0.15.
+in sequence and is the GitHub CI QEMU gate for v0.16.
 
 The tracked `.cargo/config.toml` uses a repo-local Rust compiler wrapper that
 computes the workspace root dynamically and passes
@@ -111,7 +112,7 @@ defense-in-depth for the release image path. Kernel rustflags also disable
 SSE/AVX code generation until Aesynx owns explicit FPU/SIMD context
 management. The panic handler still emits only an escaped filename basename.
 
-The v0.15 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+The v0.16 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, remap and mask legacy PIC IRQs, detect
 local APIC availability for the deferred MMIO path, handle a returning breakpoint
 exception, catch and decode an opt-in page fault, run a controlled PIT-backed
@@ -130,9 +131,12 @@ verification, kernel-space and user-space virtual range policy, high-half
 kernel user-access guard policy, low-half user kernel-privilege guard policy,
 non-empty kernel/user address-space candidate preflights, no-alias policy,
 fail-closed malformed leaf decoding, unmap, consistency audit,
-empty-table reclamation, and explicit TLB flush targets. It does not claim
-active CR3 replacement, production page-table
-ownership, APIC MMIO activation, global physical-memory ownership, heap
+empty-table reclamation, and explicit TLB flush targets. Normal boot then
+validates the intended kernel mapping policy for text RX, rodata read-only/NX,
+data RW/NX, a reserved high-half heap window, an unmapped guard page, and an
+unmapped null page. It does not claim active CR3 replacement, production
+page-table ownership, live hardware fault enforcement for text/rodata/data
+segments, APIC MMIO activation, global physical-memory ownership, heap
 allocation, page-fault recovery, a calibrated production clock service,
 scheduler preemption, or bootloader memory reclamation.
 

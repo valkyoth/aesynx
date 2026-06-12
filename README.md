@@ -46,7 +46,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.15.0` is the tagged page-table-mapper milestone. It builds a
+`v0.16.0` is the current kernel-mapping-policy implementation candidate. It builds a
 release-profile freestanding `x86_64-unknown-none` kernel ELF, packages it into
 a Limine ISO, records build and boot tool versions in the image manifest, boots
 it in QEMU, normalizes Limine handoff metadata into Aesynx `BootInfo`, verifies
@@ -79,7 +79,10 @@ policy checks, map-time no-physical-alias policy checks, redacted mapping summar
 redacted page-table debug output, fail-closed leaf decoding for
 lookup/protect/unmap, consistency audit, empty-table reclamation, and explicit
 TLB flush targets before `[TEST] page-table=ok`. Single-address translation
-returns typed errors for unmapped, invalid, or corrupt mapper state. The opt-in timer smoke
+returns typed errors for unmapped, invalid, or corrupt mapper state. Normal boot
+then validates the intended kernel mapping policy for text RX, rodata R/NX,
+data RW/NX, a reserved high-half heap window, an unmapped guard page, and an
+unmapped null page before `[TEST] paging-policy=ok`. The opt-in timer smoke
 path installs a checked IRQ0 handler, programs the legacy PIT for QEMU, observes
 three controlled timer ticks, converts ticks into monotonic nanosecond values,
 wakes a bounded sleep request for a delayed log event, acknowledges each
@@ -97,7 +100,7 @@ interrupt, and then disables the smoke IRQ.
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] irq=ok`, `[TEST] exception=ok`, `[TEST] memory-map=ok`, `[TEST] frame-allocator=ok`, `[TEST] page-table=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies `[TEST] irq=ok`, `[TEST] exception=ok`, `[TEST] memory-map=ok`, `[TEST] frame-allocator=ok`, `[TEST] page-table=ok`, `[TEST] paging-policy=ok`, `[TEST] bootinfo=ok`, and `[TEST] boot=ok` from Rust `_start`. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
 | GDT and TSS | Tagged | Early x86_64 boot installs an Aesynx-owned GDT, TSS, and double-fault IST stack, verified with `[TEST] gdt=ok`. |
@@ -109,6 +112,7 @@ interrupt, and then disables the smoke IRQ.
 | Physical memory map | Tagged | `v0.13.0`; rejects invalid/overlapping regions and reports checked total/usable/reserved bytes, frame counts, and kernel/bootloader reserved accounting with `[TEST] memory-map=ok`. |
 | Bitmap frame allocator | Tagged | `v0.14.0`; safe `aesynx-mm` bitmap allocator model plus QEMU smoke for bounded early alloc/free, contiguous allocation, debug states, double-free detection, and atomic failure behavior with `[TEST] frame-allocator=ok`. |
 | Page table mapper | Tagged | `v0.15.0`; safe bounded `aesynx-mm` page-table mapper model with x86_64-shaped tables, mapper-issued typed root-table identity, checked root-table identity, checked status accounting, non-empty kernel and user address-space candidate preflights, audit-backed map/unmap/protect, fail-closed translation, checked contiguous byte-range translation, audit-backed permission lookup, contiguous range map/protect/unmap plus lookup, upfront range validation, bounded range walks, audit-backed unmapped range checks, audit-backed mapped-range checks, page-presence checks, kernel-only policy checks, kernel high-half user-access guard checks, user low-half kernel-privilege guard checks, no-user-space policy checks, no-executable policy checks, no-writable policy checks, no-device policy checks, no-global policy checks, map-time no-physical-alias policy checks with const-capacity bounded side-index audit, audit-backed kernel-range policy checks, audit-backed user-range policy checks, write-protected range checks, non-executable range checks, executable range checks, normal-memory range checks, local range checks, high-half kernel-space checks, low-half user-space checks, read-only mapping visit, redacted mapping summaries, redacted page-table debug output, virtual range permission verification, fail-closed leaf decoding including hardware Accessed/Dirty bits, permission lookup/change, consistency audit, empty-table reclamation, explicit TLB flush targets, conservative TLB flush merging, and QEMU smoke with `[TEST] page-table=ok`. |
+| Kernel mapping policy | Active candidate | `v0.16.0`; safe `aesynx-mm` policy descriptor verifies text RX, rodata read-only/NX, data RW/NX, reserved heap, guard page, and null-page invariants before `[TEST] paging-policy=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -120,7 +124,7 @@ interrupt, and then disables the smoke IRQ.
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Kernel mapping policy | Planned | `v0.16.0`; apply real kernel text/rodata/data/stack/direct-map permission policy. |
+| Early heap | Planned | `v0.17.0`; add the first bounded kernel heap and `alloc` smoke. |
 | Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -148,14 +152,14 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.15 Limine QEMU image:
+Create and smoke-test the v0.16 Limine QEMU image:
 
 ```bash
 cargo xtask image
 cargo xtask qemu
 ```
 
-Run the full v0.15 QEMU smoke suite:
+Run the full v0.16 QEMU smoke suite:
 
 ```bash
 cargo xtask qemu-suite
@@ -193,7 +197,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.15.0
+cargo xtask release-ready v0.16.0
 ```
 
 ## Security Posture
@@ -231,6 +235,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [v0.13.0 Release Candidate Notes](docs/releases/v0.13.0-rc.md)
 - [v0.14.0 Release Candidate Notes](docs/releases/v0.14.0-rc.md)
 - [v0.15.0 Release Candidate Notes](docs/releases/v0.15.0-rc.md)
+- [v0.16.0 Release Candidate Notes](docs/releases/v0.16.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)
