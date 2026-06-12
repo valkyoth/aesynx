@@ -12,6 +12,7 @@ pub struct KernelMappingSmokeStatus {
     pub heap_reserved_ok: bool,
     pub guard_page_ok: bool,
     pub null_page_ok: bool,
+    pub hardware_image_ok: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -25,6 +26,7 @@ pub enum KernelMappingSmokeError {
 const TEXT_PHYS: aesynx_abi::PhysAddr = aesynx_abi::PhysAddr::new(0x0030_0000);
 const POLICY_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 const POLICY_MAPPED_FRAMES: usize = 256;
+const POLICY_ROOT_PHYS: aesynx_abi::PhysAddr = aesynx_abi::PhysAddr::new(0x0050_0000);
 const HEAP_RESERVED_PAGES: u64 = 2;
 const GUARD_PAGES: u64 = 1;
 
@@ -86,6 +88,15 @@ pub fn run(
     {
         return Err(KernelMappingSmokeError::UnexpectedPolicy);
     }
+    let image = mapper
+        .export_x86_64_hardware_image(POLICY_ROOT_PHYS)
+        .map_err(KernelMappingSmokeError::Mapper)?;
+    if image.root_phys() != POLICY_ROOT_PHYS
+        || image.mapped_pages() != report.mapped_pages()
+        || image.used_tables() == 0
+    {
+        return Err(KernelMappingSmokeError::UnexpectedPolicy);
+    }
 
     Ok(KernelMappingSmokeStatus {
         mapped_pages: report.mapped_pages(),
@@ -100,6 +111,7 @@ pub fn run(
         heap_reserved_ok: report.reserved_heap_unmapped(),
         guard_page_ok: report.guard_page_unmapped(),
         null_page_ok: report.null_page_unmapped(),
+        hardware_image_ok: true,
     })
 }
 

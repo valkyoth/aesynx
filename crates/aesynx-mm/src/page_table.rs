@@ -8,6 +8,7 @@ mod address;
 mod audit;
 mod entry;
 mod frame_index;
+mod hardware_image;
 mod outcome;
 mod policy;
 mod preflight;
@@ -25,6 +26,7 @@ mod walk;
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
 use entry::{PageTableSlot, X86_64PageTableEntry};
 pub(crate) use frame_index::{DEFAULT_MAPPED_FRAME_INDEX_ENTRIES, MappedFrameIndex};
+pub use hardware_image::X86_64PageTableImage;
 pub use outcome::{
     MapOutcome, MapRangeOutcome, ProtectOutcome, ProtectRangeOutcome, UnmapOutcome,
     UnmapRangeOutcome,

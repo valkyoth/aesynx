@@ -21,7 +21,7 @@ pub use page_table::{
     MapOutcome, MapRangeOutcome, PAGE_TABLE_ENTRIES, PAGE_TABLE_LEVELS, PageMapping,
     PageRangeMapping, PageTableAudit, PageTableError, PageTableMapper, PageTableMapping,
     PageTableMappingSummary, PageTableRoot, PageTableStatus, ProtectOutcome, ProtectRangeOutcome,
-    TlbFlush, TranslatedRange, UnmapOutcome, UnmapRangeOutcome,
+    TlbFlush, TranslatedRange, UnmapOutcome, UnmapRangeOutcome, X86_64PageTableImage,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq)]
