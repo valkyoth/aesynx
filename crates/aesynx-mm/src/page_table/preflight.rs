@@ -2,7 +2,7 @@ use crate::PagePrivilege;
 
 use super::{PageTableAudit, PageTableError, PageTableMapper};
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn verify_kernel_address_space_candidate(&self) -> Result<PageTableAudit, PageTableError> {
         let audit = self.checked_candidate_audit()?;
         self.ensure_kernel_candidate_shape()?;

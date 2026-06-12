@@ -4,7 +4,9 @@ use crate::{GenericPageFlags, PageAccess};
 
 use super::{KERNEL_PHYS, KERNEL_VIRT};
 use crate::page_table::range::validate_range_walk;
-use crate::page_table::{MAPPED_FRAME_INDEX_ENTRIES, PageTableError, PageTableMapper, TlbFlush};
+use crate::page_table::{
+    DEFAULT_MAPPED_FRAME_INDEX_ENTRIES, PageTableError, PageTableMapper, TlbFlush,
+};
 
 #[test]
 fn mapper_maps_contiguous_range_atomically() -> Result<(), PageTableError> {
@@ -122,7 +124,7 @@ fn mapper_contiguous_map_rejects_invalid_flags_before_mutation() -> Result<(), P
 fn mapper_contiguous_ranges_are_walk_bounded() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let before = mapper;
-    let max_pages = MAPPED_FRAME_INDEX_ENTRIES as u64;
+    let max_pages = DEFAULT_MAPPED_FRAME_INDEX_ENTRIES as u64;
     let too_many = max_pages + 1;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
 
@@ -157,7 +159,7 @@ fn mapper_contiguous_ranges_are_walk_bounded() -> Result<(), PageTableError> {
 #[test]
 fn range_walk_validator_rejects_zero_pages() {
     assert_eq!(
-        validate_range_walk::<4>(0),
+        validate_range_walk::<4, DEFAULT_MAPPED_FRAME_INDEX_ENTRIES>(0),
         Err(PageTableError::InvalidPageCount)
     );
 }
@@ -165,7 +167,7 @@ fn range_walk_validator_rejects_zero_pages() {
 #[test]
 fn mapper_unmapped_range_check_allows_maximum_bounded_walk() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
-    let max_pages = MAPPED_FRAME_INDEX_ENTRIES as u64;
+    let max_pages = DEFAULT_MAPPED_FRAME_INDEX_ENTRIES as u64;
 
     mapper.ensure_unmapped_contiguous(KERNEL_VIRT, max_pages)?;
 

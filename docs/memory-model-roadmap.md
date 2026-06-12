@@ -113,11 +113,13 @@ security purpose and tests.
 Priority items:
 
 1. Replace the bounded sorted frame side index with a scalable `no_std`
-   structure once map/unmap volume grows. The v0.15 index gives bounded
-   duplicate-frame lookup and audit-time table/index agreement checks, but its
-   fixed array still shifts entries on insert/remove. A future intrusive tree
-   or fixed-capacity B-tree should make exclusive-frame checks fast enough for
-   syscall and address-space activation paths.
+   structure once map/unmap volume grows. The v0.15 index has an explicit
+   mapper const-generic capacity, with a conservative default for QEMU smoke,
+   and gives bounded duplicate-frame lookup plus audit-time table/index
+   agreement checks. Its sorted array still shifts entries on insert/remove, so
+   a future intrusive tree or fixed-capacity B-tree should make
+   exclusive-frame checks fast enough for syscall and address-space activation
+   paths.
 2. Add typed huge-page support for 2 MiB and 1 GiB leaves. This must use
    explicit page-size types, strict alignment checks, mixed-size alias checks,
    and reviewed split/unmap semantics. Huge pages should reduce TLB pressure

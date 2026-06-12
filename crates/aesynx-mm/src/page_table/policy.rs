@@ -2,7 +2,7 @@ use crate::PagePrivilege;
 
 use super::{PageTableError, PageTableMapper};
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn ensure_no_user_space_mappings(&self) -> Result<(), PageTableError> {
         self.visit_policy_mappings(|entry| {
             if entry.virt().get() >> 47 == 0 {

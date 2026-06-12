@@ -2,11 +2,11 @@ use aesynx_abi::PhysAddr;
 
 use super::PageTableError;
 
-pub(crate) const MAPPED_FRAME_INDEX_ENTRIES: usize = 64;
+pub(crate) const DEFAULT_MAPPED_FRAME_INDEX_ENTRIES: usize = 64;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub(crate) struct MappedFrameIndex {
-    frames: [MappedFrameIndexEntry; MAPPED_FRAME_INDEX_ENTRIES],
+pub(crate) struct MappedFrameIndex<const ENTRIES: usize> {
+    frames: [MappedFrameIndexEntry; ENTRIES],
     len: usize,
 }
 
@@ -25,10 +25,10 @@ struct MappedFrameIndexEntry {
     phys: u64,
 }
 
-impl MappedFrameIndex {
+impl<const ENTRIES: usize> MappedFrameIndex<ENTRIES> {
     pub(crate) const fn empty() -> Self {
         Self {
-            frames: [MappedFrameIndexEntry::EMPTY; MAPPED_FRAME_INDEX_ENTRIES],
+            frames: [MappedFrameIndexEntry::EMPTY; ENTRIES],
             len: 0,
         }
     }
@@ -115,10 +115,7 @@ impl MappedFrameIndex {
         }
     }
 
-    pub(crate) fn validate_seen(
-        &self,
-        seen: &[bool; MAPPED_FRAME_INDEX_ENTRIES],
-    ) -> Result<(), PageTableError> {
+    pub(crate) fn validate_seen(&self, seen: &[bool; ENTRIES]) -> Result<(), PageTableError> {
         let mut index = 0usize;
         while index < self.len {
             if !seen[index] {
@@ -155,14 +152,14 @@ impl MappedFrameIndex {
     }
 
     fn get(&self, index: usize) -> Result<MappedFrameIndexEntry, PageTableError> {
-        if index >= MAPPED_FRAME_INDEX_ENTRIES {
+        if index >= ENTRIES {
             return Err(PageTableError::CorruptTable);
         }
         Ok(self.frames[index])
     }
 
     fn set(&mut self, index: usize, entry: MappedFrameIndexEntry) -> Result<(), PageTableError> {
-        if index >= MAPPED_FRAME_INDEX_ENTRIES {
+        if index >= ENTRIES {
             return Err(PageTableError::CorruptTable);
         }
         self.frames[index] = entry;
@@ -170,7 +167,10 @@ impl MappedFrameIndex {
     }
 
     fn capacity(&self) -> Result<usize, PageTableError> {
-        Ok(MAPPED_FRAME_INDEX_ENTRIES)
+        if ENTRIES == 0 {
+            return Err(PageTableError::EmptyArena);
+        }
+        Ok(ENTRIES)
     }
 }
 

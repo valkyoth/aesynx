@@ -1,6 +1,6 @@
 use super::{PAGE_TABLE_ENTRIES, PageTableAudit, PageTableError, PageTableMapper};
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn audit(&self) -> Result<PageTableAudit, PageTableError> {
         if TABLES == 0 {
             return Err(PageTableError::EmptyArena);
@@ -52,7 +52,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         }
 
         let mut incoming = [0u8; TABLES];
-        let mut seen_frames = [false; super::MAPPED_FRAME_INDEX_ENTRIES];
+        let mut seen_frames = [false; MAPPED_FRAMES];
         let mut used_tables = 0u64;
         let mut reachable_tables = 0u64;
         let mut mapped_pages = 0u64;
@@ -91,7 +91,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
                         }
                         let mapping = slot.leaf_mapping()?;
                         let frame_position = self.mapped_frames.position_of(mapping.phys())?;
-                        if frame_position >= super::MAPPED_FRAME_INDEX_ENTRIES {
+                        if frame_position >= MAPPED_FRAMES {
                             return Err(PageTableError::CorruptTable);
                         }
                         if seen_frames[frame_position] {

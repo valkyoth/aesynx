@@ -8,7 +8,7 @@ use super::{
     ProtectRangeOutcome, TlbFlush, UnmapRangeOutcome, X86_64PageTableEntry,
 };
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn map_contiguous(
         &mut self,
         virt: VirtAddr,
@@ -19,7 +19,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         validate_virt_range(virt, page_count)?;
         validate_phys_range(phys, page_count)?;
         validate_flags(flags)?;
-        validate_range_walk::<TABLES>(page_count)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
 
         let mut candidate = *self;
         let mut offset = 0u64;
@@ -45,7 +45,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
     ) -> Result<PageRangeMapping, PageTableError> {
         validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
         self.audit()?;
 
         let first = self.mapping_for_address(virt)?;
@@ -70,7 +70,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
     ) -> Result<(), PageTableError> {
         validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
         self.audit()?;
 
         let mut offset = 0u64;
@@ -92,7 +92,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
     ) -> Result<(), PageTableError> {
         validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
         self.audit()?;
 
         let mut offset = 0u64;
@@ -116,7 +116,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<(), PageTableError> {
         validate_virt_range(virt, page_count)?;
         validate_flags(flags)?;
-        validate_range_walk::<TABLES>(page_count)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
         self.audit()?;
 
         let mut offset = 0u64;
@@ -139,7 +139,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
     ) -> Result<ProtectRangeOutcome, PageTableError> {
         validate_virt_range(virt, page_count)?;
         validate_flags(flags)?;
-        validate_range_walk::<TABLES>(page_count)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
 
         let mut candidate = *self;
         let mut flush = TlbFlush::None;
@@ -163,7 +163,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         page_count: u64,
     ) -> Result<UnmapRangeOutcome, PageTableError> {
         validate_virt_range(virt, page_count)?;
-        validate_range_walk::<TABLES>(page_count)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
 
         let mut candidate = *self;
         let mut flush = TlbFlush::None;
@@ -228,15 +228,15 @@ pub(super) fn validate_virtual_space(
     Ok(())
 }
 
-pub(super) fn validate_range_walk<const TABLES: usize>(
+pub(super) fn validate_range_walk<const TABLES: usize, const MAPPED_FRAMES: usize>(
     page_count: u64,
 ) -> Result<(), PageTableError> {
     validate_page_count(page_count)?;
     let table_walk_pages = (TABLES as u64)
         .checked_mul(super::PAGE_TABLE_ENTRIES as u64)
         .ok_or(PageTableError::AddressOverflow)?;
-    let max_pages = if table_walk_pages > super::MAPPED_FRAME_INDEX_ENTRIES as u64 {
-        super::MAPPED_FRAME_INDEX_ENTRIES as u64
+    let max_pages = if table_walk_pages > MAPPED_FRAMES as u64 {
+        MAPPED_FRAMES as u64
     } else {
         table_walk_pages
     };

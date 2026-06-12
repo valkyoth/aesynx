@@ -2,7 +2,7 @@ use crate::{PageAccess, PagePrivilege};
 
 use super::{PageTableError, PageTableMapper, PageTableMappingSummary};
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn mapping_summary(&self) -> Result<PageTableMappingSummary, PageTableError> {
         let mut summary = PageTableMappingSummary::empty();
         self.visit_mappings(|entry| {

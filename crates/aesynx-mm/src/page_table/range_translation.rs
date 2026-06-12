@@ -8,14 +8,14 @@ use super::address::{PAGE_OFFSET_MASK, is_canonical, validate_virt_page};
 use super::range::{add_pages_to_phys, add_pages_to_virt, validate_range_walk};
 use super::{PageTableError, PageTableMapper, TranslatedRange};
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn translate_contiguous_range_checked(
         &self,
         virt: VirtAddr,
         byte_len: u64,
     ) -> Result<TranslatedRange, PageTableError> {
         let checked = validate_virt_byte_range(virt, byte_len)?;
-        validate_range_walk::<TABLES>(checked.pages)?;
+        validate_range_walk::<TABLES, MAPPED_FRAMES>(checked.pages)?;
         self.audit()?;
 
         let first = self.mapping_for_address(checked.start_page)?;

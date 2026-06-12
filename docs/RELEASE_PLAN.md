@@ -679,8 +679,8 @@ Deliverables:
 - No-global mapping policy check for candidate local address spaces.
 - Map-time no-physical-alias policy check for candidate exclusive frame
   ownership.
-- Bounded frame side index for duplicate-frame rejection and audit-time
-  table/index agreement checks.
+- Const-capacity bounded frame side index for duplicate-frame rejection and
+  audit-time table/index agreement checks.
 - x86_64 leaf decoding that accepts hardware-managed Accessed and Dirty bits
   without emitting them from clean mapping construction.
 - Kernel-privileged virtual range policy check for mixed address spaces.
@@ -750,9 +750,10 @@ Post-v0.15 page-table backlog:
 
 - Upgrade the v0.15 bounded sorted frame side index into a scalable `no_std`
   frame index before exclusive-frame checks move onto hot syscall or
-  address-space activation paths. The current side index gives bounded binary
-  duplicate lookup and audit-time table/index agreement checks, but insertion
-  and removal still shift fixed-array entries.
+  address-space activation paths. The current side index has an explicit
+  mapper const-generic capacity, with a conservative QEMU-smoke default, and
+  gives bounded binary duplicate lookup plus audit-time table/index agreement
+  checks, but insertion and removal still shift fixed-array entries.
 - Add typed 2 MiB and 1 GiB huge-page leaves only after the 4 KiB mapper is
   stable. Huge pages must include strict alignment validation, mixed-size alias
   detection, reviewed split/unmap behavior, and audit coverage.

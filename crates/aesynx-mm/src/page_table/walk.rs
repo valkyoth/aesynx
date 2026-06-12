@@ -2,7 +2,7 @@ use aesynx_abi::VirtAddr;
 
 use super::{PAGE_TABLE_ENTRIES, PageTableError, PageTableMapper, PageTableMapping, PageTableSlot};
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn visit_mappings<F>(&self, mut visitor: F) -> Result<u64, PageTableError>
     where
         F: FnMut(PageTableMapping) -> Result<(), PageTableError>,

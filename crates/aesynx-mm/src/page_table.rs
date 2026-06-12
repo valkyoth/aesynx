@@ -24,7 +24,7 @@ mod walk;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
 use entry::{PageTableSlot, X86_64PageTableEntry};
-pub(crate) use frame_index::{MAPPED_FRAME_INDEX_ENTRIES, MappedFrameIndex};
+pub(crate) use frame_index::{DEFAULT_MAPPED_FRAME_INDEX_ENTRIES, MappedFrameIndex};
 pub use outcome::{
     MapOutcome, MapRangeOutcome, ProtectOutcome, ProtectRangeOutcome, UnmapOutcome,
     UnmapRangeOutcome,
@@ -63,14 +63,19 @@ impl PageTable {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct PageTableMapper<const TABLES: usize> {
+pub struct PageTableMapper<
+    const TABLES: usize,
+    const MAPPED_FRAMES: usize = DEFAULT_MAPPED_FRAME_INDEX_ENTRIES,
+> {
     tables: [PageTable; TABLES],
     used: [bool; TABLES],
     mapped_pages: u64,
-    mapped_frames: MappedFrameIndex,
+    mapped_frames: MappedFrameIndex<MAPPED_FRAMES>,
 }
 
-impl<const TABLES: usize> fmt::Debug for PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> fmt::Debug
+    for PageTableMapper<TABLES, MAPPED_FRAMES>
+{
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("PageTableMapper")
@@ -82,7 +87,7 @@ impl<const TABLES: usize> fmt::Debug for PageTableMapper<TABLES> {
     }
 }
 
-impl<const TABLES: usize> PageTableMapper<TABLES> {
+impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MAPPED_FRAMES> {
     pub fn new() -> Result<Self, PageTableError> {
         if TABLES == 0 {
             return Err(PageTableError::EmptyArena);
