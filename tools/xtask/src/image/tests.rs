@@ -24,11 +24,9 @@ use super::smoke::{
     PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER, PANIC_DIAGNOSTIC_MARKER, PANIC_MARKER,
     PANIC_REGISTERS_MARKER, SERIAL_MARKER, SLEEP_MARKER, SmokeKind, TIMER_DELAYED_LOG_MARKER,
     TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER,
-    TIMER_TICK_3_MARKER, parse_qemu_args, serial_log_contains_marker,
+    TIMER_TICK_3_MARKER, parse_qemu_args, serial_log_contents_match,
 };
 use super::{BOOT_CONFIG_MARKERS, KERNEL_PROFILE, KERNEL_TARGET};
-
-use std::fs;
 
 #[test]
 fn qemu_markers_track_v0_15_contracts() {
@@ -166,32 +164,23 @@ fn qemu_args_select_smoke_kind() {
 }
 
 #[test]
-fn boot_smoke_requires_full_v0_15_page_table_marker_set() -> Result<(), String> {
+fn boot_smoke_requires_full_v0_15_page_table_marker_set() {
     let valid = SmokeKind::Boot.markers();
-    let valid_path = temp_serial_log("valid");
-    fs::write(&valid_path, valid).map_err(|error| error.to_string())?;
-    assert!(serial_log_contains_marker(&valid_path, SmokeKind::Boot));
+    assert!(serial_log_contents_match(valid, SmokeKind::Boot));
 
-    let missing_translate = valid.replace(PAGE_TABLE_TRANSLATE_OFFSET_MARKER, "");
-    let missing_translate_path = temp_serial_log("missing-translate-offset");
-    fs::write(&missing_translate_path, missing_translate).map_err(|error| error.to_string())?;
-    assert!(!serial_log_contains_marker(
-        &missing_translate_path,
+    for marker in valid.split(", ") {
+        let missing = valid.replace(marker, "");
+        assert!(
+            !serial_log_contents_match(&missing, SmokeKind::Boot),
+            "boot smoke accepted output without marker {marker}"
+        );
+    }
+
+    let missing_root_only = valid.replacen("root_ok=true, ", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_root_only,
         SmokeKind::Boot
     ));
-
-    let missing_flush = valid.replace(PAGE_TABLE_FLUSH_PAGE_MARKER, "");
-    let missing_flush_path = temp_serial_log("missing-flush-page");
-    fs::write(&missing_flush_path, missing_flush).map_err(|error| error.to_string())?;
-    assert!(!serial_log_contains_marker(
-        &missing_flush_path,
-        SmokeKind::Boot
-    ));
-
-    let _ = fs::remove_file(valid_path);
-    let _ = fs::remove_file(missing_translate_path);
-    let _ = fs::remove_file(missing_flush_path);
-    Ok(())
 }
 
 #[test]
@@ -216,11 +205,4 @@ fn boot_config_markers_cover_limine_kernel_path() {
             .iter()
             .any(|marker| marker.contains("path: boot():/boot/aesynx-kernel"))
     );
-}
-
-fn temp_serial_log(suffix: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!(
-        "aesynx-xtask-smoke-{}-{suffix}.log",
-        std::process::id()
-    ))
 }

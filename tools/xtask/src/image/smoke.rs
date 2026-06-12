@@ -76,6 +76,107 @@ pub const TIMER_TICK_1_MARKER: &str = "timer tick 1";
 pub const TIMER_TICK_2_MARKER: &str = "timer tick 2";
 pub const TIMER_TICK_3_MARKER: &str = "timer tick 3";
 
+const BOOT_REQUIRED_MARKERS: &[&str] = &[
+    CPU_SETUP_MARKER,
+    EXCEPTION_SETUP_MARKER,
+    IRQ_SETUP_MARKER,
+    EXCEPTION_MARKER,
+    BOOT_DIAGNOSTIC_MARKER,
+    MEMORY_TOTAL_MARKER,
+    MEMORY_USABLE_MARKER,
+    MEMORY_RESERVED_MARKER,
+    MEMORY_MAP_MARKER,
+    FRAME_ALLOCATOR_STATUS_MARKER,
+    FRAME_ALLOCATOR_MARKER,
+    PAGE_TABLE_STATUS_MARKER,
+    PAGE_TABLE_ROOT_MARKER,
+    PAGE_TABLE_CHECKED_ROOT_MARKER,
+    PAGE_TABLE_CHECKED_STATUS_MARKER,
+    PAGE_TABLE_KERNEL_CANDIDATE_MARKER,
+    PAGE_TABLE_USER_CANDIDATE_MARKER,
+    PAGE_TABLE_TRANSLATE_OFFSET_MARKER,
+    PAGE_TABLE_CHECKED_TRANSLATE_MARKER,
+    PAGE_TABLE_LOOKUP_MARKER,
+    PAGE_TABLE_PRESENCE_MARKER,
+    PAGE_TABLE_PROTECT_MARKER,
+    PAGE_TABLE_PROTECT_RANGE_MARKER,
+    PAGE_TABLE_RANGE_LOOKUP_MARKER,
+    PAGE_TABLE_RANGE_TRANSLATE_MARKER,
+    PAGE_TABLE_MAPPED_RANGE_MARKER,
+    PAGE_TABLE_UNMAPPED_RANGE_MARKER,
+    PAGE_TABLE_KERNEL_RANGE_MARKER,
+    PAGE_TABLE_USER_RANGE_MARKER,
+    PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER,
+    PAGE_TABLE_NON_EXECUTABLE_RANGE_MARKER,
+    PAGE_TABLE_EXECUTABLE_RANGE_MARKER,
+    PAGE_TABLE_NORMAL_MEMORY_RANGE_MARKER,
+    PAGE_TABLE_LOCAL_RANGE_MARKER,
+    PAGE_TABLE_KERNEL_SPACE_RANGE_MARKER,
+    PAGE_TABLE_USER_SPACE_RANGE_MARKER,
+    PAGE_TABLE_NO_USER_SPACE_MARKER,
+    PAGE_TABLE_NO_EXECUTABLE_MARKER,
+    PAGE_TABLE_NO_WRITABLE_MARKER,
+    PAGE_TABLE_NO_DEVICE_MARKER,
+    PAGE_TABLE_NO_GLOBAL_MARKER,
+    PAGE_TABLE_NO_ALIAS_MARKER,
+    PAGE_TABLE_KERNEL_USER_GUARD_MARKER,
+    PAGE_TABLE_KERNEL_ONLY_MARKER,
+    PAGE_TABLE_AUDIT_MARKER,
+    PAGE_TABLE_VISIT_MARKER,
+    PAGE_TABLE_FLAGS_MARKER,
+    PAGE_TABLE_RECLAIM_MARKER,
+    PAGE_TABLE_RANGE_MARKER,
+    PAGE_TABLE_FLUSH_PAGE_MARKER,
+    PAGE_TABLE_MARKER,
+    BOOTINFO_MARKER,
+    SERIAL_MARKER,
+];
+
+const BOOT_FORBIDDEN_MARKERS: &[&str] = &[
+    BOOTINFO_FAIL_MARKER,
+    MEMORY_MAP_FAIL_MARKER,
+    FRAME_ALLOCATOR_FAIL_MARKER,
+    PAGE_TABLE_FAIL_MARKER,
+];
+
+const PANIC_REQUIRED_MARKERS: &[&str] = &[
+    CPU_SETUP_MARKER,
+    EXCEPTION_SETUP_MARKER,
+    IRQ_SETUP_MARKER,
+    EXCEPTION_MARKER,
+    PANIC_DIAGNOSTIC_MARKER,
+    PANIC_MARKER,
+    PANIC_REGISTERS_MARKER,
+];
+
+const EXCEPTION_REQUIRED_MARKERS: &[&str] = &[
+    CPU_SETUP_MARKER,
+    EXCEPTION_SETUP_MARKER,
+    IRQ_SETUP_MARKER,
+    EXCEPTION_MARKER,
+    FAULT_ADDRESS_PRESENT_MARKER,
+    FAULT_ADDRESS_MARKER,
+    FAULT_CR3_MARKER,
+    FAULT_RFLAGS_MARKER,
+    FAULT_INTERRUPTS_MARKER,
+    FAULT_ERROR_DECODE_MARKER,
+    PAGE_FAULT_MARKER,
+];
+
+const TIMER_REQUIRED_MARKERS: &[&str] = &[
+    CPU_SETUP_MARKER,
+    EXCEPTION_SETUP_MARKER,
+    IRQ_SETUP_MARKER,
+    EXCEPTION_MARKER,
+    TIMER_SETUP_MARKER,
+    TIMER_TICK_1_MARKER,
+    TIMER_TICK_2_MARKER,
+    TIMER_TICK_3_MARKER,
+    TIMER_DELAYED_LOG_MARKER,
+    SLEEP_MARKER,
+    TIMER_MARKER,
+];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SmokeKind {
     Boot,
@@ -122,102 +223,62 @@ impl SmokeKind {
 }
 
 pub fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
-    fs::read_to_string(path).is_ok_and(|contents| match smoke {
+    fs::read_to_string(path).is_ok_and(|contents| serial_log_contents_match(&contents, smoke))
+}
+
+pub(crate) fn serial_log_contents_match(contents: &str, smoke: SmokeKind) -> bool {
+    match smoke {
         SmokeKind::Boot => {
-            !contents.contains(BOOTINFO_FAIL_MARKER)
-                && !contents.contains(MEMORY_MAP_FAIL_MARKER)
-                && !contents.contains(FRAME_ALLOCATOR_FAIL_MARKER)
-                && !contents.contains(PAGE_TABLE_FAIL_MARKER)
-                && contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(BOOT_DIAGNOSTIC_MARKER)
-                && contents.contains(MEMORY_TOTAL_MARKER)
-                && contents.contains(MEMORY_USABLE_MARKER)
-                && contents.contains(MEMORY_RESERVED_MARKER)
-                && contents.contains(MEMORY_MAP_MARKER)
-                && contents.contains(FRAME_ALLOCATOR_STATUS_MARKER)
-                && contents.contains(FRAME_ALLOCATOR_MARKER)
-                && contents.contains(PAGE_TABLE_STATUS_MARKER)
-                && contents.contains(PAGE_TABLE_ROOT_MARKER)
-                && contents.contains(PAGE_TABLE_CHECKED_ROOT_MARKER)
-                && contents.contains(PAGE_TABLE_CHECKED_STATUS_MARKER)
-                && contents.contains(PAGE_TABLE_KERNEL_CANDIDATE_MARKER)
-                && contents.contains(PAGE_TABLE_USER_CANDIDATE_MARKER)
-                && contents.contains(PAGE_TABLE_TRANSLATE_OFFSET_MARKER)
-                && contents.contains(PAGE_TABLE_CHECKED_TRANSLATE_MARKER)
-                && contents.contains(PAGE_TABLE_LOOKUP_MARKER)
-                && contents.contains(PAGE_TABLE_PRESENCE_MARKER)
-                && contents.contains(PAGE_TABLE_PROTECT_MARKER)
-                && contents.contains(PAGE_TABLE_PROTECT_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_RANGE_LOOKUP_MARKER)
-                && contents.contains(PAGE_TABLE_RANGE_TRANSLATE_MARKER)
-                && contents.contains(PAGE_TABLE_MAPPED_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_UNMAPPED_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_KERNEL_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_USER_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_NON_EXECUTABLE_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_EXECUTABLE_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_NORMAL_MEMORY_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_LOCAL_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_KERNEL_SPACE_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_USER_SPACE_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_NO_USER_SPACE_MARKER)
-                && contents.contains(PAGE_TABLE_NO_EXECUTABLE_MARKER)
-                && contents.contains(PAGE_TABLE_NO_WRITABLE_MARKER)
-                && contents.contains(PAGE_TABLE_NO_DEVICE_MARKER)
-                && contents.contains(PAGE_TABLE_NO_GLOBAL_MARKER)
-                && contents.contains(PAGE_TABLE_NO_ALIAS_MARKER)
-                && contents.contains(PAGE_TABLE_KERNEL_USER_GUARD_MARKER)
-                && contents.contains(PAGE_TABLE_KERNEL_ONLY_MARKER)
-                && contents.contains(PAGE_TABLE_AUDIT_MARKER)
-                && contents.contains(PAGE_TABLE_VISIT_MARKER)
-                && contents.contains(PAGE_TABLE_FLAGS_MARKER)
-                && contents.contains(PAGE_TABLE_RECLAIM_MARKER)
-                && contents.contains(PAGE_TABLE_RANGE_MARKER)
-                && contents.contains(PAGE_TABLE_FLUSH_PAGE_MARKER)
-                && contents.contains(PAGE_TABLE_MARKER)
-                && contents.contains(BOOTINFO_MARKER)
-                && contents.contains(SERIAL_MARKER)
+            contains_all(contents, BOOT_REQUIRED_MARKERS)
+                && contains_none(contents, BOOT_FORBIDDEN_MARKERS)
         }
-        SmokeKind::Panic => {
-            contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(PANIC_DIAGNOSTIC_MARKER)
-                && contents.contains(PANIC_MARKER)
-                && contents.contains(PANIC_REGISTERS_MARKER)
+        SmokeKind::Panic => contains_all(contents, PANIC_REQUIRED_MARKERS),
+        SmokeKind::Exception => contains_all(contents, EXCEPTION_REQUIRED_MARKERS),
+        SmokeKind::Timer => contains_all(contents, TIMER_REQUIRED_MARKERS),
+    }
+}
+
+fn contains_all(contents: &str, markers: &[&str]) -> bool {
+    markers
+        .iter()
+        .all(|marker| contains_marker(contents, marker))
+}
+
+fn contains_none(contents: &str, markers: &[&str]) -> bool {
+    markers
+        .iter()
+        .all(|marker| !contains_marker(contents, marker))
+}
+
+fn contains_marker(contents: &str, marker: &str) -> bool {
+    if !marker.contains('=') {
+        return contents.contains(marker);
+    }
+
+    let mut offset = 0usize;
+    while let Some(relative_start) = contents[offset..].find(marker) {
+        let start = offset + relative_start;
+        let end = start + marker.len();
+        if is_marker_boundary(contents[..start].chars().next_back())
+            && (is_value_prefix_marker(marker)
+                || is_marker_boundary(contents[end..].chars().next()))
+        {
+            return true;
         }
-        SmokeKind::Exception => {
-            contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(FAULT_ADDRESS_PRESENT_MARKER)
-                && contents.contains(FAULT_ADDRESS_MARKER)
-                && contents.contains(FAULT_CR3_MARKER)
-                && contents.contains(FAULT_RFLAGS_MARKER)
-                && contents.contains(FAULT_INTERRUPTS_MARKER)
-                && contents.contains(FAULT_ERROR_DECODE_MARKER)
-                && contents.contains(PAGE_FAULT_MARKER)
-        }
-        SmokeKind::Timer => {
-            contents.contains(CPU_SETUP_MARKER)
-                && contents.contains(EXCEPTION_SETUP_MARKER)
-                && contents.contains(IRQ_SETUP_MARKER)
-                && contents.contains(EXCEPTION_MARKER)
-                && contents.contains(TIMER_SETUP_MARKER)
-                && contents.contains(TIMER_TICK_1_MARKER)
-                && contents.contains(TIMER_TICK_2_MARKER)
-                && contents.contains(TIMER_TICK_3_MARKER)
-                && contents.contains(TIMER_DELAYED_LOG_MARKER)
-                && contents.contains(SLEEP_MARKER)
-                && contents.contains(TIMER_MARKER)
-        }
-    })
+        offset = end;
+    }
+    false
+}
+
+fn is_value_prefix_marker(marker: &str) -> bool {
+    marker.ends_with('=') || marker.ends_with("=0x")
+}
+
+fn is_marker_boundary(character: Option<char>) -> bool {
+    match character {
+        None => true,
+        Some(character) => character.is_ascii_whitespace() || character == ',',
+    }
 }
 
 pub fn parse_qemu_args(args: &[String]) -> Result<SmokeKind, &'static str> {
