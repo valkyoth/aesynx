@@ -27,6 +27,10 @@ use super::smoke::{
     TIMER_TICK_3_MARKER, parse_qemu_args, serial_log_contents_match,
 };
 use super::{BOOT_CONFIG_MARKERS, KERNEL_PROFILE, KERNEL_TARGET};
+use crate::image::host_tools::HostToolVersions;
+use crate::image::manifest::write_manifest;
+use std::fs;
+use std::path::PathBuf;
 
 #[test]
 fn qemu_markers_track_v0_15_contracts() {
@@ -206,6 +210,37 @@ fn boot_config_markers_cover_limine_kernel_path() {
     );
 }
 
+#[test]
+fn image_manifest_records_diagnostic_smoke_markers() -> Result<(), String> {
+    let manifest = temp_manifest_path("diagnostic-smoke-markers");
+    let host_tools = HostToolVersions {
+        rustc: String::from("rustc test"),
+        cargo: String::from("cargo test"),
+        limine: String::from("limine test"),
+        xorriso: String::from("xorriso test"),
+        qemu: String::from("qemu test"),
+    };
+
+    write_manifest(
+        &manifest,
+        &PathBuf::from("/tmp/aesynx.iso"),
+        &PathBuf::from("/tmp/aesynx-kernel"),
+        &host_tools,
+        SmokeKind::Panic,
+    )?;
+
+    let contents = fs::read_to_string(&manifest)
+        .map_err(|error| format!("failed to read manifest test output: {error}"))?;
+    let _ = fs::remove_file(&manifest);
+
+    assert!(contents.contains("smoke=panic\n"));
+    assert!(contents.contains("boot_diagnostic_marker=[kernel][INFO] bootinfo normalized\n"));
+    assert!(contents.contains("panic_diagnostic_marker=[kernel][FATAL] panic handler entered\n"));
+    assert!(contents.contains("panic_registers_marker=panic registers=\n"));
+    assert!(contents.contains("panic_marker=[TEST] panic=ok\n"));
+    Ok(())
+}
+
 fn assert_smoke_contract_requires_each_marker(smoke: SmokeKind) {
     let valid = smoke.markers();
     assert!(
@@ -222,4 +257,8 @@ fn assert_smoke_contract_requires_each_marker(smoke: SmokeKind) {
             smoke.name()
         );
     }
+}
+
+fn temp_manifest_path(name: &str) -> PathBuf {
+    std::env::temp_dir().join(format!("aesynx-{name}-{}.manifest", std::process::id()))
 }
