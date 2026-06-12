@@ -606,8 +606,9 @@ Deliverables:
   the internal model table index, physical root, or CR3 claims.
 - Mapping visitors run structural audit before invoking callbacks, so corrupt
   mapper state fails closed before emitting mapping records.
-- Read-only range and range-policy checks preserve mapper state when malformed
-  table links, intermediate leaves, or accounting drift fail structural audit.
+- Read-only range and range-policy checks preserve mapper state after
+  malformed table links, intermediate leaves, or accounting drift fail
+  structural audit.
 - Address-space wrapper debug output redacts the root physical frame.
 - Mapper-produced status reports are inspectable but not externally
   constructible through public fields or constructors.
