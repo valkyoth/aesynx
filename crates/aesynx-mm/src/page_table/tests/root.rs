@@ -57,3 +57,14 @@ fn mapper_checked_root_rejects_duplicate_table_parent_without_mutation()
     assert_eq!(mapper, corrupt);
     Ok(())
 }
+
+#[test]
+fn mapper_checked_root_rejects_empty_arena() {
+    let mapper = PageTableMapper::<0> {
+        tables: [],
+        used: [],
+        mapped_pages: 0,
+    };
+
+    assert_eq!(mapper.root_table_checked(), Err(PageTableError::EmptyArena));
+}
