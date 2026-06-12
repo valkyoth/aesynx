@@ -4,6 +4,9 @@ set -eu
 echo "checks: repository security policy"
 scripts/validate-security-policy.sh
 
+echo "checks: release readiness policy"
+scripts/validate-release-readiness-tests.sh
+
 echo "checks: documentation links"
 perl scripts/check-doc-links.pl
 
