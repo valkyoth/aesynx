@@ -13,6 +13,11 @@ if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
     exit 2
 fi
 
+if [ -e PENTEST.md ]; then
+    echo "release readiness: root PENTEST.md is still present; resolve and delete it before release" >&2
+    exit 1
+fi
+
 report="security/pentest/$tag.md"
 
 if [ ! -s "$report" ]; then

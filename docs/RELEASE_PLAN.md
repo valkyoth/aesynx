@@ -68,7 +68,8 @@ Use this loop for every version:
    and waits for GitHub.
 5. When GitHub CI and CodeQL default setup are green, the maintainer updates
    `security/pentest/<tag>.md` with the exact commit and `Status: PASS`.
-6. `cargo xtask release-ready <tag>` must pass before tagging.
+6. `cargo xtask release-ready <tag>` must pass before tagging; it fails if the
+   root scratch `PENTEST.md` still exists.
 
 Never commit root `PENTEST.md`; it is a local scratch handoff file and is
 ignored by git.
@@ -722,6 +723,8 @@ Verification:
   consistency audit failures, conservative TLB flush merging, and x86_64 entry
   flag encode/decode validation.
 - Normal boot emits page-table status and `[TEST] page-table=ok`.
+- `cargo xtask qemu-suite` runs the boot, panic, exception, and timer smoke
+  paths before v0.15 pentest handoff.
 
 Exit criteria:
 
