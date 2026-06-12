@@ -798,8 +798,8 @@ Deliverables:
 Expected serial:
 
 ```text
-paging-policy mapped_pages=<n> reserved_pages=<n> text_pages=<n> rodata_pages=<n> data_pages=<n> section_layout_ok=true text_rx_ok=true rodata_read_only_ok=true data_rw_nx_ok=true heap_reserved_ok=true guard_page_ok=true null_page_ok=true
-[TEST] paging-policy=ok
+paging-policy-model mapped_pages=<n> reserved_pages=<n> text_pages=<n> rodata_pages=<n> data_pages=<n> section_layout_ok=true text_rx_ok=true rodata_read_only_ok=true data_rw_nx_ok=true heap_reserved_ok=true guard_page_ok=true null_page_ok=true
+[TEST] paging-policy-model=ok
 ```
 
 Verification:
@@ -813,12 +813,12 @@ Verification:
 - Host unit tests cover section-plan derivation, malformed ordering, unaligned
   boundaries, low-half and noncanonical section ranges, empty reserved
   heap/guard ranges, and arithmetic overflow.
-- QEMU boot requires both the policy status line and `[TEST] paging-policy=ok`.
+- QEMU boot requires both the policy status line and `[TEST] paging-policy-model=ok`.
 - QEMU status booleans must come from successful section-plan derivation and
   `KernelMappingPolicyReport` accessors, not from freestanding smoke-local
   constants.
 - Xtask marker tests and image manifests must track the status line, every
-  paging-policy `*_ok=true` boolean, and the final paging-policy ok marker.
+  paging-policy-model `*_ok=true` boolean, and the final paging-policy-model ok marker.
 - Release notes must state that this is a policy model and smoke gate, not live
   replacement of Limine's active CR3.
 

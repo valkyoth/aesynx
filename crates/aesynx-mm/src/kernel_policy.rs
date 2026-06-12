@@ -21,6 +21,11 @@ impl fmt::Debug for KernelVirtualRange {
 }
 
 impl KernelVirtualRange {
+    /// Constructs an unvalidated kernel virtual range descriptor.
+    ///
+    /// Callers must pass the enclosing [`KernelMappingPolicy`] through
+    /// [`PageTableMapper::verify_kernel_mapping_policy`] before relying on
+    /// page count, alignment, canonical-address, or overlap invariants.
     #[must_use]
     pub const fn new(start: VirtAddr, pages: u64) -> Self {
         Self { start, pages }
@@ -48,6 +53,13 @@ pub struct KernelMappingPolicy {
 }
 
 impl KernelMappingPolicy {
+    /// Constructs an unvalidated kernel mapping policy descriptor.
+    ///
+    /// This constructor preserves `const` construction for early boot and
+    /// tests. It does not prove that ranges are non-empty, canonical, aligned,
+    /// non-overlapping, or backed by the expected permissions. Callers must
+    /// verify the descriptor with [`PageTableMapper::verify_kernel_mapping_policy`]
+    /// before treating any policy field as trustworthy.
     #[must_use]
     pub const fn new(
         text: KernelVirtualRange,
