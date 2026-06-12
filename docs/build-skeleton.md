@@ -79,7 +79,9 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `kernel_user_guard_ok=true`, `kernel_only_ok=true`, `visit_ok=true`,
 `flags_ok=true`, `reclaim_ok=true`, `range_ok=true`, `flush_page=true`,
 `[TEST] page-table=ok`, `paging-policy mapped_pages=`,
-`[TEST] paging-policy=ok`,
+`section_layout_ok=true`, `text_rx_ok=true`, `rodata_read_only_ok=true`,
+`data_rw_nx_ok=true`, `heap_reserved_ok=true`, `guard_page_ok=true`,
+`null_page_ok=true`, `[TEST] paging-policy=ok`,
 `[TEST] bootinfo=ok`, and `[TEST] boot=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
