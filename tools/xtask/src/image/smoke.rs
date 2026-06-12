@@ -212,6 +212,22 @@ impl SmokeKind {
         }
     }
 
+    pub(crate) fn required_markers(self) -> &'static [&'static str] {
+        match self {
+            Self::Boot => BOOT_REQUIRED_MARKERS,
+            Self::Panic => PANIC_REQUIRED_MARKERS,
+            Self::Exception => EXCEPTION_REQUIRED_MARKERS,
+            Self::Timer => TIMER_REQUIRED_MARKERS,
+        }
+    }
+
+    pub(crate) fn forbidden_markers(self) -> &'static [&'static str] {
+        match self {
+            Self::Boot => BOOT_FORBIDDEN_MARKERS,
+            Self::Panic | Self::Exception | Self::Timer => &[],
+        }
+    }
+
     pub fn feature(self) -> Option<&'static str> {
         match self {
             Self::Boot => None,
@@ -227,15 +243,8 @@ pub fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
 }
 
 pub(crate) fn serial_log_contents_match(contents: &str, smoke: SmokeKind) -> bool {
-    match smoke {
-        SmokeKind::Boot => {
-            contains_all(contents, BOOT_REQUIRED_MARKERS)
-                && contains_none(contents, BOOT_FORBIDDEN_MARKERS)
-        }
-        SmokeKind::Panic => contains_all(contents, PANIC_REQUIRED_MARKERS),
-        SmokeKind::Exception => contains_all(contents, EXCEPTION_REQUIRED_MARKERS),
-        SmokeKind::Timer => contains_all(contents, TIMER_REQUIRED_MARKERS),
-    }
+    contains_all(contents, smoke.required_markers())
+        && contains_none(contents, smoke.forbidden_markers())
 }
 
 fn contains_all(contents: &str, markers: &[&str]) -> bool {

@@ -211,8 +211,8 @@ fn boot_config_markers_cover_limine_kernel_path() {
 }
 
 #[test]
-fn image_manifest_records_diagnostic_smoke_markers() -> Result<(), String> {
-    let manifest = temp_manifest_path("diagnostic-smoke-markers");
+fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
+    let manifest = temp_manifest_path("required-smoke-markers");
     let host_tools = HostToolVersions {
         rustc: String::from("rustc test"),
         cargo: String::from("cargo test"),
@@ -234,10 +234,28 @@ fn image_manifest_records_diagnostic_smoke_markers() -> Result<(), String> {
     let _ = fs::remove_file(&manifest);
 
     assert!(contents.contains("smoke=panic\n"));
-    assert!(contents.contains("boot_diagnostic_marker=[kernel][INFO] bootinfo normalized\n"));
-    assert!(contents.contains("panic_diagnostic_marker=[kernel][FATAL] panic handler entered\n"));
-    assert!(contents.contains("panic_registers_marker=panic registers=\n"));
-    assert!(contents.contains("panic_marker=[TEST] panic=ok\n"));
+    for smoke in [
+        SmokeKind::Boot,
+        SmokeKind::Panic,
+        SmokeKind::Exception,
+        SmokeKind::Timer,
+    ] {
+        for marker in smoke.required_markers() {
+            assert!(
+                contents.contains(marker),
+                "manifest does not record required {} smoke marker: {marker}",
+                smoke.name()
+            );
+        }
+
+        for marker in smoke.forbidden_markers() {
+            assert!(
+                !contents.contains(marker),
+                "manifest records forbidden {} smoke marker: {marker}",
+                smoke.name()
+            );
+        }
+    }
     Ok(())
 }
 
