@@ -595,7 +595,8 @@ Deliverables:
   assumptions.
 - Upfront flag validation for range map/protect/verification paths.
 - Empty intermediate table reclamation after unmap.
-- Read-only consistency audit for reachable tables and mapped-page accounting.
+- Read-only consistency audit for reachable tables and mapped-page accounting
+  that does not mutate mapper state on success or failure.
 - Redacted mapping summaries for page classes without reporting physical
   addresses, with fail-closed accounting-drift and corrupt-table coverage.
 - Mapper-produced audit and mapping-summary reports are inspectable but not
