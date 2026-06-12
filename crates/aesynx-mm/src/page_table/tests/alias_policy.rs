@@ -104,6 +104,22 @@ fn mapper_alias_check_trusts_map_time_invariant() -> Result<(), PageTableError> 
 }
 
 #[test]
+fn mapper_alias_check_rederives_alias_invariant_from_tables() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<8>::new()?;
+    let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
+    mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, flags)?;
+    mapper.tables[3].slots[1] = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 63),
+    };
+
+    assert_eq!(
+        mapper.ensure_no_physical_aliases(),
+        Err(PageTableError::PhysicalAlias)
+    );
+    Ok(())
+}
+
+#[test]
 fn mapper_alias_check_rejects_corrupt_tables() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.tables[0].slots[0] = PageTableSlot::next(1)?;

@@ -52,9 +52,11 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         }
 
         let mut incoming = [0u8; TABLES];
+        let mut seen_frames = [false; super::MAPPED_FRAME_INDEX_ENTRIES];
         let mut used_tables = 0u64;
         let mut reachable_tables = 0u64;
         let mut mapped_pages = 0u64;
+        self.mapped_frames.validate(self.mapped_pages)?;
         let mut table_index = 0usize;
         while table_index < TABLES {
             if self.used[table_index] {
@@ -87,6 +89,15 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
                         if slot.mapping()?.is_none() {
                             return Err(PageTableError::CorruptTable);
                         }
+                        let mapping = slot.leaf_mapping()?;
+                        let frame_position = self.mapped_frames.position_of(mapping.phys())?;
+                        if frame_position >= super::MAPPED_FRAME_INDEX_ENTRIES {
+                            return Err(PageTableError::CorruptTable);
+                        }
+                        if seen_frames[frame_position] {
+                            return Err(PageTableError::PhysicalAlias);
+                        }
+                        seen_frames[frame_position] = true;
                         mapped_pages = mapped_pages
                             .checked_add(1)
                             .ok_or(PageTableError::AddressOverflow)?;
@@ -105,6 +116,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         if mapped_pages != self.mapped_pages {
             return Err(PageTableError::CorruptTable);
         }
+        self.mapped_frames.validate_seen(&seen_frames)?;
 
         Ok(PageTableAudit::new(
             TABLES as u64,

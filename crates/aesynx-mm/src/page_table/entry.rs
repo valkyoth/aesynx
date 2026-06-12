@@ -27,6 +27,8 @@ impl X86_64PageTableEntry {
     const USER: u64 = 1 << 2;
     const WRITE_THROUGH: u64 = 1 << 3;
     const CACHE_DISABLE: u64 = 1 << 4;
+    const ACCESSED: u64 = 1 << 5;
+    const DIRTY: u64 = 1 << 6;
     const GLOBAL: u64 = 1 << 8;
     const NO_EXECUTE: u64 = 1 << 63;
     pub(super) const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
@@ -37,6 +39,8 @@ impl X86_64PageTableEntry {
         | Self::USER
         | Self::WRITE_THROUGH
         | Self::CACHE_DISABLE
+        | Self::ACCESSED
+        | Self::DIRTY
         | Self::GLOBAL
         | Self::NO_EXECUTE
         | Self::ADDRESS_MASK;

@@ -7,6 +7,7 @@ use crate::GenericPageFlags;
 mod address;
 mod audit;
 mod entry;
+mod frame_index;
 mod outcome;
 mod policy;
 mod preflight;
@@ -23,6 +24,7 @@ mod walk;
 
 use address::{PAGE_OFFSET_MASK, is_canonical, page_indices, validate_phys, validate_virt_page};
 use entry::{PageTableSlot, X86_64PageTableEntry};
+pub(crate) use frame_index::{MAPPED_FRAME_INDEX_ENTRIES, MappedFrameIndex};
 pub use outcome::{
     MapOutcome, MapRangeOutcome, ProtectOutcome, ProtectRangeOutcome, UnmapOutcome,
     UnmapRangeOutcome,
@@ -65,6 +67,7 @@ pub struct PageTableMapper<const TABLES: usize> {
     tables: [PageTable; TABLES],
     used: [bool; TABLES],
     mapped_pages: u64,
+    mapped_frames: MappedFrameIndex,
 }
 
 impl<const TABLES: usize> fmt::Debug for PageTableMapper<TABLES> {
@@ -90,6 +93,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
             tables: [PageTable::EMPTY; TABLES],
             used,
             mapped_pages: 0,
+            mapped_frames: MappedFrameIndex::empty(),
         })
     }
 
@@ -110,7 +114,7 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let leaf = PageTableSlot::leaf(mapping)?;
         self.audit()?;
         self.validate_map_capacity(virt)?;
-        self.ensure_physical_frame_unused(mapping.phys())?;
+        let frame_insert = self.mapped_frames.validate_insert(mapping.phys())?;
         let mapped_pages = self
             .mapped_pages
             .checked_add(1)
@@ -124,6 +128,8 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         if !slot.is_empty() {
             return Err(PageTableError::AlreadyMapped);
         }
+        self.mapped_frames
+            .insert_validated(frame_insert, mapping.phys())?;
         *slot = leaf;
         self.mapped_pages = mapped_pages;
         Ok(MapOutcome::new(TlbFlush::Page(virt)))
@@ -137,10 +143,12 @@ impl<const TABLES: usize> PageTableMapper<TABLES> {
         let table_index = path[PAGE_TABLE_LEVELS - 1];
         let slot = &mut self.tables[table_index].slots[indices[PAGE_TABLE_LEVELS - 1]];
         let mapping = slot.leaf_mapping()?;
+        let frame_remove = self.mapped_frames.validate_remove(mapping.phys())?;
         let mapped_pages = self
             .mapped_pages
             .checked_sub(1)
             .ok_or(PageTableError::CorruptTable)?;
+        self.mapped_frames.remove_validated(frame_remove)?;
         *slot = PageTableSlot::EMPTY;
         self.mapped_pages = mapped_pages;
         self.reclaim_empty_tables(indices, path)?;

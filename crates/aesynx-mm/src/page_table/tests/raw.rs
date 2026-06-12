@@ -51,9 +51,24 @@ fn x86_64_entry_encodes_safe_mapping_flags() -> Result<(), PageTableError> {
     assert_eq!(entry.raw() & 1, 1);
     assert_eq!(entry.raw() & (1 << 1), 0);
     assert_eq!(entry.raw() & (1 << 2), 0);
+    assert_eq!(entry.raw() & (1 << 5), 0);
+    assert_eq!(entry.raw() & (1 << 6), 0);
     assert_eq!(entry.raw() & (1 << 8), 1 << 8);
     assert_eq!(entry.raw() & (1 << 63), 0);
     Ok(())
+}
+
+#[test]
+fn raw_slot_decode_accepts_hardware_accessed_and_dirty_bits() {
+    let flags = GenericPageFlags::kernel(PageAccess::ReadWrite);
+    let slot = PageTableSlot {
+        raw: KERNEL_PHYS.get() | 1 | (1 << 1) | (1 << 5) | (1 << 6) | (1 << 63),
+    };
+
+    assert_eq!(
+        slot.mapping(),
+        Ok(Some(PageMapping::new(KERNEL_PHYS, flags)))
+    );
 }
 
 #[test]

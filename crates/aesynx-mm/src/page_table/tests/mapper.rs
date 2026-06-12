@@ -458,6 +458,7 @@ fn mapper_capacity_helper_rejects_empty_arena() {
         tables: [],
         used: [],
         mapped_pages: 0,
+        mapped_frames: crate::page_table::MappedFrameIndex::empty(),
     };
 
     assert_eq!(
@@ -472,6 +473,7 @@ fn mapper_table_path_helper_rejects_empty_arena() {
         tables: [],
         used: [],
         mapped_pages: 0,
+        mapped_frames: crate::page_table::MappedFrameIndex::empty(),
     };
 
     assert_eq!(

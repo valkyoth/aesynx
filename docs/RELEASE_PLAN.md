@@ -679,6 +679,10 @@ Deliverables:
 - No-global mapping policy check for candidate local address spaces.
 - Map-time no-physical-alias policy check for candidate exclusive frame
   ownership.
+- Bounded frame side index for duplicate-frame rejection and audit-time
+  table/index agreement checks.
+- x86_64 leaf decoding that accepts hardware-managed Accessed and Dirty bits
+  without emitting them from clean mapping construction.
 - Kernel-privileged virtual range policy check for mixed address spaces.
 - User-privileged virtual range policy check for future user address spaces.
 - Write-protected virtual range policy check for text and read-only data

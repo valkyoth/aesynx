@@ -64,6 +64,7 @@ fn mapper_checked_root_rejects_empty_arena() {
         tables: [],
         used: [],
         mapped_pages: 0,
+        mapped_frames: crate::page_table::MappedFrameIndex::empty(),
     };
 
     assert_eq!(mapper.root_table_checked(), Err(PageTableError::EmptyArena));

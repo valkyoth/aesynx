@@ -11,6 +11,7 @@ fn mapper_audit_rejects_empty_arena() {
         tables: [],
         used: [],
         mapped_pages: 0,
+        mapped_frames: crate::page_table::MappedFrameIndex::empty(),
     };
 
     assert_eq!(mapper.audit(), Err(PageTableError::EmptyArena));

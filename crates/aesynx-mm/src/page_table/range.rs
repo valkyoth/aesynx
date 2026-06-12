@@ -232,9 +232,14 @@ pub(super) fn validate_range_walk<const TABLES: usize>(
     page_count: u64,
 ) -> Result<(), PageTableError> {
     validate_page_count(page_count)?;
-    let max_pages = (TABLES as u64)
+    let table_walk_pages = (TABLES as u64)
         .checked_mul(super::PAGE_TABLE_ENTRIES as u64)
         .ok_or(PageTableError::AddressOverflow)?;
+    let max_pages = if table_walk_pages > super::MAPPED_FRAME_INDEX_ENTRIES as u64 {
+        super::MAPPED_FRAME_INDEX_ENTRIES as u64
+    } else {
+        table_walk_pages
+    };
     if page_count > max_pages {
         return Err(PageTableError::RangeTooLarge);
     }
