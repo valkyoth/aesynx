@@ -602,6 +602,8 @@ Deliverables:
 - Page-table debug output for mapper, mapping, translation, flush, outcome,
   root-token, raw-entry, internal raw-slot, and validated-range types does not
   dump raw table slots or address-bearing fields.
+- Mapper-produced status, audit, and mapping-summary debug output reports only
+  aggregate counters.
 - Page-table root debug output reports only model-root wording without exposing
   the internal model table index, physical root, or CR3 claims.
 - Mapping visitors run structural audit before invoking callbacks, so corrupt

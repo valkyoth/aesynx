@@ -103,6 +103,29 @@ fn outcome_debug_outputs_redact_mapping_addresses() -> Result<(), PageTableError
     Ok(())
 }
 
+#[test]
+fn mapper_report_debug_outputs_are_aggregate_only() -> Result<(), PageTableError> {
+    let mut mapper = PageTableMapper::<4>::new()?;
+    mapper.map_page(
+        KERNEL_VIRT,
+        KERNEL_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )?;
+
+    let status_debug = format!("{:?}", mapper.status_checked()?);
+    let audit_debug = format!("{:?}", mapper.audit()?);
+    let summary_debug = format!("{:?}", mapper.mapping_summary()?);
+
+    for debug in [status_debug, audit_debug, summary_debug] {
+        assert!(debug.contains("tables") || debug.contains("pages"));
+        assert!(!debug.contains("<redacted>"));
+        assert!(!debug.contains("slots"));
+        assert!(!debug.contains("raw"));
+        assert_debug_hides_addresses(&debug);
+    }
+    Ok(())
+}
+
 fn assert_debug_redacts_addresses(debug: &str) {
     assert!(debug.contains("<redacted>"));
     assert_debug_hides_addresses(debug);
