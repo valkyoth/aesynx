@@ -30,6 +30,13 @@ if [ ! -s "$report" ]; then
     exit 1
 fi
 
+if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
+    if [ ! -s sbom/aesynx.spdx.json ]; then
+        echo "release readiness: missing generated SBOM: sbom/aesynx.spdx.json" >&2
+        exit 1
+    fi
+fi
+
 head_commit="$(git rev-parse HEAD)"
 
 if ! grep -Fxq "Tag: $tag" "$report"; then

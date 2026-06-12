@@ -17,7 +17,7 @@ claim that the controls are implemented today.
 | Supply chain | Executable dependency and workflow changes require review | Policy only | `docs/supply-chain-security.md` |
 | Post-quantum readiness | Boot, package, update, entitlement, and identity metadata must stay crypto-agile and support future hybrid validation | Planned | `docs/post-quantum-readiness.md`, `docs/ARCHITECTURE_DECISIONS.md` |
 | Static analysis | GitHub CodeQL default setup for Rust | Configured externally | GitHub code scanning default setup |
-| Release pentest | Passing pentest report with exact tag, current commit, required metadata, no scratch findings file, and no existing local tag required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
+| Release pentest | Passing pentest report with exact tag, current commit, required metadata, generated SBOM evidence, no scratch findings file, and no existing local tag required before every tag | Configured | `scripts/validate-release-readiness.sh`, `security/pentest/README.md` |
 | Capabilities | No ambient authority as design center | Model active | `crates/aesynx-cap`, `docs/IMPLEMENTATION_PLAN.md` |
 | Capability audit | Derive/grant authority transfer must use audited call paths | Model active | `CapAuditLog`, `derive_with_audit`, `grant_with_audit` |
 | Capability unforgeability | Capability fields are private and capability values are not `Copy` or `Clone` | Model active | `Capability` accessors |

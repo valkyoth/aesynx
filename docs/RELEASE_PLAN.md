@@ -50,6 +50,8 @@ not tag-ready until:
 - The pentest report has `Status: PASS`.
 - The pentest report has non-empty `Tester:` and `Scope:` fields and a
   `Date: YYYY-MM-DD` field.
+- `sbom/aesynx.spdx.json` exists and is non-empty when the Rust workspace is
+  active.
 - The tag does not already exist locally.
 - `scripts/validate-release-readiness.sh <tag>` passes.
 
@@ -74,7 +76,8 @@ Use this loop for every version:
    date, and scope.
 6. `cargo xtask release-ready <tag>` must pass before tagging; it fails if the
    root scratch `PENTEST.md` still exists, required report metadata is missing,
-   or the tag already exists locally.
+   SBOM evidence is missing for an active Rust workspace, or the tag already
+   exists locally.
 
 Never commit root `PENTEST.md`; it is a local scratch handoff file and is
 ignored by git.

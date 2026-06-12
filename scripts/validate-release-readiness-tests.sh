@@ -99,6 +99,19 @@ if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
 fi
 git tag -d "$tag" >/dev/null
 
+cat >Cargo.toml <<'EOF'
+[workspace]
+members = ["crates/example"]
+EOF
+write_report "$head_commit" "PASS"
+if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
+    echo "release readiness tests: missing SBOM did not block release" >&2
+    exit 1
+fi
+mkdir -p sbom
+printf '{"SPDXID":"SPDXRef-DOCUMENT"}\n' >sbom/aesynx.spdx.json
+"$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null
+
 write_report "$head_commit" "PASS"
 cat >PENTEST.md <<'EOF'
 temporary findings must block release readiness
