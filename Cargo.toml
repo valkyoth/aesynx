@@ -21,6 +21,7 @@ members = [
     "crates/aesynx-shell",
     "crates/aesynx-telemetry",
     "crates/aesynx-time",
+    "models/aesynx-object-model",
     "tools/xtask",
 ]
 resolver = "3"
@@ -54,6 +55,7 @@ aesynx-ipc = { path = "crates/aesynx-ipc", version = "0.1.0" }
 aesynx-log = { path = "crates/aesynx-log", version = "0.1.0" }
 aesynx-mm = { path = "crates/aesynx-mm", version = "0.1.0" }
 aesynx-object = { path = "crates/aesynx-object", version = "0.1.0" }
+aesynx-object-model = { path = "models/aesynx-object-model", version = "0.1.0" }
 aesynx-platform = { path = "crates/aesynx-platform", version = "0.1.0" }
 aesynx-rt = { path = "crates/aesynx-rt", version = "0.1.0" }
 aesynx-sched = { path = "crates/aesynx-sched", version = "0.1.0" }

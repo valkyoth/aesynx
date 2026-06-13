@@ -112,6 +112,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aesynx-object-model"
+version = "0.1.0"
+dependencies = [
+ "aesynx-abi",
+]
+
+[[package]]
 name = "aesynx-platform"
 version = "0.1.0"
 dependencies = [
