@@ -184,9 +184,10 @@ reclamation.
 
 The v0.24.0 candidate adds the no_std fixed-capacity kernel object registry. It
 supports memory, endpoint, queue, and task-placeholder object creation, local
-core ownership, deletion with no-reuse tombstones, validate-then-write listing,
-redacted object debug output, and capability reference resolution against object
-ID, kind, generation, and required permission. This is still host-tested
+core ownership, generation-backed slot recycling after deletion,
+validate-then-write listing, redacted object debug output, and capability
+reference resolution against object ID, kind, generation, and required
+permission. This is still host-tested
 registry logic; the live boot path does not yet expose object syscalls or a
 service queue.
 

@@ -45,13 +45,14 @@ impl ObjectCreate {
 
 #[derive(Clone, Copy)]
 enum ObjectSlot {
-    Empty,
+    Empty { next_generation: u32 },
     Live(ObjectRecord),
-    Deleted { id: ObjectId },
 }
 
 impl ObjectSlot {
-    const EMPTY: Self = Self::Empty;
+    const EMPTY: Self = Self::Empty {
+        next_generation: INITIAL_OBJECT_GENERATION,
+    };
 }
 
 pub struct ObjectRegistry<const CAPACITY: usize> {
@@ -69,14 +70,14 @@ impl<const CAPACITY: usize> ObjectRegistry<CAPACITY> {
     pub fn create(&mut self, request: ObjectCreate) -> Result<ObjectRecord, ObjectRegistryError> {
         validate_id(request.id)?;
         self.ensure_id_unused(request.id)?;
-        let slot = self
+        let (slot, generation) = self
             .vacant_slot()
             .ok_or(ObjectRegistryError::RegistryFull)?;
         let record = ObjectRecord::new(
             request.id,
             request.object_type,
             request.owner_core,
-            INITIAL_OBJECT_GENERATION,
+            generation,
         );
 
         self.slots[slot] = ObjectSlot::Live(record);
@@ -89,8 +90,12 @@ impl<const CAPACITY: usize> ObjectRegistry<CAPACITY> {
         let ObjectSlot::Live(record) = self.slots[slot] else {
             return Err(ObjectRegistryError::ObjectNotFound);
         };
+        let next_generation = record
+            .generation()
+            .checked_add(1)
+            .ok_or(ObjectRegistryError::GenerationExhausted)?;
 
-        self.slots[slot] = ObjectSlot::Deleted { id };
+        self.slots[slot] = ObjectSlot::Empty { next_generation };
         Ok(record)
     }
 
@@ -99,9 +104,7 @@ impl<const CAPACITY: usize> ObjectRegistry<CAPACITY> {
         let slot = self.live_slot(id)?;
         match self.slots[slot] {
             ObjectSlot::Live(record) => Ok(record),
-            ObjectSlot::Empty | ObjectSlot::Deleted { .. } => {
-                Err(ObjectRegistryError::ObjectNotFound)
-            }
+            ObjectSlot::Empty { .. } => Err(ObjectRegistryError::ObjectNotFound),
         }
     }
 
@@ -165,29 +168,27 @@ impl<const CAPACITY: usize> ObjectRegistry<CAPACITY> {
                 ObjectSlot::Live(record) if record.object_id() == id => {
                     return Err(ObjectRegistryError::DuplicateObject);
                 }
-                ObjectSlot::Deleted { id: deleted_id, .. } if *deleted_id == id => {
-                    return Err(ObjectRegistryError::DeletedObject);
-                }
-                ObjectSlot::Empty | ObjectSlot::Live(_) | ObjectSlot::Deleted { .. } => {}
+                ObjectSlot::Empty { .. } | ObjectSlot::Live(_) => {}
             }
         }
         Ok(())
     }
 
-    fn vacant_slot(&self) -> Option<usize> {
-        self.slots
-            .iter()
-            .position(|slot| matches!(slot, ObjectSlot::Empty))
+    fn vacant_slot(&self) -> Option<(usize, u32)> {
+        for (index, slot) in self.slots.iter().enumerate() {
+            if let ObjectSlot::Empty { next_generation } = slot {
+                return Some((index, *next_generation));
+            }
+        }
+
+        None
     }
 
     fn live_slot(&self, id: ObjectId) -> Result<usize, ObjectRegistryError> {
         for (index, slot) in self.slots.iter().enumerate() {
             match slot {
                 ObjectSlot::Live(record) if record.object_id() == id => return Ok(index),
-                ObjectSlot::Deleted { id: deleted_id, .. } if *deleted_id == id => {
-                    return Err(ObjectRegistryError::DeletedObject);
-                }
-                ObjectSlot::Empty | ObjectSlot::Live(_) | ObjectSlot::Deleted { .. } => {}
+                ObjectSlot::Empty { .. } | ObjectSlot::Live(_) => {}
             }
         }
         Err(ObjectRegistryError::ObjectNotFound)
@@ -215,11 +216,11 @@ fn cap_kind_matches(record: ObjectRecord, cap_kind: CapKind) -> bool {
 pub enum ObjectRegistryError {
     InvalidObjectId,
     DuplicateObject,
-    DeletedObject,
     RegistryFull,
     ObjectNotFound,
     OutputTooSmall,
     MissingPermission,
     WrongCapabilityKind,
     StaleObjectGeneration,
+    GenerationExhausted,
 }

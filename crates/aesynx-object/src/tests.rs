@@ -41,13 +41,29 @@ fn registry_creates_lists_and_deletes_local_objects() -> Result<(), ObjectRegist
     assert_eq!(registry.len(), 3);
     assert_eq!(
         registry.get(object_id(3)),
-        Err(ObjectRegistryError::DeletedObject)
+        Err(ObjectRegistryError::ObjectNotFound)
     );
-    assert_eq!(
-        registry.create(ObjectCreate::queue(object_id(3), owner(1))),
-        Err(ObjectRegistryError::DeletedObject)
-    );
+    let recreated = registry.create(ObjectCreate::queue(object_id(3), owner(1)))?;
+    assert_eq!(recreated.object_id(), object_id(3));
+    assert_eq!(recreated.generation(), deleted.generation() + 1);
+    assert_eq!(registry.len(), 4);
 
+    Ok(())
+}
+
+#[test]
+fn registry_recycles_deleted_slots_with_new_generations() -> Result<(), ObjectRegistryError> {
+    let mut registry = ObjectRegistry::<1>::new();
+    let first = registry.create(ObjectCreate::endpoint(object_id(9), owner(0)))?;
+    let deleted = registry.delete(first.object_id())?;
+
+    assert_eq!(deleted, first);
+    assert!(registry.is_empty());
+
+    let second = registry.create(ObjectCreate::endpoint(object_id(9), owner(0)))?;
+
+    assert_eq!(second.object_id(), first.object_id());
+    assert_eq!(second.generation(), first.generation() + 1);
     Ok(())
 }
 
@@ -156,6 +172,40 @@ fn object_capability_resolution_rejects_wrong_kind_and_stale_generation()
         ),
         Err(ObjectRegistryError::WrongCapabilityKind)
     );
+    assert_eq!(
+        registry.resolve_capability(
+            table
+                .get(stale)
+                .map_err(|_| ObjectRegistryError::ObjectNotFound)?,
+            CapPerms::READ
+        ),
+        Err(ObjectRegistryError::StaleObjectGeneration)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn object_capability_resolution_rejects_recycled_stale_generation()
+-> Result<(), ObjectRegistryError> {
+    let mut registry = ObjectRegistry::<1>::new();
+    let first = registry.create(ObjectCreate::endpoint(object_id(2), owner(0)))?;
+    let mut table = CapabilityTable::<1>::new();
+    let stale = table
+        .insert_root(
+            first.object_id(),
+            CapKind::Endpoint,
+            PrincipalId::new(7),
+            CapPerms::READ,
+            first.generation(),
+            0,
+        )
+        .map_err(|_| ObjectRegistryError::ObjectNotFound)?;
+
+    registry.delete(first.object_id())?;
+    let second = registry.create(ObjectCreate::endpoint(first.object_id(), owner(0)))?;
+
+    assert_eq!(second.generation(), first.generation() + 1);
     assert_eq!(
         registry.resolve_capability(
             table
