@@ -247,9 +247,11 @@ impl KernelHeapAllocator {
             self.page_state[page].store(PAGE_LARGE_TAIL, Ordering::Release);
             page += 1;
         }
+        let ptr = self.ptr_for_offset(start_page * KERNEL_HEAP_PAGE_SIZE);
+        zero_heap_bytes(ptr, pages * KERNEL_HEAP_PAGE_SIZE);
         self.record_allocation(pages * KERNEL_HEAP_PAGE_SIZE);
         self.page_allocations.fetch_add(1, Ordering::AcqRel);
-        Ok(self.ptr_for_offset(start_page * KERNEL_HEAP_PAGE_SIZE))
+        Ok(ptr)
     }
 
     fn deallocate_slab_locked(

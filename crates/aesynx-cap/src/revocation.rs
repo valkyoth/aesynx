@@ -1,6 +1,6 @@
 use aesynx_abi::ObjectId;
 
-use crate::{CapPerms, Capability};
+use crate::{CapPerms, CapValidationError, Capability};
 
 pub trait RevocationEpochStore {
     /// Increments and returns the object's revocation epoch.
@@ -10,11 +10,16 @@ pub trait RevocationEpochStore {
     /// Wrapped epochs can make revoked capabilities spuriously validate again.
     fn increment_epoch(&mut self, object_id: ObjectId) -> Result<u64, RevocationError>;
 
-    fn revoke_object(
+    fn revoke_object_live(
         &mut self,
         authority: &Capability,
         object_id: ObjectId,
+        current_generation: u32,
+        current_epoch: u64,
     ) -> Result<u64, RevocationError> {
+        authority
+            .validate_live(current_generation, current_epoch)
+            .map_err(RevocationError::from)?;
         ensure_revoke_authority(authority, object_id)?;
         self.increment_epoch(object_id)
     }
@@ -38,8 +43,19 @@ pub fn ensure_revoke_authority(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RevocationError {
     MissingRevokePermission,
+    StaleAuthority,
+    AuthorityRevoked,
     WrongObject,
     StoreUnavailable,
+}
+
+impl From<CapValidationError> for RevocationError {
+    fn from(error: CapValidationError) -> Self {
+        match error {
+            CapValidationError::StaleGeneration => Self::StaleAuthority,
+            CapValidationError::Revoked => Self::AuthorityRevoked,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -94,14 +110,31 @@ mod tests {
         let mut store = TestEpochStore::default();
 
         assert_eq!(
-            store.revoke_object(&cap(object_id, CapPerms::READ), object_id),
+            store.revoke_object_live(&cap(object_id, CapPerms::READ), object_id, 1, 1),
             Err(RevocationError::MissingRevokePermission)
         );
         assert_eq!(store.epoch, 0);
         assert_eq!(
-            store.revoke_object(&cap(object_id, CapPerms::REVOKE), object_id),
+            store.revoke_object_live(&cap(object_id, CapPerms::REVOKE), object_id, 1, 1),
             Ok(1)
         );
+    }
+
+    #[test]
+    fn revoke_object_rejects_stale_or_revoked_authority_before_epoch_increment() {
+        let object_id = ObjectId::new(7);
+        let mut store = TestEpochStore::default();
+
+        assert_eq!(
+            store.revoke_object_live(&cap(object_id, CapPerms::REVOKE), object_id, 2, 1),
+            Err(RevocationError::StaleAuthority)
+        );
+        assert_eq!(store.epoch, 0);
+        assert_eq!(
+            store.revoke_object_live(&cap(object_id, CapPerms::REVOKE), object_id, 1, 2),
+            Err(RevocationError::AuthorityRevoked)
+        );
+        assert_eq!(store.epoch, 0);
     }
 
     #[test]
@@ -110,7 +143,7 @@ mod tests {
         let mut store = TestEpochStore { epoch: u64::MAX };
 
         assert_eq!(
-            store.revoke_object(&cap(object_id, CapPerms::REVOKE), object_id),
+            store.revoke_object_live(&cap(object_id, CapPerms::REVOKE), object_id, 1, 1),
             Err(RevocationError::StoreUnavailable)
         );
         assert_eq!(store.epoch, u64::MAX);

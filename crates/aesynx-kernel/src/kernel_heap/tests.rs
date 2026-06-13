@@ -157,6 +157,22 @@ fn page_run_memory_is_zeroed_before_reuse() -> Result<(), KernelHeapError> {
 }
 
 #[test]
+fn page_run_memory_is_zeroed_on_first_allocation() -> Result<(), KernelHeapError> {
+    let allocator = KernelHeapAllocator::new();
+    let heap = TestHeap([0xa5; KERNEL_HEAP_PAGE_SIZE * 8]);
+    allocator.init_with_bounds(heap.0.as_ptr() as usize, heap.0.len())?;
+    let layout = Layout::from_size_align(KERNEL_HEAP_PAGE_SIZE + 17, KERNEL_HEAP_PAGE_SIZE)
+        .map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let run_bytes = KERNEL_HEAP_PAGE_SIZE * 2;
+
+    let ptr = allocator.allocate_checked(layout)?;
+    assert!(test_support::allocation_is_zero(ptr, run_bytes)?);
+
+    allocator.deallocate_checked(ptr, layout)?;
+    Ok(())
+}
+
+#[test]
 fn stats_track_allocations_frees_and_peak() -> Result<(), KernelHeapError> {
     let (allocator, _heap) = init_test_allocator()?;
     let slab = Layout::from_size_align(128, 32).map_err(|_error| KernelHeapError::InvalidLayout)?;
