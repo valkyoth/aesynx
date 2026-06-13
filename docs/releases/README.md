@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.23.0 - Object Model Crate](v0.23.0-rc.md)
+- [v0.24.0 - Kernel Object Registry](v0.24.0-rc.md)
 
 ## History
 
+- [v0.23.0 - Object Model Crate](v0.23.0-rc.md)
 - [v0.22.0 - Capability Audit Events](v0.22.0-rc.md)
 - [v0.21.0 - Memory Capabilities](v0.21.0-rc.md)
 - [v0.20.0 - Kernel Capability Table](v0.20.0-rc.md)

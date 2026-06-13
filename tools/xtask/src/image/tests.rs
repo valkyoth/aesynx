@@ -52,7 +52,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn qemu_markers_track_v0_23_0_contracts() {
+fn qemu_markers_track_v0_24_0_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
@@ -277,7 +277,7 @@ fn qemu_args_select_smoke_kind() {
 }
 
 #[test]
-fn boot_smoke_requires_full_v0_23_0_marker_set() {
+fn boot_smoke_requires_full_v0_24_0_marker_set() {
     assert_smoke_contract_requires_each_marker(SmokeKind::Boot);
 
     let valid = SmokeKind::Boot.markers();
@@ -364,28 +364,28 @@ fn image_kernel_profile_is_release() {
 #[test]
 fn image_artifact_names_track_current_candidate_version() {
     let boot = image_names(SmokeKind::Boot);
-    assert_eq!(boot.image, "aesynx-v0.23.0.iso");
-    assert_eq!(boot.manifest, "aesynx-v0.23.0.manifest");
-    assert_eq!(boot.serial_log, "aesynx-v0.23.0.serial.log");
-    assert_eq!(boot.staging_dir, "aesynx-v0.23.0-iso");
+    assert_eq!(boot.image, "aesynx-v0.24.0.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.24.0.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.24.0.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.24.0-iso");
 
     let panic = image_names(SmokeKind::Panic);
-    assert_eq!(panic.image, "aesynx-v0.23.0-panic.iso");
-    assert_eq!(panic.manifest, "aesynx-v0.23.0-panic.manifest");
-    assert_eq!(panic.serial_log, "aesynx-v0.23.0-panic.serial.log");
-    assert_eq!(panic.staging_dir, "aesynx-v0.23.0-panic-iso");
+    assert_eq!(panic.image, "aesynx-v0.24.0-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.24.0-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.24.0-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.24.0-panic-iso");
 
     let exception = image_names(SmokeKind::Exception);
-    assert_eq!(exception.image, "aesynx-v0.23.0-exception.iso");
-    assert_eq!(exception.manifest, "aesynx-v0.23.0-exception.manifest");
-    assert_eq!(exception.serial_log, "aesynx-v0.23.0-exception.serial.log");
-    assert_eq!(exception.staging_dir, "aesynx-v0.23.0-exception-iso");
+    assert_eq!(exception.image, "aesynx-v0.24.0-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.24.0-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.24.0-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.24.0-exception-iso");
 
     let timer = image_names(SmokeKind::Timer);
-    assert_eq!(timer.image, "aesynx-v0.23.0-timer.iso");
-    assert_eq!(timer.manifest, "aesynx-v0.23.0-timer.manifest");
-    assert_eq!(timer.serial_log, "aesynx-v0.23.0-timer.serial.log");
-    assert_eq!(timer.staging_dir, "aesynx-v0.23.0-timer-iso");
+    assert_eq!(timer.image, "aesynx-v0.24.0-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.24.0-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.24.0-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.24.0-timer-iso");
 }
 
 #[test]
@@ -425,7 +425,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
-    assert!(contents.contains("name=Aesynx v0.23.0 Object model candidate\n"));
+    assert!(contents.contains("name=Aesynx v0.24.0 Kernel object registry candidate\n"));
     assert!(contents.contains("smoke=panic\n"));
     for smoke in [
         SmokeKind::Boot,
