@@ -87,4 +87,7 @@ Security-sensitive milestones should add:
 - Negative tests for malformed inputs.
 - Fuzz targets when parsers appear.
 - QEMU smoke tests when boot behavior exists.
+- Typed validation wrappers for caller-supplied identifiers before they are
+  used as indices, queue selectors, core selectors, object selectors, or
+  authority-bearing handles.
 - A release pentest report before tagging.

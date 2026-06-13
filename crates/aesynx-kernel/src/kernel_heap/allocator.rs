@@ -1,6 +1,12 @@
 use core::alloc::{GlobalAlloc, Layout};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
+#[cfg(feature = "smp")]
+compile_error!(
+    "KERNEL_HEAP uses single-core static backing storage; move heap storage to \
+     explicit interior mutability or per-core ownership before enabling smp"
+);
+
 use super::free_list::{
     FREE_LIST_EMPTY, decode_offset, encode_offset, read_free_next, write_free_next, zero_heap_bytes,
 };

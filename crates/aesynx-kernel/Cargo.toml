@@ -22,6 +22,7 @@ aesynx-time.workspace = true
 default = []
 exception-smoke = []
 panic-smoke = []
+smp = []
 timer-smoke = []
 
 [lints]

@@ -1304,6 +1304,10 @@ Deliverables:
 
 - `aesynx-ipc`.
 - Ring implementation.
+- Any router or dispatcher that uses `MessageRequest::dst` as a queue/core
+  selector must first convert it into a validated core identifier through a
+  typed live-core-set check; raw `CoreId` values are not valid indexing
+  authority.
 - Log service queue.
 - Timer service queue.
 - Object service queue skeleton.

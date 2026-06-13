@@ -235,5 +235,8 @@ pub enum ObjectRegistryError {
     WrongCapabilityKind,
     StaleObjectGeneration,
     Revoked,
+    /// The object was deliberately left live because recycling its slot would
+    /// wrap the generation counter and could make stale capabilities valid
+    /// again. Operators should treat this as a registry-retirement signal.
     GenerationExhausted,
 }

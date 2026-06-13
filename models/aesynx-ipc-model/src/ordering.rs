@@ -11,7 +11,7 @@ pub struct QueueOrderingEvidence {
 
 impl QueueOrderingEvidence {
     #[must_use]
-    pub const fn new(producer_publish: Ordering, consumer_observe: Ordering) -> Self {
+    pub(crate) const fn new(producer_publish: Ordering, consumer_observe: Ordering) -> Self {
         Self {
             producer_publish,
             consumer_observe,
@@ -30,6 +30,9 @@ impl QueueOrderingEvidence {
 
     #[must_use]
     pub const fn service_queue_contract() -> Self {
-        Self::new(PRODUCER_PUBLISH_ORDERING, CONSUMER_OBSERVE_ORDERING)
+        Self {
+            producer_publish: PRODUCER_PUBLISH_ORDERING,
+            consumer_observe: CONSUMER_OBSERVE_ORDERING,
+        }
     }
 }

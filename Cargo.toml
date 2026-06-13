@@ -64,3 +64,7 @@ aesynx-sched = { path = "crates/aesynx-sched", version = "0.1.0" }
 aesynx-shell = { path = "crates/aesynx-shell", version = "0.1.0" }
 aesynx-telemetry = { path = "crates/aesynx-telemetry", version = "0.1.0" }
 aesynx-time = { path = "crates/aesynx-time", version = "0.1.0" }
+
+[profile.release]
+overflow-checks = true
+panic = "abort"

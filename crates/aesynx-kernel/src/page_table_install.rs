@@ -1,6 +1,12 @@
 use aesynx_arch::ArchCpu;
 use core::sync::atomic::{Ordering, compiler_fence};
 
+#[cfg(feature = "smp")]
+compile_error!(
+    "ACTIVATION_ARENA and ACTIVATION_STACK are single-core statics; \
+     move activation storage to per-core ownership before enabling smp"
+);
+
 pub const ACTIVATION_TABLES: usize = aesynx_mm::PAGE_TABLE_LEVELS;
 const ACTIVATION_STACK_BYTES: usize = 16 * 1024;
 const ACTIVATION_STACK_GUARD_PAGES: u64 = 1;

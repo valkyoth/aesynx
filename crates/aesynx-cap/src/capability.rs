@@ -86,6 +86,13 @@ impl fmt::Debug for CapAuditEvent {
 /// create or recycle object generations must fail instead of wrapping the
 /// `u32` generation counter; wrapped generations can let stale capabilities
 /// pass `validate_live`.
+///
+/// `base = None` and `len = None` denotes unscoped whole-object authority.
+/// Deriving a bounded child from an unscoped parent is permission-gated, but it
+/// is not range-gated here beyond overflow rejection. Callers that need bounds
+/// against the underlying object's real extent must validate those bounds at
+/// the object, memory, or syscall layer; this type only prevents widening
+/// relative to the parent's own recorded range.
 #[derive(Eq, PartialEq)]
 pub struct Capability {
     object_id: ObjectId,
