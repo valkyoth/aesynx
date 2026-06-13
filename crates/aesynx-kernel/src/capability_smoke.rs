@@ -1,7 +1,8 @@
 use aesynx_abi::{CapId, ObjectId, PhysAddr, PrincipalId, VirtAddr};
 use aesynx_cap::{
     CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError,
-    Capability, CapabilityTable, DeriveRequest, MemoryAccess, MemoryCapError, MemoryMapRequest,
+    Capability, CapabilityTable, DeriveRequest, LiveAuthorityError, LiveAuthorityState,
+    LiveAuthorityView, MemoryAccess, MemoryCapError, MemoryMapRequest,
 };
 use aesynx_mm::{FRAME_SIZE, GenericPageFlags, PageAccess, PageMapping, PageTableError};
 use aesynx_telemetry::{CapFaultKind, CoreTelemetry, TelemetryError};
@@ -52,12 +53,13 @@ pub enum CapabilitySmokeError {
 pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
     let mut table = CapabilityTable::<8>::new();
     let mut audit = SmokeAudit::new();
+    let live = SmokeLiveAuthority;
     let telemetry = CoreTelemetry::default();
     let root = insert_root(&mut table)?;
     let root_read_ok = table.check(root, CapPerms::READ).is_ok();
-    let child = derive_child(&mut table, root, &mut audit)?;
+    let child = derive_child(&mut table, root, &live, &mut audit)?;
     let child_read_ok = table.check(child, CapPerms::READ).is_ok();
-    let grant = table.grant_with_audit(root, GRANT_OWNER, &mut audit)?;
+    let grant = table.grant_with_audit(root, GRANT_OWNER, &live, &mut audit)?;
     let grant_read_ok = table.check(grant, CapPerms::READ).is_ok();
     let grant_regrant_denied =
         table.check(grant, CapPerms::GRANT).map(|_| ()) == Err(CapTableError::MissingPermission);
@@ -102,7 +104,7 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
         MemoryAccess::ReadOnly,
     )?) == Err(MemoryCapError::RangeEscapesCapability);
     let occupied_before_revoke = table.occupied_slots();
-    let revoked_slots = table.revoke_with_audit(root, child, &mut audit)?;
+    let revoked_slots = table.revoke_with_audit(root, child, &live, &mut audit)?;
     let stale_root_denied =
         table.check(root, CapPerms::READ).map(|_| ()) == Err(CapTableError::StaleId);
     if stale_root_denied {
@@ -203,6 +205,7 @@ fn insert_readless_root(table: &mut CapabilityTable<8>) -> Result<CapId, CapTabl
 fn derive_child(
     table: &mut CapabilityTable<8>,
     root: CapId,
+    live: &SmokeLiveAuthority,
     audit: &mut SmokeAudit,
 ) -> Result<CapId, CapTableError> {
     table.derive_with_audit(
@@ -213,8 +216,24 @@ fn derive_child(
             base: Some(VirtAddr::new(0x1000)),
             len: Some(0x1000),
         },
+        live,
         audit,
     )
+}
+
+struct SmokeLiveAuthority;
+
+impl LiveAuthorityView for SmokeLiveAuthority {
+    fn live_authority(
+        &self,
+        object_id: ObjectId,
+    ) -> Result<LiveAuthorityState, LiveAuthorityError> {
+        if object_id == OBJECT || object_id == ObjectId::new(0x0a21) {
+            Ok(LiveAuthorityState::new(1, 0))
+        } else {
+            Err(LiveAuthorityError::ObjectNotFound)
+        }
+    }
 }
 
 fn checked_mapping_with_memory_cap(

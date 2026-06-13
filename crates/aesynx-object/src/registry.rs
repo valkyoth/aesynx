@@ -1,5 +1,7 @@
 use aesynx_abi::{CoreId, ObjectId};
-use aesynx_cap::{CapKind, CapPerms, Capability};
+use aesynx_cap::{
+    CapKind, CapPerms, Capability, LiveAuthorityError, LiveAuthorityState, LiveAuthorityView,
+};
 
 use crate::{KernelObject, ObjectRecord, ObjectType};
 
@@ -210,6 +212,17 @@ impl<const CAPACITY: usize> ObjectRegistry<CAPACITY> {
 impl<const CAPACITY: usize> Default for ObjectRegistry<CAPACITY> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<const CAPACITY: usize> LiveAuthorityView for ObjectRegistry<CAPACITY> {
+    fn live_authority(
+        &self,
+        object_id: ObjectId,
+    ) -> Result<LiveAuthorityState, LiveAuthorityError> {
+        self.get(object_id)
+            .map(|record| LiveAuthorityState::new(record.generation(), record.revocation_epoch()))
+            .map_err(|_| LiveAuthorityError::ObjectNotFound)
     }
 }
 

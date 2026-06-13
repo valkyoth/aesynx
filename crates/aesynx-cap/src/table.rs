@@ -87,16 +87,18 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
         &mut self,
         source_id: CapId,
         request: DeriveRequest,
+        live: &impl LiveAuthorityView,
         audit: &mut impl CapAuditLog,
     ) -> Result<CapId, CapTableError> {
         let slot = self.vacant_slot().ok_or(CapTableError::TableFull)?;
         let slot_index = slot_index(slot)?;
         let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
         let source = self.get(source_id)?;
+        let current = live.live_authority(source.object_id())?;
         let child = source.derive_live_with_audit(
             request,
-            source.generation(),
-            source.revocation_epoch(),
+            current.generation(),
+            current.revocation_epoch(),
             audit,
         )?;
 
@@ -109,16 +111,18 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
         &mut self,
         source_id: CapId,
         target_owner: PrincipalId,
+        live: &impl LiveAuthorityView,
         audit: &mut impl CapAuditLog,
     ) -> Result<CapId, CapTableError> {
         let slot = self.vacant_slot().ok_or(CapTableError::TableFull)?;
         let slot_index = slot_index(slot)?;
         let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
         let source = self.get(source_id)?;
+        let current = live.live_authority(source.object_id())?;
         let child = source.grant_live_with_audit(
             target_owner,
-            source.generation(),
-            source.revocation_epoch(),
+            current.generation(),
+            current.revocation_epoch(),
             audit,
         )?;
 
@@ -144,9 +148,12 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
         &mut self,
         authority_id: CapId,
         target_id: CapId,
+        live: &impl LiveAuthorityView,
         audit: &mut impl CapAuditLog,
     ) -> Result<u32, CapTableError> {
         let authority = self.get(authority_id)?;
+        let current = live.live_authority(authority.object_id())?;
+        authority.validate_live(current.generation(), current.revocation_epoch())?;
         let source_owner = authority.owner();
         let target = self.get(target_id)?;
         let target_object = target.object_id();
@@ -276,6 +283,7 @@ pub enum CapTableError {
     EmptySlot,
     GenerationOverflow,
     Id(CapIdError),
+    LiveAuthority(LiveAuthorityError),
     MissingPermission,
     Revoke(RevocationError),
     RevokeCountOverflow,
@@ -287,6 +295,18 @@ pub enum CapTableError {
 impl From<CapIdError> for CapTableError {
     fn from(error: CapIdError) -> Self {
         Self::Id(error)
+    }
+}
+
+impl From<LiveAuthorityError> for CapTableError {
+    fn from(error: LiveAuthorityError) -> Self {
+        Self::LiveAuthority(error)
+    }
+}
+
+impl From<crate::CapValidationError> for CapTableError {
+    fn from(error: crate::CapValidationError) -> Self {
+        Self::Revoke(RevocationError::from(error))
     }
 }
 
@@ -302,6 +322,42 @@ impl From<DeriveError> for CapTableError {
             DeriveError::RangeEscalates => Self::MissingPermission,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LiveAuthorityState {
+    generation: u32,
+    revocation_epoch: u64,
+}
+
+impl LiveAuthorityState {
+    #[must_use]
+    pub const fn new(generation: u32, revocation_epoch: u64) -> Self {
+        Self {
+            generation,
+            revocation_epoch,
+        }
+    }
+
+    #[must_use]
+    pub const fn generation(self) -> u32 {
+        self.generation
+    }
+
+    #[must_use]
+    pub const fn revocation_epoch(self) -> u64 {
+        self.revocation_epoch
+    }
+}
+
+pub trait LiveAuthorityView {
+    fn live_authority(&self, object_id: ObjectId)
+    -> Result<LiveAuthorityState, LiveAuthorityError>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LiveAuthorityError {
+    ObjectNotFound,
 }
 
 impl From<RevocationError> for CapTableError {

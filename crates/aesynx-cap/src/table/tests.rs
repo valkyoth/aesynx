@@ -3,7 +3,7 @@ use alloc::format;
 
 use crate::{
     CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError,
-    CapabilityTable, DeriveRequest,
+    CapabilityTable, DeriveRequest, LiveAuthorityError, LiveAuthorityState, LiveAuthorityView,
 };
 
 #[derive(Default)]
@@ -47,6 +47,46 @@ impl CapAuditLog for TestAudit {
         self.events[self.len] = Some(event);
         self.len += 1;
         Ok(())
+    }
+}
+
+struct TestLiveAuthority {
+    object_id: ObjectId,
+    generation: u32,
+    revocation_epoch: u64,
+}
+
+impl TestLiveAuthority {
+    const fn matching_root() -> Self {
+        Self {
+            object_id: ObjectId::new(42),
+            generation: 1,
+            revocation_epoch: 0,
+        }
+    }
+
+    const fn for_object(object_id: ObjectId) -> Self {
+        Self {
+            object_id,
+            generation: 1,
+            revocation_epoch: 0,
+        }
+    }
+}
+
+impl LiveAuthorityView for TestLiveAuthority {
+    fn live_authority(
+        &self,
+        object_id: ObjectId,
+    ) -> Result<LiveAuthorityState, LiveAuthorityError> {
+        if object_id != self.object_id {
+            return Err(LiveAuthorityError::ObjectNotFound);
+        }
+
+        Ok(LiveAuthorityState::new(
+            self.generation,
+            self.revocation_epoch,
+        ))
     }
 }
 
@@ -95,9 +135,10 @@ fn table_grants_child_into_new_slot_with_audit() {
     let mut table = CapabilityTable::<4>::new();
     let root = insert_root(&mut table);
     let mut audit = TestAudit::default();
+    let live = TestLiveAuthority::matching_root();
 
     if let Ok(root) = root {
-        let child = table.grant_with_audit(root, PrincipalId::new(2), &mut audit);
+        let child = table.grant_with_audit(root, PrincipalId::new(2), &live, &mut audit);
 
         assert!(child.is_ok());
         if let Ok(child) = child {
@@ -134,6 +175,7 @@ fn table_derives_child_into_new_slot_with_audit() {
     let mut table = CapabilityTable::<4>::new();
     let root = insert_root(&mut table);
     let mut audit = TestAudit::default();
+    let live = TestLiveAuthority::matching_root();
 
     if let Ok(root) = root {
         let child = table.derive_with_audit(
@@ -144,6 +186,7 @@ fn table_derives_child_into_new_slot_with_audit() {
                 base: Some(VirtAddr::new(0x1000)),
                 len: Some(0x1000),
             },
+            &live,
             &mut audit,
         );
 
@@ -162,10 +205,52 @@ fn table_derives_child_into_new_slot_with_audit() {
 }
 
 #[test]
+fn table_rejects_stale_live_state_before_audit_or_mutation() {
+    let mut table = CapabilityTable::<4>::new();
+    let root = insert_root(&mut table);
+    let mut audit = TestAudit::default();
+    let stale_live = TestLiveAuthority {
+        object_id: ObjectId::new(42),
+        generation: 2,
+        revocation_epoch: 0,
+    };
+
+    if let Ok(root) = root {
+        assert_eq!(
+            table.derive_with_audit(
+                root,
+                DeriveRequest {
+                    perms: CapPerms::READ,
+                    owner: PrincipalId::new(2),
+                    base: Some(VirtAddr::new(0x1000)),
+                    len: Some(0x1000),
+                },
+                &stale_live,
+                &mut audit,
+            ),
+            Err(CapTableError::StaleId)
+        );
+        assert_eq!(
+            table.grant_with_audit(root, PrincipalId::new(2), &stale_live, &mut audit),
+            Err(CapTableError::StaleId)
+        );
+        assert_eq!(
+            table.revoke_with_audit(root, root, &stale_live, &mut audit),
+            Err(CapTableError::Revoke(
+                crate::RevocationError::StaleAuthority
+            ))
+        );
+        assert_eq!(audit.len(), 0);
+        assert_eq!(table.occupied_slots(), 1);
+    }
+}
+
+#[test]
 fn table_rejects_stale_ids_after_revoke() {
     let mut table = CapabilityTable::<4>::new();
     let root = insert_root(&mut table);
     let mut audit = TestAudit::default();
+    let live = TestLiveAuthority::matching_root();
 
     if let Ok(root) = root {
         let child = table.derive_with_audit(
@@ -176,11 +261,15 @@ fn table_rejects_stale_ids_after_revoke() {
                 base: Some(VirtAddr::new(0x1000)),
                 len: Some(0x1000),
             },
+            &live,
             &mut audit,
         );
 
         if let Ok(child) = child {
-            assert_eq!(table.revoke_with_audit(root, child, &mut audit), Ok(2));
+            assert_eq!(
+                table.revoke_with_audit(root, child, &live, &mut audit),
+                Ok(2)
+            );
             assert_eq!(
                 table.check(root, CapPerms::READ).map(|_| ()),
                 Err(CapTableError::StaleId)
@@ -240,6 +329,7 @@ fn full_table_derive_does_not_emit_phantom_audit() {
         0,
     );
     let mut audit = TestAudit::default();
+    let live = TestLiveAuthority::for_object(ObjectId::new(1));
 
     if let Ok(root) = root {
         assert_eq!(
@@ -251,6 +341,7 @@ fn full_table_derive_does_not_emit_phantom_audit() {
                     base: Some(VirtAddr::new(0x1000)),
                     len: Some(0x1000),
                 },
+                &live,
                 &mut audit,
             ),
             Err(CapTableError::TableFull)
@@ -271,10 +362,11 @@ fn full_table_grant_does_not_emit_phantom_audit() {
         0,
     );
     let mut audit = TestAudit::default();
+    let live = TestLiveAuthority::for_object(ObjectId::new(1));
 
     if let Ok(root) = root {
         assert_eq!(
-            table.grant_with_audit(root, PrincipalId::new(2), &mut audit),
+            table.grant_with_audit(root, PrincipalId::new(2), &live, &mut audit),
             Err(CapTableError::TableFull)
         );
         assert_eq!(audit.len(), 0);

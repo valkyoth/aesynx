@@ -22,4 +22,6 @@ pub use kind::CapKind;
 pub use memory::{MemoryAccess, MemoryCapError, MemoryMapRequest};
 pub use perms::{CapPerms, PermissionBitsError};
 pub use revocation::{RevocationEpochStore, RevocationError, ensure_revoke_authority};
-pub use table::{CapTableError, CapabilityTable};
+pub use table::{
+    CapTableError, CapabilityTable, LiveAuthorityError, LiveAuthorityState, LiveAuthorityView,
+};
