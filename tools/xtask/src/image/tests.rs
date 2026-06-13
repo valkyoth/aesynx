@@ -1,7 +1,10 @@
 use super::names::image_names;
 use super::smoke::{
     BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_HARDENING_FAIL_MARKER,
-    CPU_HARDENING_MARKER, CPU_HARDENING_STATUS_MARKER, CPU_SETUP_MARKER, EXCEPTION_MARKER,
+    CPU_HARDENING_MARKER, CPU_HARDENING_STATUS_MARKER, CPU_SETUP_MARKER,
+    ENTROPY_POLICY_FAIL_MARKER, ENTROPY_POLICY_FALLBACK_MARKER, ENTROPY_POLICY_GENERATION_MARKER,
+    ENTROPY_POLICY_HARDWARE_MARKER, ENTROPY_POLICY_MARKER, ENTROPY_POLICY_RANDOM_TOKEN_MARKER,
+    ENTROPY_POLICY_SOURCE_MARKER, ENTROPY_POLICY_STATUS_MARKER, EXCEPTION_MARKER,
     EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER, FAULT_CR3_MARKER,
     FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
     FRAME_ALLOCATOR_FAIL_MARKER, FRAME_ALLOCATOR_MARKER, FRAME_ALLOCATOR_STATUS_MARKER,
@@ -46,7 +49,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn qemu_markers_track_v0_18_contracts() {
+fn qemu_markers_track_v0_18_1_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
@@ -54,6 +57,20 @@ fn qemu_markers_track_v0_18_contracts() {
     assert_eq!(CPU_HARDENING_FAIL_MARKER, "[TEST] cpu-hardening=fail");
     assert_eq!(CPU_HARDENING_MARKER, "[TEST] cpu-hardening=ok");
     assert_eq!(CPU_HARDENING_STATUS_MARKER, "cpu-hardening nx=");
+    assert_eq!(ENTROPY_POLICY_FAIL_MARKER, "[TEST] entropy-policy=fail");
+    assert_eq!(ENTROPY_POLICY_STATUS_MARKER, "entropy-policy rdrand=");
+    assert_eq!(ENTROPY_POLICY_HARDWARE_MARKER, "hardware_present=");
+    assert_eq!(ENTROPY_POLICY_FALLBACK_MARKER, "fallback_used=");
+    assert_eq!(
+        ENTROPY_POLICY_GENERATION_MARKER,
+        "generation_counter_ok=true"
+    );
+    assert_eq!(
+        ENTROPY_POLICY_RANDOM_TOKEN_MARKER,
+        "random_tokens_available="
+    );
+    assert_eq!(ENTROPY_POLICY_SOURCE_MARKER, "source=");
+    assert_eq!(ENTROPY_POLICY_MARKER, "[TEST] entropy-policy=ok");
     assert_eq!(EXCEPTION_SETUP_MARKER, "[TEST] idt=ok");
     assert_eq!(EXCEPTION_MARKER, "[TEST] exception=ok");
     assert_eq!(FRAME_ALLOCATOR_FAIL_MARKER, "[TEST] frame-allocator=fail");
@@ -247,7 +264,7 @@ fn qemu_args_select_smoke_kind() {
 }
 
 #[test]
-fn boot_smoke_requires_full_v0_18_marker_set() {
+fn boot_smoke_requires_full_v0_18_1_marker_set() {
     assert_smoke_contract_requires_each_marker(SmokeKind::Boot);
 
     let valid = SmokeKind::Boot.markers();
@@ -274,6 +291,18 @@ fn boot_smoke_requires_full_v0_18_marker_set() {
     let failed_cpu_hardening = format!("{valid}, [TEST] cpu-hardening=fail");
     assert!(!serial_log_contents_match(
         &failed_cpu_hardening,
+        SmokeKind::Boot
+    ));
+    let missing_entropy = valid.replacen("[TEST] entropy-policy=ok", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_entropy,
+        SmokeKind::Boot
+    ));
+    let failed_entropy = format!("{valid}, [TEST] entropy-policy=fail");
+    assert!(!serial_log_contents_match(&failed_entropy, SmokeKind::Boot));
+    let missing_entropy_generation = valid.replacen("generation_counter_ok=true", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_entropy_generation,
         SmokeKind::Boot
     ));
     let missing_heap = valid.replacen("[TEST] heap=ok", "", 1);
@@ -317,28 +346,28 @@ fn image_kernel_profile_is_release() {
 #[test]
 fn image_artifact_names_track_current_candidate_version() {
     let boot = image_names(SmokeKind::Boot);
-    assert_eq!(boot.image, "aesynx-v0.18.0.iso");
-    assert_eq!(boot.manifest, "aesynx-v0.18.0.manifest");
-    assert_eq!(boot.serial_log, "aesynx-v0.18.0.serial.log");
-    assert_eq!(boot.staging_dir, "aesynx-v0.18.0-iso");
+    assert_eq!(boot.image, "aesynx-v0.18.1.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.18.1.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.18.1.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.18.1-iso");
 
     let panic = image_names(SmokeKind::Panic);
-    assert_eq!(panic.image, "aesynx-v0.18.0-panic.iso");
-    assert_eq!(panic.manifest, "aesynx-v0.18.0-panic.manifest");
-    assert_eq!(panic.serial_log, "aesynx-v0.18.0-panic.serial.log");
-    assert_eq!(panic.staging_dir, "aesynx-v0.18.0-panic-iso");
+    assert_eq!(panic.image, "aesynx-v0.18.1-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.18.1-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.18.1-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.18.1-panic-iso");
 
     let exception = image_names(SmokeKind::Exception);
-    assert_eq!(exception.image, "aesynx-v0.18.0-exception.iso");
-    assert_eq!(exception.manifest, "aesynx-v0.18.0-exception.manifest");
-    assert_eq!(exception.serial_log, "aesynx-v0.18.0-exception.serial.log");
-    assert_eq!(exception.staging_dir, "aesynx-v0.18.0-exception-iso");
+    assert_eq!(exception.image, "aesynx-v0.18.1-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.18.1-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.18.1-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.18.1-exception-iso");
 
     let timer = image_names(SmokeKind::Timer);
-    assert_eq!(timer.image, "aesynx-v0.18.0-timer.iso");
-    assert_eq!(timer.manifest, "aesynx-v0.18.0-timer.manifest");
-    assert_eq!(timer.serial_log, "aesynx-v0.18.0-timer.serial.log");
-    assert_eq!(timer.staging_dir, "aesynx-v0.18.0-timer-iso");
+    assert_eq!(timer.image, "aesynx-v0.18.1-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.18.1-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.18.1-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.18.1-timer-iso");
 }
 
 #[test]
@@ -378,7 +407,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
-    assert!(contents.contains("name=Aesynx v0.18.0 Slab/page heap candidate\n"));
+    assert!(contents.contains("name=Aesynx v0.18.1 Early entropy candidate\n"));
     assert!(contents.contains("smoke=panic\n"));
     for smoke in [
         SmokeKind::Boot,

@@ -279,6 +279,26 @@ extern "C" fn activate_on_kernel_stack(
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+    match crate::entropy_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "entropy-policy rdrand={} rdseed={} hardware_present={} fallback_used={} generation_counter_ok={} random_tokens_available={} source={:?}",
+                status.rdrand_supported,
+                status.rdseed_supported,
+                status.hardware_entropy_present,
+                status.fallback_used,
+                status.generation_counter_ok,
+                status.random_tokens_available,
+                status.primary_source
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] entropy-policy=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("entropy-policy error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] entropy-policy=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
     match crate::kernel_heap::smoke(allocator) {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(

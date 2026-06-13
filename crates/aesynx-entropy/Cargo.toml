@@ -1,15 +1,10 @@
 [package]
-name = "aesynx-arch-x86_64"
+name = "aesynx-entropy"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-
-[dependencies]
-aesynx-abi.workspace = true
-aesynx-arch.workspace = true
-aesynx-entropy.workspace = true
 
 [lints]
 workspace = true

@@ -12,6 +12,7 @@ pub(crate) const RFLAGS_PUBLIC_MASK: u64 = 0x0000_0000_0000_0cd5;
 pub mod cpu_hardening;
 #[allow(unsafe_code)]
 pub mod descriptors;
+pub mod entropy;
 #[allow(unsafe_code)]
 pub mod exceptions;
 #[allow(unsafe_code)]

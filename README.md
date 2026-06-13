@@ -48,7 +48,8 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.18.0` is the current tagged slab/page heap release.
+`v0.18.1` is the current early entropy and generation semantics implementation
+candidate.
 
 Current boot path:
 
@@ -105,11 +106,15 @@ Address-space activation and CPU hardening:
 - Post-CR3 CPU hardening enables NX, write-protect, and CPUID-gated
   SMEP/SMAP/UMIP where supported, then reports read-back redacted booleans
   before `[TEST] cpu-hardening=ok`.
+- Early entropy policy classifies x86_64 `RDRAND`/`RDSEED` support behind
+  CPUID checks, distinguishes deterministic anti-confusion generation counters
+  from attacker-unpredictable random tokens, and reports only redacted booleans
+  before `[TEST] entropy-policy=ok`.
 - A bounded static kernel heap is initialized after CR3 activation and CPU
   hardening; fixed slab classes cover small allocations, page-sized runs cover
   larger allocations, and QEMU smokes `Box`, `Vec`, `BTreeMap`, slab reuse,
-  page-run allocation/free, stress allocation/free, double-free detection, and
-  explicit OOM rejection before `[TEST] heap=ok`.
+  page-run allocation/free, stress allocation/free, invalid-free telemetry,
+  double-free detection, and explicit OOM rejection before `[TEST] heap=ok`.
 
 Fuzz and property gates:
 
@@ -131,7 +136,7 @@ Fuzz and property gates:
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, and the v0.18 kernel heap smoke with `[TEST] heap=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, v0.18.1 entropy policy evidence with `[TEST] entropy-policy=ok`, and the v0.18 kernel heap smoke with `[TEST] heap=ok` from Rust `_start`. |
 | Fuzz/property smoke | Active candidate | `v0.16.1`; `cargo xtask fuzz-smoke` runs BootInfo fuzz seeds, deterministic BootInfo byte mutations, and mapper property sweeps before live CR3 activation. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
@@ -150,6 +155,7 @@ Fuzz and property gates:
 | Limine handoff module split | Tagged | `v0.16.4`; Limine ABI structs, constants, request statics, link-section markers, and ABI assertions now live in a private `limine/abi.rs` module while normalization flow remains in `limine.rs`. |
 | Early heap | Tagged | `v0.17.0`; bounded static bump allocator, global allocator wrapper, post-CR3 `Box`/`Vec`/`BTreeMap` smoke, and explicit OOM rejection before `[TEST] heap=ok`. |
 | Slab/page heap | Tagged | `v0.18.0`; bounded static reusable kernel heap with fixed slab classes, page-sized runs, aggregate stats, invalid-free and free-while-free double-free telemetry, zero-before-reuse host coverage, and QEMU allocation/free stress before `[TEST] heap=ok`; allocation-epoch stale raw-pointer detection remains future work. |
+| Early entropy semantics | Active candidate | `v0.18.1`; safe entropy policy crate, x86_64 CPUID classification for `RDRAND`/`RDSEED`, deterministic anti-confusion generation counters, random-token gating, and redacted QEMU telemetry before `[TEST] entropy-policy=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -161,7 +167,6 @@ Fuzz and property gates:
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Early entropy semantics | Planned | `v0.18.1`; classify hardware entropy, deterministic fallback, generation counters, and random tokens before capability/object identifiers become security-relevant. |
 | Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -234,7 +239,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.18.0
+cargo xtask release-ready v0.18.1
 ```
 
 ## Security Posture
@@ -264,7 +269,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.18.0 Release Candidate Notes](docs/releases/v0.18.0-rc.md)
+- [v0.18.1 Release Candidate Notes](docs/releases/v0.18.1-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

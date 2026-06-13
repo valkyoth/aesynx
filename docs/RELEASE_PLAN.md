@@ -1070,6 +1070,7 @@ Deliverables:
 Expected serial:
 
 ```text
+entropy-policy rdrand=<bool> rdseed=<bool> hardware_present=<bool> fallback_used=<bool> generation_counter_ok=true random_tokens_available=<bool> source=<source>
 [TEST] entropy-policy=ok
 ```
 
@@ -1077,8 +1078,9 @@ Verification:
 
 - Host tests cover source classification, fallback behavior, counter overflow,
   and non-claims.
-- QEMU smoke reports whether hardware entropy was present and whether fallback
-  mode was used.
+- QEMU smoke reports whether hardware entropy was present, whether fallback mode
+  was used, whether random tokens are available, and whether generation-counter
+  overflow is rejected.
 
 Exit criteria:
 

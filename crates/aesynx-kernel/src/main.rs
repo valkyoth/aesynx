@@ -33,6 +33,17 @@ mod frame_allocator_smoke;
 ))]
 mod kernel_mapping_smoke;
 
+#[cfg(any(
+    test,
+    all(
+        target_os = "none",
+        not(feature = "panic-smoke"),
+        not(feature = "exception-smoke"),
+        not(feature = "timer-smoke")
+    )
+))]
+mod entropy_smoke;
+
 #[cfg(any(target_os = "none", test))]
 mod kernel_heap;
 

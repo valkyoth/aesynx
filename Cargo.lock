@@ -35,6 +35,7 @@ version = "0.1.0"
 dependencies = [
  "aesynx-abi",
  "aesynx-arch",
+ "aesynx-entropy",
 ]
 
 [[package]]
@@ -66,6 +67,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aesynx-entropy"
+version = "0.1.0"
+
+[[package]]
 name = "aesynx-ipc"
 version = "0.1.0"
 dependencies = [
@@ -80,6 +85,7 @@ dependencies = [
  "aesynx-arch",
  "aesynx-arch-x86_64",
  "aesynx-boot",
+ "aesynx-entropy",
  "aesynx-log",
  "aesynx-mm",
  "aesynx-time",

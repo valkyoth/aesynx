@@ -1,6 +1,7 @@
 # Aesynx Build Skeleton
 
-Status: v0.18.0 Slab/page heap implementation candidate
+Status: v0.18.1 Early entropy and generation semantics implementation
+candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +57,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.18.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.18.1.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -84,25 +85,27 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `null_page_ok=true`, `kernel_stack_pages=`, `kernel_stack_guard_ok=true`,
 `[TEST] kernel-stack-guard=ok`, `[TEST] paging-policy-model=ok`,
 `[TEST] bootinfo=ok`, `[TEST] boot=ok`, `cpu-hardening nx=`,
-`[TEST] cpu-hardening=ok`, `heap bytes=`, `slab_classes=`,
+`[TEST] cpu-hardening=ok`, `entropy-policy rdrand=`, `hardware_present=`,
+`fallback_used=`, `generation_counter_ok=true`, `random_tokens_available=`,
+`[TEST] entropy-policy=ok`, `heap bytes=`, `slab_classes=`,
 `slab_reuse_ok=true`, `page_run_ok=true`, `stress_ok=true`,
 `double_free_detected=true`, `invalid_free_detected=true`, `[TEST] heap=ok`,
 and `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.18.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.18.1-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.18.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.18.1-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.18.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.18.1-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -151,15 +154,18 @@ read-only/NX, data RW/NX, a reserved high-half heap window, an unmapped guard
 page, and an unmapped null page. It then copies audited hardware-shaped tables
 into the activation arena, switches to the private activation stack, loads the
 Aesynx-owned CR3 root, verifies kernel-stack guard evidence, and reports
-read-back CPU hardening booleans. The current candidate then initializes the
-bounded reusable kernel heap and smokes `Box`, `Vec`, `BTreeMap`, slab reuse,
-page-run allocation, stress allocation/free, invalid-free telemetry,
-double-free detection, and oversized allocation rejection. Host tests also
-cover zeroing before heap reuse. It does not claim process isolation,
-production page-table ownership for dynamic workloads, live recovery from
-hardware faults, APIC MMIO activation, global physical-memory ownership,
-page-fault recovery, a calibrated production clock service, scheduler
-preemption, or bootloader memory reclamation.
+read-back CPU hardening booleans. The current candidate then classifies early
+entropy support, verifies generation-counter overflow handling, rejects
+deterministic fallback for random-token policy, and emits redacted entropy
+booleans before `[TEST] entropy-policy=ok`. It then initializes the bounded
+reusable kernel heap and smokes `Box`, `Vec`, `BTreeMap`, slab reuse, page-run
+allocation, stress allocation/free, invalid-free telemetry, double-free
+detection, and oversized allocation rejection. Host tests also cover zeroing
+before heap reuse. It does not claim process isolation, production page-table
+ownership for dynamic workloads, live recovery from hardware faults, APIC MMIO
+activation, global physical-memory ownership, page-fault recovery, a calibrated
+production clock service, scheduler preemption, a CSPRNG, or bootloader memory
+reclamation.
 
 ## Target Shape
 
