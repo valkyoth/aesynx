@@ -763,10 +763,11 @@ Post-v0.15 page-table backlog:
   tests first, then Kani/CBMC-style bounded proofs for pure mapper logic.
 - Keep hardware features behind explicit arch capability checks: PCID/INVPCID
   for future address-space switching, SMEP/SMAP/UMIP for kernel/user hardening,
-  PKU/PKS for optional page-granularity compartments, confidential-computing
-  memory attributes for SEV-SNP/TDX-style backends, and LAM-style pointer tags
-  only as optional fast-path metadata that never replaces authoritative
-  capability generation checks.
+  CET/shadow-stack for control-flow hardening, PKU/PKS for optional
+  page-granularity compartments, confidential-computing memory attributes for
+  SEV-SNP/TDX-style backends, and LAM-style pointer tags only as optional
+  fast-path metadata that never replaces authoritative capability generation
+  checks.
 
 ### v0.16.0 - Kernel Mapping Policy
 
@@ -1248,11 +1249,18 @@ Deliverables:
 - Endpoint object.
 - Queue object.
 - Task placeholder object.
+- Pentest follow-up: cross-owner capability derivation and grant must strip
+  `GRANT`, `REVOKE`, and `ADMIN`; every x86_64 IDT vector must have a
+  deterministic halt-and-log catch-all before specialized handlers override
+  selected vectors; descriptor `rsp0` updates must validate the interrupt-mask
+  contract in release builds.
 
 Verification:
 
 - Create/list/delete local objects.
 - Object caps reference objects.
+- Host tests cover cross-owner `REVOKE`/`ADMIN` stripping and the arch exception
+  table changes.
 
 Exit criteria:
 

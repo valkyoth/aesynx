@@ -5,6 +5,7 @@ pub(super) fn encode_offset(offset: usize) -> usize {
 }
 
 pub(super) fn decode_offset(encoded: usize) -> usize {
+    debug_assert_ne!(encoded, FREE_LIST_EMPTY);
     encoded - 1
 }
 

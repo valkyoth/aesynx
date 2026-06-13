@@ -35,6 +35,7 @@ pub struct DescriptorTableStatus {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Ring0StackError {
     InvalidStackTop,
+    InterruptsEnabled,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -112,7 +113,9 @@ pub unsafe fn set_ring0_stack(stack_top: u64) -> Result<(), Ring0StackError> {
     if !valid_ring0_stack_top(stack_top) {
         return Err(Ring0StackError::InvalidStackTop);
     }
-    debug_assert!(ring0_stack_update_interrupt_contract_holds());
+    if !ring0_stack_update_interrupt_contract_holds() {
+        return Err(Ring0StackError::InterruptsEnabled);
+    }
 
     // SAFETY: The public unsafe contract above requires a valid current-CPU
     // kernel stack pointer and masked interrupts before privilege transitions

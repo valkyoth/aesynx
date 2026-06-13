@@ -1,18 +1,24 @@
 use core::arch::global_asm;
-use core::mem::{offset_of, size_of};
+use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use aesynx_arch::ArchCpu;
 
-use crate::RFLAGS_PUBLIC_MASK;
-use crate::descriptors::{InterruptStackTableIndex, SegmentSelector};
+use crate::descriptors::InterruptStackTableIndex;
 use crate::registers::FaultRegisterSnapshot;
+
+mod frame;
+mod idt;
+
+use frame::{ExceptionFrame, PageFaultErrorCode, RawExceptionFrame};
+use idt::{DescriptorTablePointer, IdtEntry};
 
 const IDT_ENTRIES: usize = 256;
 const BREAKPOINT_VECTOR: usize = 3;
 const DOUBLE_FAULT_VECTOR: usize = 8;
 const PAGE_FAULT_VECTOR: usize = 14;
 const INTERRUPT_GATE_PRESENT: u16 = 0x8e00;
+const EXCEPTION_STUB_BYTES: usize = 16;
 const RETURNING_EXCEPTION_GPR_SAVE_COUNT: usize = 15;
 const RETURNING_EXCEPTION_GPR_SAVE_BYTES: usize =
     RETURNING_EXCEPTION_GPR_SAVE_COUNT * size_of::<u64>();
@@ -23,6 +29,53 @@ static mut IDT: [IdtEntry; IDT_ENTRIES] = [IdtEntry::missing(); IDT_ENTRIES];
 
 global_asm!(
     r#"
+    .global aesynx_exception_stub_table
+    .type aesynx_exception_stub_table, @function
+aesynx_exception_stub_table:
+    .set vector, 0
+    .rept 256
+        .set has_error_code, 0
+        .if vector == 8
+            .set has_error_code, 1
+        .endif
+        .if vector == 10
+            .set has_error_code, 1
+        .endif
+        .if vector == 11
+            .set has_error_code, 1
+        .endif
+        .if vector == 12
+            .set has_error_code, 1
+        .endif
+        .if vector == 13
+            .set has_error_code, 1
+        .endif
+        .if vector == 14
+            .set has_error_code, 1
+        .endif
+        .if vector == 17
+            .set has_error_code, 1
+        .endif
+        .if vector == 21
+            .set has_error_code, 1
+        .endif
+        .if vector == 29
+            .set has_error_code, 1
+        .endif
+        .if vector == 30
+            .set has_error_code, 1
+        .endif
+        .if has_error_code
+            push vector
+        .else
+            push 0
+            push vector
+        .endif
+        jmp aesynx_exception_common_halt
+        .org aesynx_exception_stub_table + ((vector + 1) * 16), 0x90
+        .set vector, vector + 1
+    .endr
+
     .global aesynx_exception_breakpoint_stub
     .type aesynx_exception_breakpoint_stub, @function
 aesynx_exception_breakpoint_stub:
@@ -93,6 +146,7 @@ aesynx_exception_common_halt:
 );
 
 unsafe extern "C" {
+    static aesynx_exception_stub_table: u8;
     fn aesynx_exception_breakpoint_stub();
     fn aesynx_exception_page_fault_stub();
     fn aesynx_exception_double_fault_stub();
@@ -213,6 +267,11 @@ unsafe fn init_idt(double_fault_ist: InterruptStackTableIndex) {
     // SAFETY: The private IDT is initialized exactly once before it is loaded
     // into the CPU. The handler addresses are canonical kernel text addresses.
     unsafe {
+        let mut vector = 0usize;
+        while vector < IDT_ENTRIES {
+            IDT[vector] = IdtEntry::interrupt_gate_address(exception_stub_address(vector), 0);
+            vector += 1;
+        }
         IDT[BREAKPOINT_VECTOR] = IdtEntry::interrupt_gate(aesynx_exception_breakpoint_stub, 0);
         IDT[PAGE_FAULT_VECTOR] = IdtEntry::interrupt_gate(aesynx_exception_page_fault_stub, 0);
         IDT[DOUBLE_FAULT_VECTOR] = IdtEntry::interrupt_gate(
@@ -220,6 +279,11 @@ unsafe fn init_idt(double_fault_ist: InterruptStackTableIndex) {
             double_fault_ist.get() as u8,
         );
     }
+}
+
+fn exception_stub_address(vector: usize) -> u64 {
+    let table = core::ptr::addr_of!(aesynx_exception_stub_table) as usize as u64;
+    table + (vector as u64 * EXCEPTION_STUB_BYTES as u64)
 }
 
 unsafe fn load_idt() {
@@ -305,169 +369,7 @@ pub enum IdtError {
     CpuStateUnavailable,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct ExceptionFrame {
-    vector: u8,
-    error_code: u64,
-    instruction_pointer: u64,
-    code_segment: u64,
-    rflags: u64,
-}
-
-impl ExceptionFrame {
-    fn from_raw(raw: *const RawExceptionFrame) -> Option<Self> {
-        if raw.is_null() || raw.align_offset(core::mem::align_of::<RawExceptionFrame>()) != 0 {
-            return None;
-        }
-
-        // SAFETY: The assembly stubs pass a pointer to the active exception
-        // stack frame. Only value fields needed for bounded diagnostics are
-        // copied, and no reference escapes this function.
-        let raw = unsafe { raw.read() };
-        let vector = u8::try_from(raw.vector).ok()?;
-        Some(Self {
-            vector,
-            error_code: raw.error_code,
-            instruction_pointer: raw.instruction_pointer,
-            code_segment: raw.code_segment,
-            rflags: raw.rflags,
-        })
-    }
-
-    const fn public_rflags(self) -> u64 {
-        self.rflags & RFLAGS_PUBLIC_MASK
-    }
-
-    const fn instruction_pointer_present(self) -> bool {
-        self.instruction_pointer != 0
-    }
-
-    const fn instruction_pointer_offset(self) -> u16 {
-        (self.instruction_pointer & PAGE_OFFSET_MASK) as u16
-    }
-}
-
 const PAGE_OFFSET_MASK: u64 = 0xfff;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct PageFaultErrorCode(u64);
-
-impl PageFaultErrorCode {
-    const fn new(raw: u64) -> Self {
-        Self(raw)
-    }
-
-    const fn present(self) -> bool {
-        self.0 & (1 << 0) != 0
-    }
-
-    const fn write(self) -> bool {
-        self.0 & (1 << 1) != 0
-    }
-
-    const fn user(self) -> bool {
-        self.0 & (1 << 2) != 0
-    }
-
-    const fn reserved_bit(self) -> bool {
-        self.0 & (1 << 3) != 0
-    }
-
-    const fn instruction_fetch(self) -> bool {
-        self.0 & (1 << 4) != 0
-    }
-
-    const fn protection_key(self) -> bool {
-        self.0 & (1 << 5) != 0
-    }
-
-    const fn shadow_stack(self) -> bool {
-        self.0 & (1 << 6) != 0
-    }
-
-    const fn sgx(self) -> bool {
-        self.0 & (1 << 15) != 0
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct RawExceptionFrame {
-    vector: u64,
-    error_code: u64,
-    instruction_pointer: u64,
-    code_segment: u64,
-    rflags: u64,
-}
-
-const _: () = assert!(
-    size_of::<RawExceptionFrame>() == 40,
-    "RawExceptionFrame size must match exception assembly stubs"
-);
-const _: () = assert!(
-    offset_of!(RawExceptionFrame, vector) == 0,
-    "RawExceptionFrame.vector offset must match exception assembly stubs"
-);
-const _: () = assert!(
-    offset_of!(RawExceptionFrame, error_code) == 8,
-    "RawExceptionFrame.error_code offset must match exception assembly stubs"
-);
-const _: () = assert!(
-    offset_of!(RawExceptionFrame, instruction_pointer) == 16,
-    "RawExceptionFrame.instruction_pointer offset must match exception assembly stubs"
-);
-const _: () = assert!(
-    offset_of!(RawExceptionFrame, code_segment) == 24,
-    "RawExceptionFrame.code_segment offset must match exception assembly stubs"
-);
-const _: () = assert!(
-    offset_of!(RawExceptionFrame, rflags) == 32,
-    "RawExceptionFrame.rflags offset must match exception assembly stubs"
-);
-
-#[repr(C, packed)]
-struct DescriptorTablePointer {
-    limit: u16,
-    base: u64,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct IdtEntry {
-    offset_low: u16,
-    selector: u16,
-    options: u16,
-    offset_mid: u16,
-    offset_high: u32,
-    reserved: u32,
-}
-
-impl IdtEntry {
-    const fn missing() -> Self {
-        Self {
-            offset_low: 0,
-            selector: 0,
-            options: 0,
-            offset_mid: 0,
-            offset_high: 0,
-            reserved: 0,
-        }
-    }
-
-    fn interrupt_gate(handler: unsafe extern "C" fn(), ist: u8) -> Self {
-        let address = handler as *const () as usize as u64;
-        let options = INTERRUPT_GATE_PRESENT | u16::from(ist & 0x07);
-
-        Self {
-            offset_low: address as u16,
-            selector: SegmentSelector::KERNEL_CODE.bits(),
-            options,
-            offset_mid: (address >> 16) as u16,
-            offset_high: (address >> 32) as u32,
-            reserved: 0,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests;

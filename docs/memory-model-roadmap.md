@@ -218,18 +218,20 @@ The memory roadmap should advance in narrow, testable layers:
 5. BootInfo fuzzing and mapper property tests.
 6. Kernel-owned page-table activation and CR3 switch.
 7. CPU hardening bits and kernel stack guards.
-8. Kernel memory-object type.
-9. Address-space type.
-10. Capability-controlled map/unmap.
-11. Purpose-tagged allocation classes.
-12. Revocable mappings with epoch validation.
-13. Secret memory class.
-14. Usercopy discipline before ring-3 syscall pointers.
-15. IOMMU-backed DMA memory class.
-16. Shared-memory IPC transfer.
-17. Snapshot-aware memory classification.
-18. WASM linear-memory object integration.
-19. Memory pressure and self-healing policy.
+8. CET/shadow-stack investigation behind explicit CPUID and model-specific
+   register gates.
+9. Kernel memory-object type.
+10. Address-space type.
+11. Capability-controlled map/unmap.
+12. Purpose-tagged allocation classes.
+13. Revocable mappings with epoch validation.
+14. Secret memory class.
+15. Usercopy discipline before ring-3 syscall pointers.
+16. IOMMU-backed DMA memory class.
+17. Shared-memory IPC transfer.
+18. Snapshot-aware memory classification.
+19. WASM linear-memory object integration.
+20. Memory pressure and self-healing policy.
 
 Each step should add tests or QEMU smoke evidence before becoming a release
 claim.

@@ -312,11 +312,7 @@ impl Capability {
             return Err(DeriveError::RangeEscalates);
         }
 
-        let child_perms = if cross_owner {
-            request.perms.without(CapPerms::GRANT)
-        } else {
-            request.perms
-        };
+        let child_perms = delegated_perms(request.perms, cross_owner);
 
         Ok(Self {
             object_id: self.object_id,
@@ -334,9 +330,10 @@ impl Capability {
         if !self.perms.contains(CapPerms::GRANT) {
             return Err(DeriveError::MissingGrantPermission);
         }
+        let cross_owner = target_owner != self.owner;
 
         Ok(Self {
-            perms: self.perms.without(CapPerms::GRANT),
+            perms: delegated_perms(self.perms.without(CapPerms::GRANT), cross_owner),
             owner: target_owner,
             object_id: self.object_id,
             base: self.base,
@@ -345,6 +342,18 @@ impl Capability {
             revocation_epoch: self.revocation_epoch,
             kind: self.kind,
         })
+    }
+}
+
+const fn delegated_perms(perms: CapPerms, cross_owner: bool) -> CapPerms {
+    if cross_owner {
+        perms.without(
+            CapPerms::GRANT
+                .union(CapPerms::REVOKE)
+                .union(CapPerms::ADMIN),
+        )
+    } else {
+        perms
     }
 }
 
