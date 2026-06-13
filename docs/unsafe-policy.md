@@ -175,9 +175,31 @@ Status: active candidate in v0.18
 Purpose: provide a bounded reusable kernel global allocator so long-lived `alloc` containers can run after Aesynx-owned CR3 activation
 Preconditions: used only on the normal single-core boot path after the kernel has loaded its own CR3 root and post-CR3 CPU hardening has passed; the static heap lives in kernel BSS and is mapped as part of the data range
 Unsafe operation: implements `GlobalAlloc`, takes the raw address of a private static heap buffer, and places that heap in a linker-retained section
-Safety argument: the heap buffer is private, page-aligned, fixed-size, and initialized exactly once before allocation; metadata mutation is serialized by a private spin lock; slab classes are fixed and pointer-sized; free-list links are written only into free heap blocks; page-run allocation changes page metadata before exposing the pointer; checked arithmetic guards range and alignment calculations; failed allocations return null through `GlobalAlloc`; checked deallocation detects invalid frees and double frees; serial output reports aggregate byte counts, counters, and booleans only
-Tests/evidence: cargo check -p aesynx-kernel --target x86_64-unknown-none compiles the alloc-enabled kernel; host tests cover pre-initialization rejection, one-shot initialization, slab reuse, large page-run reuse, double-free detection, stats, and OOM without stat advancement; cargo xtask qemu observes heap bytes=<n> allocated=<n> peak=<n> slab_classes=<n> slab_allocations=<n> page_allocations=<n> frees=<n> double_free_detected=true box_ok=true vec_ok=true btree_ok=true slab_reuse_ok=true page_run_ok=true stress_ok=true oom_rejected=true and [TEST] heap=ok; cargo xtask qemu-suite keeps diagnostic smokes isolated from the allocator path
-Limitations: bounded static heap only; page-backed means page-sized runs inside the static kernel heap, not physical-frame-backed growth from the global frame allocator; one global allocator lock remains; no per-core heaps, quarantine, allocation-while-locking policy, backtrace leak reports, or full SMP allocator synchronization policy yet
+Safety argument: the heap buffer is private, page-aligned, fixed-size, and initialized exactly once before allocation; metadata mutation is serialized by a private spin lock; slab classes are fixed and pointer-sized; free-list links are written only into free heap blocks; slab pages keep live-block counters so normal frees do not scan the full free list to detect page emptiness; page-run allocation changes page metadata before exposing the pointer; checked arithmetic guards range and alignment calculations; failed allocations return null through `GlobalAlloc`; checked deallocation detects invalid frees and free-while-free double frees, increments aggregate tamper telemetry for invalid frees, and zeroes slab blocks and page runs before reuse; serial output reports aggregate byte counts, counters, and booleans only
+Tests/evidence: cargo check -p aesynx-kernel --target x86_64-unknown-none compiles the alloc-enabled kernel; host tests cover pre-initialization rejection, one-shot initialization, slab reuse, large page-run reuse, invalid-free telemetry, double-free detection, zeroing before reuse, stats, and OOM without stat advancement; cargo xtask qemu observes heap bytes=<n> allocated=<n> peak=<n> slab_classes=<n> slab_allocations=<n> page_allocations=<n> frees=<n> double_free_detected=true invalid_free_detected=true box_ok=true vec_ok=true btree_ok=true slab_reuse_ok=true page_run_ok=true stress_ok=true oom_rejected=true and [TEST] heap=ok; cargo xtask qemu-suite keeps diagnostic smokes isolated from the allocator path
+Limitations: bounded static heap only; page-backed means page-sized runs inside the static kernel heap, not physical-frame-backed growth from the global frame allocator; one global allocator lock remains; the standard `GlobalAlloc::dealloc(ptr, layout)` ABI cannot distinguish a delayed stale raw-pointer free from the current owner freeing the same address after reuse, so allocation-epoch ownership tokens or quarantine remain future work; no per-core heaps, allocation-while-locking policy, backtrace leak reports, or full SMP allocator synchronization policy yet
+```
+
+```text
+Location: crates/aesynx-kernel/src/kernel_heap/free_list.rs
+Status: active candidate in v0.18
+Purpose: isolate raw free-list link access and allocator-owned zeroing for the slab/page heap
+Preconditions: called only by `KernelHeapAllocator` while its metadata lock is held and after pointer/range validation has selected a free slab block or page run owned by the heap
+Unsafe operation: reads and writes `usize` free-list links through raw heap pointers, and uses `core::ptr::write_bytes` to zero validated allocator-owned ranges
+Safety argument: all slab classes are pointer-sized and naturally aligned; links are read only from blocks already on allocator free lists and written only before publishing a block back to a free list; zeroing is requested only for validated heap blocks or page runs while the allocator owns the range; the helpers expose no public API and do not derive addresses themselves
+Tests/evidence: kernel heap host tests cover slab reuse, page-run reuse, zeroing before reuse, invalid-free telemetry, double-free detection, and OOM behavior; cargo xtask qemu observes the aggregate heap smoke markers
+Limitations: these helpers do not prove raw pointer ownership epoch; that remains a future allocator-token or quarantine design requirement
+```
+
+```text
+Location: crates/aesynx-kernel/src/kernel_heap/test_support.rs
+Status: test-only evidence in v0.18
+Purpose: let host tests verify zero-before-reuse without placing raw pointer access in the test cases themselves
+Preconditions: compiled only for tests; callers pass live heap allocations returned by `KernelHeapAllocator` and lengths bounded by the allocation's rounded size
+Unsafe operation: writes a byte pattern to a live test allocation and reads bytes back to assert allocator-owned zeroing behavior
+Safety argument: the helpers reject null pointers, are private to the kernel heap test module, and are used only immediately after successful test allocations; production code does not import this module
+Tests/evidence: `cargo test -p aesynx-kernel kernel_heap` runs the slab and page-run zero-before-reuse regression tests that call these helpers
+Limitations: host-test helpers are not production allocator validation and do not prove raw pointer ownership epoch
 ```
 
 ```text

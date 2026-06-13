@@ -8,6 +8,7 @@ pub struct KernelHeapStatus {
     pub page_allocations: usize,
     pub frees: usize,
     pub double_free_detected: bool,
+    pub invalid_free_detected: bool,
     pub box_ok: bool,
     pub vec_ok: bool,
     pub btree_ok: bool,

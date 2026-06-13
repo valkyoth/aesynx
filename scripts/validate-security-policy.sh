@@ -76,6 +76,8 @@ crates/aesynx-arch-x86_64/src/port.rs
 crates/aesynx-arch-x86_64/src/registers.rs
 crates/aesynx-arch-x86_64/src/timer.rs
 crates/aesynx-kernel/src/kernel_heap/allocator.rs
+crates/aesynx-kernel/src/kernel_heap/free_list.rs
+crates/aesynx-kernel/src/kernel_heap/test_support.rs
 crates/aesynx-kernel/src/kernel_sections.rs
 crates/aesynx-kernel/src/limine.rs
 crates/aesynx-kernel/src/limine/abi.rs

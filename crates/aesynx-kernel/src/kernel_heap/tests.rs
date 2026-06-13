@@ -1,5 +1,6 @@
 use core::alloc::Layout;
 
+use super::test_support;
 use super::{KERNEL_HEAP_PAGE_SIZE, KernelHeapAllocator, KernelHeapError};
 
 #[repr(align(4096))]
@@ -75,7 +76,28 @@ fn large_free_rejects_wrong_layout_without_releasing_run() -> Result<(), KernelH
         allocator.deallocate_checked(ptr, wrong),
         Err(KernelHeapError::InvalidFree)
     );
+    assert!(allocator.stats()?.invalid_free_detected);
     assert_ne!(allocator.allocated_bytes()?, 0);
+    allocator.deallocate_checked(ptr, layout)?;
+    assert_eq!(allocator.allocated_bytes()?, 0);
+    Ok(())
+}
+
+#[test]
+fn invalid_slab_free_is_reported_without_releasing_block() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout =
+        Layout::from_size_align(128, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let wrong = Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+
+    let ptr = allocator.allocate_checked(layout)?;
+    assert_eq!(
+        allocator.deallocate_checked(ptr, wrong),
+        Err(KernelHeapError::InvalidFree)
+    );
+    assert!(allocator.stats()?.invalid_free_detected);
+    assert_ne!(allocator.allocated_bytes()?, 0);
+
     allocator.deallocate_checked(ptr, layout)?;
     assert_eq!(allocator.allocated_bytes()?, 0);
     Ok(())
@@ -94,6 +116,43 @@ fn double_free_is_reported_without_reallocating_block() -> Result<(), KernelHeap
         Err(KernelHeapError::DoubleFree)
     );
     assert!(allocator.stats()?.double_free_detected);
+    Ok(())
+}
+
+#[test]
+fn slab_memory_is_zeroed_before_reuse() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout =
+        Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+
+    let first = allocator.allocate_checked(layout)?;
+    test_support::fill_allocation(first, layout.size(), 0xa5)?;
+    allocator.deallocate_checked(first, layout)?;
+    let second = allocator.allocate_checked(layout)?;
+    assert_eq!(first, second);
+
+    assert!(test_support::allocation_is_zero(second, layout.size())?);
+
+    allocator.deallocate_checked(second, layout)?;
+    Ok(())
+}
+
+#[test]
+fn page_run_memory_is_zeroed_before_reuse() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout = Layout::from_size_align(KERNEL_HEAP_PAGE_SIZE + 17, KERNEL_HEAP_PAGE_SIZE)
+        .map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let run_bytes = KERNEL_HEAP_PAGE_SIZE * 2;
+
+    let first = allocator.allocate_checked(layout)?;
+    test_support::fill_allocation(first, run_bytes, 0xa5)?;
+    allocator.deallocate_checked(first, layout)?;
+    let second = allocator.allocate_checked(layout)?;
+    assert_eq!(first, second);
+
+    assert!(test_support::allocation_is_zero(second, run_bytes)?);
+
+    allocator.deallocate_checked(second, layout)?;
     Ok(())
 }
 

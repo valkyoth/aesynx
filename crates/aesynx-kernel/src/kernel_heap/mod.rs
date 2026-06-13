@@ -9,6 +9,7 @@
 )]
 
 mod allocator;
+mod free_list;
 mod layout;
 mod stats;
 
@@ -21,6 +22,8 @@ pub use allocator::KernelHeapAllocator;
 pub use layout::{KERNEL_HEAP_BYTES, KERNEL_HEAP_PAGE_SIZE, SLAB_CLASS_COUNT};
 pub use stats::{KernelHeapError, KernelHeapStatus};
 
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;
 
@@ -49,6 +52,7 @@ pub fn smoke(allocator: &KernelHeapAllocator) -> Result<KernelHeapStatus, Kernel
     let page_run_ok = page_run_smoke(allocator)?;
     let stress_ok = stress_smoke(allocator)?;
     let double_free_detected = double_free_smoke(allocator)?;
+    let invalid_free_detected = invalid_free_smoke(allocator)?;
 
     let mut oversized = Vec::<u8>::new();
     let oom_rejected = oversized.try_reserve_exact(KERNEL_HEAP_BYTES * 2).is_err();
@@ -60,6 +64,7 @@ pub fn smoke(allocator: &KernelHeapAllocator) -> Result<KernelHeapStatus, Kernel
         && page_run_ok
         && stress_ok
         && double_free_detected
+        && invalid_free_detected
         && oom_rejected)
     {
         return Err(KernelHeapError::SmokeFailed);
@@ -75,6 +80,7 @@ pub fn smoke(allocator: &KernelHeapAllocator) -> Result<KernelHeapStatus, Kernel
         page_allocations: stats.page_allocations,
         frees: stats.frees,
         double_free_detected: stats.double_free_detected,
+        invalid_free_detected: stats.invalid_free_detected,
         box_ok,
         vec_ok,
         btree_ok,
@@ -133,4 +139,14 @@ fn double_free_smoke(allocator: &KernelHeapAllocator) -> Result<bool, KernelHeap
     let ptr = allocator.allocate_checked(layout)?;
     allocator.deallocate_checked(ptr, layout)?;
     Ok(allocator.deallocate_checked(ptr, layout) == Err(KernelHeapError::DoubleFree))
+}
+
+fn invalid_free_smoke(allocator: &KernelHeapAllocator) -> Result<bool, KernelHeapError> {
+    let layout =
+        Layout::from_size_align(128, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let wrong = Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let ptr = allocator.allocate_checked(layout)?;
+    let detected = allocator.deallocate_checked(ptr, wrong) == Err(KernelHeapError::InvalidFree);
+    allocator.deallocate_checked(ptr, layout)?;
+    Ok(detected)
 }

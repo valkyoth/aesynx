@@ -86,7 +86,8 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] bootinfo=ok`, `[TEST] boot=ok`, `cpu-hardening nx=`,
 `[TEST] cpu-hardening=ok`, `heap bytes=`, `slab_classes=`,
 `slab_reuse_ok=true`, `page_run_ok=true`, `stress_ok=true`,
-`double_free_detected=true`, `[TEST] heap=ok`, and `[TEST] kernel-cr3=ok`.
+`double_free_detected=true`, `invalid_free_detected=true`, `[TEST] heap=ok`,
+and `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
 `build/qemu/aesynx-v0.18.0-panic.iso`, enables the kernel `panic-smoke` feature,
@@ -152,12 +153,13 @@ into the activation arena, switches to the private activation stack, loads the
 Aesynx-owned CR3 root, verifies kernel-stack guard evidence, and reports
 read-back CPU hardening booleans. The current candidate then initializes the
 bounded reusable kernel heap and smokes `Box`, `Vec`, `BTreeMap`, slab reuse,
-page-run allocation, stress allocation/free, double-free detection, and
-oversized allocation rejection. It does not claim process isolation, production
-page-table ownership for dynamic workloads, live recovery from hardware faults,
-APIC MMIO activation, global physical-memory ownership, page-fault recovery, a
-calibrated production clock service, scheduler preemption, or bootloader memory
-reclamation.
+page-run allocation, stress allocation/free, invalid-free telemetry,
+double-free detection, and oversized allocation rejection. Host tests also
+cover zeroing before heap reuse. It does not claim process isolation,
+production page-table ownership for dynamic workloads, live recovery from
+hardware faults, APIC MMIO activation, global physical-memory ownership,
+page-fault recovery, a calibrated production clock service, scheduler
+preemption, or bootloader memory reclamation.
 
 ## Target Shape
 

@@ -1022,14 +1022,19 @@ Deliverables:
 - Fixed slab classes for small allocations.
 - Page-sized large allocation runs inside the static kernel heap.
 - Checked deallocation and slab/page reuse.
+- Freed slab blocks and page-sized runs are zeroed before reuse.
+- Per-page slab live counters avoid a full free-list walk on normal frees.
 - Aggregate heap stats: allocated bytes, peak bytes, allocation counts, frees,
-  and double-free detection.
+  invalid-free telemetry, and double-free detection.
 - Host tests for pre-initialization rejection, one-shot initialization, slab
-  reuse, page-run reuse, double-free detection, stats, and OOM without stat
-  advancement.
+  reuse, page-run reuse, invalid-free telemetry, double-free detection, zeroing
+  before reuse, stats, and OOM without stat advancement.
 - QEMU smoke for `Box`, `Vec`, `BTreeMap`, slab reuse, page-run allocation,
-  mixed allocation/free stress, double-free detection, and explicit OOM
-  rejection.
+  mixed allocation/free stress, invalid-free telemetry, double-free detection,
+  and explicit OOM rejection.
+- Non-claim: the standard global allocator ABI cannot distinguish a delayed
+  stale raw-pointer free from the current owner freeing the same address after
+  reuse; future ownership-token or quarantine work must close that class.
 
 Verification:
 
