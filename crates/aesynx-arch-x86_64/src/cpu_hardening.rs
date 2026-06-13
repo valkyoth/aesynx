@@ -14,6 +14,19 @@ const CR4_SMEP: u64 = 1 << 20;
 const CR4_SMAP: u64 = 1 << 21;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AdmittedMsr {
+    Efer,
+}
+
+impl AdmittedMsr {
+    const fn index(self) -> u32 {
+        match self {
+            Self::Efer => MSR_EFER,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CpuHardeningCapabilities {
     pub nx: bool,
     pub smep: bool,
@@ -105,7 +118,7 @@ impl CpuHardeningStatus {
 }
 
 fn read_status() -> CpuHardeningStatus {
-    CpuHardeningStatus::from_registers(read_msr(MSR_EFER), read_cr0(), read_cr4())
+    CpuHardeningStatus::from_registers(read_msr(AdmittedMsr::Efer), read_cr0(), read_cr4())
 }
 
 const fn verify_applied(
@@ -125,14 +138,14 @@ const fn verify_applied(
 }
 
 unsafe fn apply_plan(plan: CpuHardeningPlan) {
-    let mut efer = read_msr(MSR_EFER);
+    let mut efer = read_msr(AdmittedMsr::Efer);
     if plan.enable_nx {
         efer |= EFER_NXE;
     }
-    // SAFETY: `MSR_EFER` is the architectural EFER MSR and the plan enables
-    // only the NXE bit after CPUID reported NX support.
+    // SAFETY: `AdmittedMsr::Efer` is the architectural EFER MSR and the plan
+    // enables only the NXE bit after CPUID reported NX support.
     unsafe {
-        write_msr(MSR_EFER, efer);
+        write_msr(AdmittedMsr::Efer, efer);
     }
 
     let mut cr0 = read_cr0();
@@ -162,15 +175,16 @@ unsafe fn apply_plan(plan: CpuHardeningPlan) {
     }
 }
 
-fn read_msr(msr: u32) -> u64 {
+fn read_msr(msr: AdmittedMsr) -> u64 {
     let low: u32;
     let high: u32;
+    let index = msr.index();
     // SAFETY: `rdmsr` reads the selected architectural MSR into EDX:EAX and
-    // does not dereference Rust pointers. Callers provide admitted MSR values.
+    // does not dereference Rust pointers. The enum admits only reviewed MSRs.
     unsafe {
         core::arch::asm!(
             "rdmsr",
-            in("ecx") msr,
+            in("ecx") index,
             out("eax") low,
             out("edx") high,
             options(nomem, nostack, preserves_flags)
@@ -179,15 +193,16 @@ fn read_msr(msr: u32) -> u64 {
     (u64::from(high) << 32) | u64::from(low)
 }
 
-unsafe fn write_msr(msr: u32, value: u64) {
+unsafe fn write_msr(msr: AdmittedMsr, value: u64) {
     let low = value as u32;
     let high = (value >> 32) as u32;
-    // SAFETY: The caller guarantees that `msr` and `value` preserve
-    // architectural reserved-bit requirements for the selected MSR.
+    let index = msr.index();
+    // SAFETY: The caller guarantees that `value` preserves architectural
+    // reserved-bit requirements for the selected admitted MSR.
     unsafe {
         core::arch::asm!(
             "wrmsr",
-            in("ecx") msr,
+            in("ecx") index,
             in("eax") low,
             in("edx") high,
             options(nomem, nostack, preserves_flags)
@@ -273,9 +288,15 @@ const fn cpuid_edx(_leaf: u32, _subleaf: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        CR0_WP, CR4_SMAP, CR4_SMEP, CR4_UMIP, CpuHardeningCapabilities, CpuHardeningError,
-        CpuHardeningPlan, CpuHardeningStatus, EFER_NXE, verify_applied,
+        AdmittedMsr, CR0_WP, CR4_SMAP, CR4_SMEP, CR4_UMIP, CpuHardeningCapabilities,
+        CpuHardeningError, CpuHardeningPlan, CpuHardeningStatus, EFER_NXE, MSR_EFER,
+        verify_applied,
     };
+
+    #[test]
+    fn admitted_msr_set_is_explicit() {
+        assert_eq!(AdmittedMsr::Efer.index(), MSR_EFER);
+    }
 
     #[test]
     fn hardening_policy_requires_nx() {

@@ -19,6 +19,8 @@ const INIT_READY: u8 = 2;
 const INIT_FAILED: u8 = 3;
 
 static INIT_STATE: AtomicU8 = AtomicU8::new(INIT_UNINITIALIZED);
+// TODO(smp): Replace this smoke-global counter with per-CPU timer accounting
+// before secondary cores can receive timer interrupts.
 static TICKS: AtomicU64 = AtomicU64::new(0);
 
 global_asm!(

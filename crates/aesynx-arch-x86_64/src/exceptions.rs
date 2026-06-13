@@ -150,26 +150,44 @@ pub(crate) fn install_interrupt_gate(
         return Err(IdtError::InvalidInterruptVector);
     }
 
-    let interrupts_were_enabled =
-        crate::X86_64::interrupts_enabled().map_err(|_| IdtError::CpuStateUnavailable)?;
+    let interrupts_were_enabled = interrupts_were_enabled_before_masking();
     debug_assert!(
         !interrupts_were_enabled,
         "install_interrupt_gate called with interrupts enabled"
     );
     if interrupts_were_enabled {
+        crate::X86_64::enable_interrupts().map_err(|_| IdtError::CpuStateUnavailable)?;
         return Err(IdtError::CpuStateUnavailable);
     }
 
     // SAFETY: The IDT is private static storage initialized during early boot
     // and this installer is limited to non-exception interrupt vectors. The
     // 16-byte descriptor write is not architecturally atomic. This function
-    // therefore refuses to run once maskable interrupts are enabled; NMIs are
-    // still a future live-IDT-mutation concern and require a separate
-    // platform-specific exclusion strategy before drivers can update gates.
+    // masks IF before the write and rejects callers that had already enabled
+    // maskable interrupts. NMIs are still a future live-IDT-mutation concern
+    // and require a separate platform-specific exclusion strategy before
+    // drivers can update gates.
     unsafe {
         IDT[index] = IdtEntry::interrupt_gate(handler, 0);
     }
     Ok(())
+}
+
+fn interrupts_were_enabled_before_masking() -> bool {
+    let rflags: u64;
+    // SAFETY: `pushfq; cli; pop` stores the previous RFLAGS value on the
+    // current stack, masks IF for the current CPU, then copies the saved value
+    // into a general-purpose register. It does not create Rust references or
+    // touch untrusted memory.
+    unsafe {
+        core::arch::asm!(
+            "pushfq",
+            "cli",
+            "pop {rflags}",
+            rflags = lateout(reg) rflags,
+        );
+    }
+    rflags & (1 << 9) != 0
 }
 
 #[allow(clippy::empty_loop)]
