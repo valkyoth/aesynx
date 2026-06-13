@@ -108,8 +108,9 @@ Address-space activation and CPU hardening:
   before `[TEST] cpu-hardening=ok`.
 - Early entropy policy classifies x86_64 `RDRAND`/`RDSEED` support behind
   CPUID checks, distinguishes deterministic anti-confusion generation counters
-  from attacker-unpredictable random tokens, and reports only redacted booleans
-  before `[TEST] entropy-policy=ok`.
+  from attacker-unpredictable random tokens, keeps random-token policy disabled
+  until a runtime self-test-backed read path exists, and reports only redacted
+  booleans before `[TEST] entropy-policy=ok`.
 - A bounded static kernel heap is initialized after CR3 activation and CPU
   hardening; fixed slab classes cover small allocations, page-sized runs cover
   larger allocations, and QEMU smokes `Box`, `Vec`, `BTreeMap`, slab reuse,
@@ -155,7 +156,7 @@ Fuzz and property gates:
 | Limine handoff module split | Tagged | `v0.16.4`; Limine ABI structs, constants, request statics, link-section markers, and ABI assertions now live in a private `limine/abi.rs` module while normalization flow remains in `limine.rs`. |
 | Early heap | Tagged | `v0.17.0`; bounded static bump allocator, global allocator wrapper, post-CR3 `Box`/`Vec`/`BTreeMap` smoke, and explicit OOM rejection before `[TEST] heap=ok`. |
 | Slab/page heap | Tagged | `v0.18.0`; bounded static reusable kernel heap with fixed slab classes, page-sized runs, aggregate stats, invalid-free and free-while-free double-free telemetry, zero-before-reuse host coverage, and QEMU allocation/free stress before `[TEST] heap=ok`; allocation-epoch stale raw-pointer detection remains future work. |
-| Early entropy semantics | Active candidate | `v0.18.1`; safe entropy policy crate, x86_64 CPUID classification for `RDRAND`/`RDSEED`, deterministic anti-confusion generation counters, random-token gating, and redacted QEMU telemetry before `[TEST] entropy-policy=ok`. |
+| Early entropy semantics | Active candidate | `v0.18.1`; safe entropy policy crate, x86_64 CPUID classification for `RDRAND`/`RDSEED`, explicit runtime self-test evidence, deterministic anti-confusion generation counters, random-token gating that rejects CPUID-only evidence, and redacted QEMU telemetry before `[TEST] entropy-policy=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |

@@ -48,13 +48,17 @@ const fn cpuid_ecx(_leaf: u32, _subleaf: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use aesynx_entropy::{EntropyCapabilities, EntropyPolicyStatus};
+    use aesynx_entropy::{EntropyCapabilities, EntropyEvidence, EntropyPolicyStatus};
 
     #[test]
     fn entropy_capabilities_feed_safe_policy() {
-        let status = EntropyPolicyStatus::classify(EntropyCapabilities {
-            rdrand: true,
-            rdseed: false,
+        let status = EntropyPolicyStatus::classify(EntropyEvidence {
+            capabilities: EntropyCapabilities {
+                rdrand: true,
+                rdseed: false,
+            },
+            generation_counter_ok: true,
+            hardware_self_test_passed: true,
         });
 
         assert!(status.rdrand_supported);

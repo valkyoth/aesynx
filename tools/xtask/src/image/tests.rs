@@ -4,9 +4,9 @@ use super::smoke::{
     CPU_HARDENING_MARKER, CPU_HARDENING_STATUS_MARKER, CPU_SETUP_MARKER,
     ENTROPY_POLICY_FAIL_MARKER, ENTROPY_POLICY_FALLBACK_MARKER, ENTROPY_POLICY_GENERATION_MARKER,
     ENTROPY_POLICY_HARDWARE_MARKER, ENTROPY_POLICY_MARKER, ENTROPY_POLICY_RANDOM_TOKEN_MARKER,
-    ENTROPY_POLICY_SOURCE_MARKER, ENTROPY_POLICY_STATUS_MARKER, EXCEPTION_MARKER,
-    EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER, FAULT_CR3_MARKER,
-    FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
+    ENTROPY_POLICY_SELF_TEST_MARKER, ENTROPY_POLICY_SOURCE_MARKER, ENTROPY_POLICY_STATUS_MARKER,
+    EXCEPTION_MARKER, EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER,
+    FAULT_CR3_MARKER, FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
     FRAME_ALLOCATOR_FAIL_MARKER, FRAME_ALLOCATOR_MARKER, FRAME_ALLOCATOR_STATUS_MARKER,
     HEAP_DOUBLE_FREE_MARKER, HEAP_FAIL_MARKER, HEAP_INVALID_FREE_MARKER, HEAP_MARKER,
     HEAP_PAGE_RUN_MARKER, HEAP_SLAB_CLASSES_MARKER, HEAP_SLAB_REUSE_MARKER, HEAP_STATUS_MARKER,
@@ -60,6 +60,7 @@ fn qemu_markers_track_v0_18_1_contracts() {
     assert_eq!(ENTROPY_POLICY_FAIL_MARKER, "[TEST] entropy-policy=fail");
     assert_eq!(ENTROPY_POLICY_STATUS_MARKER, "entropy-policy rdrand=");
     assert_eq!(ENTROPY_POLICY_HARDWARE_MARKER, "hardware_present=");
+    assert_eq!(ENTROPY_POLICY_SELF_TEST_MARKER, "hardware_self_test=false");
     assert_eq!(ENTROPY_POLICY_FALLBACK_MARKER, "fallback_used=");
     assert_eq!(
         ENTROPY_POLICY_GENERATION_MARKER,
@@ -303,6 +304,11 @@ fn boot_smoke_requires_full_v0_18_1_marker_set() {
     let missing_entropy_generation = valid.replacen("generation_counter_ok=true", "", 1);
     assert!(!serial_log_contents_match(
         &missing_entropy_generation,
+        SmokeKind::Boot
+    ));
+    let missing_entropy_self_test = valid.replacen("hardware_self_test=false", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_entropy_self_test,
         SmokeKind::Boot
     ));
     let missing_heap = valid.replacen("[TEST] heap=ok", "", 1);

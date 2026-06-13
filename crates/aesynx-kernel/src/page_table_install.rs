@@ -282,9 +282,10 @@ extern "C" fn activate_on_kernel_stack(
     match crate::entropy_smoke::run() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "entropy-policy rdrand={} rdseed={} hardware_present={} fallback_used={} generation_counter_ok={} random_tokens_available={} source={:?}",
+                "entropy-policy rdrand={} rdseed={} hardware_self_test={} hardware_present={} fallback_used={} generation_counter_ok={} random_tokens_available={} source={:?}",
                 status.rdrand_supported,
                 status.rdseed_supported,
+                status.hardware_self_test_passed,
                 status.hardware_entropy_present,
                 status.fallback_used,
                 status.generation_counter_ok,

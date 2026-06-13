@@ -85,8 +85,9 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `null_page_ok=true`, `kernel_stack_pages=`, `kernel_stack_guard_ok=true`,
 `[TEST] kernel-stack-guard=ok`, `[TEST] paging-policy-model=ok`,
 `[TEST] bootinfo=ok`, `[TEST] boot=ok`, `cpu-hardening nx=`,
-`[TEST] cpu-hardening=ok`, `entropy-policy rdrand=`, `hardware_present=`,
-`fallback_used=`, `generation_counter_ok=true`, `random_tokens_available=`,
+`[TEST] cpu-hardening=ok`, `entropy-policy rdrand=`,
+`hardware_self_test=false`, `hardware_present=`, `fallback_used=`,
+`generation_counter_ok=true`, `random_tokens_available=`,
 `[TEST] entropy-policy=ok`, `heap bytes=`, `slab_classes=`,
 `slab_reuse_ok=true`, `page_run_ok=true`, `stress_ok=true`,
 `double_free_detected=true`, `invalid_free_detected=true`, `[TEST] heap=ok`,
@@ -156,9 +157,12 @@ into the activation arena, switches to the private activation stack, loads the
 Aesynx-owned CR3 root, verifies kernel-stack guard evidence, and reports
 read-back CPU hardening booleans. The current candidate then classifies early
 entropy support, verifies generation-counter overflow handling, rejects
+CPUID-only hardware capability evidence for random-token policy, rejects
 deterministic fallback for random-token policy, and emits redacted entropy
-booleans before `[TEST] entropy-policy=ok`. It then initializes the bounded
-reusable kernel heap and smokes `Box`, `Vec`, `BTreeMap`, slab reuse, page-run
+booleans with `hardware_self_test=false` before `[TEST] entropy-policy=ok`.
+Future entropy paths must not log raw entropy or token material. It then
+initializes the bounded reusable kernel heap and smokes `Box`, `Vec`,
+`BTreeMap`, slab reuse, page-run
 allocation, stress allocation/free, invalid-free telemetry, double-free
 detection, and oversized allocation rejection. Host tests also cover zeroing
 before heap reuse. It does not claim process isolation, production page-table

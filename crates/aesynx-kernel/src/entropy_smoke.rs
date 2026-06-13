@@ -1,4 +1,4 @@
-use aesynx_entropy::{EntropyPolicyStatus, EntropySource, GenerationCounter};
+use aesynx_entropy::{EntropyEvidence, EntropyPolicyStatus, EntropySource, GenerationCounter};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EntropySmokeError {
@@ -8,9 +8,19 @@ pub enum EntropySmokeError {
 
 pub fn run() -> Result<EntropyPolicyStatus, EntropySmokeError> {
     let capabilities = aesynx_arch_x86_64::entropy::detect_capabilities();
-    let status = EntropyPolicyStatus::classify(capabilities);
+    let generation_counter_ok = verify_generation_counter().is_ok();
+    if !generation_counter_ok {
+        return Err(EntropySmokeError::GenerationCounterWrapped);
+    }
 
-    verify_generation_counter()?;
+    // v0.18.1 deliberately does not execute RDRAND/RDSEED. CPUID feature bits
+    // are visible in telemetry, but random-token policy remains disabled until
+    // a future runtime self-test-backed read path exists.
+    let status = EntropyPolicyStatus::classify(EntropyEvidence {
+        capabilities,
+        generation_counter_ok,
+        hardware_self_test_passed: false,
+    });
     verify_random_token_policy(status)?;
 
     Ok(status)
@@ -38,15 +48,21 @@ fn verify_random_token_policy(status: EntropyPolicyStatus) -> Result<(), Entropy
 
 #[cfg(test)]
 mod tests {
-    use aesynx_entropy::{EntropyCapabilities, EntropyPolicyStatus, EntropySource};
+    use aesynx_entropy::{
+        EntropyCapabilities, EntropyEvidence, EntropyPolicyStatus, EntropySource,
+    };
 
     use super::{run, verify_random_token_policy};
 
     #[test]
     fn fallback_cannot_satisfy_random_token_policy() {
-        let status = EntropyPolicyStatus::classify(EntropyCapabilities {
-            rdrand: false,
-            rdseed: false,
+        let status = EntropyPolicyStatus::classify(EntropyEvidence {
+            capabilities: EntropyCapabilities {
+                rdrand: false,
+                rdseed: false,
+            },
+            generation_counter_ok: true,
+            hardware_self_test_passed: false,
         });
 
         assert_eq!(verify_random_token_policy(status), Ok(()));
@@ -66,8 +82,11 @@ mod tests {
             assert!(status.generation_counter_ok);
             assert_eq!(
                 status.hardware_entropy_present,
-                status.rdrand_supported || status.rdseed_supported
+                (status.rdrand_supported || status.rdseed_supported)
+                    && status.hardware_self_test_passed
             );
+            assert!(!status.hardware_self_test_passed);
+            assert!(!status.random_tokens_available);
         }
     }
 }

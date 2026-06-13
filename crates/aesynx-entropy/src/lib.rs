@@ -8,6 +8,13 @@ pub struct EntropyCapabilities {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EntropyEvidence {
+    pub capabilities: EntropyCapabilities,
+    pub generation_counter_ok: bool,
+    pub hardware_self_test_passed: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EntropySource {
     RdSeed,
     RdRand,
@@ -44,6 +51,7 @@ pub struct EntropyPolicyStatus {
     pub rdrand_supported: bool,
     pub rdseed_supported: bool,
     pub hardware_entropy_present: bool,
+    pub hardware_self_test_passed: bool,
     pub fallback_used: bool,
     pub generation_counter_ok: bool,
     pub random_tokens_available: bool,
@@ -52,23 +60,27 @@ pub struct EntropyPolicyStatus {
 
 impl EntropyPolicyStatus {
     #[must_use]
-    pub const fn classify(capabilities: EntropyCapabilities) -> Self {
-        let hardware_entropy_present = capabilities.rdrand || capabilities.rdseed;
-        let primary_source = if capabilities.rdseed {
+    pub const fn classify(evidence: EntropyEvidence) -> Self {
+        let hardware_feature_present = evidence.capabilities.rdrand || evidence.capabilities.rdseed;
+        let hardware_entropy_present =
+            hardware_feature_present && evidence.hardware_self_test_passed;
+        let primary_source = if hardware_entropy_present && evidence.capabilities.rdseed {
             EntropySource::RdSeed
-        } else if capabilities.rdrand {
+        } else if hardware_entropy_present && evidence.capabilities.rdrand {
             EntropySource::RdRand
         } else {
             EntropySource::DeterministicMonotonicFallback
         };
 
         Self {
-            rdrand_supported: capabilities.rdrand,
-            rdseed_supported: capabilities.rdseed,
+            rdrand_supported: evidence.capabilities.rdrand,
+            rdseed_supported: evidence.capabilities.rdseed,
             hardware_entropy_present,
+            hardware_self_test_passed: evidence.hardware_self_test_passed,
             fallback_used: !hardware_entropy_present,
-            generation_counter_ok: true,
-            random_tokens_available: primary_source.quality().attacker_unpredictable(),
+            generation_counter_ok: evidence.generation_counter_ok,
+            random_tokens_available: evidence.generation_counter_ok
+                && primary_source.quality().attacker_unpredictable(),
             primary_source,
         }
     }
@@ -135,8 +147,8 @@ pub enum EntropyError {
 #[cfg(test)]
 mod tests {
     use super::{
-        EntropyCapabilities, EntropyError, EntropyPolicyStatus, EntropyQuality, EntropySource,
-        GenerationCounter,
+        EntropyCapabilities, EntropyError, EntropyEvidence, EntropyPolicyStatus, EntropyQuality,
+        EntropySource, GenerationCounter,
     };
 
     #[test]
@@ -164,25 +176,37 @@ mod tests {
     #[test]
     fn policy_prefers_rdseed_then_rdrand_then_fallback() {
         assert_eq!(
-            EntropyPolicyStatus::classify(EntropyCapabilities {
-                rdrand: true,
-                rdseed: true,
+            EntropyPolicyStatus::classify(EntropyEvidence {
+                capabilities: EntropyCapabilities {
+                    rdrand: true,
+                    rdseed: true,
+                },
+                generation_counter_ok: true,
+                hardware_self_test_passed: true,
             })
             .primary_source,
             EntropySource::RdSeed
         );
         assert_eq!(
-            EntropyPolicyStatus::classify(EntropyCapabilities {
-                rdrand: true,
-                rdseed: false,
+            EntropyPolicyStatus::classify(EntropyEvidence {
+                capabilities: EntropyCapabilities {
+                    rdrand: true,
+                    rdseed: false,
+                },
+                generation_counter_ok: true,
+                hardware_self_test_passed: true,
             })
             .primary_source,
             EntropySource::RdRand
         );
         assert_eq!(
-            EntropyPolicyStatus::classify(EntropyCapabilities {
-                rdrand: false,
-                rdseed: false,
+            EntropyPolicyStatus::classify(EntropyEvidence {
+                capabilities: EntropyCapabilities {
+                    rdrand: false,
+                    rdseed: false,
+                },
+                generation_counter_ok: true,
+                hardware_self_test_passed: true,
             })
             .primary_source,
             EntropySource::DeterministicMonotonicFallback
@@ -191,9 +215,13 @@ mod tests {
 
     #[test]
     fn deterministic_fallback_is_anti_confusion_only() {
-        let status = EntropyPolicyStatus::classify(EntropyCapabilities {
-            rdrand: false,
-            rdseed: false,
+        let status = EntropyPolicyStatus::classify(EntropyEvidence {
+            capabilities: EntropyCapabilities {
+                rdrand: false,
+                rdseed: false,
+            },
+            generation_counter_ok: true,
+            hardware_self_test_passed: false,
         });
 
         assert!(status.fallback_used);
@@ -207,9 +235,13 @@ mod tests {
 
     #[test]
     fn random_tokens_require_hardware_entropy() {
-        let status = EntropyPolicyStatus::classify(EntropyCapabilities {
-            rdrand: true,
-            rdseed: false,
+        let status = EntropyPolicyStatus::classify(EntropyEvidence {
+            capabilities: EntropyCapabilities {
+                rdrand: true,
+                rdseed: false,
+            },
+            generation_counter_ok: true,
+            hardware_self_test_passed: true,
         });
 
         assert!(!status.fallback_used);
@@ -218,6 +250,43 @@ mod tests {
             status.require_random_tokens().map(|policy| policy.source()),
             Ok(EntropySource::RdRand)
         );
+    }
+
+    #[test]
+    fn cpuid_without_runtime_self_test_does_not_enable_random_tokens() {
+        let status = EntropyPolicyStatus::classify(EntropyEvidence {
+            capabilities: EntropyCapabilities {
+                rdrand: true,
+                rdseed: true,
+            },
+            generation_counter_ok: true,
+            hardware_self_test_passed: false,
+        });
+
+        assert!(status.rdrand_supported);
+        assert!(status.rdseed_supported);
+        assert!(!status.hardware_entropy_present);
+        assert!(status.fallback_used);
+        assert!(!status.random_tokens_available);
+        assert_eq!(
+            status.primary_source,
+            EntropySource::DeterministicMonotonicFallback
+        );
+    }
+
+    #[test]
+    fn failed_generation_check_is_reflected_in_status() {
+        let status = EntropyPolicyStatus::classify(EntropyEvidence {
+            capabilities: EntropyCapabilities {
+                rdrand: true,
+                rdseed: false,
+            },
+            generation_counter_ok: false,
+            hardware_self_test_passed: true,
+        });
+
+        assert!(!status.generation_counter_ok);
+        assert!(!status.random_tokens_available);
     }
 
     #[test]

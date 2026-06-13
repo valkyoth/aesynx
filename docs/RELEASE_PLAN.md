@@ -1061,6 +1061,8 @@ Deliverables:
 - Early entropy service interface with explicit sources and quality labels.
 - x86_64 RDRAND/RDSEED probing behind CPUID checks, treated as one input and
   not as a sole trust anchor.
+- Runtime self-test evidence must be represented separately from CPUID feature
+  presence; CPUID alone must not enable random-token policy.
 - Deterministic boot-local monotonic fallback for identifiers that are
   anti-confusion only.
 - Clear distinction between generation counters used to reject stale authority
@@ -1070,7 +1072,7 @@ Deliverables:
 Expected serial:
 
 ```text
-entropy-policy rdrand=<bool> rdseed=<bool> hardware_present=<bool> fallback_used=<bool> generation_counter_ok=true random_tokens_available=<bool> source=<source>
+entropy-policy rdrand=<bool> rdseed=<bool> hardware_self_test=<bool> hardware_present=<bool> fallback_used=<bool> generation_counter_ok=true random_tokens_available=<bool> source=<source>
 [TEST] entropy-policy=ok
 ```
 
@@ -1078,9 +1080,10 @@ Verification:
 
 - Host tests cover source classification, fallback behavior, counter overflow,
   and non-claims.
-- QEMU smoke reports whether hardware entropy was present, whether fallback mode
-  was used, whether random tokens are available, and whether generation-counter
-  overflow is rejected.
+- QEMU smoke reports whether CPUID hardware entropy features were seen, whether
+  runtime self-test evidence was present, whether fallback mode was used,
+  whether random tokens are available, and whether generation-counter overflow
+  is rejected.
 
 Exit criteria:
 
