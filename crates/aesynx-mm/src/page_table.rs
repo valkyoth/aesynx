@@ -373,6 +373,10 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
 
         let mut level = PAGE_TABLE_LEVELS - 1;
         while level >= lowest_reclaim_level {
+            debug_assert!(level >= 1, "reclaim level must stay above the root table");
+            if level == 0 {
+                break;
+            }
             let table_index = path[level];
             let parent = path[level - 1];
             let parent_slot = indices[level - 1];
