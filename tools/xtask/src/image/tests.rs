@@ -1,3 +1,4 @@
+use super::names::image_names;
 use super::smoke::{
     BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CPU_HARDENING_FAIL_MARKER,
     CPU_HARDENING_MARKER, CPU_HARDENING_STATUS_MARKER, CPU_SETUP_MARKER, EXCEPTION_MARKER,
@@ -289,6 +290,33 @@ fn image_kernel_profile_is_release() {
 }
 
 #[test]
+fn image_artifact_names_track_current_candidate_version() {
+    let boot = image_names(SmokeKind::Boot);
+    assert_eq!(boot.image, "aesynx-v0.16.4.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.16.4.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.16.4.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.16.4-iso");
+
+    let panic = image_names(SmokeKind::Panic);
+    assert_eq!(panic.image, "aesynx-v0.16.4-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.16.4-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.16.4-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.16.4-panic-iso");
+
+    let exception = image_names(SmokeKind::Exception);
+    assert_eq!(exception.image, "aesynx-v0.16.4-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.16.4-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.16.4-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.16.4-exception-iso");
+
+    let timer = image_names(SmokeKind::Timer);
+    assert_eq!(timer.image, "aesynx-v0.16.4-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.16.4-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.16.4-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.16.4-timer-iso");
+}
+
+#[test]
 fn boot_config_markers_cover_limine_kernel_path() {
     assert!(
         BOOT_CONFIG_MARKERS
@@ -325,6 +353,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
+    assert!(contents.contains("name=Aesynx v0.16.4 Limine handoff module split candidate\n"));
     assert!(contents.contains("smoke=panic\n"));
     for smoke in [
         SmokeKind::Boot,
