@@ -1,6 +1,9 @@
 use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(all(target_arch = "x86_64", target_os = "none"))]
+use aesynx_arch::ArchCpu;
+
 const GDT_ENTRIES: usize = 5;
 const DOUBLE_FAULT_STACK_BYTES: usize = 16 * 1024;
 /// 0-indexed position in `TSS.ist`. The architectural IST number for IDT gates
@@ -101,18 +104,35 @@ pub fn init() -> DescriptorTableStatus {
 ///
 /// The caller must guarantee that `stack_top` is a canonical one-past-end
 /// pointer to a writable kernel stack that remains valid for the current CPU
-/// while ring 3 execution is enabled.
+/// while ring 3 execution is enabled. The caller must also mask interrupts
+/// before calling so no TSS consumer can observe an in-progress `rsp0` update.
+/// This remains single-core-only storage; SMP must move to per-CPU TSS storage
+/// before secondary cores can enter userspace.
 pub unsafe fn set_ring0_stack(stack_top: u64) -> Result<(), Ring0StackError> {
     if !valid_ring0_stack_top(stack_top) {
         return Err(Ring0StackError::InvalidStackTop);
     }
+    debug_assert!(ring0_stack_update_interrupt_contract_holds());
 
-    // SAFETY: The public unsafe contract above requires the caller to provide a
-    // valid current-CPU kernel stack pointer before privilege transitions use it.
+    // SAFETY: The public unsafe contract above requires a valid current-CPU
+    // kernel stack pointer and masked interrupts before privilege transitions
+    // or TSS/IST consumers can observe the update.
     unsafe {
         TSS.rsp[0] = stack_top;
     }
     Ok(())
+}
+
+fn ring0_stack_update_interrupt_contract_holds() -> bool {
+    #[cfg(all(target_arch = "x86_64", target_os = "none"))]
+    {
+        matches!(crate::X86_64::interrupts_enabled(), Ok(false))
+    }
+
+    #[cfg(not(all(target_arch = "x86_64", target_os = "none")))]
+    {
+        true
+    }
 }
 
 const fn is_canonical_address(address: u64) -> bool {

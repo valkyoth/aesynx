@@ -243,7 +243,11 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     // MMIO memory, not a Rust allocation. Future framebuffer writes must
     // re-acquire a raw pointer at the MMIO access site with a local safety
     // contract for the mapping lifetime and cacheability.
-    let base = framebuffer.address as usize as u64;
+    // SAFETY: `framebuffer` points to a validated Limine-owned response
+    // structure. A volatile read keeps bootloader-owned handoff fields under
+    // the same access convention as request responses.
+    let framebuffer_address = unsafe { core::ptr::addr_of!(framebuffer.address).read_volatile() };
+    let base = framebuffer_address as usize as u64;
     if !valid_handoff_virt(base, abi::X86_64_KERNEL_VMA_MIN) {
         return Err(LimineError::InvalidFramebuffer);
     }
@@ -283,7 +287,11 @@ fn read_rsdp() -> Result<Option<VirtAddr>, LimineError> {
     // physical/virtual address, not a Rust allocation. Future ACPI readers must
     // re-acquire a raw pointer at the read site with a documented firmware
     // table lifetime contract.
-    let address = response.address as usize as u64;
+    // SAFETY: `response` points to a validated Limine-owned response structure.
+    // A volatile read keeps bootloader-owned handoff fields under the same
+    // access convention as request responses.
+    let rsdp_address = unsafe { core::ptr::addr_of!(response.address).read_volatile() };
+    let address = rsdp_address as usize as u64;
     if !valid_handoff_virt(address, abi::X86_64_KERNEL_VMA_MIN) {
         return Err(LimineError::InvalidRsdp);
     }
