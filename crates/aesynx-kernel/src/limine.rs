@@ -11,6 +11,11 @@ use self::abi::{
     LimineHhdmResponse, LimineMemmapEntry, LimineMemmapResponse, LimineRsdpResponse,
 };
 
+const _: () = assert!(
+    usize::BITS == 64,
+    "Limine pointer address validation assumes a 64-bit target"
+);
+
 pub struct EarlyBootScratch {
     memory_regions: [MemoryRegion; MAX_EARLY_MEMORY_REGIONS],
 }

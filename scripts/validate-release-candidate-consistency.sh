@@ -17,6 +17,11 @@ if [ -z "$candidate" ]; then
     exit 1
 fi
 
+previous_patch_candidate="$(
+    printf '%s\n' "$candidate" |
+        awk -F'[v.]' '{ if ($4 > 0) printf "v%s.%s.%s", $2, $3, $4 - 1 }'
+)"
+
 release_notes="docs/releases/$candidate-rc.md"
 if [ ! -s "$release_notes" ]; then
     echo "release candidate consistency: missing current release notes: $release_notes" >&2
@@ -28,6 +33,15 @@ require_contains() {
     text="$2"
     if ! grep -Fq "$text" "$file"; then
         echo "release candidate consistency: $file missing: $text" >&2
+        exit 1
+    fi
+}
+
+require_not_contains() {
+    file="$1"
+    text="$2"
+    if [ -n "$text" ] && grep -Fq "$text" "$file"; then
+        echo "release candidate consistency: $file contains stale candidate text: $text" >&2
         exit 1
     fi
 }
@@ -52,5 +66,11 @@ require_contains tools/xtask/src/image/names.rs "aesynx-$candidate-timer.iso"
 require_contains tools/xtask/src/image/manifest.rs "Aesynx $candidate"
 require_contains tools/xtask/src/image/tests.rs "aesynx-$candidate.iso"
 require_contains tools/xtask/src/image/tests.rs "Aesynx $candidate"
+
+require_not_contains "$release_notes" "$previous_patch_candidate"
+require_not_contains docs/build-skeleton.md "$previous_patch_candidate"
+require_not_contains tools/xtask/src/image/names.rs "$previous_patch_candidate"
+require_not_contains tools/xtask/src/image/manifest.rs "$previous_patch_candidate"
+require_not_contains tools/xtask/src/image/tests.rs "$previous_patch_candidate"
 
 echo "release candidate consistency: ok for $candidate"
