@@ -1,7 +1,8 @@
 use core::sync::atomic::Ordering;
+use std::format;
 
 use aesynx_abi::{CoreId, MessageId};
-use aesynx_ipc::{MessageKind, MessagePayload};
+use aesynx_ipc::{InlineBytes, MessageKind, MessagePayload};
 
 use crate::{
     CompletionStatus, ObservedEntry, RequestError, RingQueueError, ServiceCompletion, ServiceKind,
@@ -62,6 +63,37 @@ fn service_completion_preserves_request_identity() {
     assert_eq!(completion.request_id(), MessageId::new(11));
     assert_eq!(completion.status(), CompletionStatus::Completed);
     assert_eq!(completion.payload(), MessagePayload::Empty);
+}
+
+#[test]
+fn service_debug_output_redacts_request_identity_and_payloads() -> Result<(), RequestError> {
+    let payload = MessagePayload::Inline(
+        InlineBytes::new(&[1, 2, 3]).map_err(|_| RequestError::InvalidMessageId)?,
+    );
+    let request = ServiceRequest::new(
+        MessageId::new(77),
+        CoreId::new(2),
+        ServiceKind::Object,
+        MessageKind::WriteObject,
+        payload,
+    )?;
+    let completion = ServiceCompletion::new(
+        MessageId::new(77),
+        CompletionStatus::Denied,
+        MessagePayload::Object(aesynx_abi::ObjectId::new(99)),
+    );
+
+    let request_debug = format!("{request:?}");
+    let completion_debug = format!("{completion:?}");
+
+    assert!(request_debug.contains("payload: \"<redacted>\""));
+    assert!(!request_debug.contains("MessageId"));
+    assert!(!request_debug.contains("CoreId"));
+    assert!(!request_debug.contains("[1, 2, 3]"));
+    assert!(completion_debug.contains("payload: \"<redacted>\""));
+    assert!(!completion_debug.contains("ObjectId"));
+
+    Ok(())
 }
 
 #[test]

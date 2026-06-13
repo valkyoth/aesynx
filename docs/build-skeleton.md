@@ -185,9 +185,11 @@ reclamation.
 The v0.25.0 candidate adds the host-side service queue model. It defines
 explicit service kinds, kernel-stamped request metadata, completion statuses,
 fixed-capacity ring queue behavior, FIFO wraparound, fail-closed full/empty
-handling, and modeled release/acquire publish-observe ordering evidence. This
-is still host-tested queue logic; the live boot path does not yet expose object
-syscalls or kernel service queues.
+handling, modeled release/acquire publish-observe ordering evidence, and
+redacted IPC/service debug output. It also hardens object-registry capability
+resolution against stale revocation epochs. This is still host-tested queue
+logic; the live boot path does not yet expose object syscalls or kernel service
+queues.
 
 ## Target Shape
 

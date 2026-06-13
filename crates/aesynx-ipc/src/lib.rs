@@ -1,9 +1,14 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+#[cfg(test)]
+extern crate alloc;
+
+use core::fmt;
+
 use aesynx_abi::{CapId, CoreId, MessageId, ObjectId};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct MessageHeader {
     src: CoreId,
     dst: CoreId,
@@ -50,13 +55,37 @@ impl MessageHeader {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+impl fmt::Debug for MessageHeader {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("MessageHeader")
+            .field("src", &"<redacted>")
+            .field("dst", &"<redacted>")
+            .field("kind", &self.kind)
+            .field("seq", &self.seq)
+            .field("reply_to", &self.reply_to.map(|_| "<redacted>"))
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct MessageRequest {
     /// Destination requested by the sender. Routers must validate this value
     /// against the live core set before using it as an index or queue selector.
     pub dst: CoreId,
     pub kind: MessageKind,
     pub reply_to: Option<MessageId>,
+}
+
+impl fmt::Debug for MessageRequest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("MessageRequest")
+            .field("dst", &"<redacted>")
+            .field("kind", &self.kind)
+            .field("reply_to", &self.reply_to.map(|_| "<redacted>"))
+            .finish()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,12 +109,23 @@ pub enum MessageKind {
     ModelReject,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum MessagePayload {
     Empty,
     Cap(CapId),
     Object(ObjectId),
     Inline(InlineBytes),
+}
+
+impl fmt::Debug for MessagePayload {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Empty => formatter.write_str("Empty"),
+            Self::Cap(_) => formatter.write_str("Cap(<redacted>)"),
+            Self::Object(_) => formatter.write_str("Object(<redacted>)"),
+            Self::Inline(_) => formatter.write_str("Inline(<redacted>)"),
+        }
+    }
 }
 
 pub const MAX_INLINE_PAYLOAD_LEN: usize = 64;
@@ -94,10 +134,20 @@ const _: () = assert!(
     "MAX_INLINE_PAYLOAD_LEN must fit in InlineBytes::len"
 );
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct InlineBytes {
     len: u8,
     bytes: [u8; MAX_INLINE_PAYLOAD_LEN],
+}
+
+impl fmt::Debug for InlineBytes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("InlineBytes")
+            .field("len", &self.len)
+            .field("bytes", &"<redacted>")
+            .finish()
+    }
 }
 
 impl InlineBytes {
@@ -141,10 +191,13 @@ pub enum IpcError {
 
 #[cfg(test)]
 mod tests {
-    use aesynx_abi::{CoreId, MessageId};
+    use alloc::format;
+
+    use aesynx_abi::{CapId, CoreId, MessageId, ObjectId};
 
     use super::{
-        InlineBytes, IpcError, MAX_INLINE_PAYLOAD_LEN, MessageHeader, MessageKind, MessageRequest,
+        InlineBytes, IpcError, MAX_INLINE_PAYLOAD_LEN, MessageHeader, MessageKind, MessagePayload,
+        MessageRequest,
     };
 
     #[test]
@@ -182,5 +235,31 @@ mod tests {
         let payload = InlineBytes::new(&[1, 2, 3]);
 
         assert_eq!(payload.map(|value| value.as_slice() == [1, 2, 3]), Ok(true));
+    }
+
+    #[test]
+    fn ipc_debug_output_redacts_authority_and_payload_values() -> Result<(), IpcError> {
+        let inline = InlineBytes::new(&[1, 2, 3])?;
+        let payload = MessagePayload::Inline(inline);
+        let cap = MessagePayload::Cap(CapId::new(42));
+        let object = MessagePayload::Object(ObjectId::new(99));
+        let header = MessageHeader::stamp(
+            MessageRequest {
+                dst: CoreId::new(2),
+                kind: MessageKind::WriteObject,
+                reply_to: Some(MessageId::new(7)),
+            },
+            CoreId::new(1),
+            9,
+        );
+
+        assert_eq!(format!("{payload:?}"), "Inline(<redacted>)");
+        assert_eq!(format!("{cap:?}"), "Cap(<redacted>)");
+        assert_eq!(format!("{object:?}"), "Object(<redacted>)");
+        assert!(!format!("{header:?}").contains("CoreId"));
+        assert!(!format!("{header:?}").contains("MessageId"));
+        assert!(!format!("{inline:?}").contains("[1, 2, 3]"));
+
+        Ok(())
     }
 }

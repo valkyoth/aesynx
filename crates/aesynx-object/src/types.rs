@@ -50,6 +50,7 @@ pub struct ObjectRecord {
     object_type: ObjectType,
     owner_core: CoreId,
     generation: u32,
+    revocation_epoch: u64,
 }
 
 impl ObjectRecord {
@@ -58,18 +59,25 @@ impl ObjectRecord {
         object_type: ObjectType,
         owner_core: CoreId,
         generation: u32,
+        revocation_epoch: u64,
     ) -> Self {
         Self {
             id,
             object_type,
             owner_core,
             generation,
+            revocation_epoch,
         }
     }
 
     #[must_use]
     pub const fn generation(self) -> u32 {
         self.generation
+    }
+
+    #[must_use]
+    pub const fn revocation_epoch(self) -> u64 {
+        self.revocation_epoch
     }
 
     #[must_use]
@@ -100,6 +108,7 @@ impl fmt::Debug for ObjectRecord {
             .field("object_type", &self.object_type)
             .field("owner_core", &self.owner_core)
             .field("generation", &self.generation)
+            .field("revocation_epoch", &self.revocation_epoch)
             .finish()
     }
 }

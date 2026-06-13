@@ -26,6 +26,7 @@ fn registry_creates_lists_and_deletes_local_objects() -> Result<(), ObjectRegist
     assert_eq!(endpoint.owner_core(), owner(0));
     assert_eq!(queue.owner_core(), owner(1));
     assert_eq!(task.generation(), 1);
+    assert_eq!(task.revocation_epoch(), 0);
 
     let mut listed = [memory; 4];
     let listed_count = registry.list(&mut listed)?;
@@ -180,6 +181,37 @@ fn object_capability_resolution_rejects_wrong_kind_and_stale_generation()
             CapPerms::READ
         ),
         Err(ObjectRegistryError::StaleObjectGeneration)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn object_capability_resolution_rejects_stale_revocation_epoch() -> Result<(), ObjectRegistryError>
+{
+    let mut registry = ObjectRegistry::<1>::new();
+    let endpoint =
+        registry.create(ObjectCreate::endpoint(object_id(2), owner(0)).with_revocation_epoch(1))?;
+    let mut table = CapabilityTable::<1>::new();
+    let stale_epoch = table
+        .insert_root(
+            endpoint.object_id(),
+            CapKind::Endpoint,
+            PrincipalId::new(7),
+            CapPerms::READ,
+            endpoint.generation(),
+            0,
+        )
+        .map_err(|_| ObjectRegistryError::ObjectNotFound)?;
+
+    assert_eq!(
+        registry.resolve_capability(
+            table
+                .get(stale_epoch)
+                .map_err(|_| ObjectRegistryError::ObjectNotFound)?,
+            CapPerms::READ
+        ),
+        Err(ObjectRegistryError::Revoked)
     );
 
     Ok(())

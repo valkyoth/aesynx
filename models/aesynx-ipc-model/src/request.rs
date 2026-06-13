@@ -1,15 +1,30 @@
+use core::fmt;
+
 use aesynx_abi::{CoreId, MessageId};
 use aesynx_ipc::{MessageKind, MessagePayload};
 
 use crate::ServiceKind;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ServiceRequest {
     id: MessageId,
     caller: CoreId,
     service: ServiceKind,
     kind: MessageKind,
     payload: MessagePayload,
+}
+
+impl fmt::Debug for ServiceRequest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ServiceRequest")
+            .field("id", &"<redacted>")
+            .field("caller", &"<redacted>")
+            .field("service", &self.service)
+            .field("kind", &self.kind)
+            .field("payload", &"<redacted>")
+            .finish()
+    }
 }
 
 impl ServiceRequest {

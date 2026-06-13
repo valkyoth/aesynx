@@ -10,6 +10,7 @@ pub struct ObjectCreate {
     id: ObjectId,
     object_type: ObjectType,
     owner_core: CoreId,
+    revocation_epoch: u64,
 }
 
 impl ObjectCreate {
@@ -19,7 +20,14 @@ impl ObjectCreate {
             id,
             object_type,
             owner_core,
+            revocation_epoch: 0,
         }
+    }
+
+    #[must_use]
+    pub const fn with_revocation_epoch(mut self, revocation_epoch: u64) -> Self {
+        self.revocation_epoch = revocation_epoch;
+        self
     }
 
     #[must_use]
@@ -78,6 +86,7 @@ impl<const CAPACITY: usize> ObjectRegistry<CAPACITY> {
             request.object_type,
             request.owner_core,
             generation,
+            request.revocation_epoch,
         );
 
         self.slots[slot] = ObjectSlot::Live(record);
@@ -139,6 +148,9 @@ impl<const CAPACITY: usize> ObjectRegistry<CAPACITY> {
         }
         if capability.generation() != record.generation() {
             return Err(ObjectRegistryError::StaleObjectGeneration);
+        }
+        if !capability.matches_revocation_epoch(record.revocation_epoch()) {
+            return Err(ObjectRegistryError::Revoked);
         }
 
         Ok(record)
@@ -222,5 +234,6 @@ pub enum ObjectRegistryError {
     MissingPermission,
     WrongCapabilityKind,
     StaleObjectGeneration,
+    Revoked,
     GenerationExhausted,
 }
