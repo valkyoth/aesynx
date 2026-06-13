@@ -126,7 +126,7 @@ fn read_memory_regions(
     }
 
     let entries = response.entries as *const *const LimineMemmapEntry;
-    if entries.is_null() || !entries.is_aligned() {
+    if !valid_handoff_array_ptr(entries, abi::X86_64_KERNEL_VMA_MIN) {
         return Err(LimineError::MissingMemoryMap);
     }
 
@@ -342,6 +342,10 @@ unsafe fn limine_ref<T>(ptr: *const T, min_kernel_vma: u64) -> Option<&'static T
     // against null, misaligned, and lower-half pointers before creating a
     // reference.
     Some(unsafe { &*ptr })
+}
+
+fn valid_handoff_array_ptr<T>(ptr: *const T, min_kernel_vma: u64) -> bool {
+    !ptr.is_null() && ptr.is_aligned() && valid_handoff_virt(ptr as usize as u64, min_kernel_vma)
 }
 
 const fn valid_handoff_virt(address: u64, min_kernel_vma: u64) -> bool {

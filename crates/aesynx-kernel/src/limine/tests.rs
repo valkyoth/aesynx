@@ -1,6 +1,6 @@
 use super::{
     LimineError, claim_bootinfo_normalization_once, limine_response_revision_compatible,
-    reset_bootinfo_normalization_for_test, valid_handoff_virt,
+    reset_bootinfo_normalization_for_test, valid_handoff_array_ptr, valid_handoff_virt,
 };
 
 #[test]
@@ -38,6 +38,32 @@ fn limine_payload_addresses_must_be_high_half_canonical() {
     ));
     assert!(!valid_handoff_virt(
         0xffff_0000_0000_0000,
+        X86_64_KERNEL_VMA_MIN
+    ));
+}
+
+#[test]
+fn limine_array_base_must_be_aligned_high_half_canonical_pointer() {
+    const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
+
+    assert!(valid_handoff_array_ptr::<u64>(
+        0xffff_8000_0000_1000 as *const u64,
+        X86_64_KERNEL_VMA_MIN
+    ));
+    assert!(!valid_handoff_array_ptr::<u64>(
+        core::ptr::null(),
+        X86_64_KERNEL_VMA_MIN
+    ));
+    assert!(!valid_handoff_array_ptr::<u64>(
+        0xffff_8000_0000_1001 as *const u64,
+        X86_64_KERNEL_VMA_MIN
+    ));
+    assert!(!valid_handoff_array_ptr::<u64>(
+        0x0000_8000_0000_0000 as *const u64,
+        X86_64_KERNEL_VMA_MIN
+    ));
+    assert!(!valid_handoff_array_ptr::<u64>(
+        0x1000 as *const u64,
         X86_64_KERNEL_VMA_MIN
     ));
 }

@@ -156,7 +156,7 @@ pub(crate) fn install_interrupt_gate(
         "install_interrupt_gate called with interrupts enabled"
     );
     if interrupts_were_enabled {
-        crate::X86_64::enable_interrupts().map_err(|_| IdtError::CpuStateUnavailable)?;
+        let _ = crate::X86_64::enable_interrupts();
         return Err(IdtError::CpuStateUnavailable);
     }
 
