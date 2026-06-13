@@ -77,15 +77,7 @@ Hard gate:
 - Any non-generated `.rs` file over 500 lines fails `scripts/checks.sh` unless
   it has a documented temporary exception in this file.
 
-Current exceptions:
-
-```text
-Path: crates/aesynx-kernel/src/limine.rs
-Reason: Concentrated early-boot Limine ABI boundary; v0.16.3 pentest fixes add payload-address validation without changing the bootloader request/link-section layout.
-Owner: kernel boot handoff
-Split plan: Move Limine protocol structs, constants, request statics, and ABI layout assertions into a private limine/abi.rs module; keep normalization flow in limine.rs.
-Removal deadline: v0.16.4, tracked in docs/RELEASE_PLAN.md before v0.17.0 early heap work
-```
+Current exceptions: none.
 
 Exception format:
 

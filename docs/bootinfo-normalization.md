@@ -8,8 +8,9 @@ Aesynx `BootInfo` structures before the generic kernel uses them.
 
 ## Current Path
 
-`crates/aesynx-kernel/src/limine.rs` owns the raw Limine request and response
-boundary. It requests:
+`crates/aesynx-kernel/src/limine.rs` owns the Limine normalization flow, while
+`crates/aesynx-kernel/src/limine/abi.rs` owns the raw request statics,
+protocol structs, constants, and ABI layout assertions. The handoff requests:
 
 - Base revision 6.
 - Memory map.
@@ -24,7 +25,8 @@ crate remains `no_std`, dependency-free, and safe Rust.
 
 The linker places `.limine_requests*` inside the writable data segment because
 Limine writes response pointers into those statics before `_start`. Aesynx
-treats the request statics as read-only after handoff.
+treats the request statics as read-only after handoff, and the ABI module
+exposes only raw request pointers to the normalization flow.
 
 After normalization, `_start` uses the generic `aesynx-kernel::boot_summary`
 API for serial output. The generic kernel therefore consumes only Aesynx

@@ -204,11 +204,12 @@ Limitations: early boot only; full panic and fault diagnostics start in later mi
 
 ```text
 Location: crates/aesynx-kernel/src/limine.rs
-Status: active in v0.5
+Location: crates/aesynx-kernel/src/limine/abi.rs
+Status: active in v0.5; split in v0.16.4
 Purpose: parse Limine bootloader handoff responses and normalize them into Aesynx BootInfo
 Preconditions: Limine v12.3.2-compatible bootloader loads the kernel, honours request sections, fills response pointers before _start, and keeps response data valid in bootloader-reclaimable memory during early boot
 Unsafe operation: raw reads of Limine response pointers, raw pointer traversal of memory-map and framebuffer arrays, linker-provided __kernel_end symbol address, and mutable Limine request statics written by the bootloader before Rust executes
-Safety argument: the unsafe code is confined to the boot handoff boundary; it checks response and array pointers for null and alignment before forming references, rejects Limine response pointers below the caller-supplied architecture kernel VMA floor, bounds memory-map copies to MAX_EARLY_MEMORY_REGIONS, validates framebuffer/HHDM/RSDP payload addresses separately before BootInfo exposure, validates lossy integer conversions, compile-time asserts the transcribed framebuffer ABI layout, and passes only value-copied metadata into the safe aesynx-boot normalization API
+Safety argument: the unsafe code is confined to the boot handoff boundary; protocol structs, magic constants, request statics, link-section markers, and ABI layout assertions live in the private ABI module, while the normalization module checks response and array pointers for null and alignment before forming references, rejects Limine response pointers below the caller-supplied architecture kernel VMA floor, bounds memory-map copies to MAX_EARLY_MEMORY_REGIONS, validates framebuffer/HHDM/RSDP payload addresses separately before BootInfo exposure, validates lossy integer conversions, compile-time asserts the transcribed framebuffer ABI layout, and passes only value-copied metadata into the safe aesynx-boot normalization API
 Tests/evidence: cargo xtask qemu observes [TEST] memory-map=ok, [TEST] bootinfo=ok, and [TEST] boot=ok; aesynx-boot unit tests cover synthetic memory-map normalization, checked memory accounting, frame counts, invalid empty-map rejection, overlapping memory rejection, and high-half kernel image validation; limine unit tests cover forward-compatible response revisions, one-shot normalization claims, and high-half canonical handoff-address validation
 Limitations: no bootloader memory reclamation, page-table ownership, SMP topology parsing, module parsing, or framebuffer output yet; Limine request statics are placed in the writable data segment because Limine writes them before _start, but Aesynx must not mutate them after handoff; aarch64 boot handoff must supply its own VMA floor rather than reusing x86_64 constants
 ```

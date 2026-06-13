@@ -5,11 +5,16 @@ use aesynx_boot::{
 };
 use core::sync::atomic::{AtomicBool, Ordering};
 
+mod abi;
+use self::abi::{
+    LimineExecutableAddressResponse, LimineFramebuffer, LimineFramebufferResponse,
+    LimineHhdmResponse, LimineMemmapEntry, LimineMemmapResponse, LimineRsdpResponse,
+};
+
 pub struct EarlyBootScratch {
     memory_regions: [MemoryRegion; MAX_EARLY_MEMORY_REGIONS],
 }
 
-const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
 static BOOTINFO_NORMALIZED: AtomicBool = AtomicBool::new(false);
 
 impl EarlyBootScratch {
@@ -80,7 +85,7 @@ fn base_revision_supported() -> bool {
     // the third field before entering `_start`; reading it by raw pointer avoids
     // creating a reference to mutable bootloader-owned storage.
     let supported = unsafe {
-        core::ptr::addr_of_mut!(BASE_REVISION)
+        abi::base_revision_ptr()
             .cast::<u64>()
             .add(2)
             .read_volatile()
@@ -96,13 +101,13 @@ fn read_memory_regions(
     // Aesynx after handoff.
     let response = unsafe {
         request_response::<LimineMemmapResponse>(
-            core::ptr::addr_of!(MEMMAP_REQUEST),
-            X86_64_KERNEL_VMA_MIN,
+            abi::memmap_request_ptr(),
+            abi::X86_64_KERNEL_VMA_MIN,
         )
     }
     .ok_or(LimineError::MissingMemoryMap)?;
 
-    if !limine_response_revision_compatible(response.revision, LIMINE_REQUEST_REVISION) {
+    if !limine_response_revision_compatible(response.revision, abi::LIMINE_REQUEST_REVISION) {
         return Err(LimineError::UnsupportedMemoryMapRevision);
     }
 
@@ -129,11 +134,12 @@ fn read_memory_regions(
         // SAFETY: Limine supplied this pointer through the bounded memmap
         // entries array. `limine_ref` performs null and alignment checks before
         // creating a reference.
-        let entry = if let Some(entry) = unsafe { limine_ref(entry_ptr, X86_64_KERNEL_VMA_MIN) } {
-            entry
-        } else {
-            return Err(LimineError::NullMemoryRegion);
-        };
+        let entry =
+            if let Some(entry) = unsafe { limine_ref(entry_ptr, abi::X86_64_KERNEL_VMA_MIN) } {
+                entry
+            } else {
+                return Err(LimineError::NullMemoryRegion);
+            };
 
         output[index] = MemoryRegion::new(
             PhysAddr::new(entry.base),
@@ -151,13 +157,13 @@ fn read_kernel_image() -> Result<KernelImageInfo, LimineError> {
     // The response contains plain address values and is read-only after handoff.
     let response = unsafe {
         request_response::<LimineExecutableAddressResponse>(
-            core::ptr::addr_of!(EXECUTABLE_ADDRESS_REQUEST),
-            X86_64_KERNEL_VMA_MIN,
+            abi::executable_address_request_ptr(),
+            abi::X86_64_KERNEL_VMA_MIN,
         )
     }
     .ok_or(LimineError::MissingExecutableAddress)?;
 
-    if !limine_response_revision_compatible(response.revision, LIMINE_REQUEST_REVISION) {
+    if !limine_response_revision_compatible(response.revision, abi::LIMINE_REQUEST_REVISION) {
         return Err(LimineError::UnsupportedExecutableAddressRevision);
     }
 
@@ -172,19 +178,16 @@ fn read_hhdm() -> Result<Option<HhdmInfo>, LimineError> {
     // SAFETY: Limine fills `HHDM_REQUEST.response` before `_start` when the
     // feature is available. A missing response is represented as null.
     let Some(response) = (unsafe {
-        request_response::<LimineHhdmResponse>(
-            core::ptr::addr_of!(HHDM_REQUEST),
-            X86_64_KERNEL_VMA_MIN,
-        )
+        request_response::<LimineHhdmResponse>(abi::hhdm_request_ptr(), abi::X86_64_KERNEL_VMA_MIN)
     }) else {
         return Ok(None);
     };
 
-    if !limine_response_revision_compatible(response.revision, LIMINE_REQUEST_REVISION) {
+    if !limine_response_revision_compatible(response.revision, abi::LIMINE_REQUEST_REVISION) {
         return Err(LimineError::UnsupportedHhdmRevision);
     }
 
-    if !valid_handoff_virt(response.offset, X86_64_KERNEL_VMA_MIN) {
+    if !valid_handoff_virt(response.offset, abi::X86_64_KERNEL_VMA_MIN) {
         return Err(LimineError::InvalidHhdm);
     }
 
@@ -196,14 +199,14 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     // the feature is available. A missing response is represented as null.
     let Some(response) = (unsafe {
         request_response::<LimineFramebufferResponse>(
-            core::ptr::addr_of!(FRAMEBUFFER_REQUEST),
-            X86_64_KERNEL_VMA_MIN,
+            abi::framebuffer_request_ptr(),
+            abi::X86_64_KERNEL_VMA_MIN,
         )
     }) else {
         return Ok(None);
     };
 
-    if !limine_response_revision_compatible(response.revision, LIMINE_REQUEST_REVISION) {
+    if !limine_response_revision_compatible(response.revision, abi::LIMINE_REQUEST_REVISION) {
         return Err(LimineError::UnsupportedFramebufferRevision);
     }
 
@@ -223,19 +226,20 @@ fn read_framebuffer() -> Result<Option<FramebufferInfo>, LimineError> {
     // SAFETY: Limine supplied this pointer through the framebuffer array.
     // `limine_ref` performs null and alignment checks before creating a
     // reference.
-    let framebuffer =
-        if let Some(framebuffer) = unsafe { limine_ref(framebuffer_ptr, X86_64_KERNEL_VMA_MIN) } {
-            framebuffer
-        } else {
-            return Err(LimineError::InvalidFramebuffer);
-        };
+    let framebuffer = if let Some(framebuffer) =
+        unsafe { limine_ref(framebuffer_ptr, abi::X86_64_KERNEL_VMA_MIN) }
+    {
+        framebuffer
+    } else {
+        return Err(LimineError::InvalidFramebuffer);
+    };
 
     // Provenance is intentionally dropped here: the framebuffer is bootloader
     // MMIO memory, not a Rust allocation. Future framebuffer writes must
     // re-acquire a raw pointer at the MMIO access site with a local safety
     // contract for the mapping lifetime and cacheability.
     let base = framebuffer.address as usize as u64;
-    if !valid_handoff_virt(base, X86_64_KERNEL_VMA_MIN) {
+    if !valid_handoff_virt(base, abi::X86_64_KERNEL_VMA_MIN) {
         return Err(LimineError::InvalidFramebuffer);
     }
     let width =
@@ -257,15 +261,12 @@ fn read_rsdp() -> Result<Option<VirtAddr>, LimineError> {
     // SAFETY: Limine fills `RSDP_REQUEST.response` before `_start` when the
     // feature is available. A missing response is represented as null.
     let Some(response) = (unsafe {
-        request_response::<LimineRsdpResponse>(
-            core::ptr::addr_of!(RSDP_REQUEST),
-            X86_64_KERNEL_VMA_MIN,
-        )
+        request_response::<LimineRsdpResponse>(abi::rsdp_request_ptr(), abi::X86_64_KERNEL_VMA_MIN)
     }) else {
         return Ok(None);
     };
 
-    if !limine_response_revision_compatible(response.revision, LIMINE_REQUEST_REVISION) {
+    if !limine_response_revision_compatible(response.revision, abi::LIMINE_REQUEST_REVISION) {
         return Err(LimineError::UnsupportedRsdpRevision);
     }
 
@@ -278,7 +279,7 @@ fn read_rsdp() -> Result<Option<VirtAddr>, LimineError> {
     // re-acquire a raw pointer at the read site with a documented firmware
     // table lifetime contract.
     let address = response.address as usize as u64;
-    if !valid_handoff_virt(address, X86_64_KERNEL_VMA_MIN) {
+    if !valid_handoff_virt(address, abi::X86_64_KERNEL_VMA_MIN) {
         return Err(LimineError::InvalidRsdp);
     }
 
@@ -287,13 +288,15 @@ fn read_rsdp() -> Result<Option<VirtAddr>, LimineError> {
 
 fn map_memory_region_kind(kind: u64) -> MemoryRegionKind {
     match kind {
-        LIMINE_MEMMAP_USABLE => MemoryRegionKind::Usable,
-        LIMINE_MEMMAP_ACPI_RECLAIMABLE | LIMINE_MEMMAP_ACPI_NVS => MemoryRegionKind::Acpi,
-        LIMINE_MEMMAP_BAD_MEMORY => MemoryRegionKind::Bad,
-        LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE => MemoryRegionKind::Bootloader,
-        LIMINE_MEMMAP_EXECUTABLE_AND_MODULES => MemoryRegionKind::Kernel,
-        LIMINE_MEMMAP_FRAMEBUFFER => MemoryRegionKind::Framebuffer,
-        LIMINE_MEMMAP_RESERVED | LIMINE_MEMMAP_RESERVED_MAPPED => MemoryRegionKind::Reserved,
+        abi::LIMINE_MEMMAP_USABLE => MemoryRegionKind::Usable,
+        abi::LIMINE_MEMMAP_ACPI_RECLAIMABLE | abi::LIMINE_MEMMAP_ACPI_NVS => MemoryRegionKind::Acpi,
+        abi::LIMINE_MEMMAP_BAD_MEMORY => MemoryRegionKind::Bad,
+        abi::LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE => MemoryRegionKind::Bootloader,
+        abi::LIMINE_MEMMAP_EXECUTABLE_AND_MODULES => MemoryRegionKind::Kernel,
+        abi::LIMINE_MEMMAP_FRAMEBUFFER => MemoryRegionKind::Framebuffer,
+        abi::LIMINE_MEMMAP_RESERVED | abi::LIMINE_MEMMAP_RESERVED_MAPPED => {
+            MemoryRegionKind::Reserved
+        }
         _unknown => MemoryRegionKind::Reserved,
     }
 }
@@ -306,7 +309,7 @@ const fn limine_response_revision_compatible(
 }
 
 unsafe fn request_response<T>(
-    request: *const LimineRequest,
+    request: *const abi::LimineRequest,
     min_kernel_vma: u64,
 ) -> Option<&'static T> {
     // SAFETY: The caller provides the address of a live Limine request static.
@@ -355,178 +358,6 @@ fn kernel_virt_end() -> u64 {
     // address does not read memory or create a mutable alias.
     core::ptr::addr_of!(__kernel_end) as u64
 }
-
-#[repr(C)]
-struct LimineRequest {
-    id: [u64; 4],
-    revision: u64,
-    response: u64,
-}
-
-#[repr(C)]
-struct LimineMemmapResponse {
-    revision: u64,
-    entry_count: u64,
-    entries: u64,
-}
-
-#[repr(C)]
-struct LimineMemmapEntry {
-    base: u64,
-    length: u64,
-    kind: u64,
-}
-
-#[repr(C)]
-struct LimineExecutableAddressResponse {
-    revision: u64,
-    physical_base: u64,
-    virtual_base: u64,
-}
-
-#[repr(C)]
-struct LimineHhdmResponse {
-    revision: u64,
-    offset: u64,
-}
-
-#[repr(C)]
-struct LimineFramebufferResponse {
-    revision: u64,
-    framebuffer_count: u64,
-    framebuffers: u64,
-}
-
-#[repr(C)]
-struct LimineFramebuffer {
-    address: *mut u8,
-    width: u64,
-    height: u64,
-    pitch: u64,
-    bpp: u16,
-    memory_model: u8,
-    red_mask_size: u8,
-    red_mask_shift: u8,
-    green_mask_size: u8,
-    green_mask_shift: u8,
-    blue_mask_size: u8,
-    blue_mask_shift: u8,
-    unused: [u8; 7],
-    edid_size: u64,
-    edid: u64,
-    mode_count: u64,
-    modes: u64,
-}
-
-const _: () = assert!(
-    core::mem::size_of::<LimineFramebuffer>() == 80,
-    "LimineFramebuffer size does not match Limine protocol ABI"
-);
-const _: () = assert!(
-    core::mem::offset_of!(LimineFramebuffer, edid_size) == 48,
-    "LimineFramebuffer.edid_size offset does not match Limine protocol ABI"
-);
-
-#[repr(C)]
-struct LimineRsdpResponse {
-    revision: u64,
-    address: *const u8,
-}
-
-const LIMINE_COMMON_MAGIC0: u64 = 0xc7b1dd30df4c8b88;
-const LIMINE_COMMON_MAGIC1: u64 = 0x0a82e883a194f07b;
-const LIMINE_MEMMAP_USABLE: u64 = 0;
-const LIMINE_MEMMAP_RESERVED: u64 = 1;
-const LIMINE_MEMMAP_ACPI_RECLAIMABLE: u64 = 2;
-const LIMINE_MEMMAP_ACPI_NVS: u64 = 3;
-const LIMINE_MEMMAP_BAD_MEMORY: u64 = 4;
-const LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE: u64 = 5;
-const LIMINE_MEMMAP_EXECUTABLE_AND_MODULES: u64 = 6;
-const LIMINE_MEMMAP_FRAMEBUFFER: u64 = 7;
-const LIMINE_MEMMAP_RESERVED_MAPPED: u64 = 8;
-const LIMINE_REQUEST_REVISION: u64 = 0;
-
-#[used]
-#[unsafe(link_section = ".limine_requests_start")]
-static REQUESTS_START: [u64; 4] = [
-    0xf6b8f4b39de7d1ae,
-    0xfab91a6940fcb9cf,
-    0x785c6ed015d3e316,
-    0x181e920a7852b9d9,
-];
-
-#[used]
-#[unsafe(link_section = ".limine_requests")]
-static mut BASE_REVISION: [u64; 3] = [0xf9562b2d5c95a6c8, 0x6a7b384944536bdc, 6];
-
-#[used]
-#[unsafe(link_section = ".limine_requests")]
-static mut MEMMAP_REQUEST: LimineRequest = LimineRequest {
-    id: [
-        LIMINE_COMMON_MAGIC0,
-        LIMINE_COMMON_MAGIC1,
-        0x67cf3d9d378a806f,
-        0xe304acdfc50c3c62,
-    ],
-    revision: LIMINE_REQUEST_REVISION,
-    response: 0,
-};
-
-#[used]
-#[unsafe(link_section = ".limine_requests")]
-static mut EXECUTABLE_ADDRESS_REQUEST: LimineRequest = LimineRequest {
-    id: [
-        LIMINE_COMMON_MAGIC0,
-        LIMINE_COMMON_MAGIC1,
-        0x71ba76863cc55f63,
-        0xb2644a48c516a487,
-    ],
-    revision: LIMINE_REQUEST_REVISION,
-    response: 0,
-};
-
-#[used]
-#[unsafe(link_section = ".limine_requests")]
-static mut HHDM_REQUEST: LimineRequest = LimineRequest {
-    id: [
-        LIMINE_COMMON_MAGIC0,
-        LIMINE_COMMON_MAGIC1,
-        0x48dcf1cb8ad2b852,
-        0x63984e959a98244b,
-    ],
-    revision: LIMINE_REQUEST_REVISION,
-    response: 0,
-};
-
-#[used]
-#[unsafe(link_section = ".limine_requests")]
-static mut FRAMEBUFFER_REQUEST: LimineRequest = LimineRequest {
-    id: [
-        LIMINE_COMMON_MAGIC0,
-        LIMINE_COMMON_MAGIC1,
-        0x9d5827dcd881dd75,
-        0xa3148604f6fab11b,
-    ],
-    revision: LIMINE_REQUEST_REVISION,
-    response: 0,
-};
-
-#[used]
-#[unsafe(link_section = ".limine_requests")]
-static mut RSDP_REQUEST: LimineRequest = LimineRequest {
-    id: [
-        LIMINE_COMMON_MAGIC0,
-        LIMINE_COMMON_MAGIC1,
-        0xc5e77b6b397e7b43,
-        0x27637845accdcf3c,
-    ],
-    revision: LIMINE_REQUEST_REVISION,
-    response: 0,
-};
-
-#[used]
-#[unsafe(link_section = ".limine_requests_end")]
-static REQUESTS_END: [u64; 2] = [0xadc0e0531bb10d03, 0x9572709f31764c62];
 
 #[cfg(test)]
 mod tests;

@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.16.3 CPU hardening and kernel-stack-guard release candidate
+Status: v0.16.4 Limine handoff module split implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.16.3.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.16.4.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -87,19 +87,19 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] cpu-hardening=ok`, and `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.16.3-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.16.4-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.16.3-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.16.4-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.16.3-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.16.4-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,

@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.16.3 - CPU Hardening And Kernel Stack Guards](v0.16.3-rc.md)
+- [v0.16.4 - Limine Handoff Module Split](v0.16.4-rc.md)
 
 ## History
 
+- [v0.16.3 - CPU Hardening And Kernel Stack Guards](v0.16.3-rc.md)
 - [v0.16.2 - Kernel-Owned Address Space Activation](v0.16.2-rc.md)
 - [v0.16.1 - BootInfo Fuzzing And Mapper Properties](v0.16.1-rc.md)
 - [v0.16.0 - Kernel Mapping Policy](v0.16.0-rc.md)
