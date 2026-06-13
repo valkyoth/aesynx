@@ -72,14 +72,6 @@ impl Capability {
         if !matches!(self.kind(), CapKind::Memory) {
             return Err(MemoryCapError::WrongCapabilityKind);
         }
-        if !range_is_subset(
-            self.base(),
-            self.range_len(),
-            request.base(),
-            request.byte_len(),
-        ) {
-            return Err(MemoryCapError::RangeEscapesCapability);
-        }
         if !self.perms().contains(CapPerms::MAP) {
             return Err(MemoryCapError::MissingMapPermission);
         }
@@ -95,6 +87,17 @@ impl Capability {
             && !self.perms().contains(CapPerms::EXECUTE)
         {
             return Err(MemoryCapError::MissingExecutePermission);
+        }
+        if !self.has_bounded_range() {
+            return Err(MemoryCapError::UnboundedCapability);
+        }
+        if !range_is_subset(
+            self.base(),
+            self.range_len(),
+            request.base(),
+            request.byte_len(),
+        ) {
+            return Err(MemoryCapError::RangeEscapesCapability);
         }
 
         Ok(())
@@ -140,6 +143,7 @@ pub enum MemoryCapError {
     MissingReadPermission,
     MissingWritePermission,
     RangeEscapesCapability,
+    UnboundedCapability,
     WrongCapabilityKind,
 }
 

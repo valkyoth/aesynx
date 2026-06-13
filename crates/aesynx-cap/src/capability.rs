@@ -131,6 +131,11 @@ impl Capability {
     }
 
     #[must_use]
+    pub const fn has_bounded_range(&self) -> bool {
+        matches!((self.base, self.len), (Some(_), Some(_)))
+    }
+
+    #[must_use]
     pub const fn perms(&self) -> CapPerms {
         self.perms
     }

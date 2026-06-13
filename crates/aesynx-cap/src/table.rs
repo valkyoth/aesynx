@@ -74,7 +74,7 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
 
     pub fn get(&self, id: CapId) -> Result<&Capability, CapTableError> {
         let parts = CapIdParts::from_cap_id(id)?;
-        let slot = slot_usize(parts.slot())?;
+        let slot = slot_usize(parts.slot());
         let entry = self.slots.get(slot).ok_or(CapTableError::SlotOutOfRange)?;
         if entry.generation != parts.generation().get() {
             return Err(CapTableError::StaleId);
@@ -324,13 +324,8 @@ fn slot_index(index: usize) -> Result<CapSlotIndex, CapTableError> {
     Ok(CapSlotIndex::new(index as u32))
 }
 
-fn slot_usize(slot: CapSlotIndex) -> Result<usize, CapTableError> {
-    let value = slot.get();
-    if value as u64 > usize::MAX as u64 {
-        return Err(CapTableError::SlotOutOfRange);
-    }
-
-    Ok(value as usize)
+fn slot_usize(slot: CapSlotIndex) -> usize {
+    slot.get() as usize
 }
 
 #[cfg(test)]

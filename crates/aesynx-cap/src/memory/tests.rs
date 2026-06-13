@@ -41,6 +41,19 @@ fn object_cap(perms: CapPerms) -> Capability {
     })
 }
 
+fn unbounded_memory_cap(perms: CapPerms) -> Capability {
+    Capability::new_for_test(TestCapabilitySpec {
+        object_id: ObjectId::new(9),
+        base: None,
+        len: None,
+        perms,
+        owner: PrincipalId::new(1),
+        generation: 1,
+        revocation_epoch: 0,
+        kind: CapKind::Memory,
+    })
+}
+
 #[test]
 fn memory_mapping_requires_memory_capability_kind() {
     let cap = object_cap(CapPerms::MAP.union(CapPerms::READ));
@@ -93,6 +106,17 @@ fn memory_mapping_rejects_ranges_outside_capability() {
     assert_eq!(
         request.and_then(|request| cap.authorize_memory_map(request)),
         Err(MemoryCapError::RangeEscapesCapability)
+    );
+}
+
+#[test]
+fn memory_mapping_requires_bounded_memory_capability() {
+    let cap = unbounded_memory_cap(CapPerms::MAP.union(CapPerms::READ));
+    let request = MemoryMapRequest::new(VirtAddr::new(0x1000), 0x1000, MemoryAccess::ReadOnly);
+
+    assert_eq!(
+        request.and_then(|request| cap.authorize_memory_map(request)),
+        Err(MemoryCapError::UnboundedCapability)
     );
 }
 

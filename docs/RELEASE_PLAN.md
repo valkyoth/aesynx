@@ -1253,7 +1253,8 @@ Deliverables:
   `GRANT`, `REVOKE`, and `ADMIN`; every x86_64 IDT vector must have a
   deterministic halt-and-log catch-all before specialized handlers override
   selected vectors; descriptor `rsp0` updates must validate the interrupt-mask
-  contract in release builds.
+  contract in release builds; unbounded memory root capabilities must not
+  directly authorize map requests.
 
 Verification:
 
@@ -1261,6 +1262,8 @@ Verification:
 - Object caps reference objects.
 - Host tests cover cross-owner `REVOKE`/`ADMIN` stripping and the arch exception
   table changes.
+- Host tests cover rejection of direct map authorization from unbounded memory
+  capabilities while preserving bounded derived memory caps.
 
 Exit criteria:
 
