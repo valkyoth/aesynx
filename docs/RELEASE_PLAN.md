@@ -1895,6 +1895,41 @@ Exit criteria:
 
 - Native userspace is ergonomic enough to grow.
 
+### v0.47.1 - Aesynx SDK And App Template
+
+Goal:
+
+Make it clear how developers build native and WASM apps for Aesynx.
+
+Deliverables:
+
+- `docs/sdk-roadmap.md`.
+- Native Rust app target plan for `x86_64-unknown-aesynx`.
+- Future `aarch64-unknown-aesynx` target placeholder.
+- WASM component target/profile plan for `wasm32-wasip2-aesynx`.
+- Userspace linker/startup rules owned by `aesynx-rt`.
+- Minimal native command template.
+- Minimal WASM component template.
+- App/package manifest schema with artifact kind, target, entry point,
+  exported commands, requested capabilities, SBOM, and provenance fields.
+- Developer command flow for build, package, inspect, and QEMU-run smoke.
+- Explicit rule that app developers use `aesynx-abi`, `aesynx-rt`, manifests,
+  and capability handles rather than kernel-private headers or internals.
+
+Verification:
+
+- Template native app compiles against the SDK target plan or host-side
+  placeholder until the native target is live.
+- Template WASM component produces a manifest with no default authority.
+- Manifest validation rejects undeclared ambient filesystem, network, device, or
+  IPC authority.
+- SDK docs include one complete hello-world flow and one capability-denied flow.
+
+Exit criteria:
+
+- External developers have a documented path for writing Aesynx apps without
+  learning kernel internals.
+
 ### v0.48.0 - aesynx-init
 
 Goal:

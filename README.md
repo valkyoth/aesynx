@@ -266,6 +266,7 @@ pentest report in `security/pentest/<tag>.md`.
 
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Userspace Vision](docs/userspace-vision.md)
+- [SDK Roadmap](docs/sdk-roadmap.md)
 - [Memory Model Roadmap](docs/memory-model-roadmap.md)
 - [OS World Roadmap](docs/os-world-roadmap.md)
 - [Package Manager Roadmap](docs/package-manager-roadmap.md)

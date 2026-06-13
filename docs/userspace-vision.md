@@ -219,7 +219,62 @@ For native Rust components, `aesynx-rt` wraps this ABI.
 
 For WASM components, the runtime maps it to the WASM component interface. WASI concepts can be used where they fit, but Aesynx should not blindly inherit POSIX-like WASI assumptions.
 
-## 9. Capability Manifests
+## 9. Developer SDK And Rust Targets
+
+Aesynx needs a first-class SDK. Developers should not write against informal
+kernel internals, copied C headers, or unstable syscall numbers. Native apps
+should build through versioned crates, target specifications, startup/runtime
+support, package manifests, and capability manifests. The detailed SDK plan
+lives in [Aesynx SDK Roadmap](sdk-roadmap.md).
+
+The SDK should include:
+
+- `aesynx-abi`: stable ABI types, syscall/message numbers, handles, object IDs,
+  capability IDs, value-schema identifiers, error codes, and wire formats.
+- `aesynx-rt`: safe Rust wrappers for startup info, capability handles,
+  structured input/output channels, logging, panic reporting, allocation hooks,
+  and raw syscall or IPC entry points.
+- Rust target specifications such as `x86_64-unknown-aesynx` and
+  `aarch64-unknown-aesynx` for native apps.
+- A WASM target/profile such as `wasm32-wasip2-aesynx` for portable
+  components, mapped onto Aesynx host calls rather than POSIX-shaped ambient
+  filesystem assumptions.
+- A userspace linker/startup path comparable in purpose to `crt0`, but exposed
+  through `aesynx-rt` instead of C headers.
+- App templates for native commands, services, WASM components, and drivers.
+- A package/app manifest schema that records artifact kind, target, entry
+  point, exported commands, required schemas, requested capabilities, SBOM, and
+  provenance.
+- Local tooling to build, package, sign, inspect, and run a minimal app in QEMU.
+
+The intended developer flow should eventually be:
+
+```bash
+cargo aesynx new hello --kind native-command
+cargo build --target x86_64-unknown-aesynx
+aepkg build
+aepkg run ./target/aesynx/hello.aepkg
+```
+
+For WASM:
+
+```bash
+cargo aesynx new log-view --kind wasm-component
+cargo build --target wasm32-wasip2-aesynx
+aepkg build
+```
+
+The SDK must keep the same security model as the OS. A native binary is not
+automatically trusted with broad access. At launch it receives an explicit
+capability bundle from the shell, package manager, service manager, or policy
+engine. Missing authority is a structured error, not an invitation to inspect a
+global filesystem path.
+
+Rust target support can start as repo-owned JSON targets and `build-std`
+experiments. Upstream Rust target support is a later ecosystem milestone, not a
+requirement for the first SDK.
+
+## 10. Capability Manifests
 
 Every component declares the authority it wants.
 
@@ -262,7 +317,7 @@ The shell knows:
 - What capabilities were used.
 - What provenance to record.
 
-## 10. WASM As The Extension And Automation Format
+## 11. WASM As The Extension And Automation Format
 
 WASM should be the default untrusted extension format.
 
@@ -296,7 +351,7 @@ WASM host calls must be capability-checked:
 
 No WASM component gets filesystem-style ambient authority by default.
 
-## 11. Native Rust Components
+## 12. Native Rust Components
 
 Native Rust is the right path for trusted and performance-sensitive tools.
 
@@ -318,7 +373,7 @@ Examples:
 
 Native components still use capabilities. Native does not mean unrestricted.
 
-## 12. Rich TUI And Views
+## 13. Rich TUI And Views
 
 A modern CLI should not be only monochrome text.
 
@@ -345,7 +400,7 @@ aesh> trace --boot latest | view
 
 If the terminal is limited, output falls back to plain text.
 
-## 13. AI Assistance
+## 14. AI Assistance
 
 AI should be integrated, but bounded.
 
@@ -388,7 +443,7 @@ requires:
 run? yes/no
 ```
 
-## 14. Provenance And Audit
+## 15. Provenance And Audit
 
 Every pipeline should be able to answer:
 
@@ -404,7 +459,7 @@ Every pipeline should be able to answer:
 
 This makes userspace naturally auditable.
 
-## 15. Object-Native Commands
+## 16. Object-Native Commands
 
 Commands should work with object IDs and object capabilities naturally.
 
@@ -420,7 +475,7 @@ aesh> rollback system-root --to object:01J...
 
 Text paths can exist as human-friendly names, but internally they resolve through name-index objects to object IDs.
 
-## 16. Error Model
+## 17. Error Model
 
 Errors should be structured, not just strings.
 
@@ -436,7 +491,7 @@ Error {
 
 This lets the shell render useful messages and lets AI explain errors without guessing from text.
 
-## 17. First Userspace Milestones
+## 18. First Userspace Milestones
 
 1. Native `aesynx-init` starts.
 2. `aesh` starts with text fallback output.
@@ -456,7 +511,7 @@ This lets the shell render useful messages and lets AI explain errors without gu
 9. WASM command requests a capability and is denied/granted explicitly.
 10. AI command explanation works with no authority escalation.
 
-## 18. Package Management Direction
+## 19. Package Management Direction
 
 Native userspace should eventually grow into the package-management model in
 [Aesynx Package Manager Roadmap](package-manager-roadmap.md).
@@ -473,7 +528,7 @@ and present track, publisher, capability, price, and persistence choices before
 running or installing anything. This must be policy-controlled and disabled by
 default in high-security contexts.
 
-## 19. 1.0 Userspace Target
+## 20. 1.0 Userspace Target
 
 Minimum 1.0:
 
@@ -507,7 +562,7 @@ Not required for 1.0:
 - Browser-grade GUI.
 - Cloud AI integration.
 
-## 20. Design Rule
+## 21. Design Rule
 
 The core userspace rule is:
 
