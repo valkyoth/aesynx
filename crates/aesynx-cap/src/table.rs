@@ -89,6 +89,9 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
         request: DeriveRequest,
         audit: &mut impl CapAuditLog,
     ) -> Result<CapId, CapTableError> {
+        let slot = self.vacant_slot().ok_or(CapTableError::TableFull)?;
+        let slot_index = slot_index(slot)?;
+        let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
         let source = self.get(source_id)?;
         let child = source.derive_live_with_audit(
             request,
@@ -96,9 +99,6 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
             source.revocation_epoch(),
             audit,
         )?;
-        let slot = self.vacant_slot().ok_or(CapTableError::TableFull)?;
-        let slot_index = slot_index(slot)?;
-        let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
 
         self.slots[slot].cap = Some(child);
 
@@ -111,6 +111,9 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
         target_owner: PrincipalId,
         audit: &mut impl CapAuditLog,
     ) -> Result<CapId, CapTableError> {
+        let slot = self.vacant_slot().ok_or(CapTableError::TableFull)?;
+        let slot_index = slot_index(slot)?;
+        let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
         let source = self.get(source_id)?;
         let child = source.grant_live_with_audit(
             target_owner,
@@ -118,15 +121,20 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
             source.revocation_epoch(),
             audit,
         )?;
-        let slot = self.vacant_slot().ok_or(CapTableError::TableFull)?;
-        let slot_index = slot_index(slot)?;
-        let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
 
         self.slots[slot].cap = Some(child);
 
         Ok(id)
     }
 
+    /// Revokes every in-table capability for the target object's authority
+    /// epoch, including the authority capability used for the revoke.
+    ///
+    /// This is deliberate total-revoke semantics for the v0.20 table model:
+    /// callers that need post-revoke authority must re-mint it from a future
+    /// object registry or epoch store. Slot generations fail instead of
+    /// wrapping; a persistent table must rebuild or retire slots before
+    /// `u32::MAX` is reached.
     pub fn revoke(&mut self, authority_id: CapId, target_id: CapId) -> Result<u32, CapTableError> {
         let authority = self.get(authority_id)?;
         let target_object = self.get(target_id)?.object_id();

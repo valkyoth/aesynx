@@ -48,7 +48,6 @@ pub struct Capability {
 
 impl Capability {
     #[must_use]
-    #[allow(dead_code)]
     pub(crate) const fn new_root(
         object_id: ObjectId,
         kind: CapKind,

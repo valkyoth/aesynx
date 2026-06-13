@@ -157,3 +157,56 @@ fn table_fails_closed_when_full() {
         Err(CapTableError::TableFull)
     );
 }
+
+#[test]
+fn full_table_derive_does_not_emit_phantom_audit() {
+    let mut table = CapabilityTable::<1>::new();
+    let root = table.insert_root(
+        ObjectId::new(1),
+        CapKind::Memory,
+        PrincipalId::new(1),
+        CapPerms::READ.union(CapPerms::DERIVE),
+        1,
+        0,
+    );
+    let mut audit = TestAudit::default();
+
+    if let Ok(root) = root {
+        assert_eq!(
+            table.derive_with_audit(
+                root,
+                DeriveRequest {
+                    perms: CapPerms::READ,
+                    owner: PrincipalId::new(1),
+                    base: Some(VirtAddr::new(0x1000)),
+                    len: Some(0x1000),
+                },
+                &mut audit,
+            ),
+            Err(CapTableError::TableFull)
+        );
+        assert_eq!(audit.len(), 0);
+    }
+}
+
+#[test]
+fn full_table_grant_does_not_emit_phantom_audit() {
+    let mut table = CapabilityTable::<1>::new();
+    let root = table.insert_root(
+        ObjectId::new(1),
+        CapKind::Object,
+        PrincipalId::new(1),
+        CapPerms::READ.union(CapPerms::GRANT),
+        1,
+        0,
+    );
+    let mut audit = TestAudit::default();
+
+    if let Ok(root) = root {
+        assert_eq!(
+            table.grant_with_audit(root, PrincipalId::new(2), &mut audit),
+            Err(CapTableError::TableFull)
+        );
+        assert_eq!(audit.len(), 0);
+    }
+}
