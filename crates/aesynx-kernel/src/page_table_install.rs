@@ -329,6 +329,29 @@ extern "C" fn activate_on_kernel_stack(
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+    match crate::capability_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "cap-table capacity={} occupied_before_revoke={} occupied_after_revoke={} root_read_ok={} child_read_ok={} child_write_denied={} stale_root_denied={} stale_child_denied={} audit_events={} revoked_slots={}",
+                status.capacity,
+                status.occupied_before_revoke,
+                status.occupied_after_revoke,
+                status.root_read_ok,
+                status.child_read_ok,
+                status.child_write_denied,
+                status.stale_root_denied,
+                status.stale_child_denied,
+                status.audit_events,
+                status.revoked_slots
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] cap=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("cap-table error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] cap=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
     aesynx_arch_x86_64::serial::write_str("kernel-cr3 active=true stack=kernel\n");
     aesynx_arch_x86_64::serial::write_str("[TEST] kernel-cr3=ok\n");
     aesynx_arch_x86_64::X86_64::halt_forever()

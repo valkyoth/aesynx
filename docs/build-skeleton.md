@@ -1,7 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.19.0 Capability model implementation
-candidate
+Status: v0.20.0 Kernel capability table candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -57,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.19.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.20.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -91,29 +90,29 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] entropy-policy=ok`, `heap bytes=`, `slab_classes=`,
 `slab_reuse_ok=true`, `page_run_ok=true`, `stress_ok=true`,
 `double_free_detected=true`, `invalid_free_detected=true`, `[TEST] heap=ok`,
-and `[TEST] kernel-cr3=ok`.
+`cap-table capacity=`, `[TEST] cap=ok`, and `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.19.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.20.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.19.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.20.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.19.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.20.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
 `timer delayed-log`, `[TEST] sleep=ok`, `timer tick 3`, and `[TEST] timer=ok`.
 
 `cargo xtask qemu-suite` runs the boot, panic, exception, and timer smoke paths
-in sequence and is the GitHub CI QEMU gate for v0.19.
+in sequence and is the GitHub CI QEMU gate for v0.20.
 
 `cargo xtask fuzz-smoke` runs the bounded v0.16.1 host fuzz/property gate. It
 executes the BootInfo normalization fuzz seeds and deterministic byte-mutation
@@ -130,7 +129,7 @@ defense-in-depth for the release image path. Kernel rustflags also disable
 SSE/AVX code generation until Aesynx owns explicit FPU/SIMD context
 management. The panic handler still emits only an escaped filename basename.
 
-The v0.19 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+The v0.20 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, remap and mask legacy PIC IRQs, detect
 local APIC availability for the deferred MMIO path, handle a returning breakpoint
 exception, catch and decode an opt-in page fault, run a controlled PIT-backed
@@ -162,20 +161,24 @@ deterministic fallback for random-token policy, and emits redacted entropy
 booleans with `hardware_self_test=false` before `[TEST] entropy-policy=ok`.
 Future entropy paths must not log raw entropy or token material. It then
 initializes the bounded reusable kernel heap and smokes `Box`, `Vec`,
-`BTreeMap`, slab reuse, page-run
-allocation, stress allocation/free, invalid-free telemetry, double-free
-detection, and oversized allocation rejection. Host tests also cover zeroing
-before heap reuse. It does not claim process isolation, production page-table
+`BTreeMap`, slab reuse, page-run allocation, stress allocation/free,
+invalid-free telemetry, double-free detection, and oversized allocation
+rejection. The v0.20 candidate then smoke-tests a fixed-capacity kernel
+capability table with root insertion, checked permissions, audited derivation,
+cross-owner authority reduction, revoke-authority enforcement, stale `CapId`
+rejection after revoke, and aggregate redacted table telemetry before
+`[TEST] cap=ok`. Host tests also cover zeroing before heap reuse. It does not
+claim process isolation, production page-table
 ownership for dynamic workloads, live recovery from hardware faults, APIC MMIO
 activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.19.0 candidate also graduates the host capability model in
-`aesynx-cap`: checked capability-id layout, permission bitsets, audited
-derive/grant operations, live generation/epoch validation, revoke-authority
-checks, and redacted capability debug output. This release does not install a
-kernel capability table or emit `[TEST] cap=ok`; that is reserved for v0.20.0.
+The v0.20.0 candidate also graduates the host capability model into a
+kernel-facing table in `aesynx-cap`: checked capability-id layout, permission
+bitsets, audited derive/grant operations, live generation/epoch validation,
+revoke-authority checks, slot-generation stale-id rejection, and redacted
+capability/table debug output.
 
 ## Target Shape
 

@@ -157,7 +157,7 @@ impl Capability {
     }
 
     pub fn derive_live_with_audit(
-        self,
+        &self,
         request: DeriveRequest,
         current_generation: u32,
         current_epoch: u64,
@@ -168,7 +168,7 @@ impl Capability {
     }
 
     fn derive_prevalidated_with_audit(
-        self,
+        &self,
         request: DeriveRequest,
         audit: &mut impl CapAuditLog,
     ) -> Result<Self, DeriveError> {
@@ -198,7 +198,7 @@ impl Capability {
     }
 
     pub fn grant_live_with_audit(
-        self,
+        &self,
         target_owner: PrincipalId,
         current_generation: u32,
         current_epoch: u64,
@@ -209,7 +209,7 @@ impl Capability {
     }
 
     fn grant_prevalidated_with_audit(
-        self,
+        &self,
         target_owner: PrincipalId,
         audit: &mut impl CapAuditLog,
     ) -> Result<Self, DeriveError> {
@@ -242,7 +242,7 @@ impl Capability {
         }
     }
 
-    fn derive_inner(self, request: DeriveRequest) -> Result<Self, DeriveError> {
+    fn derive_inner(&self, request: DeriveRequest) -> Result<Self, DeriveError> {
         if !self.perms.contains(CapPerms::DERIVE) {
             return Err(DeriveError::MissingDerivePermission);
         }
@@ -282,7 +282,7 @@ impl Capability {
         })
     }
 
-    fn grant_inner(self, target_owner: PrincipalId) -> Result<Self, DeriveError> {
+    fn grant_inner(&self, target_owner: PrincipalId) -> Result<Self, DeriveError> {
         if !self.perms.contains(CapPerms::GRANT) {
             return Err(DeriveError::MissingGrantPermission);
         }
@@ -290,7 +290,12 @@ impl Capability {
         Ok(Self {
             perms: self.perms.without(CapPerms::GRANT),
             owner: target_owner,
-            ..self
+            object_id: self.object_id,
+            base: self.base,
+            len: self.len,
+            generation: self.generation,
+            revocation_epoch: self.revocation_epoch,
+            kind: self.kind,
         })
     }
 }

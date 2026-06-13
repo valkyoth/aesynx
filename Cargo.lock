@@ -85,6 +85,7 @@ dependencies = [
  "aesynx-arch",
  "aesynx-arch-x86_64",
  "aesynx-boot",
+ "aesynx-cap",
  "aesynx-entropy",
  "aesynx-log",
  "aesynx-mm",

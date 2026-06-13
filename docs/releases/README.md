@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.19.0 - Capability Model Crate](v0.19.0-rc.md)
+- [v0.20.0 - Kernel Capability Table](v0.20.0-rc.md)
 
 ## History
 
+- [v0.19.0 - Capability Model Crate](v0.19.0-rc.md)
 - [v0.18.1 - Early Entropy And Generation Semantics](v0.18.1-rc.md)
 - [v0.18.0 - Slab/Page Heap](v0.18.0-rc.md)
 - [v0.17.0 - Early Heap](v0.17.0-rc.md)
