@@ -21,12 +21,38 @@ pub(super) struct LimineRequest {
     pub(super) response: u64,
 }
 
+const _: () = assert!(
+    core::mem::size_of::<LimineRequest>() == 48,
+    "LimineRequest size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineRequest, _revision) == 32,
+    "LimineRequest.revision offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineRequest, response) == 40,
+    "LimineRequest.response offset does not match Limine protocol ABI"
+);
+
 #[repr(C)]
 pub(super) struct LimineMemmapResponse {
     pub(super) revision: u64,
     pub(super) entry_count: u64,
     pub(super) entries: u64,
 }
+
+const _: () = assert!(
+    core::mem::size_of::<LimineMemmapResponse>() == 24,
+    "LimineMemmapResponse size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineMemmapResponse, entry_count) == 8,
+    "LimineMemmapResponse.entry_count offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineMemmapResponse, entries) == 16,
+    "LimineMemmapResponse.entries offset does not match Limine protocol ABI"
+);
 
 #[repr(C)]
 pub(super) struct LimineMemmapEntry {
@@ -35,6 +61,19 @@ pub(super) struct LimineMemmapEntry {
     pub(super) kind: u64,
 }
 
+const _: () = assert!(
+    core::mem::size_of::<LimineMemmapEntry>() == 24,
+    "LimineMemmapEntry size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineMemmapEntry, length) == 8,
+    "LimineMemmapEntry.length offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineMemmapEntry, kind) == 16,
+    "LimineMemmapEntry.kind offset does not match Limine protocol ABI"
+);
+
 #[repr(C)]
 pub(super) struct LimineExecutableAddressResponse {
     pub(super) revision: u64,
@@ -42,11 +81,33 @@ pub(super) struct LimineExecutableAddressResponse {
     pub(super) virtual_base: u64,
 }
 
+const _: () = assert!(
+    core::mem::size_of::<LimineExecutableAddressResponse>() == 24,
+    "LimineExecutableAddressResponse size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineExecutableAddressResponse, physical_base) == 8,
+    "LimineExecutableAddressResponse.physical_base offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineExecutableAddressResponse, virtual_base) == 16,
+    "LimineExecutableAddressResponse.virtual_base offset does not match Limine protocol ABI"
+);
+
 #[repr(C)]
 pub(super) struct LimineHhdmResponse {
     pub(super) revision: u64,
     pub(super) offset: u64,
 }
+
+const _: () = assert!(
+    core::mem::size_of::<LimineHhdmResponse>() == 16,
+    "LimineHhdmResponse size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineHhdmResponse, offset) == 8,
+    "LimineHhdmResponse.offset does not match Limine protocol ABI"
+);
 
 #[repr(C)]
 pub(super) struct LimineFramebufferResponse {
@@ -54,6 +115,19 @@ pub(super) struct LimineFramebufferResponse {
     pub(super) framebuffer_count: u64,
     pub(super) framebuffers: u64,
 }
+
+const _: () = assert!(
+    core::mem::size_of::<LimineFramebufferResponse>() == 24,
+    "LimineFramebufferResponse size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineFramebufferResponse, framebuffer_count) == 8,
+    "LimineFramebufferResponse.framebuffer_count offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineFramebufferResponse, framebuffers) == 16,
+    "LimineFramebufferResponse.framebuffers offset does not match Limine protocol ABI"
+);
 
 #[repr(C)]
 pub(super) struct LimineFramebuffer {
@@ -81,6 +155,18 @@ const _: () = assert!(
     "LimineFramebuffer size does not match Limine protocol ABI"
 );
 const _: () = assert!(
+    core::mem::offset_of!(LimineFramebuffer, width) == 8,
+    "LimineFramebuffer.width offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineFramebuffer, height) == 16,
+    "LimineFramebuffer.height offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineFramebuffer, pitch) == 24,
+    "LimineFramebuffer.pitch offset does not match Limine protocol ABI"
+);
+const _: () = assert!(
     core::mem::offset_of!(LimineFramebuffer, _edid_size) == 48,
     "LimineFramebuffer.edid_size offset does not match Limine protocol ABI"
 );
@@ -90,6 +176,15 @@ pub(super) struct LimineRsdpResponse {
     pub(super) revision: u64,
     pub(super) address: *const u8,
 }
+
+const _: () = assert!(
+    core::mem::size_of::<LimineRsdpResponse>() == 16,
+    "LimineRsdpResponse size does not match Limine protocol ABI"
+);
+const _: () = assert!(
+    core::mem::offset_of!(LimineRsdpResponse, address) == 8,
+    "LimineRsdpResponse.address offset does not match Limine protocol ABI"
+);
 
 pub(super) fn base_revision_ptr() -> *mut [u64; 3] {
     core::ptr::addr_of_mut!(BASE_REVISION)
