@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.17.0 - Early Heap](v0.17.0-rc.md)
+- [v0.18.0 - Slab/Page Heap](v0.18.0-rc.md)
 
 ## History
 
+- [v0.17.0 - Early Heap](v0.17.0-rc.md)
 - [v0.16.4 - Limine Handoff Module Split](v0.16.4-rc.md)
 - [v0.16.3 - CPU Hardening And Kernel Stack Guards](v0.16.3-rc.md)
 - [v0.16.2 - Kernel-Owned Address Space Activation](v0.16.2-rc.md)

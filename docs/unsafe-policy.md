@@ -170,14 +170,14 @@ Limitations: no AArch64 QEMU boot target exists yet; host builds use spin_loop a
 ```
 
 ```text
-Location: crates/aesynx-kernel/src/early_heap.rs
-Status: active candidate in v0.17
-Purpose: provide the first bounded kernel global allocator so `alloc` containers can run after Aesynx-owned CR3 activation
+Location: crates/aesynx-kernel/src/kernel_heap/allocator.rs
+Status: active candidate in v0.18
+Purpose: provide a bounded reusable kernel global allocator so long-lived `alloc` containers can run after Aesynx-owned CR3 activation
 Preconditions: used only on the normal single-core boot path after the kernel has loaded its own CR3 root and post-CR3 CPU hardening has passed; the static heap lives in kernel BSS and is mapped as part of the data range
 Unsafe operation: implements `GlobalAlloc`, takes the raw address of a private static heap buffer, and places that heap in a linker-retained section
-Safety argument: the heap buffer is private, page-aligned, fixed-size, and initialized exactly once before allocation; allocation uses checked arithmetic and an atomic compare-exchange bump pointer to hand out monotonically increasing nonoverlapping ranges; failed allocations return null; deallocation is a documented no-op for this bump-only release; serial output reports aggregate byte counts and booleans only
-Tests/evidence: cargo check -p aesynx-kernel --target x86_64-unknown-none compiles the alloc-enabled kernel; cargo xtask qemu observes heap bytes=<n> allocated=<n> box_ok=true vec_ok=true btree_ok=true oom_rejected=true and [TEST] heap=ok; cargo xtask qemu-suite keeps diagnostic smokes isolated from the allocator path
-Limitations: early single-core bump allocator only; no free/reuse, slab classes, page-backed large allocations, per-subsystem accounting, leak detection, allocation quarantine, SMP allocator synchronization policy, or allocation-while-locking policy yet
+Safety argument: the heap buffer is private, page-aligned, fixed-size, and initialized exactly once before allocation; metadata mutation is serialized by a private spin lock; slab classes are fixed and pointer-sized; free-list links are written only into free heap blocks; page-run allocation changes page metadata before exposing the pointer; checked arithmetic guards range and alignment calculations; failed allocations return null through `GlobalAlloc`; checked deallocation detects invalid frees and double frees; serial output reports aggregate byte counts, counters, and booleans only
+Tests/evidence: cargo check -p aesynx-kernel --target x86_64-unknown-none compiles the alloc-enabled kernel; host tests cover pre-initialization rejection, one-shot initialization, slab reuse, large page-run reuse, double-free detection, stats, and OOM without stat advancement; cargo xtask qemu observes heap bytes=<n> allocated=<n> peak=<n> slab_classes=<n> slab_allocations=<n> page_allocations=<n> frees=<n> double_free_detected=true box_ok=true vec_ok=true btree_ok=true slab_reuse_ok=true page_run_ok=true stress_ok=true oom_rejected=true and [TEST] heap=ok; cargo xtask qemu-suite keeps diagnostic smokes isolated from the allocator path
+Limitations: bounded static heap only; page-backed means page-sized runs inside the static kernel heap, not physical-frame-backed growth from the global frame allocator; one global allocator lock remains; no per-core heaps, quarantine, allocation-while-locking policy, backtrace leak reports, or full SMP allocator synchronization policy yet
 ```
 
 ```text

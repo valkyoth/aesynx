@@ -5,24 +5,26 @@ use super::smoke::{
     EXCEPTION_SETUP_MARKER, FAULT_ADDRESS_MARKER, FAULT_ADDRESS_PRESENT_MARKER, FAULT_CR3_MARKER,
     FAULT_ERROR_DECODE_MARKER, FAULT_INTERRUPTS_MARKER, FAULT_RFLAGS_MARKER,
     FRAME_ALLOCATOR_FAIL_MARKER, FRAME_ALLOCATOR_MARKER, FRAME_ALLOCATOR_STATUS_MARKER,
-    HEAP_FAIL_MARKER, HEAP_MARKER, HEAP_STATUS_MARKER, IRQ_SETUP_MARKER, KERNEL_CR3_ACTIVE_MARKER,
-    KERNEL_CR3_FAIL_MARKER, KERNEL_CR3_MARKER, KERNEL_STACK_GUARD_MARKER,
-    KERNEL_STACK_GUARD_STATUS_MARKER, KERNEL_STACK_PAGES_MARKER, MEMORY_MAP_FAIL_MARKER,
-    MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER, MEMORY_TOTAL_MARKER, MEMORY_USABLE_MARKER,
-    PAGE_FAULT_MARKER, PAGE_TABLE_AUDIT_MARKER, PAGE_TABLE_CHECKED_ROOT_MARKER,
-    PAGE_TABLE_CHECKED_STATUS_MARKER, PAGE_TABLE_CHECKED_TRANSLATE_MARKER,
-    PAGE_TABLE_EXECUTABLE_RANGE_MARKER, PAGE_TABLE_FAIL_MARKER, PAGE_TABLE_FLAGS_MARKER,
-    PAGE_TABLE_FLUSH_PAGE_MARKER, PAGE_TABLE_KERNEL_CANDIDATE_MARKER,
-    PAGE_TABLE_KERNEL_ONLY_MARKER, PAGE_TABLE_KERNEL_RANGE_MARKER,
-    PAGE_TABLE_KERNEL_SPACE_RANGE_MARKER, PAGE_TABLE_KERNEL_USER_GUARD_MARKER,
-    PAGE_TABLE_LOCAL_RANGE_MARKER, PAGE_TABLE_LOOKUP_MARKER, PAGE_TABLE_MAPPED_RANGE_MARKER,
-    PAGE_TABLE_MARKER, PAGE_TABLE_NO_ALIAS_MARKER, PAGE_TABLE_NO_DEVICE_MARKER,
-    PAGE_TABLE_NO_EXECUTABLE_MARKER, PAGE_TABLE_NO_GLOBAL_MARKER, PAGE_TABLE_NO_USER_SPACE_MARKER,
-    PAGE_TABLE_NO_WRITABLE_MARKER, PAGE_TABLE_NON_EXECUTABLE_RANGE_MARKER,
-    PAGE_TABLE_NORMAL_MEMORY_RANGE_MARKER, PAGE_TABLE_PRESENCE_MARKER, PAGE_TABLE_PROTECT_MARKER,
-    PAGE_TABLE_PROTECT_RANGE_MARKER, PAGE_TABLE_RANGE_LOOKUP_MARKER, PAGE_TABLE_RANGE_MARKER,
-    PAGE_TABLE_RANGE_TRANSLATE_MARKER, PAGE_TABLE_RECLAIM_MARKER, PAGE_TABLE_ROOT_MARKER,
-    PAGE_TABLE_STATUS_MARKER, PAGE_TABLE_TRANSLATE_OFFSET_MARKER, PAGE_TABLE_UNMAPPED_RANGE_MARKER,
+    HEAP_DOUBLE_FREE_MARKER, HEAP_FAIL_MARKER, HEAP_MARKER, HEAP_PAGE_RUN_MARKER,
+    HEAP_SLAB_CLASSES_MARKER, HEAP_SLAB_REUSE_MARKER, HEAP_STATUS_MARKER, HEAP_STRESS_MARKER,
+    IRQ_SETUP_MARKER, KERNEL_CR3_ACTIVE_MARKER, KERNEL_CR3_FAIL_MARKER, KERNEL_CR3_MARKER,
+    KERNEL_STACK_GUARD_MARKER, KERNEL_STACK_GUARD_STATUS_MARKER, KERNEL_STACK_PAGES_MARKER,
+    MEMORY_MAP_FAIL_MARKER, MEMORY_MAP_MARKER, MEMORY_RESERVED_MARKER, MEMORY_TOTAL_MARKER,
+    MEMORY_USABLE_MARKER, PAGE_FAULT_MARKER, PAGE_TABLE_AUDIT_MARKER,
+    PAGE_TABLE_CHECKED_ROOT_MARKER, PAGE_TABLE_CHECKED_STATUS_MARKER,
+    PAGE_TABLE_CHECKED_TRANSLATE_MARKER, PAGE_TABLE_EXECUTABLE_RANGE_MARKER,
+    PAGE_TABLE_FAIL_MARKER, PAGE_TABLE_FLAGS_MARKER, PAGE_TABLE_FLUSH_PAGE_MARKER,
+    PAGE_TABLE_KERNEL_CANDIDATE_MARKER, PAGE_TABLE_KERNEL_ONLY_MARKER,
+    PAGE_TABLE_KERNEL_RANGE_MARKER, PAGE_TABLE_KERNEL_SPACE_RANGE_MARKER,
+    PAGE_TABLE_KERNEL_USER_GUARD_MARKER, PAGE_TABLE_LOCAL_RANGE_MARKER, PAGE_TABLE_LOOKUP_MARKER,
+    PAGE_TABLE_MAPPED_RANGE_MARKER, PAGE_TABLE_MARKER, PAGE_TABLE_NO_ALIAS_MARKER,
+    PAGE_TABLE_NO_DEVICE_MARKER, PAGE_TABLE_NO_EXECUTABLE_MARKER, PAGE_TABLE_NO_GLOBAL_MARKER,
+    PAGE_TABLE_NO_USER_SPACE_MARKER, PAGE_TABLE_NO_WRITABLE_MARKER,
+    PAGE_TABLE_NON_EXECUTABLE_RANGE_MARKER, PAGE_TABLE_NORMAL_MEMORY_RANGE_MARKER,
+    PAGE_TABLE_PRESENCE_MARKER, PAGE_TABLE_PROTECT_MARKER, PAGE_TABLE_PROTECT_RANGE_MARKER,
+    PAGE_TABLE_RANGE_LOOKUP_MARKER, PAGE_TABLE_RANGE_MARKER, PAGE_TABLE_RANGE_TRANSLATE_MARKER,
+    PAGE_TABLE_RECLAIM_MARKER, PAGE_TABLE_ROOT_MARKER, PAGE_TABLE_STATUS_MARKER,
+    PAGE_TABLE_TRANSLATE_OFFSET_MARKER, PAGE_TABLE_UNMAPPED_RANGE_MARKER,
     PAGE_TABLE_USER_CANDIDATE_MARKER, PAGE_TABLE_USER_RANGE_MARKER,
     PAGE_TABLE_USER_SPACE_RANGE_MARKER, PAGE_TABLE_VISIT_MARKER,
     PAGE_TABLE_WRITE_PROTECTED_RANGE_MARKER, PAGING_POLICY_MODEL_DATA_RW_NX_MARKER,
@@ -44,7 +46,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn qemu_markers_track_v0_17_contracts() {
+fn qemu_markers_track_v0_18_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
@@ -63,6 +65,11 @@ fn qemu_markers_track_v0_17_contracts() {
     assert_eq!(HEAP_FAIL_MARKER, "[TEST] heap=fail");
     assert_eq!(HEAP_MARKER, "[TEST] heap=ok");
     assert_eq!(HEAP_STATUS_MARKER, "heap bytes=");
+    assert_eq!(HEAP_SLAB_CLASSES_MARKER, "slab_classes=");
+    assert_eq!(HEAP_SLAB_REUSE_MARKER, "slab_reuse_ok=true");
+    assert_eq!(HEAP_PAGE_RUN_MARKER, "page_run_ok=true");
+    assert_eq!(HEAP_STRESS_MARKER, "stress_ok=true");
+    assert_eq!(HEAP_DOUBLE_FREE_MARKER, "double_free_detected=true");
     assert_eq!(IRQ_SETUP_MARKER, "[TEST] irq=ok");
     assert_eq!(KERNEL_CR3_ACTIVE_MARKER, "kernel-cr3 active=true");
     assert_eq!(KERNEL_CR3_FAIL_MARKER, "[TEST] kernel-cr3=fail");
@@ -239,7 +246,7 @@ fn qemu_args_select_smoke_kind() {
 }
 
 #[test]
-fn boot_smoke_requires_full_v0_17_marker_set() {
+fn boot_smoke_requires_full_v0_18_marker_set() {
     assert_smoke_contract_requires_each_marker(SmokeKind::Boot);
 
     let valid = SmokeKind::Boot.markers();
@@ -272,6 +279,11 @@ fn boot_smoke_requires_full_v0_17_marker_set() {
     assert!(!serial_log_contents_match(&missing_heap, SmokeKind::Boot));
     let failed_heap = format!("{valid}, [TEST] heap=fail");
     assert!(!serial_log_contents_match(&failed_heap, SmokeKind::Boot));
+    let missing_heap_double_free = valid.replacen("double_free_detected=true", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_heap_double_free,
+        SmokeKind::Boot
+    ));
     let missing_stack_guard = valid.replacen("[TEST] kernel-stack-guard=ok", "", 1);
     assert!(!serial_log_contents_match(
         &missing_stack_guard,
@@ -299,28 +311,28 @@ fn image_kernel_profile_is_release() {
 #[test]
 fn image_artifact_names_track_current_candidate_version() {
     let boot = image_names(SmokeKind::Boot);
-    assert_eq!(boot.image, "aesynx-v0.17.0.iso");
-    assert_eq!(boot.manifest, "aesynx-v0.17.0.manifest");
-    assert_eq!(boot.serial_log, "aesynx-v0.17.0.serial.log");
-    assert_eq!(boot.staging_dir, "aesynx-v0.17.0-iso");
+    assert_eq!(boot.image, "aesynx-v0.18.0.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.18.0.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.18.0.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.18.0-iso");
 
     let panic = image_names(SmokeKind::Panic);
-    assert_eq!(panic.image, "aesynx-v0.17.0-panic.iso");
-    assert_eq!(panic.manifest, "aesynx-v0.17.0-panic.manifest");
-    assert_eq!(panic.serial_log, "aesynx-v0.17.0-panic.serial.log");
-    assert_eq!(panic.staging_dir, "aesynx-v0.17.0-panic-iso");
+    assert_eq!(panic.image, "aesynx-v0.18.0-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.18.0-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.18.0-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.18.0-panic-iso");
 
     let exception = image_names(SmokeKind::Exception);
-    assert_eq!(exception.image, "aesynx-v0.17.0-exception.iso");
-    assert_eq!(exception.manifest, "aesynx-v0.17.0-exception.manifest");
-    assert_eq!(exception.serial_log, "aesynx-v0.17.0-exception.serial.log");
-    assert_eq!(exception.staging_dir, "aesynx-v0.17.0-exception-iso");
+    assert_eq!(exception.image, "aesynx-v0.18.0-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.18.0-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.18.0-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.18.0-exception-iso");
 
     let timer = image_names(SmokeKind::Timer);
-    assert_eq!(timer.image, "aesynx-v0.17.0-timer.iso");
-    assert_eq!(timer.manifest, "aesynx-v0.17.0-timer.manifest");
-    assert_eq!(timer.serial_log, "aesynx-v0.17.0-timer.serial.log");
-    assert_eq!(timer.staging_dir, "aesynx-v0.17.0-timer-iso");
+    assert_eq!(timer.image, "aesynx-v0.18.0-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.18.0-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.18.0-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.18.0-timer-iso");
 }
 
 #[test]
@@ -360,7 +372,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
-    assert!(contents.contains("name=Aesynx v0.17.0 Early heap candidate\n"));
+    assert!(contents.contains("name=Aesynx v0.18.0 Slab/page heap candidate\n"));
     assert!(contents.contains("smoke=panic\n"));
     for smoke in [
         SmokeKind::Boot,

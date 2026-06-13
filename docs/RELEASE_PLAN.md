@@ -1019,18 +1019,30 @@ Replace bump-only heap for long-lived kernel data.
 
 Deliverables:
 
-- Slab classes.
-- Page-backed large allocations.
-- Heap stats.
-- Leak/double-free debug checks where feasible.
+- Fixed slab classes for small allocations.
+- Page-sized large allocation runs inside the static kernel heap.
+- Checked deallocation and slab/page reuse.
+- Aggregate heap stats: allocated bytes, peak bytes, allocation counts, frees,
+  and double-free detection.
+- Host tests for pre-initialization rejection, one-shot initialization, slab
+  reuse, page-run reuse, double-free detection, stats, and OOM without stat
+  advancement.
+- QEMU smoke for `Box`, `Vec`, `BTreeMap`, slab reuse, page-run allocation,
+  mixed allocation/free stress, double-free detection, and explicit OOM
+  rejection.
 
 Verification:
 
-- Allocate/free stress smoke.
+- Host kernel heap tests.
+- Allocate/free stress smoke in QEMU.
+- Existing panic, exception, and timer smokes remain isolated from the normal
+  allocator path.
 
 Exit criteria:
 
 - Heap is suitable for capability/object structures.
+- Remaining physical-frame-backed heap growth, per-core heaps, quarantine, and
+  allocation-while-locking policy are documented as non-claims.
 
 ### v0.18.1 - Early Entropy And Generation Semantics
 

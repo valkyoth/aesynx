@@ -34,7 +34,7 @@ mod frame_allocator_smoke;
 mod kernel_mapping_smoke;
 
 #[cfg(any(target_os = "none", test))]
-mod early_heap;
+mod kernel_heap;
 
 #[cfg(all(
     target_os = "none",
@@ -62,7 +62,7 @@ mod page_table_install;
 
 #[cfg(target_os = "none")]
 #[global_allocator]
-static KERNEL_ALLOCATOR: early_heap::EarlyBumpAllocator = early_heap::EarlyBumpAllocator::new();
+static KERNEL_ALLOCATOR: kernel_heap::KernelHeapAllocator = kernel_heap::KernelHeapAllocator::new();
 
 #[cfg(all(
     target_os = "none",

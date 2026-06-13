@@ -50,7 +50,7 @@ SECTIONS
         *(COMMON)
         *(.bss .bss.*)
         . = ALIGN(4K);
-        KEEP(*(.aesynx_early_heap))
+        KEEP(*(.aesynx_kernel_heap))
     } :data
 
     . = ALIGN(4K);

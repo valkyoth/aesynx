@@ -130,7 +130,7 @@ pub fn copy_mapper_to_activation_arena<const TABLES: usize, const MAPPED_FRAMES:
 
 pub fn activate_kernel_address_space_and_halt(
     root_phys: aesynx_abi::PhysAddr,
-    allocator: &'static crate::early_heap::EarlyBumpAllocator,
+    allocator: &'static crate::kernel_heap::KernelHeapAllocator,
 ) -> Result<core::convert::Infallible, PageTableInstallError> {
     if aesynx_arch_x86_64::registers::EarlyRegisterSnapshot::capture().cr3_page_matches(root_phys) {
         return Err(PageTableInstallError::ActiveCr3Overlap);
@@ -224,7 +224,7 @@ fn activation_stack_end() -> *const u8 {
 unsafe fn switch_to_activation_stack(
     root_phys: u64,
     stack_top: u64,
-    allocator: &'static crate::early_heap::EarlyBumpAllocator,
+    allocator: &'static crate::kernel_heap::KernelHeapAllocator,
 ) -> ! {
     // SAFETY: The caller guarantees that `stack_top` is the one-past-end
     // address of the private activation stack and that `root_phys` points to a
@@ -248,7 +248,7 @@ unsafe fn switch_to_activation_stack(
 
 extern "C" fn activate_on_kernel_stack(
     root_phys: u64,
-    allocator: &'static crate::early_heap::EarlyBumpAllocator,
+    allocator: &'static crate::kernel_heap::KernelHeapAllocator,
 ) -> ! {
     // SAFETY: The caller switched to the private activation stack and passes
     // the physical root of the static activation arena populated from the
@@ -279,15 +279,24 @@ extern "C" fn activate_on_kernel_stack(
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
-    match crate::early_heap::smoke(allocator) {
+    match crate::kernel_heap::smoke(allocator) {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "heap bytes={} allocated={} box_ok={} vec_ok={} btree_ok={} oom_rejected={}",
+                "heap bytes={} allocated={} peak={} slab_classes={} slab_allocations={} page_allocations={} frees={} double_free_detected={} box_ok={} vec_ok={} btree_ok={} slab_reuse_ok={} page_run_ok={} stress_ok={} oom_rejected={}",
                 status.heap_bytes,
                 status.allocated_bytes,
+                status.peak_allocated_bytes,
+                status.slab_classes,
+                status.slab_allocations,
+                status.page_allocations,
+                status.frees,
+                status.double_free_detected,
                 status.box_ok,
                 status.vec_ok,
                 status.btree_ok,
+                status.slab_reuse_ok,
+                status.page_run_ok,
+                status.stress_ok,
                 status.oom_rejected
             );
             aesynx_arch_x86_64::serial::write_str("[TEST] heap=ok\n");
