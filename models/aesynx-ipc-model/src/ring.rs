@@ -105,7 +105,7 @@ impl<T> ServiceRingQueue<T> {
 
     #[must_use]
     fn next_index(&self, index: usize) -> usize {
-        let next = index + 1;
+        let next = index.wrapping_add(1);
         if next == self.capacity() { 0 } else { next }
     }
 }

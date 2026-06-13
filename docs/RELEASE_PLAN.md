@@ -1047,8 +1047,10 @@ Verification:
 Exit criteria:
 
 - Heap is suitable for capability/object structures.
-- Remaining physical-frame-backed heap growth, per-core heaps, quarantine, and
-  allocation-while-locking policy are documented as non-claims.
+- Remaining physical-frame-backed heap growth, per-core heaps, quarantine,
+  non-`static mut` backing storage, bounded IRQ-masked latency before material
+  heap growth, and allocation-while-locking policy are documented as
+  non-claims.
 
 ### v0.18.1 - Early Entropy And Generation Semantics
 
@@ -1064,6 +1066,8 @@ Deliverables:
   not as a sole trust anchor.
 - Runtime self-test evidence must be represented separately from CPUID feature
   presence; CPUID alone must not enable random-token policy.
+- Runtime self-tests must detect stuck or repeated sample patterns before
+  classifying a hardware path as suitable for attacker-unpredictable tokens.
 - Deterministic boot-local monotonic fallback for identifiers that are
   anti-confusion only.
 - Clear distinction between generation counters used to reject stale authority
@@ -1516,6 +1520,11 @@ Deliverables:
 - Static activation arenas/stacks must move to explicit interior mutability
   such as `SyncUnsafeCell`, or to per-core owned storage, before multi-core
   activation paths can use them.
+- The kernel heap backing store must move away from the current `static mut`
+  raw-address pattern before SMP or material heap growth.
+- Heap operations that run with interrupts masked must have bounded latency, or
+  use a two-phase design that performs bulk work outside the lock, before the
+  heap grows beyond the current fixed static bound.
 - Tests for double-unlock prevention, nested interrupt guard behavior, and
   lock-order validation where feasible.
 

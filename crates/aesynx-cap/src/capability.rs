@@ -50,6 +50,11 @@ pub struct RedactedCapAuditEvent {
     pub affected_slots: u32,
 }
 
+/// Audit sink for capability authority movement.
+///
+/// Implementations must not reenter the capability table they are auditing.
+/// Table mutation paths validate commit feasibility before calling `record`,
+/// but the actual mutation may happen after the audit event is accepted.
 pub trait CapAuditLog {
     fn record(&mut self, event: CapAuditEvent) -> Result<(), CapAuditError>;
 }
