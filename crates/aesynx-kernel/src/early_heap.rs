@@ -1,5 +1,6 @@
 #![cfg_attr(
     any(
+        test,
         feature = "panic-smoke",
         feature = "exception-smoke",
         feature = "timer-smoke"
@@ -65,6 +66,10 @@ impl EarlyBumpAllocator {
     }
 
     pub fn init(&self) -> Result<(), EarlyHeapError> {
+        self.init_with_bounds(early_heap_start(), EARLY_HEAP_BYTES)
+    }
+
+    fn init_with_bounds(&self, start: usize, len: usize) -> Result<(), EarlyHeapError> {
         if self
             .state
             .compare_exchange(
@@ -78,8 +83,7 @@ impl EarlyBumpAllocator {
             return Err(EarlyHeapError::AlreadyInitialized);
         }
 
-        let start = early_heap_start();
-        let Some(end) = start.checked_add(EARLY_HEAP_BYTES) else {
+        let Some(end) = start.checked_add(len) else {
             self.state.store(HEAP_UNINITIALIZED, Ordering::Release);
             return Err(EarlyHeapError::InvalidLayout);
         };
@@ -197,3 +201,81 @@ fn early_heap_start() -> usize {
 #[unsafe(link_section = ".aesynx_early_heap")]
 #[used]
 static mut EARLY_HEAP: AlignedEarlyHeap = AlignedEarlyHeap::ZERO;
+
+#[cfg(test)]
+mod tests {
+    use core::alloc::Layout;
+
+    use super::{EARLY_HEAP_BYTES, EarlyBumpAllocator, EarlyHeapError};
+
+    #[repr(align(64))]
+    struct TestHeap([u8; 256]);
+
+    #[test]
+    fn allocation_rejects_before_initialization() -> Result<(), EarlyHeapError> {
+        let allocator = EarlyBumpAllocator::new();
+        let layout =
+            Layout::from_size_align(8, 8).map_err(|_error| EarlyHeapError::InvalidLayout)?;
+
+        assert!(allocator.allocate(layout).is_null());
+        assert_eq!(
+            allocator.allocated_bytes(),
+            Err(EarlyHeapError::NotInitialized)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn allocator_hands_out_aligned_nonoverlapping_ranges() -> Result<(), EarlyHeapError> {
+        let heap = TestHeap([0; 256]);
+        let allocator = EarlyBumpAllocator::new();
+        allocator.init_with_bounds(heap.0.as_ptr() as usize, heap.0.len())?;
+
+        let eight =
+            Layout::from_size_align(8, 8).map_err(|_error| EarlyHeapError::InvalidLayout)?;
+        let thirty_two =
+            Layout::from_size_align(16, 32).map_err(|_error| EarlyHeapError::InvalidLayout)?;
+
+        let first = allocator.allocate(eight) as usize;
+        let second = allocator.allocate(thirty_two) as usize;
+
+        assert_ne!(first, 0);
+        assert_ne!(second, 0);
+        assert_eq!(first & 7, 0);
+        assert_eq!(second & 31, 0);
+        assert!(second >= first + 8);
+        assert!(allocator.allocated_bytes()? >= 24);
+        Ok(())
+    }
+
+    #[test]
+    fn allocator_rejects_oversized_requests_without_advancing() -> Result<(), EarlyHeapError> {
+        let heap = TestHeap([0; 256]);
+        let allocator = EarlyBumpAllocator::new();
+        allocator.init_with_bounds(heap.0.as_ptr() as usize, heap.0.len())?;
+
+        let small =
+            Layout::from_size_align(8, 8).map_err(|_error| EarlyHeapError::InvalidLayout)?;
+        let oversized = Layout::from_size_align(EARLY_HEAP_BYTES, 8)
+            .map_err(|_error| EarlyHeapError::InvalidLayout)?;
+
+        let before = allocator.allocated_bytes()?;
+        assert!(allocator.allocate(oversized).is_null());
+        assert_eq!(allocator.allocated_bytes()?, before);
+        assert!(!allocator.allocate(small).is_null());
+        Ok(())
+    }
+
+    #[test]
+    fn allocator_init_is_one_shot() -> Result<(), EarlyHeapError> {
+        let heap = TestHeap([0; 256]);
+        let allocator = EarlyBumpAllocator::new();
+
+        allocator.init_with_bounds(heap.0.as_ptr() as usize, heap.0.len())?;
+        assert_eq!(
+            allocator.init_with_bounds(heap.0.as_ptr() as usize, heap.0.len()),
+            Err(EarlyHeapError::AlreadyInitialized)
+        );
+        Ok(())
+    }
+}

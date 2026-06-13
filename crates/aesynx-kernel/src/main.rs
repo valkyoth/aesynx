@@ -2,7 +2,7 @@
 #![cfg_attr(target_os = "none", no_main)]
 #![cfg_attr(target_os = "none", allow(unsafe_code))]
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", test))]
 extern crate alloc;
 
 #[cfg(target_os = "none")]
@@ -33,7 +33,7 @@ mod frame_allocator_smoke;
 ))]
 mod kernel_mapping_smoke;
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", test))]
 mod early_heap;
 
 #[cfg(all(
