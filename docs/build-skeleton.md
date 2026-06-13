@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.16.4 Limine handoff module split implementation candidate
+Status: v0.17.0 Early heap implementation candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.16.4.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.17.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -84,29 +84,30 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `null_page_ok=true`, `kernel_stack_pages=`, `kernel_stack_guard_ok=true`,
 `[TEST] kernel-stack-guard=ok`, `[TEST] paging-policy-model=ok`,
 `[TEST] bootinfo=ok`, `[TEST] boot=ok`, `cpu-hardening nx=`,
-`[TEST] cpu-hardening=ok`, and `[TEST] kernel-cr3=ok`.
+`[TEST] cpu-hardening=ok`, `heap bytes=`, `[TEST] heap=ok`, and
+`[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.16.4-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.17.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.16.4-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.17.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.16.4-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.17.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
 `timer delayed-log`, `[TEST] sleep=ok`, `timer tick 3`, and `[TEST] timer=ok`.
 
 `cargo xtask qemu-suite` runs the boot, panic, exception, and timer smoke paths
-in sequence and is the GitHub CI QEMU gate for v0.16.
+in sequence and is the GitHub CI QEMU gate for v0.17.
 
 `cargo xtask fuzz-smoke` runs the bounded v0.16.1 host fuzz/property gate. It
 executes the BootInfo normalization fuzz seeds and deterministic byte-mutation
@@ -123,7 +124,7 @@ defense-in-depth for the release image path. Kernel rustflags also disable
 SSE/AVX code generation until Aesynx owns explicit FPU/SIMD context
 management. The panic handler still emits only an escaped filename basename.
 
-The v0.16 image proves that Limine can load the Rust kernel ELF, reach `_start`,
+The v0.17 image proves that Limine can load the Rust kernel ELF, reach `_start`,
 install basic x86_64 GDT/TSS/IDT state, remap and mask legacy PIC IRQs, detect
 local APIC availability for the deferred MMIO path, handle a returning breakpoint
 exception, catch and decode an opt-in page fault, run a controlled PIT-backed
@@ -148,9 +149,11 @@ read-only/NX, data RW/NX, a reserved high-half heap window, an unmapped guard
 page, and an unmapped null page. It then copies audited hardware-shaped tables
 into the activation arena, switches to the private activation stack, loads the
 Aesynx-owned CR3 root, verifies kernel-stack guard evidence, and reports
-read-back CPU hardening booleans. It does not claim process isolation, production
-page-table ownership for dynamic workloads, live recovery from hardware faults,
-APIC MMIO activation, global physical-memory ownership, heap allocation,
+read-back CPU hardening booleans. The current candidate then initializes the
+bounded early heap and smokes `Box`, `Vec`, `BTreeMap`, and oversized allocation
+rejection. It does not claim process isolation, production page-table ownership
+for dynamic workloads, live recovery from hardware faults, APIC MMIO
+activation, global physical-memory ownership, free/reuse heap semantics,
 page-fault recovery, a calibrated production clock service, scheduler
 preemption, or bootloader memory reclamation.
 

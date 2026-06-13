@@ -170,6 +170,17 @@ Limitations: no AArch64 QEMU boot target exists yet; host builds use spin_loop a
 ```
 
 ```text
+Location: crates/aesynx-kernel/src/early_heap.rs
+Status: active candidate in v0.17
+Purpose: provide the first bounded kernel global allocator so `alloc` containers can run after Aesynx-owned CR3 activation
+Preconditions: used only on the normal single-core boot path after the kernel has loaded its own CR3 root and post-CR3 CPU hardening has passed; the static heap lives in kernel BSS and is mapped as part of the data range
+Unsafe operation: implements `GlobalAlloc`, takes the raw address of a private static heap buffer, and places that heap in a linker-retained section
+Safety argument: the heap buffer is private, page-aligned, fixed-size, and initialized exactly once before allocation; allocation uses checked arithmetic and an atomic compare-exchange bump pointer to hand out monotonically increasing nonoverlapping ranges; failed allocations return null; deallocation is a documented no-op for this bump-only release; serial output reports aggregate byte counts and booleans only
+Tests/evidence: cargo check -p aesynx-kernel --target x86_64-unknown-none compiles the alloc-enabled kernel; cargo xtask qemu observes heap bytes=<n> allocated=<n> box_ok=true vec_ok=true btree_ok=true oom_rejected=true and [TEST] heap=ok; cargo xtask qemu-suite keeps diagnostic smokes isolated from the allocator path
+Limitations: early single-core bump allocator only; no free/reuse, slab classes, page-backed large allocations, per-subsystem accounting, leak detection, allocation quarantine, SMP allocator synchronization policy, or allocation-while-locking policy yet
+```
+
+```text
 Location: crates/aesynx-kernel/src/kernel_sections.rs
 Status: active candidate in v0.16
 Purpose: expose linker-provided page-granular kernel text, rodata, and data/BSS section boundaries for the kernel mapping policy smoke

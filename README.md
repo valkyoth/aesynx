@@ -48,8 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.16.4` is the current Limine handoff module split implementation
-candidate.
+`v0.17.0` is the current early heap implementation candidate.
 
 Current boot path:
 
@@ -106,6 +105,9 @@ Address-space activation and CPU hardening:
 - Post-CR3 CPU hardening enables NX, write-protect, and CPUID-gated
   SMEP/SMAP/UMIP where supported, then reports read-back redacted booleans
   before `[TEST] cpu-hardening=ok`.
+- A bounded static early heap is initialized after CR3 activation and CPU
+  hardening; QEMU smokes `Box`, `Vec`, `BTreeMap`, and explicit OOM rejection
+  before `[TEST] heap=ok`.
 
 Fuzz and property gates:
 
@@ -127,7 +129,7 @@ Fuzz and property gates:
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, and `[TEST] cpu-hardening=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, and the v0.17 early heap smoke with `[TEST] heap=ok` from Rust `_start`. |
 | Fuzz/property smoke | Active candidate | `v0.16.1`; `cargo xtask fuzz-smoke` runs BootInfo fuzz seeds, deterministic BootInfo byte mutations, and mapper property sweeps before live CR3 activation. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
@@ -143,7 +145,8 @@ Fuzz and property gates:
 | Kernel mapping policy | Tagged | `v0.16.0`; linker-exported section boundaries feed a safe `aesynx-mm` policy descriptor that verifies section layout, text RX, rodata read-only/NX, data RW/NX, reserved heap, guard page, and null-page invariants before `[TEST] paging-policy-model=ok`. |
 | Kernel-owned address space | Tagged | `v0.16.2`; audited mapper state now streams redacted x86_64 hardware-shaped page-table entries using Limine's normalized kernel physical placement, copies used tables into a static activation arena, switches to a private kernel activation stack, loads an Aesynx-owned CR3 root, and QEMU requires `hardware_copied=true` plus `[TEST] kernel-cr3=ok`. |
 | CPU hardening and stack guards | Tagged | `v0.16.3`; CPUID-gated EFER.NXE, CR0.WP, SMEP, SMAP, and UMIP policy is host-tested and QEMU-smoked with redacted read-back `cpu-hardening` booleans; the terminal activation stack is mapped separately with an unmapped guard page and `[TEST] kernel-stack-guard=ok`. |
-| Limine handoff module split | Active candidate | `v0.16.4`; Limine ABI structs, constants, request statics, link-section markers, and ABI assertions now live in a private `limine/abi.rs` module while normalization flow remains in `limine.rs`. |
+| Limine handoff module split | Tagged | `v0.16.4`; Limine ABI structs, constants, request statics, link-section markers, and ABI assertions now live in a private `limine/abi.rs` module while normalization flow remains in `limine.rs`. |
+| Early heap | Active candidate | `v0.17.0`; bounded static bump allocator, global allocator wrapper, post-CR3 `Box`/`Vec`/`BTreeMap` smoke, and explicit OOM rejection before `[TEST] heap=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -155,7 +158,7 @@ Fuzz and property gates:
 
 | Area | Status | Target |
 | --- | --- | --- |
-| Early heap | Planned | `v0.17.0`; add the first bounded kernel heap and `alloc` smoke after the memory enforcement gates. |
+| Slab/page heap | Planned | `v0.18.0`; replace the bump-only heap with allocator classes suitable for long-lived capability and object structures. |
 | Real arch mechanisms | Planned | Core identity, timestamp, production page tables, and CPU setup. |
 | Capability services | Planned | Concrete revocation epoch store, audit backend, object registry, and authenticated call paths. |
 | Native userspace | Planned | `aesh`, structured pipelines, WASM components, and capability-scoped command execution. |
@@ -183,14 +186,14 @@ Validate the current kernel build path:
 cargo xtask build-kernel
 ```
 
-Create and smoke-test the v0.16 Limine QEMU image:
+Create and smoke-test the v0.17 Limine QEMU image:
 
 ```bash
 cargo xtask image
 cargo xtask qemu
 ```
 
-Run the full v0.16 QEMU smoke suite:
+Run the full v0.17 QEMU smoke suite:
 
 ```bash
 cargo xtask qemu-suite
@@ -228,7 +231,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.16.4
+cargo xtask release-ready v0.17.0
 ```
 
 ## Security Posture
@@ -258,7 +261,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.16.4 Release Candidate Notes](docs/releases/v0.16.4-rc.md)
+- [v0.17.0 Release Candidate Notes](docs/releases/v0.17.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

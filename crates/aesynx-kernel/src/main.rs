@@ -3,6 +3,9 @@
 #![cfg_attr(target_os = "none", allow(unsafe_code))]
 
 #[cfg(target_os = "none")]
+extern crate alloc;
+
+#[cfg(target_os = "none")]
 use core::panic::PanicInfo;
 
 #[cfg(target_os = "none")]
@@ -30,6 +33,9 @@ mod frame_allocator_smoke;
 ))]
 mod kernel_mapping_smoke;
 
+#[cfg(target_os = "none")]
+mod early_heap;
+
 #[cfg(all(
     target_os = "none",
     not(feature = "panic-smoke"),
@@ -53,6 +59,10 @@ mod page_table_smoke;
     not(feature = "timer-smoke")
 ))]
 mod page_table_install;
+
+#[cfg(target_os = "none")]
+#[global_allocator]
+static KERNEL_ALLOCATOR: early_heap::EarlyBumpAllocator = early_heap::EarlyBumpAllocator::new();
 
 #[cfg(all(
     target_os = "none",
@@ -345,9 +355,9 @@ fn boot_entry() -> ! {
             aesynx_arch_x86_64::serial::write_str("[TEST] bootinfo=ok\n");
             aesynx_arch_x86_64::serial::write_str("[TEST] boot=ok\n");
             diagnostics::set_boot_phase(BootPhase::Running);
-            match page_table_install::activation_root_phys(&info)
-                .and_then(page_table_install::activate_kernel_address_space_and_halt)
-            {
+            match page_table_install::activation_root_phys(&info).and_then(|root| {
+                page_table_install::activate_kernel_address_space_and_halt(root, &KERNEL_ALLOCATOR)
+            }) {
                 Ok(never) => match never {},
                 Err(error) => {
                     aesynx_arch_x86_64::serial_println!("kernel-cr3 error={:?}", error);
