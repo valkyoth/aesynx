@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.24.0` is the current kernel object registry candidate.
+`v0.25.0` is the current service queue model candidate.
 
 Current boot path:
 
@@ -141,7 +141,8 @@ Fuzz and property gates:
 | Kernel crate policy | Active | Crates under `crates/` must be `no_std`, deny unsafe by default, and avoid external dependencies without exceptions. |
 | Capability model | Tagged | `v0.22.0`; private non-copy authority values, checked `CapId` slot/generation layout, fixed-capacity kernel capability table, permission validation, audited derive/grant/revoke paths, slot generation stale-id rejection, revoke authority checks, redacted capability/table/audit debug output, cap-fault telemetry, and memory-map authorization based on capability kind, range, and `MAP`/READ/WRITE/EXECUTE permissions. |
 | Object model | Tagged | `v0.23.0`; host-side `aesynx-object-model` crate with nonzero redacted object IDs, explicit object kinds, immutable node metadata, duplicate/self-reference rejection, append-only graph insertion, missing-reference rejection, and reachability over references plus predecessor links. |
-| Kernel object registry | Active candidate | `v0.24.0`; no_std fixed-capacity `aesynx-object` registry with memory, endpoint, queue, and task-placeholder objects, local core ownership, create/list/delete operations, generation-backed slot recycling, redacted object debug output, and capability reference resolution against object ID, kind, generation, and permission. |
+| Kernel object registry | Tagged | `v0.24.0`; no_std fixed-capacity `aesynx-object` registry with memory, endpoint, queue, and task-placeholder objects, local core ownership, create/list/delete operations, generation-backed slot recycling, redacted object debug output, and capability reference resolution against object ID, kind, generation, and permission. |
+| Service queue model | Active candidate | `v0.25.0`; host-side `aesynx-ipc-model` crate with explicit service kinds, request/completion structures, fixed-capacity ring queue behavior, fail-closed full/empty handling, FIFO wraparound tests, and modeled release/acquire publish-observe ordering evidence before kernel service queues land. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
@@ -251,7 +252,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.24.0
+cargo xtask release-ready v0.25.0
 ```
 
 ## Security Posture
@@ -282,7 +283,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.24.0 Release Candidate Notes](docs/releases/v0.24.0-rc.md)
+- [v0.25.0 Release Candidate Notes](docs/releases/v0.25.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

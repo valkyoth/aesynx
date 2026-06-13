@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.24.0 Kernel object registry candidate
+Status: v0.25.0 Service queue model candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.24.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.25.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -95,19 +95,19 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.24.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.25.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.24.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.25.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.24.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.25.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -182,14 +182,12 @@ activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.24.0 candidate adds the no_std fixed-capacity kernel object registry. It
-supports memory, endpoint, queue, and task-placeholder object creation, local
-core ownership, generation-backed slot recycling after deletion,
-validate-then-write listing, redacted object debug output, and capability
-reference resolution against object ID, kind, generation, and required
-permission. This is still host-tested
-registry logic; the live boot path does not yet expose object syscalls or a
-service queue.
+The v0.25.0 candidate adds the host-side service queue model. It defines
+explicit service kinds, kernel-stamped request metadata, completion statuses,
+fixed-capacity ring queue behavior, FIFO wraparound, fail-closed full/empty
+handling, and modeled release/acquire publish-observe ordering evidence. This
+is still host-tested queue logic; the live boot path does not yet expose object
+syscalls or kernel service queues.
 
 ## Target Shape
 

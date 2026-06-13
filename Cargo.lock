@@ -78,6 +78,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aesynx-ipc-model"
+version = "0.1.0"
+dependencies = [
+ "aesynx-abi",
+ "aesynx-ipc",
+]
+
+[[package]]
 name = "aesynx-kernel"
 version = "0.1.0"
 dependencies = [
