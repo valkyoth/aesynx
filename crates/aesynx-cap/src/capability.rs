@@ -315,20 +315,20 @@ impl fmt::Debug for Capability {
 }
 
 #[cfg(test)]
-struct TestCapabilitySpec {
-    object_id: ObjectId,
-    base: Option<VirtAddr>,
-    len: Option<u64>,
-    perms: CapPerms,
-    owner: PrincipalId,
-    generation: u32,
-    revocation_epoch: u64,
-    kind: CapKind,
+pub(crate) struct TestCapabilitySpec {
+    pub(crate) object_id: ObjectId,
+    pub(crate) base: Option<VirtAddr>,
+    pub(crate) len: Option<u64>,
+    pub(crate) perms: CapPerms,
+    pub(crate) owner: PrincipalId,
+    pub(crate) generation: u32,
+    pub(crate) revocation_epoch: u64,
+    pub(crate) kind: CapKind,
 }
 
 #[cfg(test)]
 impl Capability {
-    const fn new_for_test(spec: TestCapabilitySpec) -> Self {
+    pub(crate) const fn new_for_test(spec: TestCapabilitySpec) -> Self {
         Self {
             object_id: spec.object_id,
             base: spec.base,

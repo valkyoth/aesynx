@@ -43,6 +43,9 @@ pub const KERNEL_STACK_GUARD_STATUS_MARKER: &str = "kernel_stack_guard_ok=true";
 pub const KERNEL_STACK_PAGES_MARKER: &str = "kernel_stack_pages=";
 pub const MEMORY_MAP_FAIL_MARKER: &str = "[TEST] memory-map=fail";
 pub const MEMORY_MAP_MARKER: &str = "[TEST] memory-map=ok";
+pub const MEMORY_CAP_FAIL_MARKER: &str = "[TEST] memory-cap=fail";
+pub const MEMORY_CAP_MARKER: &str = "[TEST] memory-cap=ok";
+pub const MEMORY_CAP_STATUS_MARKER: &str = "memory-cap map_allowed=";
 pub const MEMORY_RESERVED_MARKER: &str = "memory reserved_bytes=";
 pub const MEMORY_TOTAL_MARKER: &str = "memory total_bytes=";
 pub const MEMORY_USABLE_MARKER: &str = "memory usable_bytes=";
@@ -212,6 +215,8 @@ const BOOT_REQUIRED_MARKERS: &[&str] = &[
     HEAP_MARKER,
     CAP_TABLE_STATUS_MARKER,
     CAP_TABLE_MARKER,
+    MEMORY_CAP_STATUS_MARKER,
+    MEMORY_CAP_MARKER,
     KERNEL_CR3_ACTIVE_MARKER,
     KERNEL_CR3_MARKER,
 ];
@@ -226,6 +231,7 @@ const BOOT_FORBIDDEN_MARKERS: &[&str] = &[
     ENTROPY_POLICY_FAIL_MARKER,
     HEAP_FAIL_MARKER,
     CAP_TABLE_FAIL_MARKER,
+    MEMORY_CAP_FAIL_MARKER,
     KERNEL_CR3_FAIL_MARKER,
 ];
 
@@ -288,7 +294,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, hardware_tables_copied=, hardware_copied=true, kernel_stack_pages=, kernel_stack_guard_ok=true, [TEST] kernel-stack-guard=ok, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok, cpu-hardening nx=, [TEST] cpu-hardening=ok, entropy-policy rdrand=, hardware_self_test=false, hardware_present=, fallback_used=, generation_counter_ok=true, random_tokens_available=, source=, [TEST] entropy-policy=ok, heap bytes=, slab_classes=, slab_reuse_ok=true, page_run_ok=true, stress_ok=true, double_free_detected=true, invalid_free_detected=true, [TEST] heap=ok, cap-table capacity=, [TEST] cap=ok, kernel-cr3 active=true, [TEST] kernel-cr3=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, hardware_tables_copied=, hardware_copied=true, kernel_stack_pages=, kernel_stack_guard_ok=true, [TEST] kernel-stack-guard=ok, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok, cpu-hardening nx=, [TEST] cpu-hardening=ok, entropy-policy rdrand=, hardware_self_test=false, hardware_present=, fallback_used=, generation_counter_ok=true, random_tokens_available=, source=, [TEST] entropy-policy=ok, heap bytes=, slab_classes=, slab_reuse_ok=true, page_run_ok=true, stress_ok=true, double_free_detected=true, invalid_free_detected=true, [TEST] heap=ok, cap-table capacity=, [TEST] cap=ok, memory-cap map_allowed=, [TEST] memory-cap=ok, kernel-cr3 active=true, [TEST] kernel-cr3=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"

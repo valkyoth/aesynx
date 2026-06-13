@@ -344,11 +344,21 @@ extern "C" fn activate_on_kernel_stack(
                 status.audit_events,
                 status.revoked_slots
             );
+            aesynx_arch_x86_64::serial_println!(
+                "memory-cap map_allowed={} mapping_descriptor_ok={} read_denied={} write_denied={} range_escape_denied={}",
+                status.memory_map_allowed,
+                status.memory_mapping_descriptor_ok,
+                status.memory_read_denied,
+                status.memory_write_denied,
+                status.memory_range_escape_denied
+            );
             aesynx_arch_x86_64::serial::write_str("[TEST] cap=ok\n");
+            aesynx_arch_x86_64::serial::write_str("[TEST] memory-cap=ok\n");
         }
         Err(error) => {
             aesynx_arch_x86_64::serial_println!("cap-table error={:?}", error);
             aesynx_arch_x86_64::serial::write_str("[TEST] cap=fail\n");
+            aesynx_arch_x86_64::serial::write_str("[TEST] memory-cap=fail\n");
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }

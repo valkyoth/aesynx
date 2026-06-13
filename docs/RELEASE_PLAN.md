@@ -1160,11 +1160,19 @@ Deliverables:
 - Derive subrange cap.
 - Reject extra permissions.
 
+Expected serial:
+
+```text
+[TEST] memory-cap=ok
+```
+
 Verification:
 
 - READ without permission fails.
 - WRITE without permission fails.
 - Derived cap cannot escape range.
+- Mapper-facing checked mapping descriptor construction is attempted only after
+  memory-cap authorization.
 
 Exit criteria:
 

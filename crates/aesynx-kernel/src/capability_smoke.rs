@@ -1,12 +1,15 @@
-use aesynx_abi::{CapId, ObjectId, PrincipalId, VirtAddr};
+use aesynx_abi::{CapId, ObjectId, PhysAddr, PrincipalId, VirtAddr};
 use aesynx_cap::{
-    CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError, CapabilityTable, DeriveError,
-    DeriveRequest,
+    CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError, Capability, CapabilityTable,
+    DeriveError, DeriveRequest, MemoryAccess, MemoryCapError, MemoryMapRequest,
 };
+use aesynx_mm::{FRAME_SIZE, GenericPageFlags, PageAccess, PageMapping, PageTableError};
 
 const ROOT_OWNER: PrincipalId = PrincipalId::new(1);
 const CHILD_OWNER: PrincipalId = PrincipalId::new(2);
 const OBJECT: ObjectId = ObjectId::new(0x0a20);
+const MEMORY_VIRT: VirtAddr = VirtAddr::new(0x1000);
+const MEMORY_PHYS: PhysAddr = PhysAddr::new(0x0030_0000);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapabilitySmokeStatus {
@@ -16,6 +19,11 @@ pub struct CapabilitySmokeStatus {
     pub root_read_ok: bool,
     pub child_read_ok: bool,
     pub child_write_denied: bool,
+    pub memory_map_allowed: bool,
+    pub memory_mapping_descriptor_ok: bool,
+    pub memory_read_denied: bool,
+    pub memory_write_denied: bool,
+    pub memory_range_escape_denied: bool,
     pub stale_root_denied: bool,
     pub stale_child_denied: bool,
     pub audit_events: usize,
@@ -25,6 +33,8 @@ pub struct CapabilitySmokeStatus {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CapabilitySmokeError {
     AuditRejected,
+    Memory(MemoryCapError),
+    Mapping(PageTableError),
     Table(CapTableError),
     UnexpectedAuthorityState,
 }
@@ -38,6 +48,38 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
     let child_read_ok = table.check(child, CapPerms::READ).is_ok();
     let child_write_denied =
         table.check(child, CapPerms::WRITE).map(|_| ()) == Err(CapTableError::MissingPermission);
+    let readless_root = insert_readless_root(&mut table)?;
+    let child_cap = table.get(child)?;
+    let memory_map_allowed = child_cap
+        .authorize_memory_map(MemoryMapRequest::new(
+            MEMORY_VIRT,
+            FRAME_SIZE,
+            MemoryAccess::ReadOnly,
+        )?)
+        .is_ok();
+    let memory_mapping_descriptor_ok = checked_mapping_with_memory_cap(
+        child_cap,
+        MEMORY_VIRT,
+        MEMORY_PHYS,
+        GenericPageFlags::kernel(PageAccess::ReadOnly),
+    )
+    .is_ok();
+    let readless_cap = table.get(readless_root)?;
+    let memory_read_denied = readless_cap.authorize_memory_map(MemoryMapRequest::new(
+        MEMORY_VIRT,
+        FRAME_SIZE,
+        MemoryAccess::ReadOnly,
+    )?) == Err(MemoryCapError::MissingReadPermission);
+    let memory_write_denied = child_cap.authorize_memory_map(MemoryMapRequest::new(
+        MEMORY_VIRT,
+        FRAME_SIZE,
+        MemoryAccess::ReadWrite,
+    )?) == Err(MemoryCapError::MissingWritePermission);
+    let memory_range_escape_denied = child_cap.authorize_memory_map(MemoryMapRequest::new(
+        VirtAddr::new(MEMORY_VIRT.get() + FRAME_SIZE),
+        FRAME_SIZE,
+        MemoryAccess::ReadOnly,
+    )?) == Err(MemoryCapError::RangeEscapesCapability);
     let occupied_before_revoke = table.occupied_slots();
     let revoked_slots = table.revoke(root, child)?;
     let stale_root_denied =
@@ -49,10 +91,15 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
     if !(root_read_ok
         && child_read_ok
         && child_write_denied
+        && memory_map_allowed
+        && memory_mapping_descriptor_ok
+        && memory_read_denied
+        && memory_write_denied
+        && memory_range_escape_denied
         && stale_root_denied
         && stale_child_denied
-        && occupied_before_revoke == 2
-        && occupied_after_revoke == 0
+        && occupied_before_revoke == 3
+        && occupied_after_revoke == 1
         && audit.len() == 1
         && revoked_slots == 2)
     {
@@ -66,6 +113,11 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
         root_read_ok,
         child_read_ok,
         child_write_denied,
+        memory_map_allowed,
+        memory_mapping_descriptor_ok,
+        memory_read_denied,
+        memory_write_denied,
+        memory_range_escape_denied,
         stale_root_denied,
         stale_child_denied,
         audit_events: audit.len(),
@@ -80,9 +132,21 @@ fn insert_root(table: &mut CapabilityTable<8>) -> Result<CapId, CapTableError> {
         ROOT_OWNER,
         CapPerms::READ
             .union(CapPerms::WRITE)
+            .union(CapPerms::MAP)
             .union(CapPerms::DERIVE)
             .union(CapPerms::GRANT)
             .union(CapPerms::REVOKE),
+        1,
+        0,
+    )
+}
+
+fn insert_readless_root(table: &mut CapabilityTable<8>) -> Result<CapId, CapTableError> {
+    table.insert_root(
+        ObjectId::new(0x0a21),
+        CapKind::Memory,
+        ROOT_OWNER,
+        CapPerms::MAP,
         1,
         0,
     )
@@ -96,13 +160,33 @@ fn derive_child(
     table.derive_with_audit(
         root,
         DeriveRequest {
-            perms: CapPerms::READ,
+            perms: CapPerms::READ.union(CapPerms::MAP),
             owner: CHILD_OWNER,
             base: Some(VirtAddr::new(0x1000)),
             len: Some(0x1000),
         },
         audit,
     )
+}
+
+fn checked_mapping_with_memory_cap(
+    cap: &Capability,
+    virt: VirtAddr,
+    phys: PhysAddr,
+    flags: GenericPageFlags,
+) -> Result<(), CapabilitySmokeError> {
+    let request = MemoryMapRequest::new(virt, FRAME_SIZE, memory_access_for_flags(flags))?;
+    cap.authorize_memory_map(request)?;
+    PageMapping::new_checked(phys, flags)?;
+    Ok(())
+}
+
+const fn memory_access_for_flags(flags: GenericPageFlags) -> MemoryAccess {
+    match flags.access() {
+        PageAccess::ReadOnly => MemoryAccess::ReadOnly,
+        PageAccess::ReadWrite => MemoryAccess::ReadWrite,
+        PageAccess::ReadExecute => MemoryAccess::ReadExecute,
+    }
 }
 
 struct SmokeAudit {
@@ -144,6 +228,18 @@ impl From<CapTableError> for CapabilitySmokeError {
     }
 }
 
+impl From<MemoryCapError> for CapabilitySmokeError {
+    fn from(error: MemoryCapError) -> Self {
+        Self::Memory(error)
+    }
+}
+
+impl From<PageTableError> for CapabilitySmokeError {
+    fn from(error: PageTableError) -> Self {
+        Self::Mapping(error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::run;
@@ -155,11 +251,16 @@ mod tests {
         assert!(result.is_ok());
         if let Ok(status) = result {
             assert_eq!(status.capacity, 8);
-            assert_eq!(status.occupied_before_revoke, 2);
-            assert_eq!(status.occupied_after_revoke, 0);
+            assert_eq!(status.occupied_before_revoke, 3);
+            assert_eq!(status.occupied_after_revoke, 1);
             assert!(status.root_read_ok);
             assert!(status.child_read_ok);
             assert!(status.child_write_denied);
+            assert!(status.memory_map_allowed);
+            assert!(status.memory_mapping_descriptor_ok);
+            assert!(status.memory_read_denied);
+            assert!(status.memory_write_denied);
+            assert!(status.memory_range_escape_denied);
             assert!(status.stale_root_denied);
             assert!(status.stale_child_denied);
             assert_eq!(status.audit_events, 1);
