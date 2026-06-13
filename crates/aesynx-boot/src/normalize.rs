@@ -1,6 +1,7 @@
 use crate::{
     ArchKind, BootInfo, CpuInfo, CpuTopology, FramebufferInfo, HhdmInfo, KernelImageInfo,
-    MemoryAccountingError, MemoryMap, MemoryRegion, PlatformKind, types::BootInfoParts,
+    MAX_EARLY_MEMORY_REGIONS, MemoryAccountingError, MemoryMap, MemoryRegion, PlatformKind,
+    types::BootInfoParts,
 };
 
 const PAGE_SIZE: u64 = 4096;
@@ -71,6 +72,9 @@ fn validate_memory_regions(regions: &[MemoryRegion]) -> Result<(), BootInfoError
     if regions.is_empty() {
         return Err(BootInfoError::EmptyMemoryMap);
     }
+    if regions.len() > MAX_EARLY_MEMORY_REGIONS {
+        return Err(BootInfoError::InvalidMemoryRegion);
+    }
 
     for (index, region) in regions.iter().enumerate() {
         if region.len == 0 || region.end().is_none() {
@@ -124,6 +128,8 @@ mod tests {
     use core::fmt;
 
     use aesynx_abi::{PhysAddr, VirtAddr};
+
+    mod region_limit;
 
     use crate::{
         ArchKind, BootInfo, BootInfoError, BootMetadata, FramebufferInfo, HhdmInfo,

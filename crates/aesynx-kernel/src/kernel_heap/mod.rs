@@ -11,6 +11,7 @@
 mod allocator;
 mod free_list;
 mod layout;
+mod lock;
 mod stats;
 
 use alloc::boxed::Box;

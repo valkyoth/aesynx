@@ -135,6 +135,11 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
     /// object registry or epoch store. Slot generations fail instead of
     /// wrapping; a persistent table must rebuild or retire slots before
     /// `u32::MAX` is reached.
+    ///
+    /// Callers must treat `authority_id`, `target_id`, and every other in-table
+    /// `CapId` for the same object as consumed by a successful revoke. A later
+    /// `StaleId` from one of those IDs is the expected self-revocation result,
+    /// not a recovery signal.
     pub fn revoke_with_audit(
         &mut self,
         authority_id: CapId,

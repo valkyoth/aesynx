@@ -9,6 +9,7 @@ use super::layout::{
     PAGE_LARGE_HEAD, PAGE_LARGE_TAIL, PAGE_SLAB_BASE, SLAB_CLASS_COUNT, SLAB_CLASSES,
     class_for_layout, page_count_for_len, pages_for_size,
 };
+use super::lock::HeapLockGuard;
 use super::stats::KernelHeapError;
 
 const HEAP_UNINITIALIZED: usize = 0;
@@ -434,14 +435,7 @@ impl KernelHeapAllocator {
     }
 
     fn lock(&self) -> HeapLockGuard<'_> {
-        while self
-            .locked
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_err()
-        {
-            core::hint::spin_loop();
-        }
-        HeapLockGuard { allocator: self }
+        HeapLockGuard::lock(&self.locked)
     }
 }
 
@@ -456,20 +450,10 @@ pub struct KernelHeapStats {
     pub invalid_free_detected: bool,
 }
 
-struct HeapLockGuard<'a> {
-    allocator: &'a KernelHeapAllocator,
-}
-
-impl Drop for HeapLockGuard<'_> {
-    fn drop(&mut self) {
-        self.allocator.locked.store(false, Ordering::Release);
-    }
-}
-
 // SAFETY: `KernelHeapAllocator` serializes metadata mutation with a private
-// spin lock, hands out nonoverlapping blocks from a private page-aligned static
-// heap, and reconstructs the allocation class from the `Layout` supplied by
-// `GlobalAlloc::dealloc`.
+// IRQ-masking spin lock, hands out nonoverlapping blocks from a private
+// page-aligned static heap, and reconstructs the allocation class from the
+// `Layout` supplied by `GlobalAlloc::dealloc`.
 unsafe impl GlobalAlloc for KernelHeapAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.allocate_checked(layout)
