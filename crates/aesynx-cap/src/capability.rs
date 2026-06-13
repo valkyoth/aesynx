@@ -1,6 +1,11 @@
-use aesynx_abi::{ObjectId, PrincipalId, VirtAddr};
+use core::fmt;
 
-use crate::{CapKind, CapPerms, CapValidationError, DeriveError, DeriveRequest};
+use aesynx_abi::{CapId, ObjectId, PrincipalId, VirtAddr};
+
+use crate::{
+    CapGeneration, CapIdError, CapIdParts, CapKind, CapPerms, CapSlotIndex, CapValidationError,
+    DeriveError, DeriveRequest,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapAuditEvent {
@@ -29,7 +34,7 @@ pub trait CapAuditLog {
 /// create or recycle object generations must fail instead of wrapping the
 /// `u32` generation counter; wrapped generations can let stale capabilities
 /// pass `validate_live`.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Capability {
     object_id: ObjectId,
     base: Option<VirtAddr>,
@@ -106,6 +111,15 @@ impl Capability {
     #[must_use]
     pub const fn kind(&self) -> CapKind {
         self.kind
+    }
+
+    pub const fn id_for_slot(&self, slot: CapSlotIndex) -> Result<CapId, CapIdError> {
+        let generation = match CapGeneration::new(self.generation) {
+            Ok(generation) => generation,
+            Err(error) => return Err(error),
+        };
+
+        Ok(CapIdParts::new(slot, generation).cap_id())
     }
 
     #[must_use]
@@ -278,6 +292,21 @@ impl Capability {
             owner: target_owner,
             ..self
         })
+    }
+}
+
+impl fmt::Debug for Capability {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Capability")
+            .field("object_id", &"<redacted>")
+            .field("has_range", &(self.base.is_some() && self.len.is_some()))
+            .field("perms_bits", &self.perms.bits())
+            .field("owner", &"<redacted>")
+            .field("generation", &self.generation)
+            .field("revocation_epoch", &self.revocation_epoch)
+            .field("kind", &self.kind)
+            .finish()
     }
 }
 

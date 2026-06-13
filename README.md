@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.18.1` is the current early entropy and generation semantics implementation
+`v0.19.0` is the current capability model implementation
 candidate.
 
 Current boot path:
@@ -130,7 +130,7 @@ Fuzz and property gates:
 | Rust workspace | Active | Modular crate layout with no root `src/` implementation pile. |
 | Toolchain | Active | Stable Rust `1.96.0`, edition 2024, resolver `3`, and `x86_64-unknown-none` for the first boot ELF. |
 | Kernel crate policy | Active | Crates under `crates/` must be `no_std`, deny unsafe by default, and avoid external dependencies without exceptions. |
-| Capability model | Model active | Private non-copy authority values, permission validation, audited derive/grant paths, generation/epoch validation, and revoke authority checks. |
+| Capability model | Active candidate | `v0.19.0`; private non-copy authority values, checked `CapId` slot/generation layout, permission validation, audited derive/grant paths, generation/epoch validation, revoke authority checks, and redacted capability debug output. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
@@ -156,7 +156,7 @@ Fuzz and property gates:
 | Limine handoff module split | Tagged | `v0.16.4`; Limine ABI structs, constants, request statics, link-section markers, and ABI assertions now live in a private `limine/abi.rs` module while normalization flow remains in `limine.rs`. |
 | Early heap | Tagged | `v0.17.0`; bounded static bump allocator, global allocator wrapper, post-CR3 `Box`/`Vec`/`BTreeMap` smoke, and explicit OOM rejection before `[TEST] heap=ok`. |
 | Slab/page heap | Tagged | `v0.18.0`; bounded static reusable kernel heap with fixed slab classes, page-sized runs, aggregate stats, invalid-free and free-while-free double-free telemetry, zero-before-reuse host coverage, and QEMU allocation/free stress before `[TEST] heap=ok`; allocation-epoch stale raw-pointer detection remains future work. |
-| Early entropy semantics | Active candidate | `v0.18.1`; safe entropy policy crate, x86_64 CPUID classification for `RDRAND`/`RDSEED`, explicit runtime self-test evidence, deterministic anti-confusion generation counters, random-token gating that rejects CPUID-only evidence, and redacted QEMU telemetry before `[TEST] entropy-policy=ok`. |
+| Early entropy semantics | Tagged | `v0.18.1`; safe entropy policy crate, x86_64 CPUID classification for `RDRAND`/`RDSEED`, explicit runtime self-test evidence, deterministic anti-confusion generation counters, random-token gating that rejects CPUID-only evidence, and redacted QEMU telemetry before `[TEST] entropy-policy=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |
@@ -240,7 +240,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.18.1
+cargo xtask release-ready v0.19.0
 ```
 
 ## Security Posture
@@ -270,7 +270,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.18.1 Release Candidate Notes](docs/releases/v0.18.1-rc.md)
+- [v0.19.0 Release Candidate Notes](docs/releases/v0.19.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

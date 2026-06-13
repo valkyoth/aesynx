@@ -1096,24 +1096,27 @@ Exit criteria:
 
 Goal:
 
-Model capability logic under `std`.
+Model capability logic in safe Rust before the kernel capability table becomes
+live.
 
 Deliverables:
 
-- `models/aesynx-cap-model`.
-- CapId layout.
+- `aesynx-cap` as the no-unsafe capability model crate.
+- Checked `CapId` layout over `CapId(u64)`.
 - Permission bitset.
 - Derivation tests.
 - Revocation tests.
 - Generation tests.
+- Redacted capability debug output.
 
 Verification:
 
-- Host tests pass.
+- `cargo test -p aesynx-cap`.
+- `scripts/checks.sh`.
 
 Exit criteria:
 
-- Model is trusted enough to implement in kernel.
+- Model is trusted enough to implement the kernel capability table in v0.20.0.
 
 ### v0.20.0 - Kernel Capability Table
 
