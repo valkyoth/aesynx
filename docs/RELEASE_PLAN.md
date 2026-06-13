@@ -1186,16 +1186,25 @@ Make authority movement observable.
 
 Deliverables:
 
-- Grant/revoke audit event.
-- Redaction rules.
+- Grant and revoke audit events.
+- Revoke requires an audited table path; unaudited table revoke is not a public
+  API.
+- Redaction rules for audit debug output.
 - Telemetry event for cap faults.
 - Serial debug view.
+
+Expected serial:
+
+```text
+[TEST] cap-audit=ok
+```
 
 Verification:
 
 - Grant emits event.
 - Revoke emits event.
 - Secret payloads are not logged.
+- Cap-fault telemetry reports aggregate redacted events.
 
 Exit criteria:
 

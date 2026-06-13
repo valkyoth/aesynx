@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.21.0 - Memory Capabilities](v0.21.0-rc.md)
+- [v0.22.0 - Capability Audit Events](v0.22.0-rc.md)
 
 ## History
 
+- [v0.21.0 - Memory Capabilities](v0.21.0-rc.md)
 - [v0.20.0 - Kernel Capability Table](v0.20.0-rc.md)
 - [v0.19.0 - Capability Model Crate](v0.19.0-rc.md)
 - [v0.18.1 - Early Entropy And Generation Semantics](v0.18.1-rc.md)

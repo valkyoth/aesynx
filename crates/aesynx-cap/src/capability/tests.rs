@@ -2,8 +2,8 @@ use aesynx_abi::{CapId, ObjectId, PrincipalId, VirtAddr};
 use core::fmt::{self, Write};
 
 use crate::{
-    CapAuditAction, CapAuditEvent, CapAuditLog, CapIdError, CapKind, CapPerms, CapSlotIndex,
-    CapValidationError, Capability, DeriveError, DeriveRequest,
+    CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapIdError, CapKind, CapPerms,
+    CapSlotIndex, CapValidationError, Capability, DeriveError, DeriveRequest,
 };
 
 use super::TestCapabilitySpec;
@@ -40,7 +40,7 @@ struct TestAudit {
 }
 
 impl CapAuditLog for TestAudit {
-    fn record(&mut self, event: CapAuditEvent) -> Result<(), DeriveError> {
+    fn record(&mut self, event: CapAuditEvent) -> Result<(), CapAuditError> {
         self.last_event = Some(event);
         Ok(())
     }

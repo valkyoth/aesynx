@@ -60,7 +60,20 @@ impl CoreTelemetry {
     }
 
     pub fn inc_cap_faults(&self) {
-        self.cap_faults.fetch_add(1, Ordering::Relaxed);
+        let _ = self.record_cap_fault(CapFaultKind::Unknown);
+    }
+
+    pub fn record_cap_fault(&self, kind: CapFaultKind) -> Result<CapFaultEvent, TelemetryError> {
+        let previous = self
+            .cap_faults
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+                value.checked_add(1)
+            })
+            .map_err(|_| TelemetryError::CounterOverflow)?;
+        Ok(CapFaultEvent {
+            kind,
+            total_cap_faults: previous + 1,
+        })
     }
 
     pub fn inc_page_faults(&self) {
@@ -109,6 +122,21 @@ pub struct CoreTelemetrySnapshot {
     pub page_faults: u64,
     pub driver_irqs: u64,
     pub service_queue_depth: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CapFaultKind {
+    InvalidId,
+    MissingPermission,
+    Revoked,
+    StaleId,
+    Unknown,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CapFaultEvent {
+    pub kind: CapFaultKind,
+    pub total_cap_faults: u64,
 }
 
 impl CoreTelemetrySnapshot {
@@ -262,7 +290,7 @@ const fn idle_ratio_basis_points(idle_ticks: u64, timer_ticks: u64) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        CoreTelemetry, CoreTelemetrySnapshot, MAX_SCHEDULE_COUNTER_FEATURE,
+        CapFaultKind, CoreTelemetry, CoreTelemetrySnapshot, MAX_SCHEDULE_COUNTER_FEATURE,
         MAX_SCHEDULE_QUEUE_FEATURE, MAX_SCHEDULE_RATIO_FEATURE, TaskTelemetry, TelemetryError,
     };
 
@@ -294,6 +322,27 @@ mod tests {
         assert_eq!(snapshot.cap_faults, 1);
         assert_eq!(snapshot.page_faults, 1);
         assert_eq!(snapshot.driver_irqs, 1);
+    }
+
+    #[test]
+    fn core_telemetry_records_redacted_cap_fault_events() {
+        let telemetry = CoreTelemetry::default();
+
+        assert_eq!(
+            telemetry.record_cap_fault(CapFaultKind::MissingPermission),
+            Ok(super::CapFaultEvent {
+                kind: CapFaultKind::MissingPermission,
+                total_cap_faults: 1,
+            })
+        );
+        assert_eq!(
+            telemetry.record_cap_fault(CapFaultKind::StaleId),
+            Ok(super::CapFaultEvent {
+                kind: CapFaultKind::StaleId,
+                total_cap_faults: 2,
+            })
+        );
+        assert_eq!(telemetry.snapshot().cap_faults, 2);
     }
 
     #[test]

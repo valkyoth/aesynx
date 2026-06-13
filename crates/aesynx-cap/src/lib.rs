@@ -1,6 +1,9 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+#[cfg(test)]
+extern crate alloc;
+
 mod capability;
 mod derivation;
 mod id;
@@ -10,7 +13,9 @@ mod perms;
 mod revocation;
 mod table;
 
-pub use capability::{CapAuditAction, CapAuditEvent, CapAuditLog, Capability};
+pub use capability::{
+    CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, Capability, RedactedCapAuditEvent,
+};
 pub use derivation::{CapValidationError, DeriveError, DeriveRequest};
 pub use id::{CapGeneration, CapIdError, CapIdParts, CapSlotIndex};
 pub use kind::CapKind;

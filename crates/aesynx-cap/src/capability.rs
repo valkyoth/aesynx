@@ -7,7 +7,7 @@ use crate::{
     DeriveError, DeriveRequest,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct CapAuditEvent {
     pub action: CapAuditAction,
     pub object_id: ObjectId,
@@ -16,16 +16,63 @@ pub struct CapAuditEvent {
     pub perms: CapPerms,
     pub generation: u32,
     pub revocation_epoch: u64,
+    pub affected_slots: u32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CapAuditAction {
     Derive,
     Grant,
+    Revoke,
+}
+
+impl CapAuditAction {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Derive => "derive",
+            Self::Grant => "grant",
+            Self::Revoke => "revoke",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CapAuditError {
+    Rejected,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RedactedCapAuditEvent {
+    pub action: CapAuditAction,
+    pub permission_bits: u32,
+    pub cross_owner: bool,
+    pub affected_slots: u32,
 }
 
 pub trait CapAuditLog {
-    fn record(&mut self, event: CapAuditEvent) -> Result<(), DeriveError>;
+    fn record(&mut self, event: CapAuditEvent) -> Result<(), CapAuditError>;
+}
+
+impl CapAuditEvent {
+    #[must_use]
+    pub const fn redacted(self) -> RedactedCapAuditEvent {
+        RedactedCapAuditEvent {
+            action: self.action,
+            permission_bits: self.perms.bits(),
+            cross_owner: self.source_owner.get() != self.target_owner.get(),
+            affected_slots: self.affected_slots,
+        }
+    }
+}
+
+impl fmt::Debug for CapAuditEvent {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CapAuditEvent")
+            .field("redacted", &self.redacted())
+            .finish_non_exhaustive()
+    }
 }
 
 /// Capability token for one object and owner.
@@ -182,6 +229,7 @@ impl Capability {
                 perms: child.perms,
                 generation: child.generation,
                 revocation_epoch: child.revocation_epoch,
+                affected_slots: 1,
             })
             .map_err(|_| DeriveError::AuditRejected)?;
 
@@ -223,6 +271,7 @@ impl Capability {
                 perms: child.perms,
                 generation: child.generation,
                 revocation_epoch: child.revocation_epoch,
+                affected_slots: 1,
             })
             .map_err(|_| DeriveError::AuditRejected)?;
 

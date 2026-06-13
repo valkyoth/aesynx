@@ -1,8 +1,9 @@
 use aesynx_abi::{CapId, ObjectId, PrincipalId, VirtAddr};
+use alloc::format;
 
 use crate::{
-    CapAuditAction, CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError, CapabilityTable,
-    DeriveError, DeriveRequest,
+    CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError,
+    CapabilityTable, DeriveRequest,
 };
 
 #[derive(Default)]
@@ -19,18 +20,59 @@ impl TestAudit {
     fn first_action(&self) -> Option<CapAuditAction> {
         self.events[0].map(|event| event.action)
     }
+
+    fn last_action(&self) -> Option<CapAuditAction> {
+        if self.len == 0 {
+            None
+        } else {
+            self.events[self.len - 1].map(|event| event.action)
+        }
+    }
+
+    fn last_event(&self) -> Option<CapAuditEvent> {
+        if self.len == 0 {
+            None
+        } else {
+            self.events[self.len - 1]
+        }
+    }
 }
 
 impl CapAuditLog for TestAudit {
-    fn record(&mut self, event: CapAuditEvent) -> Result<(), DeriveError> {
+    fn record(&mut self, event: CapAuditEvent) -> Result<(), CapAuditError> {
         if self.len >= self.events.len() {
-            return Err(DeriveError::AuditRejected);
+            return Err(CapAuditError::Rejected);
         }
 
         self.events[self.len] = Some(event);
         self.len += 1;
         Ok(())
     }
+}
+
+#[test]
+fn audit_event_debug_redacts_authority_identifiers() {
+    let event = CapAuditEvent {
+        action: CapAuditAction::Grant,
+        object_id: ObjectId::new(0xfeed_cafe),
+        source_owner: PrincipalId::new(0xdead_beef),
+        target_owner: PrincipalId::new(0xabcd_1234),
+        perms: CapPerms::READ.union(CapPerms::GRANT),
+        generation: 0x1357_2468,
+        revocation_epoch: 0x9988_7766,
+        affected_slots: 1,
+    };
+
+    let debug = format!("{:?}", event);
+
+    assert!(debug.contains("redacted"));
+    assert!(debug.contains("Grant"));
+    assert!(!debug.contains("ObjectId"));
+    assert!(!debug.contains("PrincipalId"));
+    assert!(!debug.contains("feed"));
+    assert!(!debug.contains("dead"));
+    assert!(!debug.contains("13572468"));
+    assert!(!debug.contains("99887766"));
 }
 
 fn insert_root(table: &mut CapabilityTable<4>) -> Result<CapId, CapTableError> {
@@ -46,6 +88,29 @@ fn insert_root(table: &mut CapabilityTable<4>) -> Result<CapId, CapTableError> {
         1,
         0,
     )
+}
+
+#[test]
+fn table_grants_child_into_new_slot_with_audit() {
+    let mut table = CapabilityTable::<4>::new();
+    let root = insert_root(&mut table);
+    let mut audit = TestAudit::default();
+
+    if let Ok(root) = root {
+        let child = table.grant_with_audit(root, PrincipalId::new(2), &mut audit);
+
+        assert!(child.is_ok());
+        if let Ok(child) = child {
+            assert!(table.check(child, CapPerms::READ).is_ok());
+            assert_eq!(
+                table.check(child, CapPerms::GRANT).map(|_| ()),
+                Err(CapTableError::MissingPermission)
+            );
+            assert_eq!(audit.len(), 1);
+            assert_eq!(audit.first_action(), Some(CapAuditAction::Grant));
+            assert_eq!(table.occupied_slots(), 2);
+        }
+    }
 }
 
 #[test]
@@ -115,7 +180,7 @@ fn table_rejects_stale_ids_after_revoke() {
         );
 
         if let Ok(child) = child {
-            assert_eq!(table.revoke(root, child), Ok(2));
+            assert_eq!(table.revoke_with_audit(root, child, &mut audit), Ok(2));
             assert_eq!(
                 table.check(root, CapPerms::READ).map(|_| ()),
                 Err(CapTableError::StaleId)
@@ -125,6 +190,11 @@ fn table_rejects_stale_ids_after_revoke() {
                 Err(CapTableError::StaleId)
             );
             assert_eq!(table.occupied_slots(), 0);
+            assert_eq!(audit.last_action(), Some(CapAuditAction::Revoke));
+            assert_eq!(
+                audit.last_event().map(|event| event.affected_slots),
+                Some(2)
+            );
         }
     }
 }

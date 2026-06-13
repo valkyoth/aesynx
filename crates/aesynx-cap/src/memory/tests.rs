@@ -1,7 +1,7 @@
 use aesynx_abi::{ObjectId, PrincipalId, VirtAddr};
 
 use crate::{
-    CapAuditLog, CapKind, CapPerms, Capability, DeriveError, DeriveRequest, MemoryAccess,
+    CapAuditError, CapAuditLog, CapKind, CapPerms, Capability, DeriveRequest, MemoryAccess,
     MemoryCapError, MemoryMapRequest,
 };
 
@@ -10,7 +10,7 @@ use super::super::capability::TestCapabilitySpec;
 struct NoopAudit;
 
 impl CapAuditLog for NoopAudit {
-    fn record(&mut self, _event: crate::CapAuditEvent) -> Result<(), DeriveError> {
+    fn record(&mut self, _event: crate::CapAuditEvent) -> Result<(), CapAuditError> {
         Ok(())
     }
 }

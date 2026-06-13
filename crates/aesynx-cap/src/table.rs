@@ -3,8 +3,8 @@ use core::fmt;
 use aesynx_abi::{CapId, ObjectId, PrincipalId};
 
 use crate::{
-    CapAuditLog, CapIdError, CapIdParts, CapKind, CapPerms, CapSlotIndex, Capability, DeriveError,
-    DeriveRequest, RevocationError, ensure_revoke_authority,
+    CapAuditAction, CapAuditEvent, CapAuditLog, CapIdError, CapIdParts, CapKind, CapPerms,
+    CapSlotIndex, Capability, DeriveError, DeriveRequest, RevocationError, ensure_revoke_authority,
 };
 
 const INITIAL_SLOT_GENERATION: u32 = 1;
@@ -135,13 +135,36 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
     /// object registry or epoch store. Slot generations fail instead of
     /// wrapping; a persistent table must rebuild or retire slots before
     /// `u32::MAX` is reached.
-    pub fn revoke(&mut self, authority_id: CapId, target_id: CapId) -> Result<u32, CapTableError> {
+    pub fn revoke_with_audit(
+        &mut self,
+        authority_id: CapId,
+        target_id: CapId,
+        audit: &mut impl CapAuditLog,
+    ) -> Result<u32, CapTableError> {
         let authority = self.get(authority_id)?;
-        let target_object = self.get(target_id)?.object_id();
+        let source_owner = authority.owner();
+        let target = self.get(target_id)?;
+        let target_object = target.object_id();
+        let target_owner = target.owner();
+        let target_generation = target.generation();
+        let target_revocation_epoch = target.revocation_epoch();
         ensure_revoke_authority(authority, target_object)?;
         self.validate_revoke_can_commit(target_object)?;
+        let revoked = self.count_revoke_targets(target_object)?;
 
-        let mut revoked = 0u32;
+        audit
+            .record(CapAuditEvent {
+                action: CapAuditAction::Revoke,
+                object_id: target_object,
+                source_owner,
+                target_owner,
+                perms: CapPerms::REVOKE,
+                generation: target_generation,
+                revocation_epoch: target_revocation_epoch,
+                affected_slots: revoked,
+            })
+            .map_err(|_| CapTableError::AuditRejected)?;
+
         let mut index = 0usize;
         while index < SLOTS {
             if self.slots[index]
@@ -151,7 +174,6 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
             {
                 self.slots[index].cap = None;
                 self.slots[index].generation += 1;
-                revoked += 1;
             }
             index += 1;
         }
@@ -206,6 +228,25 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
 
         Ok(())
     }
+
+    fn count_revoke_targets(&self, object_id: ObjectId) -> Result<u32, CapTableError> {
+        let mut revoked = 0u32;
+        let mut index = 0usize;
+        while index < SLOTS {
+            if self.slots[index]
+                .cap
+                .as_ref()
+                .is_some_and(|cap| cap.object_id() == object_id)
+            {
+                revoked = revoked
+                    .checked_add(1)
+                    .ok_or(CapTableError::RevokeCountOverflow)?;
+            }
+            index += 1;
+        }
+
+        Ok(revoked)
+    }
 }
 
 impl<const SLOTS: usize> Default for CapabilityTable<SLOTS> {
@@ -232,6 +273,7 @@ pub enum CapTableError {
     Id(CapIdError),
     MissingPermission,
     Revoke(RevocationError),
+    RevokeCountOverflow,
     SlotOutOfRange,
     StaleId,
     TableFull,

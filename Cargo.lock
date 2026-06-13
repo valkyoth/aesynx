@@ -89,6 +89,7 @@ dependencies = [
  "aesynx-entropy",
  "aesynx-log",
  "aesynx-mm",
+ "aesynx-telemetry",
  "aesynx-time",
 ]
 

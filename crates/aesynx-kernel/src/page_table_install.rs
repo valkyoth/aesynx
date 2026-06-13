@@ -332,12 +332,14 @@ extern "C" fn activate_on_kernel_stack(
     match crate::capability_smoke::run() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "cap-table capacity={} occupied_before_revoke={} occupied_after_revoke={} root_read_ok={} child_read_ok={} child_write_denied={} stale_root_denied={} stale_child_denied={} audit_events={} revoked_slots={}",
+                "cap-table capacity={} occupied_before_revoke={} occupied_after_revoke={} root_read_ok={} child_read_ok={} grant_read_ok={} grant_regrant_denied={} child_write_denied={} stale_root_denied={} stale_child_denied={} audit_events={} revoked_slots={}",
                 status.capacity,
                 status.occupied_before_revoke,
                 status.occupied_after_revoke,
                 status.root_read_ok,
                 status.child_read_ok,
+                status.grant_read_ok,
+                status.grant_regrant_denied,
                 status.child_write_denied,
                 status.stale_root_denied,
                 status.stale_child_denied,
@@ -352,13 +354,24 @@ extern "C" fn activate_on_kernel_stack(
                 status.memory_write_denied,
                 status.memory_range_escape_denied
             );
+            aesynx_arch_x86_64::serial_println!(
+                "cap-audit events={} derive_seen={} grant_seen={} revoke_seen={} revoke_slots={} cap_faults={}",
+                status.audit_events,
+                status.derive_audit_seen,
+                status.grant_audit_seen,
+                status.revoke_audit_seen,
+                status.revoke_audit_slots,
+                status.cap_fault_events
+            );
             aesynx_arch_x86_64::serial::write_str("[TEST] cap=ok\n");
             aesynx_arch_x86_64::serial::write_str("[TEST] memory-cap=ok\n");
+            aesynx_arch_x86_64::serial::write_str("[TEST] cap-audit=ok\n");
         }
         Err(error) => {
             aesynx_arch_x86_64::serial_println!("cap-table error={:?}", error);
             aesynx_arch_x86_64::serial::write_str("[TEST] cap=fail\n");
             aesynx_arch_x86_64::serial::write_str("[TEST] memory-cap=fail\n");
+            aesynx_arch_x86_64::serial::write_str("[TEST] cap-audit=fail\n");
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
