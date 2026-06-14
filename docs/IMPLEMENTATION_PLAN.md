@@ -1170,6 +1170,8 @@ v0:
 - Live queue mutation must be protected against local interrupt/preemption
   re-entry. SMP queue sharing requires explicit per-core ownership,
   IRQ-safe locking, and lock-ordering rules.
+- Queue model types stay non-`Sync` until a dedicated IRQ-safe/per-core lock
+  wrapper exists. Shared statics must not expose raw run/wait queues directly.
 
 v1:
 

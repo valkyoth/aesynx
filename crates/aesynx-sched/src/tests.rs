@@ -239,6 +239,12 @@ fn zero_capacity_task_queues_are_rejected() {
     );
 }
 
+#[test]
+fn task_queues_remain_send_for_owned_transfer() {
+    assert_send::<LocalRunQueue<2>>();
+    assert_send::<WaitQueue<2>>();
+}
+
 struct TestBuffer {
     bytes: [u8; 256],
     len: usize,
@@ -297,3 +303,5 @@ fn assert_rejected(result: Result<(), TaskRejected>, error: TaskQueueError, task
     assert_eq!(rejected.error(), error);
     assert_eq!(rejected.task().id(), task_id);
 }
+
+fn assert_send<T: Send>() {}

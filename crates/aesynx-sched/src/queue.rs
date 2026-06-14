@@ -1,3 +1,5 @@
+use core::{cell::Cell, marker::PhantomData};
+
 use aesynx_abi::{CoreId, TaskId};
 
 use crate::{Task, TaskState};
@@ -14,6 +16,7 @@ pub struct LocalRunQueue<const CAPACITY: usize> {
     slots: [Option<Task>; CAPACITY],
     head: usize,
     len: usize,
+    _not_sync: PhantomData<Cell<()>>,
 }
 
 impl<const CAPACITY: usize> LocalRunQueue<CAPACITY> {
@@ -27,6 +30,7 @@ impl<const CAPACITY: usize> LocalRunQueue<CAPACITY> {
             slots: [const { None }; CAPACITY],
             head: 0,
             len: 0,
+            _not_sync: PhantomData,
         })
     }
 
@@ -119,6 +123,7 @@ pub struct WaitQueue<const CAPACITY: usize> {
     slots: [Option<Task>; CAPACITY],
     head: usize,
     len: usize,
+    _not_sync: PhantomData<Cell<()>>,
 }
 
 impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
@@ -132,6 +137,7 @@ impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
             slots: [const { None }; CAPACITY],
             head: 0,
             len: 0,
+            _not_sync: PhantomData,
         })
     }
 
