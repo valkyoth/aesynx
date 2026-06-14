@@ -349,6 +349,10 @@ impl Capability {
         }
         let cross_owner = target_owner != self.owner;
 
+        // Same-owner grants intentionally retain REVOKE/ADMIN: the owner is
+        // creating another handle for its own authority, not delegating to a
+        // different principal. Cross-owner grants strip those permissions in
+        // `delegated_perms`.
         Ok(Self {
             perms: delegated_perms(self.perms.without(CapPerms::GRANT), cross_owner),
             owner: target_owner,

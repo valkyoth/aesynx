@@ -211,13 +211,33 @@ fn service_queue_set_routes_log_timer_and_object_queues() -> Result<(), QueueSet
 #[test]
 fn service_queue_set_rejects_unsupported_services_without_mutation() -> Result<(), RingQueueError> {
     let mut queues = ServiceQueueSet::<1, 1>::new()?;
-    let unsupported = request(4, ServiceKind::Capability)?;
+    let unsupported = [
+        ServiceKind::Capability,
+        ServiceKind::Memory,
+        ServiceKind::Driver,
+        ServiceKind::Telemetry,
+    ];
 
-    assert_eq!(
-        queues.submit(unsupported),
-        Err(QueueSetError::UnsupportedService)
-    );
-    assert_eq!(queues.pending_requests(ServiceKind::Log), 0);
+    for (index, service) in unsupported.into_iter().enumerate() {
+        let id = u64::try_from(index)
+            .map(|value| value + 4)
+            .map_err(|_| RingQueueError::CorruptState)?;
+        let request = request(id, service)?;
+
+        assert_eq!(
+            queues.submit(request),
+            Err(QueueSetError::UnsupportedService)
+        );
+        assert_eq!(
+            queues.pop_request(service),
+            Err(QueueSetError::UnsupportedService)
+        );
+        assert_eq!(queues.pending_requests(service), 0);
+        assert_eq!(queues.pending_requests(ServiceKind::Log), 0);
+        assert_eq!(queues.pending_requests(ServiceKind::Timer), 0);
+        assert_eq!(queues.pending_requests(ServiceKind::Object), 0);
+    }
+
     Ok(())
 }
 

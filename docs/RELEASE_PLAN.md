@@ -1518,6 +1518,9 @@ Deliverables:
 - Documented rule for which code may block, allocate, or log while holding a
   lock.
 - Per-core versus shared-state ownership checklist.
+- Service queue concurrency policy must state that any future shared-memory or
+  multi-core queue slot vacate path zeroes or otherwise scrubs payload storage
+  before the slot can be observed outside the current trust domain.
 - Explicit migration plan for current single-core `static mut` GDT/TSS/IDT
   storage, including non-atomic IDT gate writes, before any secondary core can
   observe or mutate descriptor state.
@@ -1868,7 +1871,8 @@ Deliverables:
 - User page tables.
 - User text/data/stack mappings.
 - Guard page.
-- Shared service queue mapping.
+- Shared service queue mapping with zero-on-vacate or equivalent payload
+  scrubbing so stale inline payload bytes cannot be observed after pop.
 
 Verification:
 
