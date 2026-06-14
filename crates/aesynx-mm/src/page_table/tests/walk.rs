@@ -31,7 +31,7 @@ fn mapper_visits_leaf_mappings_in_virtual_order() -> Result<(), PageTableError> 
 
     let mut index = 0usize;
     let mut seen = [None; 2];
-    let before = mapper;
+    let before = mapper.clone();
     let visited = mapper.visit_mappings(|entry| {
         if index >= seen.len() {
             return Err(PageTableError::CorruptTable);

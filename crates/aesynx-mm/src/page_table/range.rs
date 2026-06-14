@@ -21,18 +21,19 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
         validate_flags(flags)?;
         validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
 
-        let mut candidate = *self;
         let mut offset = 0u64;
         while offset < page_count {
-            candidate.map_page(
+            if let Err(error) = self.map_page(
                 add_pages_to_virt(virt, offset)?,
                 add_pages_to_phys(phys, offset)?,
                 flags,
-            )?;
+            ) {
+                self.rollback_mapped_prefix(virt, offset)?;
+                return Err(error);
+            }
             offset += 1;
         }
 
-        *self = candidate;
         Ok(MapRangeOutcome::new(
             page_count,
             flush_for_range(virt, page_count),
@@ -141,16 +142,30 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
         validate_flags(flags)?;
         validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
 
-        let mut candidate = *self;
+        let mut previous = [None; MAPPED_FRAMES];
+        self.audit()?;
+        let mut offset = 0u64;
+        while offset < page_count {
+            let mapping = self.mapping_for_address(add_pages_to_virt(virt, offset)?)?;
+            PageMapping::new_checked(mapping.phys(), flags)?;
+            previous[offset as usize] = Some(mapping);
+            offset += 1;
+        }
+
         let mut flush = TlbFlush::None;
         let mut offset = 0u64;
         while offset < page_count {
-            let outcome = candidate.protect_page(add_pages_to_virt(virt, offset)?, flags)?;
+            let outcome = match self.protect_page(add_pages_to_virt(virt, offset)?, flags) {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    self.rollback_protected_prefix(virt, &previous, offset)?;
+                    return Err(error);
+                }
+            };
             flush = combine_flushes(flush, outcome.flush());
             offset += 1;
         }
 
-        *self = candidate;
         Ok(ProtectRangeOutcome::new(
             page_count,
             collapse_range_flush(virt, page_count, flush),
@@ -165,20 +180,92 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
         validate_virt_range(virt, page_count)?;
         validate_range_walk::<TABLES, MAPPED_FRAMES>(page_count)?;
 
-        let mut candidate = *self;
+        let mut previous = [None; MAPPED_FRAMES];
+        self.audit()?;
+        let mut offset = 0u64;
+        while offset < page_count {
+            previous[offset as usize] =
+                Some(self.mapping_for_address(add_pages_to_virt(virt, offset)?)?);
+            offset += 1;
+        }
+
         let mut flush = TlbFlush::None;
         let mut offset = 0u64;
         while offset < page_count {
-            let outcome = candidate.unmap_page(add_pages_to_virt(virt, offset)?)?;
+            let outcome = match self.unmap_page(add_pages_to_virt(virt, offset)?) {
+                Ok(outcome) => outcome,
+                Err(error) => {
+                    self.rollback_unmapped_prefix(virt, &previous, offset)?;
+                    return Err(error);
+                }
+            };
             flush = combine_flushes(flush, outcome.flush());
             offset += 1;
         }
 
-        *self = candidate;
         Ok(UnmapRangeOutcome::new(
             page_count,
             collapse_range_flush(virt, page_count, flush),
         ))
+    }
+
+    fn rollback_mapped_prefix(
+        &mut self,
+        virt: VirtAddr,
+        mapped_pages: u64,
+    ) -> Result<(), PageTableError> {
+        let mut offset = mapped_pages;
+        while offset > 0 {
+            offset -= 1;
+            if self.unmap_page(add_pages_to_virt(virt, offset)?).is_err() {
+                return Err(PageTableError::CorruptTable);
+            }
+        }
+        Ok(())
+    }
+
+    fn rollback_protected_prefix(
+        &mut self,
+        virt: VirtAddr,
+        previous: &[Option<PageMapping>; MAPPED_FRAMES],
+        protected_pages: u64,
+    ) -> Result<(), PageTableError> {
+        let mut offset = protected_pages;
+        while offset > 0 {
+            offset -= 1;
+            let mapping = previous[offset as usize].ok_or(PageTableError::CorruptTable)?;
+            if self
+                .protect_page(add_pages_to_virt(virt, offset)?, mapping.flags())
+                .is_err()
+            {
+                return Err(PageTableError::CorruptTable);
+            }
+        }
+        Ok(())
+    }
+
+    fn rollback_unmapped_prefix(
+        &mut self,
+        virt: VirtAddr,
+        previous: &[Option<PageMapping>; MAPPED_FRAMES],
+        unmapped_pages: u64,
+    ) -> Result<(), PageTableError> {
+        let mut offset = unmapped_pages;
+        while offset > 0 {
+            offset -= 1;
+            let mapping = previous[offset as usize].ok_or(PageTableError::CorruptTable)?;
+            if self
+                .map_page(
+                    add_pages_to_virt(virt, offset)?,
+                    mapping.phys(),
+                    mapping.flags(),
+                )
+                .is_err()
+            {
+                return Err(PageTableError::CorruptTable);
+            }
+        }
+        Ok(())
     }
 }
 

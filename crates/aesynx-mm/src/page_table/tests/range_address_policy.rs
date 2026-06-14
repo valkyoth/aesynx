@@ -13,7 +13,7 @@ fn mapper_verifies_kernel_space_range() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     mapper.ensure_kernel_space_contiguous(KERNEL_VIRT, 2)?;
 
@@ -26,7 +26,7 @@ fn mapper_verifies_user_space_range() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<8>::new()?;
     let flags = GenericPageFlags::user(PageAccess::ReadOnly);
     mapper.map_contiguous(USER_VIRT, KERNEL_PHYS, 2, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     mapper.ensure_user_space_contiguous(USER_VIRT, 2)?;
 
@@ -54,7 +54,7 @@ fn mapper_kernel_space_range_rejects_low_half_or_user_flags() -> Result<(), Page
         2,
         user_flags,
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_kernel_space_contiguous(USER_VIRT, 2),
@@ -80,7 +80,7 @@ fn mapper_user_space_range_rejects_high_half_or_kernel_flags() -> Result<(), Pag
         2,
         user_flags,
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_user_space_contiguous(KERNEL_VIRT, 2),
@@ -99,7 +99,7 @@ fn mapper_space_range_checks_reject_gaps_and_invalid_ranges() -> Result<(), Page
     let mut mapper = PageTableMapper::<8>::new()?;
     let user_flags = GenericPageFlags::user(PageAccess::ReadOnly);
     mapper.map_page(USER_VIRT, KERNEL_PHYS, user_flags)?;
-    let before = mapper;
+    let before = mapper.clone();
     let max_pages = (8 * PAGE_TABLE_ENTRIES) as u64;
 
     assert_eq!(
@@ -139,7 +139,7 @@ fn mapper_space_range_checks_reject_corrupt_tables() -> Result<(), PageTableErro
         Err(PageTableError::UnexpectedVirtualAddressSpace)
     );
     kernel_mapper.used[1] = false;
-    let corrupt_kernel = kernel_mapper;
+    let corrupt_kernel = kernel_mapper.clone();
     assert_eq!(
         kernel_mapper.ensure_kernel_space_contiguous(KERNEL_VIRT, 1),
         Err(PageTableError::CorruptTable)
@@ -148,7 +148,7 @@ fn mapper_space_range_checks_reject_corrupt_tables() -> Result<(), PageTableErro
 
     let mut user_mapper = PageTableMapper::<4>::new()?;
     user_mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
-    let corrupt_user = user_mapper;
+    let corrupt_user = user_mapper.clone();
     assert_eq!(
         user_mapper.ensure_user_space_contiguous(USER_VIRT, 1),
         Err(PageTableError::CorruptTable)

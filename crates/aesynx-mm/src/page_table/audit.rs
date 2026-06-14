@@ -13,45 +13,48 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
         let mut levels = [0usize; TABLES];
         reachable[0] = true;
 
-        let mut changed = true;
-        while changed {
-            changed = false;
-            let mut table_index = 0usize;
-            while table_index < TABLES {
-                if reachable[table_index] {
-                    let mut slot_index = 0usize;
-                    while slot_index < PAGE_TABLE_ENTRIES {
-                        let slot = self.tables[table_index].slots[slot_index];
-                        if slot.is_next() {
-                            if levels[table_index] + 1 >= super::PAGE_TABLE_LEVELS {
-                                return Err(PageTableError::CorruptTable);
-                            }
-                            let next = slot.next_index()?;
-                            if next >= TABLES || !self.used[next] {
-                                return Err(PageTableError::CorruptTable);
-                            }
-                            let next_level = levels[table_index] + 1;
-                            if reachable[next] && levels[next] != next_level {
-                                return Err(PageTableError::CorruptTable);
-                            }
-                            levels[next] = next_level;
-                            if !reachable[next] {
-                                reachable[next] = true;
-                                changed = true;
-                            }
-                        } else if !slot.is_empty()
-                            && levels[table_index] != super::PAGE_TABLE_LEVELS - 1
-                        {
+        let mut incoming = [0u8; TABLES];
+        let mut queue = [0usize; TABLES];
+        let mut head = 0usize;
+        let mut tail = 1usize;
+        queue[0] = 0;
+
+        while head < tail {
+            let table_index = queue[head];
+            head += 1;
+
+            let mut slot_index = 0usize;
+            while slot_index < PAGE_TABLE_ENTRIES {
+                let slot = self.tables[table_index].slots[slot_index];
+                if slot.is_next() {
+                    if levels[table_index] + 1 >= super::PAGE_TABLE_LEVELS {
+                        return Err(PageTableError::CorruptTable);
+                    }
+                    let next = slot.next_index()?;
+                    if next >= TABLES || !self.used[next] || incoming[next] != 0 {
+                        return Err(PageTableError::CorruptTable);
+                    }
+                    let next_level = levels[table_index] + 1;
+                    if reachable[next] && levels[next] != next_level {
+                        return Err(PageTableError::CorruptTable);
+                    }
+                    incoming[next] = 1;
+                    levels[next] = next_level;
+                    if !reachable[next] {
+                        if tail >= TABLES {
                             return Err(PageTableError::CorruptTable);
                         }
-                        slot_index += 1;
+                        reachable[next] = true;
+                        queue[tail] = next;
+                        tail += 1;
                     }
+                } else if !slot.is_empty() && levels[table_index] != super::PAGE_TABLE_LEVELS - 1 {
+                    return Err(PageTableError::CorruptTable);
                 }
-                table_index += 1;
+                slot_index += 1;
             }
         }
 
-        let mut incoming = [0u8; TABLES];
         let mut seen_frames = [false; MAPPED_FRAMES];
         let mut used_tables = 0u64;
         let mut reachable_tables = 0u64;
@@ -78,10 +81,13 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
                             return Err(PageTableError::CorruptTable);
                         }
                         let next = slot.next_index()?;
-                        if next >= TABLES || !self.used[next] || incoming[next] != 0 {
+                        if next >= TABLES
+                            || !self.used[next]
+                            || !reachable[next]
+                            || levels[next] != levels[table_index] + 1
+                        {
                             return Err(PageTableError::CorruptTable);
                         }
-                        incoming[next] = 1;
                     } else if !slot.is_empty() {
                         if levels[table_index] != super::PAGE_TABLE_LEVELS - 1 {
                             return Err(PageTableError::CorruptTable);

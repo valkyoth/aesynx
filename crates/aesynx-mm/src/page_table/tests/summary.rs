@@ -27,7 +27,7 @@ fn mapper_summarizes_mapping_classes_without_addresses() -> Result<(), PageTable
         PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE * 3),
         GenericPageFlags::kernel(PageAccess::ReadOnly).device(),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     let summary = mapper.mapping_summary()?;
     assert_eq!(summary.total_pages(), 4);
@@ -62,7 +62,7 @@ fn mapper_summary_rejects_corrupt_tables() -> Result<(), PageTableError> {
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
     mapper.mapped_pages = 1;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(mapper.mapping_summary(), Err(PageTableError::CorruptTable));
     assert_eq!(mapper, corrupt);
@@ -78,7 +78,7 @@ fn mapper_summary_rejects_accounting_drift_without_mutation() -> Result<(), Page
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.mapped_pages = 0;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(mapper.mapping_summary(), Err(PageTableError::CorruptTable));
     assert_eq!(mapper, corrupt);

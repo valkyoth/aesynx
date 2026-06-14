@@ -46,7 +46,7 @@ fn mapper_translates_byte_range_across_contiguous_pages() -> Result<(), PageTabl
 #[test]
 fn mapper_translate_byte_range_rejects_malformed_ranges() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(KERNEL_VIRT, 0),
@@ -76,7 +76,7 @@ fn mapper_translate_byte_range_rejects_gaps_without_mutation() -> Result<(), Pag
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(VirtAddr::new(KERNEL_VIRT.get() + 0xff0), 0x20),
@@ -95,7 +95,7 @@ fn mapper_translate_byte_range_rejects_accounting_drift() -> Result<(), PageTabl
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.mapped_pages = 2;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(KERNEL_VIRT, 0x80),
@@ -116,7 +116,7 @@ fn mapper_translate_byte_range_rejects_noncontiguous_physical_pages() -> Result<
         PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
         flags,
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(VirtAddr::new(KERNEL_VIRT.get() + 0xff0), 0x20),
@@ -139,7 +139,7 @@ fn mapper_translate_byte_range_rejects_flag_mismatch() -> Result<(), PageTableEr
         PhysAddr::new(KERNEL_PHYS.get() + FRAME_SIZE),
         GenericPageFlags::kernel(PageAccess::ReadWrite),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(VirtAddr::new(KERNEL_VIRT.get() + 0xff0), 0x20),
@@ -161,7 +161,7 @@ fn mapper_translate_byte_range_rejects_corrupt_leaf() -> Result<(), PageTableErr
     mapper.tables[3].slots[1] = PageTableSlot {
         raw: (KERNEL_PHYS.get() + FRAME_SIZE) | 1 | (1 << 1),
     };
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.translate_contiguous_range_checked(VirtAddr::new(KERNEL_VIRT.get() + 0xff0), 0x20),
@@ -174,7 +174,7 @@ fn mapper_translate_byte_range_rejects_corrupt_leaf() -> Result<(), PageTableErr
 #[test]
 fn mapper_translate_byte_range_is_walk_bounded() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
     let too_many_bytes = max_pages
         .checked_mul(FRAME_SIZE)

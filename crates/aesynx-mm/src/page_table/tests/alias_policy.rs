@@ -20,7 +20,7 @@ fn mapper_alias_check_accepts_distinct_frames_without_mutation() -> Result<(), P
     let mut mapper = PageTableMapper::<8>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 3, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     mapper.ensure_no_physical_aliases()?;
 
@@ -34,7 +34,7 @@ fn mapper_rejects_duplicate_physical_frames_at_map_time() -> Result<(), PageTabl
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     let alias_virt = VirtAddr::new(KERNEL_VIRT.get() + 0x4000);
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_page(alias_virt, KERNEL_PHYS, flags),
@@ -54,7 +54,7 @@ fn mapper_rejects_duplicate_physical_frames_with_different_flags() -> Result<(),
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_page(
@@ -73,7 +73,7 @@ fn mapper_rejects_contiguous_ranges_that_alias_existing_frames() -> Result<(), P
     let mut mapper = PageTableMapper::<8>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_contiguous(

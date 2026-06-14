@@ -22,7 +22,7 @@ fn mapper_verifies_mapped_contiguous_range_without_mutation() -> Result<(), Page
         PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
         GenericPageFlags::kernel(PageAccess::ReadExecute),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     mapper.ensure_mapped_contiguous(first_virt, 2)?;
 
@@ -39,7 +39,7 @@ fn mapper_mapped_range_check_rejects_gaps_without_mutation() -> Result<(), PageT
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_mapped_contiguous(KERNEL_VIRT, 2),
@@ -52,7 +52,7 @@ fn mapper_mapped_range_check_rejects_gaps_without_mutation() -> Result<(), PageT
 #[test]
 fn mapper_mapped_range_check_rejects_invalid_ranges() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
 
     assert_eq!(
@@ -76,7 +76,7 @@ fn mapper_mapped_range_check_rejects_corrupt_intermediate_leaf() -> Result<(), P
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.ensure_mapped_contiguous(VirtAddr::new(0), 1),

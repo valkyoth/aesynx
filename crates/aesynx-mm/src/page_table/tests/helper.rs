@@ -9,7 +9,7 @@ use crate::page_table::{
 fn mapper_next_table_helper_rejects_unused_child_link() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.tables[0].slots[0] = PageTableSlot::next(1)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_next_table(0, 0),
@@ -25,7 +25,7 @@ fn mapper_next_table_helper_rejects_out_of_range_child_link() -> Result<(), Page
     mapper.tables[0].slots[0] = PageTableSlot {
         raw: 1 | (1 << 9) | (2 << 12),
     };
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_next_table(0, 0),
@@ -38,7 +38,7 @@ fn mapper_next_table_helper_rejects_out_of_range_child_link() -> Result<(), Page
 #[test]
 fn mapper_next_table_helper_rejects_invalid_parent_index() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<2>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_next_table(2, 0),
@@ -51,7 +51,7 @@ fn mapper_next_table_helper_rejects_invalid_parent_index() -> Result<(), PageTab
 #[test]
 fn mapper_next_table_helper_rejects_invalid_slot_index() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<2>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_next_table(0, PAGE_TABLE_ENTRIES),
@@ -64,7 +64,7 @@ fn mapper_next_table_helper_rejects_invalid_slot_index() -> Result<(), PageTable
 #[test]
 fn mapper_reclaim_helper_rejects_root_child_path_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let indices = [0usize; PAGE_TABLE_LEVELS];
     let path = [0usize; PAGE_TABLE_LEVELS];
 
@@ -80,7 +80,7 @@ fn mapper_reclaim_helper_rejects_root_child_path_without_mutation() -> Result<()
 fn mapper_reclaim_helper_rejects_out_of_range_path_without_mutation() -> Result<(), PageTableError>
 {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let indices = [0usize; PAGE_TABLE_LEVELS];
     let path = [0usize, 1, 2, 4];
 
@@ -104,7 +104,7 @@ fn mapper_reclaim_helper_rejects_invalid_parent_slot_without_mutation() -> Resul
     let mut indices = [0usize; PAGE_TABLE_LEVELS];
     indices[PAGE_TABLE_LEVELS - 2] = PAGE_TABLE_ENTRIES;
     let path = [0usize, 1, 2, 3];
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.reclaim_empty_tables(indices, path),
@@ -129,7 +129,7 @@ fn mapper_reclaim_helper_rejects_mismatched_parent_link() -> Result<(), PageTabl
         mapper.tables[3].slots[slot] = PageTableSlot::EMPTY;
         slot += 1;
     }
-    let before = mapper;
+    let before = mapper.clone();
     let indices = [0usize; PAGE_TABLE_LEVELS];
     let path = [0usize, 1, 2, 3];
 
@@ -144,7 +144,7 @@ fn mapper_reclaim_helper_rejects_mismatched_parent_link() -> Result<(), PageTabl
 #[test]
 fn mapper_reclaim_helper_rejects_unused_path_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let indices = [0usize; PAGE_TABLE_LEVELS];
     let path = [0usize, 1, 2, 3];
 
@@ -169,7 +169,7 @@ fn mapper_reclaim_helper_rejects_late_invalid_path_atomically() -> Result<(), Pa
         mapper.tables[3].slots[slot] = PageTableSlot::EMPTY;
         slot += 1;
     }
-    let before = mapper;
+    let before = mapper.clone();
     let indices = [0usize; PAGE_TABLE_LEVELS];
     let path = [0usize, 4, 2, 3];
 

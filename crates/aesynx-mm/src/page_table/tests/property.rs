@@ -48,7 +48,7 @@ fn mapper_property_failed_single_page_operations_are_atomic() -> Result<(), Page
 
     let mut offset = 0u64;
     while offset < PROPERTY_PAGES {
-        let before = mapper;
+        let before = mapper.clone();
         let virt = add_pages_to_virt(KERNEL_VIRT, offset);
         let phys = add_pages_to_phys(KERNEL_PHYS, offset + 1);
 
@@ -65,7 +65,7 @@ fn mapper_property_failed_single_page_operations_are_atomic() -> Result<(), Page
             mapper.unmap_page(virt)?;
         }
 
-        let before = mapper;
+        let before = mapper.clone();
         assert_eq!(
             mapper.unmap_page(add_pages_to_virt(KERNEL_VIRT, PROPERTY_PAGES + offset)),
             Err(PageTableError::NotMapped)
@@ -87,7 +87,7 @@ fn mapper_property_duplicate_physical_frames_are_rejected_without_mutation()
     while offset < PROPERTY_PAGES {
         let mut mapper = PageTableMapper::<8>::new()?;
         mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
-        let before = mapper;
+        let before = mapper.clone();
 
         assert_eq!(
             mapper.map_page(add_pages_to_virt(KERNEL_VIRT, offset), KERNEL_PHYS, flags),
@@ -108,7 +108,7 @@ fn mapper_property_contiguous_range_round_trips_and_walk_bounds() -> Result<(), 
     let mut pages = 1u64;
     while pages <= PROPERTY_PAGES {
         let mut mapper = PageTableMapper::<8, 32>::new()?;
-        let before = mapper;
+        let before = mapper.clone();
 
         assert_eq!(
             mapper.ensure_unmapped_contiguous(KERNEL_VIRT, pages),
@@ -139,7 +139,7 @@ fn mapper_property_contiguous_range_round_trips_and_walk_bounds() -> Result<(), 
 fn mapper_property_contiguous_range_boundary_is_explicit() -> Result<(), PageTableError> {
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     let mut mapper = PageTableMapper::<8, 32>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     let mapped = mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, PROPERTY_BOUNDARY_PAGES, flags)?;
     assert_eq!(mapped.pages(), PROPERTY_BOUNDARY_PAGES);
@@ -168,16 +168,16 @@ fn mapper_property_audit_detects_table_index_and_accounting_drift() -> Result<()
     let mut mapper = PageTableMapper::<8>::new()?;
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
 
-    let mut accounting_drift = mapper;
+    let mut accounting_drift = mapper.clone();
     accounting_drift.mapped_pages = 0;
     assert_eq!(accounting_drift.audit(), Err(PageTableError::CorruptTable));
 
-    let mut stale_index = mapper;
+    let mut stale_index = mapper.clone();
     let indices = page_indices(KERNEL_VIRT);
     stale_index.tables[0].slots[indices[0]] = PageTableSlot { raw: 0 };
     assert_eq!(stale_index.audit(), Err(PageTableError::CorruptTable));
 
-    let mut malformed_next = mapper;
+    let mut malformed_next = mapper.clone();
     malformed_next.tables[0].slots[indices[0]] = PageTableSlot { raw: 1 << 9 };
     assert_eq!(malformed_next.audit(), Err(PageTableError::CorruptTable));
 

@@ -149,7 +149,7 @@ fn mapper_reports_mapping_flags_without_mutation() -> Result<(), PageTableError>
         .with_global()
         .map_err(|_error| PageTableError::InvalidMappingFlags)?;
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.mapping_for_page(KERNEL_VIRT),
@@ -162,7 +162,7 @@ fn mapper_reports_mapping_flags_without_mutation() -> Result<(), PageTableError>
 #[test]
 fn mapper_mapping_lookup_rejects_invalid_or_unmapped_pages() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.mapping_for_page(VirtAddr::new(0x0000_8000_0000_0000)),
@@ -193,7 +193,7 @@ fn mapper_checked_translation_rejects_accounting_drift() -> Result<(), PageTable
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.mapped_pages = 2;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.translate_checked(KERNEL_VIRT),
@@ -246,7 +246,7 @@ fn mapper_protect_failures_are_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, initial)?;
-    let before = mapper;
+    let before = mapper.clone();
     let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
     invalid.device_memory = true;
     invalid.cacheable = false;
@@ -279,7 +279,7 @@ fn mapper_rejects_double_map_without_mutation() -> Result<(), PageTableError> {
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_page(
@@ -336,7 +336,7 @@ fn mapper_rejects_noncanonical_and_unaligned_addresses() -> Result<(), PageTable
 #[test]
 fn mapper_rejects_physical_address_above_supported_range() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_page(
@@ -353,7 +353,7 @@ fn mapper_rejects_physical_address_above_supported_range() -> Result<(), PageTab
 #[test]
 fn mapper_invalid_mapping_flags_failure_is_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let mut flags = GenericPageFlags::kernel(PageAccess::ReadExecute);
     flags.device_memory = true;
     flags.cacheable = false;
@@ -372,7 +372,7 @@ fn mapper_invalid_mapping_flags_failure_is_atomic() -> Result<(), PageTableError
 fn mapper_accounting_drift_failure_is_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.mapped_pages = u64::MAX;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_page(
@@ -398,7 +398,7 @@ fn mapper_unmap_validation_failures_are_atomic() -> Result<(), PageTableError> {
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.unmap_page(VirtAddr::new(0x0000_8000_0000_0000)),
@@ -419,7 +419,7 @@ fn mapper_unmap_rejects_accounting_underflow_without_mutation() -> Result<(), Pa
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
     mapper.mapped_pages = 0;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.unmap_page(KERNEL_VIRT),
@@ -436,7 +436,7 @@ fn mapper_unmap_rejects_accounting_underflow_without_mutation() -> Result<(), Pa
 #[test]
 fn mapper_capacity_failure_is_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<3>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_page(

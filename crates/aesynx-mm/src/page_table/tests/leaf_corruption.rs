@@ -30,7 +30,7 @@ fn mapper_lookup_rejects_corrupt_leaf_slot() -> Result<(), PageTableError> {
 #[test]
 fn mapper_protect_rejects_corrupt_leaf_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = mapper_with_corrupt_leaf()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.protect_page(KERNEL_VIRT, GenericPageFlags::kernel(PageAccess::ReadOnly)),
@@ -43,7 +43,7 @@ fn mapper_protect_rejects_corrupt_leaf_without_mutation() -> Result<(), PageTabl
 #[test]
 fn mapper_unmap_rejects_corrupt_leaf_without_mutation() -> Result<(), PageTableError> {
     let mut mapper = mapper_with_corrupt_leaf()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.unmap_page(KERNEL_VIRT),

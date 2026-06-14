@@ -22,7 +22,7 @@ fn mapper_verifies_kernel_mapped_range_without_physical_contiguity() -> Result<(
         PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
         GenericPageFlags::kernel(PageAccess::ReadExecute),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     mapper.ensure_kernel_mapped_contiguous(first_virt, 2)?;
 
@@ -45,7 +45,7 @@ fn mapper_verifies_user_mapped_range_without_physical_contiguity() -> Result<(),
         PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     mapper.ensure_user_mapped_contiguous(first_virt, 2)?;
 
@@ -66,7 +66,7 @@ fn mapper_kernel_range_check_rejects_user_mappings() -> Result<(), PageTableErro
         PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_kernel_mapped_contiguous(KERNEL_VIRT, 2),
@@ -89,7 +89,7 @@ fn mapper_user_range_check_rejects_kernel_mappings() -> Result<(), PageTableErro
         PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_user_mapped_contiguous(KERNEL_VIRT, 2),
@@ -107,7 +107,7 @@ fn mapper_kernel_range_check_rejects_gaps_and_invalid_ranges() -> Result<(), Pag
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
 
     assert_eq!(
@@ -134,7 +134,7 @@ fn mapper_user_range_check_rejects_gaps_and_invalid_ranges() -> Result<(), PageT
         KERNEL_PHYS,
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
     let max_pages = (4 * PAGE_TABLE_ENTRIES) as u64;
 
     assert_eq!(
@@ -158,7 +158,7 @@ fn mapper_kernel_range_check_rejects_corrupt_tables() -> Result<(), PageTableErr
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.ensure_kernel_mapped_contiguous(VirtAddr::new(0), 1),
@@ -173,7 +173,7 @@ fn mapper_user_range_check_rejects_corrupt_tables() -> Result<(), PageTableError
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.ensure_user_mapped_contiguous(VirtAddr::new(0), 1),

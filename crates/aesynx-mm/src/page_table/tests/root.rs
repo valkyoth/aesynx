@@ -7,7 +7,7 @@ use crate::page_table::{PageTableError, PageTableMapper, PageTableSlot};
 fn mapper_checked_root_matches_valid_mapper() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
 
-    let empty = mapper;
+    let empty = mapper.clone();
     assert_eq!(mapper.root_table_checked()?, mapper.root_table());
     assert_eq!(mapper, empty);
 
@@ -16,7 +16,7 @@ fn mapper_checked_root_matches_valid_mapper() -> Result<(), PageTableError> {
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let mapped = mapper;
+    let mapped = mapper.clone();
 
     assert_eq!(mapper.root_table_checked()?.table_index(), 0);
     assert_eq!(mapper, mapped);
@@ -27,7 +27,7 @@ fn mapper_checked_root_matches_valid_mapper() -> Result<(), PageTableError> {
 fn mapper_checked_root_rejects_corrupt_mapper() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     mapper.used[0] = false;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(mapper.root_table().table_index(), 0);
     assert_eq!(
@@ -48,7 +48,7 @@ fn mapper_checked_root_rejects_duplicate_table_parent_without_mutation()
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.tables[0].slots[1] = PageTableSlot::next(1)?;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.root_table_checked(),

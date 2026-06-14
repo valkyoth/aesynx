@@ -16,7 +16,7 @@ fn mapper_reports_page_presence_without_mutation() -> Result<(), PageTableError>
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(mapper.is_page_mapped(KERNEL_VIRT), Ok(true));
     assert_eq!(mapper, before);
@@ -43,7 +43,7 @@ fn mapper_lookup_and_presence_reject_accounting_drift() -> Result<(), PageTableE
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
     mapper.mapped_pages = 2;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.mapping_for_page(KERNEL_VIRT),
@@ -60,7 +60,7 @@ fn mapper_lookup_and_presence_reject_accounting_drift() -> Result<(), PageTableE
 #[test]
 fn mapper_page_presence_rejects_invalid_virtual_addresses() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.is_page_mapped(VirtAddr::new(0x0000_8000_0000_0000)),
@@ -79,7 +79,7 @@ fn mapper_page_presence_rejects_corrupt_intermediate_leaf() -> Result<(), PageTa
     let mut mapper = PageTableMapper::<4>::new()?;
     let mapping = PageMapping::new(KERNEL_PHYS, GenericPageFlags::kernel(PageAccess::ReadOnly));
     mapper.tables[0].slots[0] = PageTableSlot::leaf(mapping)?;
-    let corrupt = mapper;
+    let corrupt = mapper.clone();
 
     assert_eq!(
         mapper.is_page_mapped(VirtAddr::new(0)),

@@ -35,7 +35,7 @@ fn mapper_contiguous_map_failure_is_atomic() -> Result<(), PageTableError> {
         KERNEL_PHYS,
         flags,
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_contiguous(
@@ -57,7 +57,7 @@ fn mapper_contiguous_map_failure_is_atomic() -> Result<(), PageTableError> {
 #[test]
 fn mapper_contiguous_ranges_reject_malformed_virtual_ranges() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
 
     assert_eq!(
@@ -79,7 +79,7 @@ fn mapper_contiguous_ranges_reject_malformed_virtual_ranges() -> Result<(), Page
 #[test]
 fn mapper_contiguous_map_rejects_malformed_physical_ranges() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_contiguous(
@@ -106,7 +106,7 @@ fn mapper_contiguous_map_rejects_malformed_physical_ranges() -> Result<(), PageT
 #[test]
 fn mapper_contiguous_map_rejects_invalid_flags_before_mutation() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
     invalid.device_memory = true;
     invalid.cacheable = false;
@@ -123,7 +123,7 @@ fn mapper_contiguous_map_rejects_invalid_flags_before_mutation() -> Result<(), P
 #[test]
 fn mapper_contiguous_ranges_are_walk_bounded() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
     let max_pages = DEFAULT_MAPPED_FRAME_INDEX_ENTRIES as u64;
     let too_many = max_pages + 1;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
@@ -180,7 +180,7 @@ fn mapper_reports_contiguous_range_without_mutation() -> Result<(), PageTableErr
     let mut mapper = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 3, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     let mapping = mapper.mapping_for_contiguous(KERNEL_VIRT, 3)?;
 
@@ -194,7 +194,7 @@ fn mapper_reports_contiguous_range_without_mutation() -> Result<(), PageTableErr
 #[test]
 fn mapper_verifies_unmapped_contiguous_range_without_mutation() -> Result<(), PageTableError> {
     let mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     mapper.ensure_unmapped_contiguous(KERNEL_VIRT, 3)?;
 
@@ -216,7 +216,7 @@ fn mapper_verifies_contiguous_range_flags_without_physical_contiguity() -> Resul
         PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
         flags,
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(mapper.ensure_contiguous_flags(first_virt, 2, flags), Ok(()));
     assert_eq!(
@@ -238,7 +238,7 @@ fn mapper_contiguous_flag_check_rejects_gaps_or_mismatches() -> Result<(), PageT
         PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
         writable,
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_contiguous_flags(KERNEL_VIRT, 2, initial),
@@ -261,7 +261,7 @@ fn mapper_contiguous_flag_check_rejects_invalid_expected_flags() -> Result<(), P
     let mut mapper = PageTableMapper::<8>::new()?;
     let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_page(KERNEL_VIRT, KERNEL_PHYS, initial)?;
-    let before = mapper;
+    let before = mapper.clone();
     let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
     invalid.device_memory = true;
     invalid.cacheable = false;
@@ -283,7 +283,7 @@ fn mapper_unmapped_range_check_rejects_any_mapped_page() -> Result<(), PageTable
         KERNEL_PHYS,
         GenericPageFlags::kernel(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.ensure_unmapped_contiguous(KERNEL_VIRT, 3),
@@ -298,7 +298,7 @@ fn mapper_contiguous_range_lookup_rejects_gaps_or_mismatches() -> Result<(), Pag
     let mut gap = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     gap.map_page(KERNEL_VIRT, KERNEL_PHYS, flags)?;
-    let gap_before = gap;
+    let gap_before = gap.clone();
     assert_eq!(
         gap.mapping_for_contiguous(KERNEL_VIRT, 2),
         Err(PageTableError::NotMapped)
@@ -312,7 +312,7 @@ fn mapper_contiguous_range_lookup_rejects_gaps_or_mismatches() -> Result<(), Pag
         PhysAddr::new(KERNEL_PHYS.get() + 0x3000),
         flags,
     )?;
-    let mismatched_phys_before = mismatched_phys;
+    let mismatched_phys_before = mismatched_phys.clone();
     assert_eq!(
         mismatched_phys.mapping_for_contiguous(KERNEL_VIRT, 2),
         Err(PageTableError::NonContiguousRange)
@@ -326,7 +326,7 @@ fn mapper_contiguous_range_lookup_rejects_gaps_or_mismatches() -> Result<(), Pag
         PhysAddr::new(KERNEL_PHYS.get() + 0x1000),
         GenericPageFlags::kernel(PageAccess::ReadWrite),
     )?;
-    let mismatched_flags_before = mismatched_flags;
+    let mismatched_flags_before = mismatched_flags.clone();
     assert_eq!(
         mismatched_flags.mapping_for_contiguous(KERNEL_VIRT, 2),
         Err(PageTableError::NonContiguousRange)
@@ -366,7 +366,7 @@ fn mapper_contiguous_protect_failure_is_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, initial)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.protect_contiguous(
@@ -389,7 +389,7 @@ fn mapper_contiguous_protect_rejects_invalid_flags_before_mutation() -> Result<(
     let mut mapper = PageTableMapper::<4>::new()?;
     let initial = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, initial)?;
-    let before = mapper;
+    let before = mapper.clone();
     let mut invalid = GenericPageFlags::kernel(PageAccess::ReadExecute);
     invalid.device_memory = true;
     invalid.cacheable = false;
@@ -430,7 +430,7 @@ fn mapper_contiguous_unmap_failure_is_atomic() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
     let flags = GenericPageFlags::kernel(PageAccess::ReadOnly);
     mapper.map_contiguous(KERNEL_VIRT, KERNEL_PHYS, 2, flags)?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.unmap_contiguous(KERNEL_VIRT, 3),
@@ -445,7 +445,7 @@ fn mapper_contiguous_unmap_failure_is_atomic() -> Result<(), PageTableError> {
 #[test]
 fn mapper_contiguous_ranges_reject_zero_pages() -> Result<(), PageTableError> {
     let mut mapper = PageTableMapper::<4>::new()?;
-    let before = mapper;
+    let before = mapper.clone();
 
     assert_eq!(
         mapper.map_contiguous(

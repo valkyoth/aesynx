@@ -21,7 +21,7 @@ fn mapper_kernel_candidate_preflight_accepts_kernel_mappings_without_mutation()
         PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
         GenericPageFlags::kernel(PageAccess::ReadWrite),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     let audit = mapper.verify_kernel_address_space_candidate()?;
 
@@ -167,7 +167,7 @@ fn mapper_user_candidate_preflight_accepts_split_address_space_without_mutation(
         PhysAddr::new(KERNEL_PHYS.get() + crate::FRAME_SIZE),
         GenericPageFlags::user(PageAccess::ReadOnly),
     )?;
-    let before = mapper;
+    let before = mapper.clone();
 
     let audit = mapper.verify_user_address_space_candidate()?;
 
@@ -322,18 +322,18 @@ fn assert_kernel_candidate_rejects_without_mutation<const TABLES: usize>(
     mapper: &PageTableMapper<TABLES>,
     error: PageTableError,
 ) {
-    let before = *mapper;
+    let before = mapper.clone();
 
     assert_eq!(mapper.verify_kernel_address_space_candidate(), Err(error));
-    assert_eq!(*mapper, before);
+    assert_eq!(mapper, &before);
 }
 
 fn assert_user_candidate_rejects_without_mutation<const TABLES: usize>(
     mapper: &PageTableMapper<TABLES>,
     error: PageTableError,
 ) {
-    let before = *mapper;
+    let before = mapper.clone();
 
     assert_eq!(mapper.verify_user_address_space_candidate(), Err(error));
-    assert_eq!(*mapper, before);
+    assert_eq!(mapper, &before);
 }
