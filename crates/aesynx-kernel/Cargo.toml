@@ -16,6 +16,7 @@ aesynx-entropy.workspace = true
 aesynx-ipc.workspace = true
 aesynx-log.workspace = true
 aesynx-mm.workspace = true
+aesynx-sched.workspace = true
 aesynx-telemetry.workspace = true
 aesynx-time.workspace = true
 

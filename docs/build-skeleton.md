@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.26.0 Kernel service queues candidate
+Status: v0.27.0 Kernel task model candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.26.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.27.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -96,19 +96,19 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.26.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.27.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.26.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.27.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.26.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.27.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -183,14 +183,14 @@ activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.26.0 candidate adds kernel-facing service queues. It defines explicit
-service kinds, kernel-stamped request metadata, completion statuses,
-fixed-capacity ring queue behavior, FIFO wraparound, fail-closed
-full/empty/unsupported-service handling, modeled release/acquire
-publish-observe ordering evidence, and redacted IPC/service debug output. The
-live boot path now submits and completes a log request through the queue set
-before `[TEST] service-queue=ok`; userspace syscalls, blocking receive, SMP
-doorbells, and real service-side work remain future milestones.
+The v0.27.0 candidate adds the kernel task model. It keeps `aesynx-sched`
+`no_std`, splits task and queue logic into small modules, adds fixed-capacity
+local run queues and wait queues, rejects zero task IDs and wrong-core runnable
+tasks before queue mutation, preserves FIFO run-queue order, wakes matching
+waiters back to runnable state, and redacts task IDs in debug output. The live
+boot path creates multiple task objects and verifies the model before
+`[TEST] task-model=ok`; a real cooperative executor, context switching,
+preemption, and userspace tasks remain future milestones.
 
 ## Target Shape
 
