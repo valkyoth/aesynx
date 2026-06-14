@@ -21,6 +21,7 @@ pub struct KernelHeapStatus {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum KernelHeapError {
     AlreadyInitialized,
+    CorruptFreeList,
     DoubleFree,
     InvalidFree,
     InvalidLayout,

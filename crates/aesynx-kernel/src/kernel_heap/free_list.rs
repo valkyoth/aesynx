@@ -4,9 +4,8 @@ pub(super) fn encode_offset(offset: usize) -> usize {
     offset + 1
 }
 
-pub(super) fn decode_offset(encoded: usize) -> usize {
-    debug_assert_ne!(encoded, FREE_LIST_EMPTY);
-    encoded - 1
+pub(super) const fn decode_offset(encoded: usize) -> Option<usize> {
+    encoded.checked_sub(1)
 }
 
 pub(super) fn read_free_next(ptr: *mut u8) -> usize {
@@ -29,5 +28,16 @@ pub(super) fn zero_heap_bytes(ptr: *mut u8, len: usize) {
     // range during allocator-owned zeroing.
     unsafe {
         core::ptr::write_bytes(ptr, 0, len);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FREE_LIST_EMPTY, decode_offset, encode_offset};
+
+    #[test]
+    fn free_list_offset_decode_rejects_empty_sentinel() {
+        assert_eq!(decode_offset(FREE_LIST_EMPTY), None);
+        assert_eq!(decode_offset(encode_offset(4096)), Some(4096));
     }
 }

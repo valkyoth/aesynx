@@ -209,7 +209,9 @@ impl KernelHeapAllocator {
         if head == FREE_LIST_EMPTY {
             return Err(KernelHeapError::OutOfMemory);
         }
-        let offset = decode_offset(head);
+        let Some(offset) = decode_offset(head) else {
+            return Err(KernelHeapError::CorruptFreeList);
+        };
         let ptr = self.ptr_for_offset(offset);
         let next = read_free_next(ptr);
         self.free_heads[class].store(next, Ordering::Release);
@@ -279,7 +281,7 @@ impl KernelHeapAllocator {
         {
             return Err(KernelHeapError::InvalidFree);
         }
-        if self.free_list_contains(class, ptr) {
+        if self.free_list_contains(class, ptr)? {
             self.double_free_detected.fetch_add(1, Ordering::AcqRel);
             return Err(KernelHeapError::DoubleFree);
         }
@@ -296,7 +298,7 @@ impl KernelHeapAllocator {
         self.page_live_blocks[page].store(live_blocks - 1, Ordering::Release);
         self.record_free(block_size);
         if live_blocks == 1 {
-            self.reclaim_slab_page_locked(class, page);
+            self.reclaim_slab_page_locked(class, page)?;
         }
         Ok(())
     }
@@ -334,13 +336,15 @@ impl KernelHeapAllocator {
         Ok(())
     }
 
-    fn reclaim_slab_page_locked(&self, class: usize, page: usize) {
+    fn reclaim_slab_page_locked(&self, class: usize, page: usize) -> Result<(), KernelHeapError> {
         let page_offset = page * KERNEL_HEAP_PAGE_SIZE;
         let page_end = page_offset + KERNEL_HEAP_PAGE_SIZE;
         let mut old_head = self.free_heads[class].load(Ordering::Acquire);
         let mut new_head = FREE_LIST_EMPTY;
         while old_head != FREE_LIST_EMPTY {
-            let offset = decode_offset(old_head);
+            let Some(offset) = decode_offset(old_head) else {
+                return Err(KernelHeapError::CorruptFreeList);
+            };
             let ptr = self.ptr_for_offset(offset);
             let next = read_free_next(ptr);
             if offset < page_offset || offset >= page_end {
@@ -352,6 +356,7 @@ impl KernelHeapAllocator {
         self.free_heads[class].store(new_head, Ordering::Release);
         self.page_live_blocks[page].store(0, Ordering::Release);
         self.page_state[page].store(PAGE_FREE, Ordering::Release);
+        Ok(())
     }
 
     fn find_free_page_locked(&self) -> Result<usize, KernelHeapError> {
@@ -390,17 +395,19 @@ impl KernelHeapAllocator {
         Err(KernelHeapError::OutOfMemory)
     }
 
-    fn free_list_contains(&self, class: usize, ptr: usize) -> bool {
+    fn free_list_contains(&self, class: usize, ptr: usize) -> Result<bool, KernelHeapError> {
         let mut head = self.free_heads[class].load(Ordering::Acquire);
         while head != FREE_LIST_EMPTY {
-            let offset = decode_offset(head);
+            let Some(offset) = decode_offset(head) else {
+                return Err(KernelHeapError::CorruptFreeList);
+            };
             let current = self.ptr_for_offset(offset) as usize;
             if current == ptr {
-                return true;
+                return Ok(true);
             }
             head = read_free_next(current as *mut u8);
         }
-        false
+        Ok(false)
     }
 
     fn offset_for_ptr(&self, ptr: usize) -> Result<usize, KernelHeapError> {
