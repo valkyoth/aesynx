@@ -57,6 +57,9 @@ impl QueueOrderingEvidence {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ServiceRingQueue<T: Copy, const CAPACITY: usize> {
+    // Non-Sync by design: the current queue is a single-owner `&mut self`
+    // structure. Future shared-memory or SMP service rings must add external
+    // synchronization and real atomic head/tail or slot-validity ordering.
     slots: [Option<PublishedEntry<T>>; CAPACITY],
     head: usize,
     tail: usize,
