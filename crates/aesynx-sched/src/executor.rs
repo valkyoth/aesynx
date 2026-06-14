@@ -1,3 +1,5 @@
+use core::fmt;
+
 use aesynx_abi::{CoreId, TaskId};
 use aesynx_telemetry::{SchedulerDecisionReason, SchedulerTelemetry, TelemetryError};
 
@@ -257,7 +259,7 @@ pub struct ExecutorStatus {
     pub woke: u64,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum ExecutorError {
     Queue(TaskQueueError),
     Transition(SchedError),
@@ -266,4 +268,22 @@ pub enum ExecutorError {
     CounterOverflow,
     RestoreFailed(TaskQueueError, Task),
     Telemetry(TelemetryError),
+}
+
+impl fmt::Debug for ExecutorError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Queue(error) => formatter.debug_tuple("Queue").field(error).finish(),
+            Self::Transition(error) => formatter.debug_tuple("Transition").field(error).finish(),
+            Self::TaskAlreadyRunning => formatter.write_str("TaskAlreadyRunning"),
+            Self::NoCurrentTask => formatter.write_str("NoCurrentTask"),
+            Self::CounterOverflow => formatter.write_str("CounterOverflow"),
+            Self::RestoreFailed(error, _task) => formatter
+                .debug_tuple("RestoreFailed")
+                .field(error)
+                .field(&"<redacted>")
+                .finish(),
+            Self::Telemetry(error) => formatter.debug_tuple("Telemetry").field(error).finish(),
+        }
+    }
 }

@@ -28,8 +28,10 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
                 add_pages_to_phys(phys, offset)?,
                 flags,
             ) {
-                self.rollback_mapped_prefix(virt, offset)?;
-                return Err(error);
+                return preserve_error_after_rollback(
+                    error,
+                    self.rollback_mapped_prefix(virt, offset),
+                );
             }
             offset += 1;
         }
@@ -158,8 +160,10 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
             let outcome = match self.protect_page(add_pages_to_virt(virt, offset)?, flags) {
                 Ok(outcome) => outcome,
                 Err(error) => {
-                    self.rollback_protected_prefix(virt, &previous, offset)?;
-                    return Err(error);
+                    return preserve_error_after_rollback(
+                        error,
+                        self.rollback_protected_prefix(virt, &previous, offset),
+                    );
                 }
             };
             flush = combine_flushes(flush, outcome.flush());
@@ -195,8 +199,10 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
             let outcome = match self.unmap_page(add_pages_to_virt(virt, offset)?) {
                 Ok(outcome) => outcome,
                 Err(error) => {
-                    self.rollback_unmapped_prefix(virt, &previous, offset)?;
-                    return Err(error);
+                    return preserve_error_after_rollback(
+                        error,
+                        self.rollback_unmapped_prefix(virt, &previous, offset),
+                    );
                 }
             };
             flush = combine_flushes(flush, outcome.flush());
@@ -266,6 +272,16 @@ impl<const TABLES: usize, const MAPPED_FRAMES: usize> PageTableMapper<TABLES, MA
             }
         }
         Ok(())
+    }
+}
+
+fn preserve_error_after_rollback<T>(
+    original: PageTableError,
+    rollback: Result<(), PageTableError>,
+) -> Result<T, PageTableError> {
+    match rollback {
+        Ok(()) => Err(original),
+        Err(_rollback_error) => Err(PageTableError::CorruptTable),
     }
 }
 

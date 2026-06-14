@@ -1,5 +1,6 @@
 use aesynx_abi::{CoreId, TaskId};
 use aesynx_telemetry::{SchedulerDecisionReason, SchedulerTelemetry, TelemetryError};
+use core::fmt::{self, Write};
 
 use crate::{ExecutorError, LocalExecutor, Priority, Task, TaskQueueError, TimeBudget};
 
@@ -13,6 +14,36 @@ fn task(id: u64, core: u32) -> Task {
         Err(_) => TimeBudget::ZERO,
     };
     Task::new(TaskId::new(id), CoreId::new(core), priority, budget)
+}
+
+struct DebugBuffer {
+    bytes: [u8; 128],
+    len: usize,
+}
+
+impl DebugBuffer {
+    const fn new() -> Self {
+        Self {
+            bytes: [0; 128],
+            len: 0,
+        }
+    }
+
+    fn as_str(&self) -> Result<&str, core::str::Utf8Error> {
+        core::str::from_utf8(&self.bytes[..self.len])
+    }
+}
+
+impl Write for DebugBuffer {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        let next_len = self.len.checked_add(value.len()).ok_or(fmt::Error)?;
+        if next_len > self.bytes.len() {
+            return Err(fmt::Error);
+        }
+        self.bytes[self.len..next_len].copy_from_slice(value.as_bytes());
+        self.len = next_len;
+        Ok(())
+    }
 }
 
 #[test]
@@ -138,6 +169,25 @@ fn cooperative_executor_full_telemetry_buffer_does_not_dispatch() {
         ))
     );
     assert_eq!(executor.status(), before);
+}
+
+#[test]
+fn executor_restore_failure_debug_redacts_rejected_task() {
+    let error = ExecutorError::RestoreFailed(TaskQueueError::QueueFull, task(42, 0));
+    let mut buffer = DebugBuffer::new();
+    assert_eq!(write!(&mut buffer, "{:?}", error), Ok(()));
+    let debug = match buffer.as_str() {
+        Ok(debug) => debug,
+        Err(_) => {
+            assert_eq!(buffer.as_str().map(|_| ()), Ok(()));
+            return;
+        }
+    };
+
+    assert!(debug.contains("RestoreFailed"));
+    assert!(debug.contains("<redacted>"));
+    assert!(!debug.contains("TaskId"));
+    assert!(!debug.contains("42"));
 }
 
 #[test]
