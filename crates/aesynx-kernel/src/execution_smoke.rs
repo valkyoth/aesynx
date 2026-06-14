@@ -85,6 +85,18 @@ pub fn run() {
                 status.scheduler_event_id,
                 status.schema_ok
             );
+            aesynx_arch_x86_64::serial_println!(
+                "trace-event schema=1 event=boot-phase sequence=0 core=0 phase={}",
+                aesynx_telemetry::TelemetryBootPhase::Running.label()
+            );
+            aesynx_arch_x86_64::serial_println!(
+                "trace-event schema=1 event=capability-fault sequence=1 core=0 kind={} total_cap_faults=1",
+                aesynx_telemetry::CapFaultKind::MissingPermission.label()
+            );
+            aesynx_arch_x86_64::serial_println!(
+                "trace-event schema=1 event=scheduler-decision sequence=2 core=0 selected_task=<redacted> reason={} runnable_before=2 runnable_before_saturated=false timer_wait_before=0 timer_wait_before_saturated=false",
+                aesynx_telemetry::SchedulerDecisionReason::RoundRobinRunnable.label()
+            );
             aesynx_arch_x86_64::serial::write_str("[TEST] telemetry-events=ok\n");
         }
         Err(error) => {

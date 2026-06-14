@@ -30,6 +30,7 @@ fn main() -> ExitCode {
             print_status();
             ExitCode::SUCCESS
         }
+        "trace-decode" => trace_decode(&rest),
         "help" => {
             print_help();
             ExitCode::SUCCESS
@@ -85,6 +86,33 @@ fn fuzz_smoke(args: &[String]) -> ExitCode {
     process::run_command(&mut mapper, "cargo test -p aesynx-mm mapper_property")
 }
 
+fn trace_decode(args: &[String]) -> ExitCode {
+    match args {
+        [path] => {
+            let root = match workspace::root() {
+                Ok(root) => root,
+                Err(error) => {
+                    eprintln!("xtask: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            let mut command = Command::new("cargo");
+            command
+                .arg("run")
+                .arg("-p")
+                .arg("trace-decode")
+                .arg("--")
+                .arg(path)
+                .current_dir(root);
+            process::run_command(&mut command, "cargo run -p trace-decode")
+        }
+        _ => {
+            eprintln!("xtask: trace-decode requires one serial log path");
+            ExitCode::from(2)
+        }
+    }
+}
+
 fn print_status() {
     println!("Aesynx workspace foundation is active.");
 }
@@ -105,5 +133,6 @@ fn print_help() {
     println!("  qemu-suite                           run all v0.16 QEMU smoke paths");
     println!("  release-ready TAG                    validate release pentest gate for TAG");
     println!("  status                               print workspace status");
+    println!("  trace-decode SERIAL_LOG              decode v0.31 serial trace-event lines");
     println!("  help                                 print this help");
 }

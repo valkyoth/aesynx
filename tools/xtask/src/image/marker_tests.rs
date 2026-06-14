@@ -47,7 +47,8 @@ use super::smoke::{
     TASK_MODEL_FAIL_MARKER, TASK_MODEL_MARKER, TASK_MODEL_STATUS_MARKER,
     TELEMETRY_EVENTS_FAIL_MARKER, TELEMETRY_EVENTS_MARKER, TELEMETRY_EVENTS_SCHEMA_MARKER,
     TELEMETRY_EVENTS_STATUS_MARKER, TIMER_DELAYED_LOG_MARKER, TIMER_MARKER, TIMER_SETUP_MARKER,
-    TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER,
+    TIMER_TICK_1_MARKER, TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER, TRACE_EVENT_BOOT_MARKER,
+    TRACE_EVENT_CAPABILITY_MARKER, TRACE_EVENT_SCHEDULER_MARKER, TRACE_EVENT_TASK_REDACTED_MARKER,
 };
 
 #[test]
@@ -123,6 +124,19 @@ fn qemu_markers_track_current_contracts() {
         TELEMETRY_EVENTS_STATUS_MARKER,
         "telemetry-events schema=1 events="
     );
+    assert_eq!(
+        TRACE_EVENT_BOOT_MARKER,
+        "trace-event schema=1 event=boot-phase"
+    );
+    assert_eq!(
+        TRACE_EVENT_CAPABILITY_MARKER,
+        "trace-event schema=1 event=capability-fault"
+    );
+    assert_eq!(
+        TRACE_EVENT_SCHEDULER_MARKER,
+        "trace-event schema=1 event=scheduler-decision"
+    );
+    assert_eq!(TRACE_EVENT_TASK_REDACTED_MARKER, "selected_task=<redacted>");
     assert_eq!(IRQ_SETUP_MARKER, "[TEST] irq=ok");
     assert_eq!(KERNEL_CR3_ACTIVE_MARKER, "kernel-cr3 active=true");
     assert_eq!(KERNEL_CR3_FAIL_MARKER, "[TEST] kernel-cr3=fail");

@@ -145,6 +145,19 @@ pub enum CapFaultKind {
     Unknown,
 }
 
+impl CapFaultKind {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::InvalidId => "invalid-id",
+            Self::MissingPermission => "missing-permission",
+            Self::Revoked => "revoked",
+            Self::StaleId => "stale-id",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapFaultEvent {
     pub kind: CapFaultKind,

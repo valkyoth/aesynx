@@ -174,5 +174,9 @@ dependencies = [
 ]
 
 [[package]]
+name = "trace-decode"
+version = "0.1.0"
+
+[[package]]
 name = "xtask"
 version = "0.1.0"

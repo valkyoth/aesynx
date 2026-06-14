@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.30.0` is the current telemetry event schema candidate.
+`v0.31.0` is the current trace export tool candidate.
 
 Current boot path:
 
@@ -138,7 +138,11 @@ Address-space activation and CPU hardening:
   `[TEST] scheduler-telemetry=ok`.
 - The telemetry event smoke records versioned boot-phase, capability-fault, and
   scheduler-decision events in a bounded per-core ring, then dumps a redacted
-  serial summary before `[TEST] telemetry-events=ok`.
+  serial summary plus schema-v1 `trace-event` records before
+  `[TEST] telemetry-events=ok`.
+- `tools/trace-decode` and `cargo xtask trace-decode <serial-log>` decode the
+  QEMU serial trace into line-based offline analysis output while rejecting
+  scheduler events that expose raw task identity.
 
 Fuzz and property gates:
 
@@ -160,14 +164,15 @@ Fuzz and property gates:
 | Kernel task model | Tagged | `v0.27.0`; no_std `aesynx-sched` task objects, checked state transitions, redacted task debug output, fixed-capacity local run queues, message/timer/object wait queues, fail-closed queue admission, and QEMU `[TEST] task-model=ok`. |
 | Cooperative executor | Tagged | `v0.28.0`; local cooperative executor, deterministic round-robin dispatch, yield, timer sleep/wake, linear task ownership preservation, and QEMU `[TEST] cooperative-sched=ok`. |
 | Scheduler telemetry | Tagged | `v0.29.0`; bounded scheduler decision records, deterministic round-robin decision reasons, task scheduled-run counters, core run-queue telemetry, redacted decision debug output, and QEMU `[TEST] scheduler-telemetry=ok`. |
-| Telemetry event schema | Active candidate | `v0.30.0`; versioned event IDs, event headers, boot-phase/capability/scheduler payloads, bounded per-core event ring, redacted scheduler event debug output, and QEMU `[TEST] telemetry-events=ok`. |
+| Telemetry event schema | Tagged | `v0.30.0`; versioned event IDs, event headers, boot-phase/capability/scheduler payloads, bounded per-core event ring, redacted scheduler event debug output, and QEMU `[TEST] telemetry-events=ok`. |
+| Trace export tool | Active candidate | `v0.31.0`; kernel emits schema-v1 `trace-event` serial records, `tools/trace-decode` produces line-based offline output, core IDs stay visible as local scheduling context, and scheduler selected-task export must remain `<redacted>`. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, v0.18.1 entropy policy evidence with `[TEST] entropy-policy=ok`, the v0.18 kernel heap smoke with `[TEST] heap=ok`, the v0.20 kernel capability-table smoke with `[TEST] cap=ok`, the v0.21 memory-capability mapping-descriptor gate with `[TEST] memory-cap=ok`, the v0.22 capability audit/telemetry gate with `[TEST] cap-audit=ok`, the v0.26 kernel service queue smoke with `[TEST] service-queue=ok`, the v0.27 task-model smoke with `[TEST] task-model=ok`, the v0.28 cooperative scheduler smoke with `[TEST] cooperative-sched=ok`, the v0.29 scheduler telemetry smoke with `[TEST] scheduler-telemetry=ok`, and the v0.30 telemetry event schema smoke with `[TEST] telemetry-events=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, v0.18.1 entropy policy evidence with `[TEST] entropy-policy=ok`, the v0.18 kernel heap smoke with `[TEST] heap=ok`, the v0.20 kernel capability-table smoke with `[TEST] cap=ok`, the v0.21 memory-capability mapping-descriptor gate with `[TEST] memory-cap=ok`, the v0.22 capability audit/telemetry gate with `[TEST] cap-audit=ok`, the v0.26 kernel service queue smoke with `[TEST] service-queue=ok`, the v0.27 task-model smoke with `[TEST] task-model=ok`, the v0.28 cooperative scheduler smoke with `[TEST] cooperative-sched=ok`, the v0.29 scheduler telemetry smoke with `[TEST] scheduler-telemetry=ok`, the v0.30 telemetry event schema smoke with `[TEST] telemetry-events=ok`, and v0.31 decodable `trace-event` serial records from Rust `_start`. |
 | Fuzz/property smoke | Active candidate | `v0.16.1`; `cargo xtask fuzz-smoke` runs BootInfo fuzz seeds, deterministic BootInfo byte mutations, and mapper property sweeps before live CR3 activation. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
@@ -270,7 +275,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.30.0
+cargo xtask release-ready v0.31.0
 ```
 
 ## Security Posture
@@ -301,7 +306,8 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.30.0 Release Candidate Notes](docs/releases/v0.30.0-rc.md)
+- [Telemetry Event Schema](docs/telemetry-event-schema.md)
+- [v0.31.0 Release Candidate Notes](docs/releases/v0.31.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

@@ -9,6 +9,15 @@ pub enum SchedulerDecisionReason {
     RoundRobinRunnable,
 }
 
+impl SchedulerDecisionReason {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::RoundRobinRunnable => "round-robin-runnable",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct SchedulerDecisionRecord {
     sequence: u64,

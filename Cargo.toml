@@ -23,6 +23,7 @@ members = [
     "crates/aesynx-time",
     "models/aesynx-ipc-model",
     "models/aesynx-object-model",
+    "tools/trace-decode",
     "tools/xtask",
 ]
 resolver = "3"
