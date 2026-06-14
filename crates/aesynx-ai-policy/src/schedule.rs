@@ -13,6 +13,8 @@ pub struct ScheduleFeatures {
     pub cache_miss_rate: u32,
     pub idle_ratio: u32,
     pub migration_cost: u32,
+    /// Discrete scheduler priority. This is a compact rank, not a
+    /// `FIXED_POINT_SCALE` ratio.
     pub priority: u8,
 }
 
@@ -173,6 +175,57 @@ mod tests {
         assert_eq!(*decision.output(), 7);
         assert_eq!(decision.confidence().get(), crate::MAX_CONFIDENCE);
         assert!(!decision.fallback_used());
+    }
+
+    #[test]
+    fn model_decision_enforces_manifest_confidence_ceiling() {
+        let confidence = match Confidence::new(1) {
+            Ok(confidence) => confidence,
+            Err(error) => return assert_eq!(error, PolicyError::ConfidenceOutOfRange),
+        };
+        let decision = PolicyDecision::from_model(
+            7u8,
+            3u8,
+            ModelId::new(42),
+            confidence,
+            &ModelSafetyLimits::scheduler_default(),
+            DecisionReason::ModelAdvice,
+        );
+
+        assert_eq!(*decision.output(), 3);
+        assert_eq!(decision.model(), None);
+        assert_eq!(decision.confidence(), Confidence::ZERO);
+        assert!(decision.fallback_used());
+        assert_eq!(decision.reason(), DecisionReason::SafetyRejected);
+    }
+
+    #[test]
+    fn model_decision_accepts_confidence_within_manifest_ceiling() {
+        let confidence = match Confidence::new(7) {
+            Ok(confidence) => confidence,
+            Err(error) => return assert_eq!(error, PolicyError::ConfidenceOutOfRange),
+        };
+        let limits = ModelSafetyLimits::new(
+            10_000,
+            64 * 1024,
+            confidence,
+            true,
+            RequiredTelemetryFields::scheduler_minimum(),
+        );
+        let decision = PolicyDecision::from_model(
+            7u8,
+            3u8,
+            ModelId::new(42),
+            confidence,
+            &limits,
+            DecisionReason::ModelAdvice,
+        );
+
+        assert_eq!(*decision.output(), 7);
+        assert_eq!(decision.model(), Some(ModelId::new(42)));
+        assert_eq!(decision.confidence(), confidence);
+        assert!(!decision.fallback_used());
+        assert_eq!(decision.reason(), DecisionReason::ModelAdvice);
     }
 
     #[test]

@@ -42,6 +42,23 @@ id_type!(
     VirtAddr,
     u64
 );
+impl VirtAddr {
+    /// Returns `Some` only when `value` is canonical under the x86_64 48-bit
+    /// virtual-address rule.
+    ///
+    /// This helper is intended for privilege-boundary validation. `new` remains
+    /// available for raw numeric values that have already been checked by an
+    /// architecture-specific layer.
+    #[must_use]
+    pub const fn new_x86_64_canonical(value: u64) -> Option<Self> {
+        let sign_extended = ((value as i64) << 16) >> 16;
+        if sign_extended as u64 == value {
+            Some(Self(value))
+        } else {
+            None
+        }
+    }
+}
 id_type!(PhysFrame, u64);
 id_type!(Page, u64);
 id_type!(ObjectId, u128);
@@ -58,3 +75,26 @@ id_type!(PolicyId, u64);
 id_type!(ModelId, u128);
 
 pub const ROOT_CORE: CoreId = CoreId::new(0);
+
+#[cfg(test)]
+mod tests {
+    use super::VirtAddr;
+
+    #[test]
+    fn virt_addr_x86_64_canonical_constructor_accepts_sign_extended_values() {
+        assert_eq!(
+            VirtAddr::new_x86_64_canonical(0x0000_7fff_ffff_f000),
+            Some(VirtAddr::new(0x0000_7fff_ffff_f000))
+        );
+        assert_eq!(
+            VirtAddr::new_x86_64_canonical(0xffff_8000_0000_0000),
+            Some(VirtAddr::new(0xffff_8000_0000_0000))
+        );
+    }
+
+    #[test]
+    fn virt_addr_x86_64_canonical_constructor_rejects_noncanonical_values() {
+        assert_eq!(VirtAddr::new_x86_64_canonical(0x0000_8000_0000_0000), None);
+        assert_eq!(VirtAddr::new_x86_64_canonical(0xffff_7fff_ffff_ffff), None);
+    }
+}

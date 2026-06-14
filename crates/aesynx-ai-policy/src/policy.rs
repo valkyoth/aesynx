@@ -1,6 +1,6 @@
 use aesynx_abi::ModelId;
 
-use crate::Confidence;
+use crate::{Confidence, ModelSafetyLimits};
 
 /// Policy engines may use heuristics or model advice, but their fallback path
 /// is part of the security contract.
@@ -33,6 +33,13 @@ pub struct PolicyDecision<T> {
 }
 
 impl<T> PolicyDecision<T> {
+    /// Constructs a raw policy decision.
+    ///
+    /// # Security
+    ///
+    /// This constructor does not enforce a model manifest's confidence ceiling.
+    /// Model-backed decisions should use [`Self::from_model`] so
+    /// `ModelSafetyLimits::max_confidence` is applied at the trust boundary.
     pub const fn new(
         output: T,
         model: Option<ModelId>,
@@ -45,6 +52,40 @@ impl<T> PolicyDecision<T> {
             model,
             confidence,
             fallback_used,
+            reason,
+        }
+    }
+
+    /// Constructs a model-backed policy decision with manifest confidence
+    /// enforcement.
+    ///
+    /// If `confidence` exceeds `limits.max_confidence`, this returns the
+    /// provided deterministic `fallback`, clears the model identity, reports
+    /// zero confidence, and marks the reason as [`DecisionReason::SafetyRejected`].
+    #[must_use]
+    pub fn from_model(
+        output: T,
+        fallback: T,
+        model: ModelId,
+        confidence: Confidence,
+        limits: &ModelSafetyLimits,
+        reason: DecisionReason,
+    ) -> Self {
+        if confidence.get() > limits.max_confidence.get() {
+            return Self {
+                output: fallback,
+                model: None,
+                confidence: Confidence::ZERO,
+                fallback_used: true,
+                reason: DecisionReason::SafetyRejected,
+            };
+        }
+
+        Self {
+            output,
+            model: Some(model),
+            confidence,
+            fallback_used: false,
             reason,
         }
     }

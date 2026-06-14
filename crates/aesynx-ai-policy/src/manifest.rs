@@ -8,6 +8,12 @@ pub const MODEL_MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MODEL_EVAL_STEPS: u32 = 1_000_000;
 pub const MAX_MODEL_MEMORY_BYTES: u32 = 1_048_576;
 
+/// A nonzero 256-bit hash metadata field.
+///
+/// # Security
+///
+/// Construction only proves the field is present and nonzero. It does not
+/// verify that bytes loaded from storage match this hash.
 #[derive(Clone, Copy, Eq)]
 pub struct Hash256([u8; 32]);
 
@@ -39,6 +45,12 @@ impl PartialEq for Hash256 {
     }
 }
 
+/// A nonzero 64-byte signature metadata field.
+///
+/// # Security
+///
+/// Construction only proves the field is present and nonzero. It does not
+/// cryptographically verify a manifest, model object, or model weights.
 #[derive(Clone, Copy, Eq)]
 pub struct Signature64([u8; 64]);
 
@@ -163,6 +175,11 @@ impl ModelSafetyLimits {
     }
 }
 
+/// Model metadata submitted to the policy layer.
+///
+/// A manifest is data, not executable code. Use
+/// [`ModelObjectManifest::validate_for_domain`] before admitting it to a
+/// policy domain.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ModelObjectManifest {
     pub id: ModelId,
@@ -235,6 +252,17 @@ impl ModelObjectManifest {
     }
 }
 
+/// A manifest that passed structural and policy validation.
+///
+/// Validation covers schema version, policy domain, supported model kind,
+/// bounded resource limits, required fallback, and domain-specific telemetry
+/// requirements.
+///
+/// # Security
+///
+/// This does not verify [`Hash256`] or [`Signature64`] cryptographically.
+/// Callers that load model weights must perform real signature/hash
+/// verification before trusting the metadata carried by this type.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ValidatedModelManifest {
     manifest: ModelObjectManifest,
