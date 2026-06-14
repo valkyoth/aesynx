@@ -4,6 +4,7 @@ use alloc::format;
 use crate::{
     CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError,
     CapabilityTable, DeriveRequest, LiveAuthorityError, LiveAuthorityState, LiveAuthorityView,
+    ObjectBoundedRange, RootCapabilitySpec,
 };
 
 #[derive(Default)]
@@ -130,6 +131,63 @@ fn insert_root(table: &mut CapabilityTable<4>) -> Result<CapId, CapTableError> {
     )
 }
 
+fn bounded_request(perms: CapPerms, owner: PrincipalId, base: VirtAddr, len: u64) -> DeriveRequest {
+    DeriveRequest::bounded(perms, owner, ObjectBoundedRange::new_for_test(base, len))
+}
+
+#[test]
+fn table_mints_root_into_new_slot_with_audit() {
+    let mut table = CapabilityTable::<4>::new();
+    let mut audit = TestAudit::default();
+    let root = table.insert_root_with_audit(
+        RootCapabilitySpec {
+            object_id: ObjectId::new(42),
+            kind: CapKind::Memory,
+            owner: PrincipalId::new(1),
+            perms: CapPerms::READ,
+            object_generation: 1,
+            revocation_epoch: 0,
+        },
+        &mut audit,
+    );
+
+    assert!(root.is_ok());
+    if let Ok(root) = root {
+        assert!(table.check(root, CapPerms::READ).is_ok());
+        assert_eq!(audit.len(), 1);
+        assert_eq!(audit.first_action(), Some(CapAuditAction::Mint));
+        assert_eq!(
+            audit.last_event().map(|event| event.affected_slots),
+            Some(1)
+        );
+    }
+}
+
+#[test]
+fn audited_root_mint_rejects_audit_failure_without_mutation() {
+    let mut table = CapabilityTable::<4>::new();
+    let mut audit = TestAudit {
+        events: [None; 4],
+        len: 4,
+    };
+
+    assert_eq!(
+        table.insert_root_with_audit(
+            RootCapabilitySpec {
+                object_id: ObjectId::new(42),
+                kind: CapKind::Memory,
+                owner: PrincipalId::new(1),
+                perms: CapPerms::READ,
+                object_generation: 1,
+                revocation_epoch: 0,
+            },
+            &mut audit,
+        ),
+        Err(CapTableError::AuditRejected)
+    );
+    assert_eq!(table.occupied_slots(), 0);
+}
+
 #[test]
 fn table_grants_child_into_new_slot_with_audit() {
     let mut table = CapabilityTable::<4>::new();
@@ -180,12 +238,12 @@ fn table_derives_child_into_new_slot_with_audit() {
     if let Ok(root) = root {
         let child = table.derive_with_audit(
             root,
-            DeriveRequest {
-                perms: CapPerms::READ,
-                owner: PrincipalId::new(2),
-                base: Some(VirtAddr::new(0x1000)),
-                len: Some(0x1000),
-            },
+            bounded_request(
+                CapPerms::READ,
+                PrincipalId::new(2),
+                VirtAddr::new(0x1000),
+                0x1000,
+            ),
             &live,
             &mut audit,
         );
@@ -219,12 +277,12 @@ fn table_rejects_stale_live_state_before_audit_or_mutation() {
         assert_eq!(
             table.derive_with_audit(
                 root,
-                DeriveRequest {
-                    perms: CapPerms::READ,
-                    owner: PrincipalId::new(2),
-                    base: Some(VirtAddr::new(0x1000)),
-                    len: Some(0x1000),
-                },
+                bounded_request(
+                    CapPerms::READ,
+                    PrincipalId::new(2),
+                    VirtAddr::new(0x1000),
+                    0x1000,
+                ),
                 &stale_live,
                 &mut audit,
             ),
@@ -255,12 +313,12 @@ fn table_rejects_stale_ids_after_revoke() {
     if let Ok(root) = root {
         let child = table.derive_with_audit(
             root,
-            DeriveRequest {
-                perms: CapPerms::READ,
-                owner: PrincipalId::new(2),
-                base: Some(VirtAddr::new(0x1000)),
-                len: Some(0x1000),
-            },
+            bounded_request(
+                CapPerms::READ,
+                PrincipalId::new(2),
+                VirtAddr::new(0x1000),
+                0x1000,
+            ),
             &live,
             &mut audit,
         );
@@ -335,12 +393,12 @@ fn full_table_derive_does_not_emit_phantom_audit() {
         assert_eq!(
             table.derive_with_audit(
                 root,
-                DeriveRequest {
-                    perms: CapPerms::READ,
-                    owner: PrincipalId::new(1),
-                    base: Some(VirtAddr::new(0x1000)),
-                    len: Some(0x1000),
-                },
+                bounded_request(
+                    CapPerms::READ,
+                    PrincipalId::new(1),
+                    VirtAddr::new(0x1000),
+                    0x1000,
+                ),
                 &live,
                 &mut audit,
             ),

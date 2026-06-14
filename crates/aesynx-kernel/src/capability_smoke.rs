@@ -2,7 +2,8 @@ use aesynx_abi::{CapId, ObjectId, PhysAddr, PrincipalId, VirtAddr};
 use aesynx_cap::{
     CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError,
     Capability, CapabilityTable, DeriveRequest, LiveAuthorityError, LiveAuthorityState,
-    LiveAuthorityView, MemoryAccess, MemoryCapError, MemoryMapRequest,
+    LiveAuthorityView, MemoryAccess, MemoryCapError, MemoryMapRequest, ObjectBoundedRange,
+    RootCapabilitySpec,
 };
 use aesynx_mm::{FRAME_SIZE, GenericPageFlags, PageAccess, PageMapping, PageTableError};
 use aesynx_telemetry::{CapFaultKind, CoreTelemetry, TelemetryError};
@@ -32,6 +33,7 @@ pub struct CapabilitySmokeStatus {
     pub stale_root_denied: bool,
     pub stale_child_denied: bool,
     pub audit_events: usize,
+    pub mint_audit_seen: bool,
     pub derive_audit_seen: bool,
     pub grant_audit_seen: bool,
     pub revoke_audit_seen: bool,
@@ -55,7 +57,7 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
     let mut audit = SmokeAudit::new();
     let live = SmokeLiveAuthority;
     let telemetry = CoreTelemetry::default();
-    let root = insert_root(&mut table)?;
+    let root = insert_root(&mut table, &mut audit)?;
     let root_read_ok = table.check(root, CapPerms::READ).is_ok();
     let child = derive_child(&mut table, root, &live, &mut audit)?;
     let child_read_ok = table.check(child, CapPerms::READ).is_ok();
@@ -71,7 +73,7 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
     if child_write_denied {
         telemetry.record_cap_fault(CapFaultKind::MissingPermission)?;
     }
-    let readless_root = insert_readless_root(&mut table)?;
+    let readless_root = insert_readless_root(&mut table, &mut audit)?;
     let child_cap = table.get(child)?;
     let memory_map_allowed = child_cap
         .authorize_memory_map(MemoryMapRequest::new(
@@ -116,6 +118,7 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
         telemetry.record_cap_fault(CapFaultKind::StaleId)?;
     }
     let occupied_after_revoke = table.occupied_slots();
+    let mint_audit_seen = audit.seen(CapAuditAction::Mint);
     let derive_audit_seen = audit.seen(CapAuditAction::Derive);
     let grant_audit_seen = audit.seen(CapAuditAction::Grant);
     let revoke_audit_seen = audit.seen(CapAuditAction::Revoke);
@@ -138,7 +141,8 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
         && stale_child_denied
         && occupied_before_revoke == 4
         && occupied_after_revoke == 1
-        && audit.len() == 3
+        && audit.len() == 5
+        && mint_audit_seen
         && derive_audit_seen
         && grant_audit_seen
         && revoke_audit_seen
@@ -166,6 +170,7 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
         stale_root_denied,
         stale_child_denied,
         audit_events: audit.len(),
+        mint_audit_seen,
         derive_audit_seen,
         grant_audit_seen,
         revoke_audit_seen,
@@ -175,30 +180,42 @@ pub fn run() -> Result<CapabilitySmokeStatus, CapabilitySmokeError> {
     })
 }
 
-fn insert_root(table: &mut CapabilityTable<8>) -> Result<CapId, CapTableError> {
-    table.insert_root(
-        OBJECT,
-        CapKind::Memory,
-        ROOT_OWNER,
-        CapPerms::READ
-            .union(CapPerms::WRITE)
-            .union(CapPerms::MAP)
-            .union(CapPerms::DERIVE)
-            .union(CapPerms::GRANT)
-            .union(CapPerms::REVOKE),
-        1,
-        0,
+fn insert_root(
+    table: &mut CapabilityTable<8>,
+    audit: &mut SmokeAudit,
+) -> Result<CapId, CapTableError> {
+    table.insert_root_with_audit(
+        RootCapabilitySpec {
+            object_id: OBJECT,
+            kind: CapKind::Memory,
+            owner: ROOT_OWNER,
+            perms: CapPerms::READ
+                .union(CapPerms::WRITE)
+                .union(CapPerms::MAP)
+                .union(CapPerms::DERIVE)
+                .union(CapPerms::GRANT)
+                .union(CapPerms::REVOKE),
+            object_generation: 1,
+            revocation_epoch: 0,
+        },
+        audit,
     )
 }
 
-fn insert_readless_root(table: &mut CapabilityTable<8>) -> Result<CapId, CapTableError> {
-    table.insert_root(
-        ObjectId::new(0x0a21),
-        CapKind::Memory,
-        ROOT_OWNER,
-        CapPerms::MAP,
-        1,
-        0,
+fn insert_readless_root(
+    table: &mut CapabilityTable<8>,
+    audit: &mut SmokeAudit,
+) -> Result<CapId, CapTableError> {
+    table.insert_root_with_audit(
+        RootCapabilitySpec {
+            object_id: ObjectId::new(0x0a21),
+            kind: CapKind::Memory,
+            owner: ROOT_OWNER,
+            perms: CapPerms::MAP,
+            object_generation: 1,
+            revocation_epoch: 0,
+        },
+        audit,
     )
 }
 
@@ -208,14 +225,15 @@ fn derive_child(
     live: &SmokeLiveAuthority,
     audit: &mut SmokeAudit,
 ) -> Result<CapId, CapTableError> {
+    let range = ObjectBoundedRange::new_within_extent(
+        VirtAddr::new(0x1000),
+        0x1000,
+        VirtAddr::new(0),
+        u64::MAX,
+    )?;
     table.derive_with_audit(
         root,
-        DeriveRequest {
-            perms: CapPerms::READ.union(CapPerms::MAP),
-            owner: CHILD_OWNER,
-            base: Some(VirtAddr::new(0x1000)),
-            len: Some(0x1000),
-        },
+        DeriveRequest::bounded(CapPerms::READ.union(CapPerms::MAP), CHILD_OWNER, range),
         live,
         audit,
     )
@@ -257,14 +275,14 @@ const fn memory_access_for_flags(flags: GenericPageFlags) -> MemoryAccess {
 }
 
 struct SmokeAudit {
-    events: [Option<CapAuditEvent>; 4],
+    events: [Option<CapAuditEvent>; 5],
     len: usize,
 }
 
 impl SmokeAudit {
     const fn new() -> Self {
         Self {
-            events: [None, None, None, None],
+            events: [None, None, None, None, None],
             len: 0,
         }
     }
@@ -362,7 +380,8 @@ mod tests {
             assert!(status.memory_range_escape_denied);
             assert!(status.stale_root_denied);
             assert!(status.stale_child_denied);
-            assert_eq!(status.audit_events, 3);
+            assert_eq!(status.audit_events, 5);
+            assert!(status.mint_audit_seen);
             assert!(status.derive_audit_seen);
             assert!(status.grant_audit_seen);
             assert!(status.revoke_audit_seen);

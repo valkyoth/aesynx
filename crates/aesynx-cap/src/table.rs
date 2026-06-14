@@ -9,6 +9,16 @@ use crate::{
 
 const INITIAL_SLOT_GENERATION: u32 = 1;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RootCapabilitySpec {
+    pub object_id: ObjectId,
+    pub kind: CapKind,
+    pub owner: PrincipalId,
+    pub perms: CapPerms,
+    pub object_generation: u32,
+    pub revocation_epoch: u64,
+}
+
 pub struct CapabilityTable<const SLOTS: usize> {
     slots: [CapabilitySlot; SLOTS],
 }
@@ -37,6 +47,11 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
         }
     }
 
+    /// Inserts a new root capability without emitting an audit event.
+    ///
+    /// This is intended for bootstrap-only authority seeding before an audit
+    /// sink exists. Runtime object creation must use `insert_root_with_audit`
+    /// so every authority chain has a mint event.
     pub fn insert_root(
         &mut self,
         object_id: ObjectId,
@@ -57,6 +72,46 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
             revocation_epoch,
         );
         let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
+
+        self.slots[slot].cap = Some(cap);
+
+        Ok(id)
+    }
+
+    /// Inserts a new root capability and records the mint event.
+    ///
+    /// Runtime object-creation paths should use this audited entry point. The
+    /// unaudited `insert_root` remains for tightly controlled bootstrap paths
+    /// that have not initialized an audit sink yet.
+    pub fn insert_root_with_audit(
+        &mut self,
+        spec: RootCapabilitySpec,
+        audit: &mut impl CapAuditLog,
+    ) -> Result<CapId, CapTableError> {
+        let slot = self.vacant_slot().ok_or(CapTableError::TableFull)?;
+        let slot_index = slot_index(slot)?;
+        let cap = Capability::new_root(
+            spec.object_id,
+            spec.kind,
+            spec.owner,
+            spec.perms,
+            spec.object_generation,
+            spec.revocation_epoch,
+        );
+        let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
+
+        audit
+            .record(CapAuditEvent {
+                action: CapAuditAction::Mint,
+                object_id: spec.object_id,
+                source_owner: spec.owner,
+                target_owner: spec.owner,
+                perms: spec.perms,
+                generation: spec.object_generation,
+                revocation_epoch: spec.revocation_epoch,
+                affected_slots: 1,
+            })
+            .map_err(|_| CapTableError::AuditRejected)?;
 
         self.slots[slot].cap = Some(cap);
 

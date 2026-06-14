@@ -7,12 +7,7 @@ fn derive_reduces_authority_for_same_owner() {
             .union(CapPerms::WRITE)
             .union(CapPerms::DERIVE),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: parent.owner(),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(CapPerms::READ, parent.owner(), VirtAddr::new(120), 10);
 
     let expected = Capability::new_for_test(TestCapabilitySpec {
         object_id: parent.object_id(),
@@ -31,12 +26,7 @@ fn derive_reduces_authority_for_same_owner() {
 #[test]
 fn derive_cross_owner_requires_grant_permission() {
     let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(CapPerms::READ, PrincipalId::new(2), VirtAddr::new(120), 10);
 
     assert_eq!(
         audited_derive(parent, request),
@@ -51,12 +41,7 @@ fn derive_cross_owner_succeeds_with_grant_permission() {
             .union(CapPerms::DERIVE)
             .union(CapPerms::GRANT),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(CapPerms::READ, PrincipalId::new(2), VirtAddr::new(120), 10);
 
     assert_eq!(
         audited_derive(parent, request).map(|cap| cap.owner()),
@@ -71,12 +56,12 @@ fn derive_cross_owner_strips_grant_permission_from_child() {
             .union(CapPerms::DERIVE)
             .union(CapPerms::GRANT),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ.union(CapPerms::GRANT),
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(
+        CapPerms::READ.union(CapPerms::GRANT),
+        PrincipalId::new(2),
+        VirtAddr::new(120),
+        10,
+    );
 
     assert_eq!(
         audited_derive(parent, request).map(|cap| cap.perms()),
@@ -93,15 +78,15 @@ fn derive_cross_owner_strips_revoke_and_admin_permissions_from_child() {
             .union(CapPerms::REVOKE)
             .union(CapPerms::ADMIN),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ
+    let request = bounded_request(
+        CapPerms::READ
             .union(CapPerms::GRANT)
             .union(CapPerms::REVOKE)
             .union(CapPerms::ADMIN),
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+        PrincipalId::new(2),
+        VirtAddr::new(120),
+        10,
+    );
 
     assert_eq!(
         audited_derive(parent, request).map(|cap| cap.perms()),
@@ -116,12 +101,12 @@ fn derive_same_owner_may_retain_grant_permission() {
             .union(CapPerms::DERIVE)
             .union(CapPerms::GRANT),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ.union(CapPerms::GRANT),
-        owner: parent.owner(),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(
+        CapPerms::READ.union(CapPerms::GRANT),
+        parent.owner(),
+        VirtAddr::new(120),
+        10,
+    );
 
     assert_eq!(
         audited_derive(parent, request).map(|cap| cap.perms()),
@@ -136,12 +121,7 @@ fn derive_with_audit_records_chain_of_custody() {
             .union(CapPerms::DERIVE)
             .union(CapPerms::GRANT),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(CapPerms::READ, PrincipalId::new(2), VirtAddr::new(120), 10);
     let mut audit = TestAudit::default();
 
     assert_eq!(
@@ -163,12 +143,7 @@ fn derive_live_rejects_stale_parent_before_audit() {
             .union(CapPerms::DERIVE)
             .union(CapPerms::GRANT),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(CapPerms::READ, PrincipalId::new(2), VirtAddr::new(120), 10);
     let mut audit = TestAudit::default();
 
     assert_eq!(
@@ -185,12 +160,7 @@ fn derive_live_rejects_revoked_parent_before_audit() {
             .union(CapPerms::DERIVE)
             .union(CapPerms::GRANT),
     );
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(CapPerms::READ, PrincipalId::new(2), VirtAddr::new(120), 10);
     let mut audit = TestAudit::default();
 
     assert_eq!(
@@ -215,12 +185,7 @@ fn grant_live_rejects_revoked_parent_before_audit() {
 #[test]
 fn derive_requires_derive_permission() {
     let parent = parent_cap(CapPerms::READ);
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: PrincipalId::new(2),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(CapPerms::READ, PrincipalId::new(2), VirtAddr::new(120), 10);
 
     assert_eq!(
         audited_derive(parent, request),
@@ -231,12 +196,12 @@ fn derive_requires_derive_permission() {
 #[test]
 fn derive_rejects_permission_escalation() {
     let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
-    let request = DeriveRequest {
-        perms: CapPerms::READ.union(CapPerms::WRITE),
-        owner: parent.owner(),
-        base: Some(VirtAddr::new(120)),
-        len: Some(10),
-    };
+    let request = bounded_request(
+        CapPerms::READ.union(CapPerms::WRITE),
+        parent.owner(),
+        VirtAddr::new(120),
+        10,
+    );
 
     assert_eq!(
         audited_derive(parent, request),
@@ -247,12 +212,7 @@ fn derive_rejects_permission_escalation() {
 #[test]
 fn derive_rejects_range_expansion() {
     let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: parent.owner(),
-        base: Some(VirtAddr::new(120)),
-        len: Some(40),
-    };
+    let request = bounded_request(CapPerms::READ, parent.owner(), VirtAddr::new(120), 40);
 
     assert_eq!(
         audited_derive(parent, request),
@@ -261,34 +221,34 @@ fn derive_rejects_range_expansion() {
 }
 
 #[test]
-fn derive_rejects_zero_length_range() {
-    let parent = parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: parent.owner(),
-        base: Some(VirtAddr::new(120)),
-        len: Some(0),
-    };
-
+fn object_bounded_range_rejects_zero_length_before_derivation() {
     assert_eq!(
-        audited_derive(parent, request),
+        ObjectBoundedRange::new_within_extent(VirtAddr::new(120), 0, VirtAddr::new(0), u64::MAX),
         Err(DeriveError::RangeEscalates)
     );
 }
 
 #[test]
-fn derive_rejects_overflowing_child_range_from_unbounded_parent() {
+fn object_bounded_range_rejects_overflow_before_derivation() {
+    assert_eq!(
+        ObjectBoundedRange::new_within_extent(
+            VirtAddr::new(u64::MAX - 3),
+            8,
+            VirtAddr::new(0),
+            u64::MAX
+        ),
+        Err(DeriveError::RangeEscalates)
+    );
+}
+
+#[test]
+fn unbounded_parent_derives_only_prevalidated_object_bounded_child_range() {
     let parent = unbounded_parent_cap(CapPerms::READ.union(CapPerms::DERIVE));
-    let request = DeriveRequest {
-        perms: CapPerms::READ,
-        owner: parent.owner(),
-        base: Some(VirtAddr::new(u64::MAX - 3)),
-        len: Some(8),
-    };
+    let request = bounded_request(CapPerms::READ, parent.owner(), VirtAddr::new(120), 10);
 
     assert_eq!(
-        audited_derive(parent, request),
-        Err(DeriveError::RangeEscalates)
+        audited_derive(parent, request).map(|cap| (cap.base(), cap.range_len())),
+        Ok((Some(VirtAddr::new(120)), Some(10)))
     );
 }
 

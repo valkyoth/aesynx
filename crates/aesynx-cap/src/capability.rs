@@ -23,6 +23,7 @@ pub struct CapAuditEvent {
 pub enum CapAuditAction {
     Derive,
     Grant,
+    Mint,
     Revoke,
 }
 
@@ -32,6 +33,7 @@ impl CapAuditAction {
         match self {
             Self::Derive => "derive",
             Self::Grant => "grant",
+            Self::Mint => "mint",
             Self::Revoke => "revoke",
         }
     }
@@ -87,12 +89,11 @@ impl fmt::Debug for CapAuditEvent {
 /// `u32` generation counter; wrapped generations can let stale capabilities
 /// pass `validate_live`.
 ///
-/// `base = None` and `len = None` denotes unscoped whole-object authority.
-/// Deriving a bounded child from an unscoped parent is permission-gated, but it
-/// is not range-gated here beyond overflow rejection. Callers that need bounds
-/// against the underlying object's real extent must validate those bounds at
-/// the object, memory, or syscall layer; this type only prevents widening
-/// relative to the parent's own recorded range.
+/// `base = None` and `len = None` denotes unscoped whole-object authority. A
+/// bounded derivation request must carry an `ObjectBoundedRange`, which is the
+/// type-level handoff that an object, memory, or syscall layer already checked
+/// the requested range against the real backing extent before the cap layer
+/// reduces authority.
 #[derive(Eq, PartialEq)]
 pub struct Capability {
     object_id: ObjectId,
@@ -314,31 +315,31 @@ impl Capability {
             return Err(DeriveError::MissingDerivePermission);
         }
 
-        let cross_owner = request.owner != self.owner;
+        let cross_owner = request.owner() != self.owner;
         if cross_owner && !self.perms.contains(CapPerms::GRANT) {
             return Err(DeriveError::MissingGrantPermission);
         }
 
-        if matches!(request.len, Some(0)) {
+        if matches!(request.range_len(), Some(0)) {
             return Err(DeriveError::RangeEscalates);
         }
 
-        if !self.perms.contains(request.perms) {
+        if !self.perms.contains(request.perms()) {
             return Err(DeriveError::PermissionsEscalate);
         }
 
-        if !range_is_subset(self.base, self.len, request.base, request.len) {
+        if !range_is_subset(self.base, self.len, request.base(), request.range_len()) {
             return Err(DeriveError::RangeEscalates);
         }
 
-        let child_perms = delegated_perms(request.perms, cross_owner);
+        let child_perms = delegated_perms(request.perms(), cross_owner);
 
         Ok(Self {
             object_id: self.object_id,
-            base: request.base,
-            len: request.len,
+            base: request.base(),
+            len: request.range_len(),
             perms: child_perms,
-            owner: request.owner,
+            owner: request.owner(),
             generation: self.generation,
             revocation_epoch: self.revocation_epoch,
             kind: self.kind,
@@ -386,10 +387,7 @@ impl fmt::Debug for Capability {
             .debug_struct("Capability")
             .field("object_id", &"<redacted>")
             .field("has_range", &(self.base.is_some() && self.len.is_some()))
-            .field("perms_bits", &self.perms.bits())
             .field("owner", &"<redacted>")
-            .field("generation", &self.generation)
-            .field("revocation_epoch", &self.revocation_epoch)
             .field("kind", &self.kind)
             .finish()
     }

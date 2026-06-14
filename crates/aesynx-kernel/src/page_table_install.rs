@@ -362,8 +362,9 @@ extern "C" fn activate_on_kernel_stack(
                 status.memory_range_escape_denied
             );
             aesynx_arch_x86_64::serial_println!(
-                "cap-audit events={} derive_seen={} grant_seen={} revoke_seen={} revoke_slots={} cap_faults={}",
+                "cap-audit events={} mint_seen={} derive_seen={} grant_seen={} revoke_seen={} revoke_slots={} cap_faults={}",
                 status.audit_events,
+                status.mint_audit_seen,
                 status.derive_audit_seen,
                 status.grant_audit_seen,
                 status.revoke_audit_seen,

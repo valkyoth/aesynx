@@ -89,6 +89,10 @@ pub enum DeviceError {
 }
 
 const fn device_transition_allowed(current: DeviceState, next: DeviceState) -> bool {
+    if matches!(current, DeviceState::Revoked | DeviceState::Crashed) {
+        return false;
+    }
+
     matches!(
         (current, next),
         (DeviceState::Discovered, DeviceState::Matched)
@@ -131,6 +135,14 @@ mod tests {
         assert_eq!(device.transition(DeviceState::Bound), Ok(()));
         assert_eq!(device.transition(DeviceState::Running), Ok(()));
         assert_eq!(device.transition(DeviceState::Crashed), Ok(()));
+        assert_eq!(
+            device.transition(DeviceState::Revoked),
+            Err(DeviceError::InvalidStateTransition)
+        );
+        assert_eq!(
+            device.transition(DeviceState::Crashed),
+            Err(DeviceError::InvalidStateTransition)
+        );
     }
 
     #[test]

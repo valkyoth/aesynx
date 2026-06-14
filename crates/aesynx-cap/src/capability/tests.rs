@@ -3,7 +3,7 @@ use core::fmt::{self, Write};
 
 use crate::{
     CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapIdError, CapKind, CapPerms,
-    CapSlotIndex, CapValidationError, Capability, DeriveError, DeriveRequest,
+    CapSlotIndex, CapValidationError, Capability, DeriveError, DeriveRequest, ObjectBoundedRange,
 };
 
 use super::TestCapabilitySpec;
@@ -99,6 +99,10 @@ fn audited_derive(parent: Capability, request: DeriveRequest) -> Result<Capabili
     parent.derive_with_audit(request, &mut audit)
 }
 
+fn bounded_request(perms: CapPerms, owner: PrincipalId, base: VirtAddr, len: u64) -> DeriveRequest {
+    DeriveRequest::bounded(perms, owner, ObjectBoundedRange::new_for_test(base, len))
+}
+
 fn audited_grant(parent: Capability, target_owner: PrincipalId) -> Result<Capability, DeriveError> {
     let mut audit = TestAudit::default();
 
@@ -156,6 +160,11 @@ fn capability_debug_redacts_authority_identifiers() {
     );
     assert!(rendered.contains("object_id: \"<redacted>\""));
     assert!(rendered.contains("owner: \"<redacted>\""));
+    assert!(rendered.contains("has_range"));
+    assert!(rendered.contains("kind"));
+    assert!(!rendered.contains("perms_bits"));
+    assert!(!rendered.contains("generation"));
+    assert!(!rendered.contains("revocation_epoch"));
     assert!(!rendered.contains("ObjectId"));
     assert!(!rendered.contains("PrincipalId"));
     assert!(!rendered.contains("VirtAddr"));

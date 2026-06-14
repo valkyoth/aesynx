@@ -2,7 +2,7 @@ use aesynx_abi::{ObjectId, PrincipalId, VirtAddr};
 
 use crate::{
     CapAuditError, CapAuditLog, CapKind, CapPerms, Capability, DeriveRequest, MemoryAccess,
-    MemoryCapError, MemoryMapRequest,
+    MemoryCapError, MemoryMapRequest, ObjectBoundedRange,
 };
 
 use super::super::capability::TestCapabilitySpec;
@@ -129,13 +129,13 @@ fn derived_memory_subrange_cannot_escape_parent_range() {
             .union(CapPerms::DERIVE),
     );
     let mut audit = NoopAudit;
+    let range = ObjectBoundedRange::new_for_test(VirtAddr::new(0x2000), 0x1000);
     let child = parent.derive_with_audit(
-        DeriveRequest {
-            perms: CapPerms::MAP.union(CapPerms::READ),
-            owner: PrincipalId::new(1),
-            base: Some(VirtAddr::new(0x2000)),
-            len: Some(0x1000),
-        },
+        DeriveRequest::bounded(
+            CapPerms::MAP.union(CapPerms::READ),
+            PrincipalId::new(1),
+            range,
+        ),
         &mut audit,
     );
 
