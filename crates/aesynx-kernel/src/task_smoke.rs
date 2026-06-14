@@ -1,7 +1,7 @@
 use aesynx_abi::{CoreId, ROOT_CORE, TaskId};
 use aesynx_sched::{
-    LocalRunQueue, Priority, SchedError, Task, TaskQueueError, TaskState, TimeBudget, WaitQueue,
-    WaitReason,
+    LocalRunQueue, Priority, SchedError, Task, TaskQueueError, TaskRejected, TaskState, TimeBudget,
+    WaitQueue, WaitReason,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,21 +39,27 @@ pub fn run() -> Result<TaskSmokeStatus, TaskSmokeError> {
     let wrong_core = task(3, CoreId::new(1))?;
     let zero_id = task(0, ROOT_CORE)?;
 
-    run_queue.push(first).map_err(TaskSmokeError::Queue)?;
-    run_queue.push(second).map_err(TaskSmokeError::Queue)?;
+    run_queue.push(first).map_err(rejected_queue_error)?;
+    run_queue.push(second).map_err(rejected_queue_error)?;
     let runnable_before = run_queue.status().len;
-    let wrong_core_denied = run_queue.push(wrong_core) == Err(TaskQueueError::WrongCore);
-    let zero_id_denied = run_queue.push(zero_id) == Err(TaskQueueError::TaskIdZero);
+    let wrong_core_denied = rejected_matches(
+        run_queue.push(wrong_core),
+        TaskQueueError::WrongCore,
+        TaskId::new(3),
+    );
+    let zero_id_denied = rejected_matches(
+        run_queue.push(zero_id),
+        TaskQueueError::TaskIdZero,
+        TaskId::new(0),
+    );
 
     let popped_first = run_queue.pop().map_err(TaskSmokeError::Queue)?;
     let popped_second = run_queue.pop().map_err(TaskSmokeError::Queue)?;
     let fifo_ok = popped_first.id() == TaskId::new(1) && popped_second.id() == TaskId::new(2);
-    run_queue
-        .push(popped_first)
-        .map_err(TaskSmokeError::Queue)?;
+    run_queue.push(popped_first).map_err(rejected_queue_error)?;
     run_queue
         .push(popped_second)
-        .map_err(TaskSmokeError::Queue)?;
+        .map_err(rejected_queue_error)?;
 
     let mut waits_on_message = run_queue.pop().map_err(TaskSmokeError::Queue)?;
     waits_on_message
@@ -64,7 +70,7 @@ pub fn run() -> Result<TaskSmokeStatus, TaskSmokeError> {
         .map_err(TaskSmokeError::Transition)?;
     message_wait
         .push(waits_on_message)
-        .map_err(TaskSmokeError::Queue)?;
+        .map_err(rejected_queue_error)?;
 
     let mut waits_on_timer = run_queue.pop().map_err(TaskSmokeError::Queue)?;
     waits_on_timer
@@ -75,7 +81,7 @@ pub fn run() -> Result<TaskSmokeStatus, TaskSmokeError> {
         .map_err(TaskSmokeError::Transition)?;
     timer_wait
         .push(waits_on_timer)
-        .map_err(TaskSmokeError::Queue)?;
+        .map_err(rejected_queue_error)?;
 
     let message_wait_before = message_wait.status().len;
     let timer_wait_before = timer_wait.status().len;
@@ -87,7 +93,7 @@ pub fn run() -> Result<TaskSmokeStatus, TaskSmokeError> {
     woken
         .transition(TaskState::Runnable)
         .map_err(TaskSmokeError::Transition)?;
-    run_queue.push(woken).map_err(TaskSmokeError::Queue)?;
+    run_queue.push(woken).map_err(rejected_queue_error)?;
 
     let status = TaskSmokeStatus {
         created_tasks: 4,
@@ -125,4 +131,20 @@ fn task(id: u64, core: CoreId) -> Result<Task, TaskSmokeError> {
     let priority = Priority::new(1).map_err(TaskSmokeError::Priority)?;
     let budget = TimeBudget::new(10).map_err(TaskSmokeError::Budget)?;
     Ok(Task::new(TaskId::new(id), core, priority, budget))
+}
+
+fn rejected_queue_error(rejected: TaskRejected) -> TaskSmokeError {
+    TaskSmokeError::Queue(rejected.error())
+}
+
+fn rejected_matches(
+    result: Result<(), TaskRejected>,
+    error: TaskQueueError,
+    task_id: TaskId,
+) -> bool {
+    let Err(rejected) = result else {
+        return false;
+    };
+
+    rejected.error() == error && rejected.task().id() == task_id
 }

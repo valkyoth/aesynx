@@ -3,7 +3,7 @@ use core::fmt::{self, Write};
 
 use crate::{
     LocalRunQueue, MAX_PRIORITY, MAX_TASK_BUDGET_TICKS, Priority, SchedError, Task, TaskQueueError,
-    TaskState, TimeBudget, WaitQueue, WaitReason,
+    TaskRejected, TaskState, TimeBudget, WaitQueue, WaitReason,
 };
 
 fn task(id: u64, core: u32) -> Task {
@@ -128,9 +128,21 @@ fn local_run_queue_rejects_invalid_tasks_without_mutation() {
     assert_eq!(waiting.transition(TaskState::Running), Ok(()));
     assert_eq!(waiting.transition(TaskState::WaitingOnMessage), Ok(()));
 
-    assert_eq!(queue.push(task(0, 0)), Err(TaskQueueError::TaskIdZero));
-    assert_eq!(queue.push(task(1, 1)), Err(TaskQueueError::WrongCore));
-    assert_eq!(queue.push(waiting), Err(TaskQueueError::TaskNotRunnable));
+    assert_rejected(
+        queue.push(task(0, 0)),
+        TaskQueueError::TaskIdZero,
+        TaskId::new(0),
+    );
+    assert_rejected(
+        queue.push(task(1, 1)),
+        TaskQueueError::WrongCore,
+        TaskId::new(1),
+    );
+    assert_rejected(
+        queue.push(waiting),
+        TaskQueueError::TaskNotRunnable,
+        TaskId::new(1),
+    );
     assert_eq!(queue.status(), before);
 }
 
@@ -143,12 +155,20 @@ fn local_run_queue_full_and_duplicate_pushes_do_not_mutate() {
 
     assert_eq!(queue.push(task(1, 0)), Ok(()));
     let before_duplicate = queue.status();
-    assert_eq!(queue.push(task(1, 0)), Err(TaskQueueError::DuplicateTask));
+    assert_rejected(
+        queue.push(task(1, 0)),
+        TaskQueueError::DuplicateTask,
+        TaskId::new(1),
+    );
     assert_eq!(queue.status(), before_duplicate);
 
     assert_eq!(queue.push(task(2, 0)), Ok(()));
     let before_full = queue.status();
-    assert_eq!(queue.push(task(3, 0)), Err(TaskQueueError::QueueFull));
+    assert_rejected(
+        queue.push(task(3, 0)),
+        TaskQueueError::QueueFull,
+        TaskId::new(3),
+    );
     assert_eq!(queue.status(), before_full);
 }
 
@@ -184,7 +204,11 @@ fn wait_queue_rejects_wrong_reason_without_mutation() {
     assert_eq!(waiting.transition(TaskState::WaitingOnMessage), Ok(()));
     let before = queue.status();
 
-    assert_eq!(queue.push(waiting), Err(TaskQueueError::WaitReasonMismatch));
+    assert_rejected(
+        queue.push(waiting),
+        TaskQueueError::WaitReasonMismatch,
+        TaskId::new(1),
+    );
     assert_eq!(queue.status(), before);
 }
 
@@ -262,4 +286,14 @@ impl Write for TestBuffer {
         self.len = end;
         Ok(())
     }
+}
+
+fn assert_rejected(result: Result<(), TaskRejected>, error: TaskQueueError, task_id: TaskId) {
+    let rejected = match result {
+        Ok(()) => return assert_eq!(Ok::<(), TaskQueueError>(()), Err(error)),
+        Err(rejected) => rejected,
+    };
+
+    assert_eq!(rejected.error(), error);
+    assert_eq!(rejected.task().id(), task_id);
 }

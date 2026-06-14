@@ -48,19 +48,33 @@ impl<const CAPACITY: usize> LocalRunQueue<CAPACITY> {
         self.len == 0
     }
 
-    pub fn push(&mut self, task: Task) -> Result<(), TaskQueueError> {
-        validate_task_id(task.id())?;
+    pub fn push(&mut self, task: Task) -> Result<(), TaskRejected> {
+        if let Err(error) = validate_task_id(task.id()) {
+            return Err(TaskRejected { error, task });
+        }
         if task.owner_core() != self.owner_core {
-            return Err(TaskQueueError::WrongCore);
+            return Err(TaskRejected {
+                error: TaskQueueError::WrongCore,
+                task,
+            });
         }
         if task.state() != TaskState::Runnable {
-            return Err(TaskQueueError::TaskNotRunnable);
+            return Err(TaskRejected {
+                error: TaskQueueError::TaskNotRunnable,
+                task,
+            });
         }
         if self.contains(task.id()) {
-            return Err(TaskQueueError::DuplicateTask);
+            return Err(TaskRejected {
+                error: TaskQueueError::DuplicateTask,
+                task,
+            });
         }
         if self.len == CAPACITY {
-            return Err(TaskQueueError::QueueFull);
+            return Err(TaskRejected {
+                error: TaskQueueError::QueueFull,
+                task,
+            });
         }
 
         let tail = (self.head + self.len) % CAPACITY;
@@ -134,16 +148,27 @@ impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
         }
     }
 
-    pub fn push(&mut self, task: Task) -> Result<(), TaskQueueError> {
-        validate_task_id(task.id())?;
+    pub fn push(&mut self, task: Task) -> Result<(), TaskRejected> {
+        if let Err(error) = validate_task_id(task.id()) {
+            return Err(TaskRejected { error, task });
+        }
         if self.reason.task_state() != task.state() {
-            return Err(TaskQueueError::WaitReasonMismatch);
+            return Err(TaskRejected {
+                error: TaskQueueError::WaitReasonMismatch,
+                task,
+            });
         }
         if self.contains(task.id()) {
-            return Err(TaskQueueError::DuplicateTask);
+            return Err(TaskRejected {
+                error: TaskQueueError::DuplicateTask,
+                task,
+            });
         }
         if self.len == CAPACITY {
-            return Err(TaskQueueError::QueueFull);
+            return Err(TaskRejected {
+                error: TaskQueueError::QueueFull,
+                task,
+            });
         }
 
         let tail = (self.head + self.len) % CAPACITY;
@@ -200,6 +225,29 @@ impl WaitReason {
             Self::Timer => TaskState::WaitingOnTimer,
             Self::Object => TaskState::WaitingOnObject,
         }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct TaskRejected {
+    error: TaskQueueError,
+    task: Task,
+}
+
+impl TaskRejected {
+    #[must_use]
+    pub const fn error(&self) -> TaskQueueError {
+        self.error
+    }
+
+    #[must_use]
+    pub const fn task(&self) -> &Task {
+        &self.task
+    }
+
+    #[must_use]
+    pub fn into_task(self) -> Task {
+        self.task
     }
 }
 
