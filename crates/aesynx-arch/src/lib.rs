@@ -1,5 +1,5 @@
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 use aesynx_abi::{CoreId, IrqLine, PhysAddr, VirtAddr};
 use aesynx_mm::{AddressSpace, GenericPageFlags};

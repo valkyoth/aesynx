@@ -1,5 +1,5 @@
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 mod confidence;
 mod manifest;

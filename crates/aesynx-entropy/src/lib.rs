@@ -1,5 +1,5 @@
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EntropyCapabilities {

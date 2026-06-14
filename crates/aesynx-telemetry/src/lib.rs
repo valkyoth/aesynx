@@ -1,5 +1,5 @@
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 mod event;
 mod scheduler;
@@ -71,8 +71,8 @@ impl CoreTelemetry {
         self.migrations_out.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn inc_cap_faults(&self) {
-        let _ = self.record_cap_fault(CapFaultKind::Unknown);
+    pub fn inc_cap_faults(&self) -> Result<CapFaultEvent, TelemetryError> {
+        self.record_cap_fault(CapFaultKind::Unknown)
     }
 
     pub fn record_cap_fault(&self, kind: CapFaultKind) -> Result<CapFaultEvent, TelemetryError> {
@@ -341,7 +341,13 @@ mod tests {
         telemetry.inc_idle_ticks();
         telemetry.inc_migrations_in();
         telemetry.inc_migrations_out();
-        telemetry.inc_cap_faults();
+        assert_eq!(
+            telemetry.inc_cap_faults(),
+            Ok(super::CapFaultEvent {
+                kind: CapFaultKind::Unknown,
+                total_cap_faults: 1,
+            })
+        );
         telemetry.inc_page_faults();
         telemetry.inc_driver_irqs();
 

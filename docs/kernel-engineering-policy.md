@@ -12,7 +12,9 @@ Crates under `crates/` are kernel, runtime, ABI, or model-adjacent crates. They
 must:
 
 - Use `#![no_std]`.
-- Use `#![deny(unsafe_code)]` unless an unsafe exception is documented first.
+- Use `#![forbid(unsafe_code)]` for unsafe-free crates.
+- Use `#![deny(unsafe_code)]` only for crates with documented unsafe islands
+  that need narrow local `#[allow(unsafe_code)]` exceptions.
 - Avoid `std` imports entirely.
 - Prefer Aesynx-owned primitives for kernel-critical behavior.
 - Keep external dependencies out unless a serious reason is documented.
@@ -82,8 +84,9 @@ internals. It is not allowed until the exact boundary is documented in
 `scripts/validate-kernel-policy.sh` enforces the current baseline:
 
 - Every crate under `crates/` has `#![no_std]`.
-- Every crate under `crates/` has `#![deny(unsafe_code)]` or
-  `#![forbid(unsafe_code)]`.
+- Every unsafe-free crate under `crates/` uses `#![forbid(unsafe_code)]`.
+- Every unsafe-bearing crate under `crates/` keeps `#![deny(unsafe_code)]` and
+  documents each local unsafe exception in `docs/unsafe-policy.md`.
 - No Rust file under `crates/` imports `std`.
 - Non-Aesynx dependencies must have an exception entry in this document.
 

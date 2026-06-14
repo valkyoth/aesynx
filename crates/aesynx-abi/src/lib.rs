@@ -1,5 +1,5 @@
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 macro_rules! id_type {
     ($(#[$meta:meta])* $name:ident, $inner:ty) => {

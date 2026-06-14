@@ -382,9 +382,11 @@ fn boot_entry() -> ! {
 }
 
 #[cfg(all(target_os = "none", feature = "panic-smoke"))]
-#[allow(clippy::panic)]
 fn trigger_panic_smoke() -> ! {
-    panic!("intentional v0.16.0 panic smoke");
+    let values = [0u8; 1];
+    let index = core::hint::black_box(1usize);
+    let _ = values[index];
+    aesynx_arch_x86_64::X86_64::halt_forever()
 }
 
 #[cfg(target_os = "none")]

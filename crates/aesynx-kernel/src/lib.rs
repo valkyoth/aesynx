@@ -1,5 +1,5 @@
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 pub mod diagnostics;
 pub mod kernel_mapping_policy;

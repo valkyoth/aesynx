@@ -13,12 +13,18 @@ Kernel and runtime crates under `crates/` must use:
 
 ```rust
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 ```
 
 Unsafe is forbidden by default. Any crate or module that needs unsafe must first
 be admitted as an explicit exception in this document, with a narrowly scoped
 purpose and tests/evidence.
+
+Unsafe-bearing architecture or kernel-entry crates may keep
+`#![deny(unsafe_code)]` only so their documented modules can use narrow local
+`#[allow(unsafe_code)]` exceptions. Unsafe-free crates should use
+`#![forbid(unsafe_code)]` so a later local `allow` cannot silently downgrade the
+crate boundary.
 
 Host-only tools may use `std`, but they still inherit the workspace lint policy.
 

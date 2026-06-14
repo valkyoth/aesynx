@@ -19,6 +19,21 @@ for manifest in crates/*/Cargo.toml; do
         echo "kernel policy: missing unsafe-code denial: $root" >&2
         exit 1
     fi
+
+    case "$crate_dir" in
+        crates/aesynx-arch-aarch64|crates/aesynx-arch-x86_64)
+            if ! grep -Fq '#![deny(unsafe_code)]' "$root"; then
+                echo "kernel policy: unsafe-bearing crate must use deny plus documented local exceptions: $root" >&2
+                exit 1
+            fi
+            ;;
+        *)
+            if ! grep -Fq '#![forbid(unsafe_code)]' "$root"; then
+                echo "kernel policy: unsafe-free crate must use #![forbid(unsafe_code)]: $root" >&2
+                exit 1
+            fi
+            ;;
+    esac
 done
 
 if grep -RInE '(^|[^A-Za-z0-9_])std::|extern crate std' crates --include='*.rs' 2>/dev/null; then
