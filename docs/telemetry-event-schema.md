@@ -32,6 +32,10 @@ Supported event kinds:
 - Unknown event kinds and unknown fields fail closed.
 - Unknown enum labels fail closed. Schema v1 accepts only documented phase,
   capability-fault kind, and scheduler reason labels.
+- Serial lines are bounded to 16 fields before duplicate detection, and decoded
+  output is bounded to 4096 trace events per file.
+- The CLI refuses input files larger than 16 MiB before reading them into
+  memory.
 - `core`, `runnable_before`, and `timer_wait_before` must fit the kernel's
   current `u32` telemetry fields; `sequence` and `total_cap_faults` are `u64`.
 - Decoded output is canonicalized from typed values, so accepted numeric fields

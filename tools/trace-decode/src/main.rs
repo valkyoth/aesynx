@@ -4,6 +4,8 @@ use std::process::ExitCode;
 
 use trace_decode::decode_serial_trace;
 
+const MAX_TRACE_LOG_BYTES: u64 = 16 * 1024 * 1024;
+
 fn main() -> ExitCode {
     let mut args = env::args();
     let _program = args.next();
@@ -20,6 +22,18 @@ fn main() -> ExitCode {
     if args.next().is_some() {
         eprintln!("trace-decode: expected exactly one serial log path");
         return ExitCode::from(2);
+    }
+
+    let metadata = match fs::metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            eprintln!("trace-decode: failed to inspect {path}: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if metadata.len() > MAX_TRACE_LOG_BYTES {
+        eprintln!("trace-decode: {path} exceeds {MAX_TRACE_LOG_BYTES} byte limit");
+        return ExitCode::FAILURE;
     }
 
     let input = match fs::read_to_string(&path) {

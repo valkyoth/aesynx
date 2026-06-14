@@ -5,8 +5,10 @@ pub enum CoreExportPolicy {
 
 pub const CORE_EXPORT_POLICY: CoreExportPolicy = CoreExportPolicy::VisibleLocalCoreId;
 pub const SUPPORTED_SCHEMA_VERSION: u16 = 1;
+pub const MAX_TRACE_EVENTS: usize = 4096;
 
 const TRACE_PREFIX: &str = "trace-event ";
+const MAX_FIELDS: usize = 16;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum TraceDecodeError {
@@ -16,6 +18,7 @@ pub enum TraceDecodeError {
     MissingField(&'static str),
     NoTraceEvents,
     RedactionViolation,
+    TraceLimitExceeded,
     UnsupportedEvent,
     UnsupportedSchema,
     UnknownField,
@@ -51,6 +54,9 @@ pub fn decode_serial_trace(input: &str) -> Result<TraceExport, TraceDecodeError>
         let Some(rest) = line.strip_prefix(TRACE_PREFIX) else {
             continue;
         };
+        if lines.len() >= MAX_TRACE_EVENTS {
+            return Err(TraceDecodeError::TraceLimitExceeded);
+        }
         lines.push(decode_trace_event(rest)?);
     }
 
@@ -184,6 +190,9 @@ fn decode_scheduler_decision(
 fn parse_fields(input: &str) -> Result<Vec<(&str, &str)>, TraceDecodeError> {
     let mut fields = Vec::new();
     for token in input.split_whitespace() {
+        if fields.len() >= MAX_FIELDS {
+            return Err(TraceDecodeError::UnknownField);
+        }
         let Some((key, value)) = token.split_once('=') else {
             return Err(TraceDecodeError::UnknownField);
         };
@@ -196,13 +205,12 @@ fn parse_fields(input: &str) -> Result<Vec<(&str, &str)>, TraceDecodeError> {
 }
 
 fn decode_common_fields(fields: &[(&str, &str)]) -> Result<CommonFields, TraceDecodeError> {
-    let sequence = parse_u64(required_field(fields, "sequence")?)?;
-    let core = parse_u32(required_field(fields, "core")?)?;
-
     let schema = parse_u64(required_field(fields, "schema")?)?;
     if schema != u64::from(SUPPORTED_SCHEMA_VERSION) {
         return Err(TraceDecodeError::UnsupportedSchema);
     }
+    let sequence = parse_u64(required_field(fields, "sequence")?)?;
+    let core = parse_u32(required_field(fields, "core")?)?;
     Ok(CommonFields {
         schema: SUPPORTED_SCHEMA_VERSION,
         sequence,
@@ -263,7 +271,7 @@ fn parse_bool(value: &str) -> Result<bool, TraceDecodeError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{TraceDecodeError, decode_serial_trace};
+    use super::{MAX_TRACE_EVENTS, TraceDecodeError, decode_serial_trace};
 
     const TRACE_FIXTURE: &str = "\
 boot noise
@@ -386,6 +394,40 @@ trace-event schema=01 event=scheduler-decision sequence=0002 core=0000 selected_
         assert_eq!(
             decode_serial_trace(missing_phase),
             Err(TraceDecodeError::MissingField("phase"))
+        );
+    }
+
+    #[test]
+    fn trace_decoder_rejects_too_many_fields_before_duplicate_scan_growth() {
+        let too_many_fields = "\
+trace-event schema=1 event=boot-phase sequence=0 core=0 phase=running a=1 b=2 c=3 d=4 e=5 f=6 g=7 h=8 i=9 j=10 k=11 l=12
+";
+
+        assert_eq!(
+            decode_serial_trace(too_many_fields),
+            Err(TraceDecodeError::UnknownField)
+        );
+    }
+
+    #[test]
+    fn trace_decoder_rejects_too_many_trace_events() {
+        let event = "trace-event schema=1 event=boot-phase sequence=0 core=0 phase=running\n";
+        let input = event.repeat(MAX_TRACE_EVENTS + 1);
+
+        assert_eq!(
+            decode_serial_trace(&input),
+            Err(TraceDecodeError::TraceLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn trace_decoder_reports_unsupported_schema_before_later_numeric_fields() {
+        let unknown =
+            "trace-event schema=2 event=boot-phase sequence=bad core=also-bad phase=running\n";
+
+        assert_eq!(
+            decode_serial_trace(unknown),
+            Err(TraceDecodeError::UnsupportedSchema)
         );
     }
 }
