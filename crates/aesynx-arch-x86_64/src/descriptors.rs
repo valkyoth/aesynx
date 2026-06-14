@@ -1,5 +1,5 @@
 use core::mem::size_of;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicU8, Ordering};
 
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 use aesynx_arch::ArchCpu;
@@ -23,11 +23,20 @@ const KERNEL_DATA_DESCRIPTOR: u64 = 0x00af_9200_0000_ffff;
 const TSS_DESCRIPTOR_TYPE: u64 = 0x9;
 const PRESENT_BIT: u64 = 1 << 47;
 const X86_64_KERNEL_VMA_MIN: u64 = 0xffff_8000_0000_0000;
+const INIT_UNINITIALIZED: u8 = 0;
+const INIT_IN_PROGRESS: u8 = 1;
+const INIT_READY: u8 = 2;
+const MSR_FS_BASE: u32 = 0xc000_0100;
+const MSR_GS_BASE: u32 = 0xc000_0101;
+const MSR_KERNEL_GS_BASE: u32 = 0xc000_0102;
 
-static INITIALIZED: AtomicBool = AtomicBool::new(false);
+static INIT_STATE: AtomicU8 = AtomicU8::new(INIT_UNINITIALIZED);
 
+// TODO(smp): move GDT storage to per-core ownership before enabling SMP.
 static mut GDT: [u64; GDT_ENTRIES] = [0; GDT_ENTRIES];
+// TODO(smp): move TSS storage to per-core ownership before enabling SMP.
 static mut TSS: TaskStateSegment = TaskStateSegment::new();
+// TODO(smp): allocate a dedicated double-fault IST stack per core.
 static mut DOUBLE_FAULT_STACK: AlignedStack = AlignedStack::new();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,6 +46,23 @@ pub struct DescriptorTableStatus {
     pub double_fault_ist: InterruptStackTableIndex,
     pub double_fault_stack_bytes: usize,
     pub initialized_this_call: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SegmentBaseMsr {
+    Fs,
+    Gs,
+    KernelGs,
+}
+
+impl SegmentBaseMsr {
+    const fn index(self) -> u32 {
+        match self {
+            Self::Fs => MSR_FS_BASE,
+            Self::Gs => MSR_GS_BASE,
+            Self::KernelGs => MSR_KERNEL_GS_BASE,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -76,19 +102,31 @@ impl InterruptStackTableIndex {
 
 #[must_use]
 pub fn init() -> DescriptorTableStatus {
-    let initialized_this_call = !INITIALIZED.swap(true, Ordering::AcqRel);
-    if initialized_this_call {
-        // SAFETY: Descriptor-table initialization runs during early single-core
-        // boot before interrupts are enabled by Aesynx. The statics are private
-        // to this module, initialized once, and then treated as read-only CPU
-        // tables for the rest of early boot.
-        unsafe {
-            init_tables();
-            load_gdt();
-            reload_segment_registers();
-            load_task_register(SegmentSelector::TSS);
+    let initialized_this_call = match INIT_STATE.compare_exchange(
+        INIT_UNINITIALIZED,
+        INIT_IN_PROGRESS,
+        Ordering::AcqRel,
+        Ordering::Acquire,
+    ) {
+        Ok(_) => {
+            // SAFETY: Descriptor-table initialization runs during early single-core
+            // boot before interrupts are enabled by Aesynx. The statics are private
+            // to this module, initialized once, and then treated as read-only CPU
+            // tables for the rest of early boot.
+            unsafe {
+                init_tables();
+                load_gdt();
+                reload_segment_registers();
+                load_task_register(SegmentSelector::TSS);
+            }
+            INIT_STATE.store(INIT_READY, Ordering::Release);
+            true
         }
-    }
+        Err(INIT_READY) => false,
+        Err(_) => {
+            fail_closed_init("descriptor table init re-entered\n");
+        }
+    };
 
     DescriptorTableStatus {
         gdt_entries: GDT_ENTRIES,
@@ -124,6 +162,9 @@ pub unsafe fn set_ring0_stack(stack_top: u64) -> Result<(), Ring0StackError> {
         return Err(Ring0StackError::InterruptsEnabled);
     }
 
+    // NOTE: this is a single aligned 64-bit store, which is atomic with
+    // respect to interrupt/NMI observation on x86_64. Do not split it into
+    // multiple writes.
     // SAFETY: The public unsafe contract above requires a valid current-CPU
     // kernel stack pointer and masked interrupts before privilege transitions
     // or TSS/IST consumers can observe the update.
@@ -222,6 +263,51 @@ unsafe fn reload_segment_registers() {
             return_address = lateout(reg) _,
             options(preserves_flags)
         );
+        clear_fs_gs_bases();
+    }
+}
+
+unsafe fn clear_fs_gs_bases() {
+    // SAFETY: These are architectural x86_64 segment-base MSRs. Clearing them
+    // removes bootloader/firmware residual state after FS/GS selectors are
+    // reset and before Aesynx has any TLS/per-CPU base policy.
+    unsafe {
+        write_segment_base_msr(SegmentBaseMsr::Fs, 0);
+        write_segment_base_msr(SegmentBaseMsr::Gs, 0);
+        write_segment_base_msr(SegmentBaseMsr::KernelGs, 0);
+    }
+}
+
+unsafe fn write_segment_base_msr(msr: SegmentBaseMsr, value: u64) {
+    let low = value as u32;
+    let high = (value >> 32) as u32;
+    let index = msr.index();
+    // SAFETY: The caller admits the architectural MSR and preserves its
+    // reserved-bit requirements.
+    unsafe {
+        core::arch::asm!(
+            "wrmsr",
+            in("ecx") index,
+            in("eax") low,
+            in("edx") high,
+            options(nomem, nostack, preserves_flags)
+        );
+    }
+}
+
+fn fail_closed_init(message: &str) -> ! {
+    #[cfg(all(target_arch = "x86_64", target_os = "none"))]
+    {
+        crate::serial::write_str(message);
+        crate::X86_64::halt_forever()
+    }
+
+    #[cfg(not(all(target_arch = "x86_64", target_os = "none")))]
+    {
+        let _ = message;
+        loop {
+            core::hint::spin_loop();
+        }
     }
 }
 
@@ -306,8 +392,10 @@ mod tests {
 
     use super::{
         AlignedStack, DOUBLE_FAULT_IST_SLOT, DOUBLE_FAULT_STACK_BYTES, DescriptorTablePointer,
-        GDT_ENTRIES, InterruptStackTableIndex, KERNEL_CODE_DESCRIPTOR, KERNEL_DATA_DESCRIPTOR,
-        SegmentSelector, TaskStateSegment, tss_descriptor, valid_ring0_stack_top,
+        GDT_ENTRIES, INIT_IN_PROGRESS, INIT_READY, INIT_UNINITIALIZED, InterruptStackTableIndex,
+        KERNEL_CODE_DESCRIPTOR, KERNEL_DATA_DESCRIPTOR, MSR_FS_BASE, MSR_GS_BASE,
+        MSR_KERNEL_GS_BASE, SegmentBaseMsr, SegmentSelector, TaskStateSegment, tss_descriptor,
+        valid_ring0_stack_top,
     };
 
     #[test]
@@ -316,6 +404,20 @@ mod tests {
         assert_eq!(SegmentSelector::KERNEL_DATA.bits(), 0x10);
         assert_eq!(SegmentSelector::TSS.bits(), 0x18);
         assert_eq!(GDT_ENTRIES, 5);
+    }
+
+    #[test]
+    fn init_state_values_are_ordered() {
+        assert_eq!(INIT_UNINITIALIZED, 0);
+        assert_eq!(INIT_IN_PROGRESS, 1);
+        assert_eq!(INIT_READY, 2);
+    }
+
+    #[test]
+    fn admitted_segment_base_msrs_are_explicit() {
+        assert_eq!(SegmentBaseMsr::Fs.index(), MSR_FS_BASE);
+        assert_eq!(SegmentBaseMsr::Gs.index(), MSR_GS_BASE);
+        assert_eq!(SegmentBaseMsr::KernelGs.index(), MSR_KERNEL_GS_BASE);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use core::arch::global_asm;
 use core::mem::size_of;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicU8, Ordering};
 
 use aesynx_arch::ArchCpu;
 
@@ -28,9 +28,13 @@ const EXCEPTION_STUB_BYTES: usize = 16;
 const RETURNING_EXCEPTION_GPR_SAVE_COUNT: usize = 15;
 const RETURNING_EXCEPTION_GPR_SAVE_BYTES: usize =
     RETURNING_EXCEPTION_GPR_SAVE_COUNT * size_of::<u64>();
+const INIT_UNINITIALIZED: u8 = 0;
+const INIT_IN_PROGRESS: u8 = 1;
+const INIT_READY: u8 = 2;
 
-static INITIALIZED: AtomicBool = AtomicBool::new(false);
+static INIT_STATE: AtomicU8 = AtomicU8::new(INIT_UNINITIALIZED);
 
+// TODO(smp): move IDT storage to per-core ownership before enabling SMP.
 static mut IDT: [IdtEntry; IDT_ENTRIES] = [IdtEntry::missing(); IDT_ENTRIES];
 
 global_asm!(
@@ -170,17 +174,27 @@ pub struct ExceptionTableStatus {
 
 #[must_use]
 pub fn init(double_fault_ist: InterruptStackTableIndex) -> ExceptionTableStatus {
-    let initialized_this_call = !INITIALIZED.swap(true, Ordering::AcqRel);
-    if initialized_this_call {
-        // SAFETY: IDT setup runs during early single-core boot before Aesynx
-        // enables external interrupts. The IDT static is private and remains
-        // valid after `lidt`; handler symbols are fixed assembly stubs in this
-        // module.
-        unsafe {
-            init_idt(double_fault_ist);
-            load_idt();
+    let initialized_this_call = match INIT_STATE.compare_exchange(
+        INIT_UNINITIALIZED,
+        INIT_IN_PROGRESS,
+        Ordering::AcqRel,
+        Ordering::Acquire,
+    ) {
+        Ok(_) => {
+            // SAFETY: IDT setup runs during early single-core boot before Aesynx
+            // enables external interrupts. The IDT static is private and remains
+            // valid after `lidt`; handler symbols are fixed assembly stubs in this
+            // module.
+            unsafe {
+                init_idt(double_fault_ist);
+                load_idt();
+            }
+            INIT_STATE.store(INIT_READY, Ordering::Release);
+            true
         }
-    }
+        Err(INIT_READY) => false,
+        Err(_) => fail_closed_init("exception table init re-entered\n"),
+    };
 
     ExceptionTableStatus {
         idt_entries: IDT_ENTRIES,
@@ -210,12 +224,7 @@ pub(crate) fn install_interrupt_gate(
         return Err(IdtError::InvalidInterruptVector);
     }
 
-    let interrupts_were_enabled = interrupts_were_enabled_before_masking();
-    debug_assert!(
-        !interrupts_were_enabled,
-        "install_interrupt_gate called with interrupts enabled"
-    );
-    if interrupts_were_enabled {
+    if mask_interrupts_and_was_enabled() {
         let _ = crate::X86_64::enable_interrupts();
         return Err(IdtError::CpuStateUnavailable);
     }
@@ -233,7 +242,7 @@ pub(crate) fn install_interrupt_gate(
     Ok(())
 }
 
-fn interrupts_were_enabled_before_masking() -> bool {
+fn mask_interrupts_and_was_enabled() -> bool {
     let rflags: u64;
     // SAFETY: `pushfq; cli; pop` stores the previous RFLAGS value on the
     // current stack, masks IF for the current CPU, then copies the saved value
@@ -248,6 +257,22 @@ fn interrupts_were_enabled_before_masking() -> bool {
         );
     }
     rflags & (1 << 9) != 0
+}
+
+fn fail_closed_init(message: &str) -> ! {
+    #[cfg(all(target_arch = "x86_64", target_os = "none"))]
+    {
+        crate::serial::write_str(message);
+        crate::X86_64::halt_forever()
+    }
+
+    #[cfg(not(all(target_arch = "x86_64", target_os = "none")))]
+    {
+        let _ = message;
+        loop {
+            core::hint::spin_loop();
+        }
+    }
 }
 
 #[allow(clippy::empty_loop)]

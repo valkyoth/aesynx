@@ -1,9 +1,10 @@
 use core::mem::size_of;
 
 use super::{
-    DOUBLE_FAULT_VECTOR, ExceptionErrorCode, ExceptionFrame, IDT_ENTRIES, INTERRUPT_GATE_PRESENT,
-    IdtEntry, PAGE_FAULT_VECTOR, PageFaultErrorCode, RETURNING_EXCEPTION_GPR_SAVE_BYTES,
-    RETURNING_EXCEPTION_GPR_SAVE_COUNT, RawExceptionFrame,
+    DOUBLE_FAULT_VECTOR, ExceptionErrorCode, ExceptionFrame, IDT_ENTRIES, INIT_IN_PROGRESS,
+    INIT_READY, INIT_UNINITIALIZED, INTERRUPT_GATE_PRESENT, IdtEntry, PAGE_FAULT_VECTOR,
+    PageFaultErrorCode, RETURNING_EXCEPTION_GPR_SAVE_BYTES, RETURNING_EXCEPTION_GPR_SAVE_COUNT,
+    RawExceptionFrame,
 };
 use crate::descriptors::{InterruptStackTableIndex, SegmentSelector};
 
@@ -33,6 +34,13 @@ fn idt_shape_matches_x86_64_descriptor_size() {
     assert_eq!(IDT_ENTRIES, 256);
     assert_eq!(DOUBLE_FAULT_VECTOR, 8);
     assert_eq!(PAGE_FAULT_VECTOR, 14);
+}
+
+#[test]
+fn init_state_values_are_ordered() {
+    assert_eq!(INIT_UNINITIALIZED, 0);
+    assert_eq!(INIT_IN_PROGRESS, 1);
+    assert_eq!(INIT_READY, 2);
 }
 
 #[test]
