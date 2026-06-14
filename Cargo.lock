@@ -90,6 +90,7 @@ name = "aesynx-kernel"
 version = "0.1.0"
 dependencies = [
  "aesynx-abi",
+ "aesynx-ai-policy",
  "aesynx-arch",
  "aesynx-arch-x86_64",
  "aesynx-boot",

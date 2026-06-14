@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.31.0 - Trace Export Tool](v0.31.0-rc.md)
+- [v0.32.0 - AI Policy Interface](v0.32.0-rc.md)
 
 ## History
 
+- [v0.31.0 - Trace Export Tool](v0.31.0-rc.md)
 - [v0.30.0 - Telemetry Event Schema](v0.30.0-rc.md)
 - [v0.29.0 - Scheduler Telemetry Baseline](v0.29.0-rc.md)
 - [v0.28.0 - Cooperative Executor](v0.28.0-rc.md)

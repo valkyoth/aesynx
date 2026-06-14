@@ -105,4 +105,25 @@ pub fn run() {
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+
+    match crate::ai_policy_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "ai-policy schema={} accepted_manifest={} rejected_manifest={} fallback_used={} fallback_confidence={} fallback_core={} safety_gate_ok={}",
+                status.schema_version,
+                status.accepted_manifest,
+                status.rejected_manifest,
+                status.fallback_used,
+                status.fallback_confidence,
+                status.fallback_core,
+                status.safety_gate_ok
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] ai-policy=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("ai-policy error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] ai-policy=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
 }

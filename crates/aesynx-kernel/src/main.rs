@@ -14,33 +14,13 @@ use aesynx_kernel::diagnostics::{self, BootPhase, DiagnosticComponent};
 #[cfg(target_os = "none")]
 use aesynx_log::{LogLevel, LogMessage};
 
-#[cfg(any(
-    test,
-    all(
-        target_os = "none",
-        not(feature = "panic-smoke"),
-        not(feature = "exception-smoke"),
-        not(feature = "timer-smoke")
-    )
-))]
-mod capability_smoke;
-#[cfg(any(
-    test,
-    all(
-        target_os = "none",
-        not(feature = "panic-smoke"),
-        not(feature = "exception-smoke"),
-        not(feature = "timer-smoke")
-    )
-))]
-mod entropy_smoke;
 #[cfg(all(
     target_os = "none",
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke"),
     not(feature = "timer-smoke")
 ))]
-mod frame_allocator_smoke;
+mod execution_smoke;
 #[cfg(any(target_os = "none", test))]
 mod kernel_heap;
 #[cfg(all(
@@ -49,52 +29,7 @@ mod kernel_heap;
     not(feature = "exception-smoke"),
     not(feature = "timer-smoke")
 ))]
-mod kernel_mapping_smoke;
-#[cfg(all(
-    target_os = "none",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke"),
-    not(feature = "timer-smoke")
-))]
 mod kernel_sections;
-#[cfg(all(
-    target_os = "none",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke"),
-    not(feature = "timer-smoke")
-))]
-mod page_table_install;
-#[cfg(all(
-    target_os = "none",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke"),
-    not(feature = "timer-smoke")
-))]
-mod page_table_smoke;
-#[cfg(all(
-    target_os = "none",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke"),
-    not(feature = "timer-smoke")
-))]
-mod service_queue_smoke;
-
-#[cfg(all(
-    target_os = "none",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke"),
-    not(feature = "timer-smoke")
-))]
-mod task_smoke;
-
-#[cfg(all(
-    target_os = "none",
-    not(feature = "panic-smoke"),
-    not(feature = "exception-smoke"),
-    not(feature = "timer-smoke")
-))]
-mod cooperative_sched_smoke;
-
 #[cfg(any(
     test,
     all(
@@ -104,7 +39,7 @@ mod cooperative_sched_smoke;
         not(feature = "timer-smoke")
     )
 ))]
-mod scheduler_telemetry_smoke;
+mod smoke_modules;
 #[cfg(any(
     test,
     all(
@@ -114,15 +49,20 @@ mod scheduler_telemetry_smoke;
         not(feature = "timer-smoke")
     )
 ))]
-mod telemetry_events_smoke;
-
+pub use smoke_modules::{
+    ai_policy_smoke, capability_smoke, entropy_smoke, scheduler_telemetry_smoke,
+    telemetry_events_smoke,
+};
 #[cfg(all(
     target_os = "none",
     not(feature = "panic-smoke"),
     not(feature = "exception-smoke"),
     not(feature = "timer-smoke")
 ))]
-mod execution_smoke;
+pub use smoke_modules::{
+    cooperative_sched_smoke, frame_allocator_smoke, kernel_mapping_smoke, page_table_install,
+    page_table_smoke, service_queue_smoke, task_smoke,
+};
 
 #[cfg(target_os = "none")]
 #[global_allocator]

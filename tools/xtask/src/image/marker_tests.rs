@@ -1,4 +1,5 @@
 use super::smoke::{
+    AI_POLICY_FAIL_MARKER, AI_POLICY_MARKER, AI_POLICY_SAFETY_GATE_MARKER, AI_POLICY_STATUS_MARKER,
     BOOT_DIAGNOSTIC_MARKER, BOOTINFO_FAIL_MARKER, BOOTINFO_MARKER, CAP_AUDIT_FAIL_MARKER,
     CAP_AUDIT_MARKER, CAP_AUDIT_STATUS_MARKER, CAP_TABLE_FAIL_MARKER, CAP_TABLE_MARKER,
     CAP_TABLE_STATUS_MARKER, COOPERATIVE_SCHED_FAIL_MARKER, COOPERATIVE_SCHED_MARKER,
@@ -56,6 +57,10 @@ fn qemu_markers_track_current_contracts() {
     assert_eq!(BOOTINFO_FAIL_MARKER, "[TEST] bootinfo=fail");
     assert_eq!(BOOTINFO_MARKER, "[TEST] bootinfo=ok");
     assert_eq!(BOOT_DIAGNOSTIC_MARKER, "[kernel][INFO] bootinfo normalized");
+    assert_eq!(AI_POLICY_FAIL_MARKER, "[TEST] ai-policy=fail");
+    assert_eq!(AI_POLICY_STATUS_MARKER, "ai-policy schema=1");
+    assert_eq!(AI_POLICY_SAFETY_GATE_MARKER, "safety_gate_ok=true");
+    assert_eq!(AI_POLICY_MARKER, "[TEST] ai-policy=ok");
     assert_eq!(CAP_AUDIT_FAIL_MARKER, "[TEST] cap-audit=fail");
     assert_eq!(CAP_AUDIT_MARKER, "[TEST] cap-audit=ok");
     assert_eq!(CAP_AUDIT_STATUS_MARKER, "cap-audit events=");

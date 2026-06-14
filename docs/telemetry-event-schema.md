@@ -1,6 +1,6 @@
 # Aesynx Telemetry Event Schema
 
-Status: v0.31.0 trace export candidate
+Status: v0.31.0 tagged trace export schema
 
 Aesynx telemetry events are kernel-stamped facts for boot diagnostics and
 future world-model ingestion. The current schema is intentionally small and
