@@ -381,6 +381,26 @@ extern "C" fn activate_on_kernel_stack(
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+    match crate::service_queue_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "service-queue log_submitted={} log_observed={} completion_observed={} timer_pending={} object_pending={} release_acquire_ok={} unsupported_denied={}",
+                status.log_submitted,
+                status.log_observed,
+                status.completion_observed,
+                status.timer_pending,
+                status.object_pending,
+                status.release_acquire_ok,
+                status.unsupported_denied
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] service-queue=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("service-queue error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] service-queue=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
     aesynx_arch_x86_64::serial::write_str("kernel-cr3 active=true stack=kernel\n");
     aesynx_arch_x86_64::serial::write_str("[TEST] kernel-cr3=ok\n");
     aesynx_arch_x86_64::X86_64::halt_forever()

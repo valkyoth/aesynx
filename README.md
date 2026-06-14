@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.25.0` is the current service queue model candidate.
+`v0.26.0` is the current kernel service queue candidate.
 
 Current boot path:
 
@@ -142,14 +142,14 @@ Fuzz and property gates:
 | Capability model | Tagged | `v0.22.0`; private non-copy authority values, checked `CapId` slot/generation layout, fixed-capacity kernel capability table, permission validation, audited derive/grant/revoke paths, slot generation stale-id rejection, revoke authority checks, redacted capability/table/audit debug output, cap-fault telemetry, and memory-map authorization based on capability kind, range, and `MAP`/READ/WRITE/EXECUTE permissions. |
 | Object model | Tagged | `v0.23.0`; host-side `aesynx-object-model` crate with nonzero redacted object IDs, explicit object kinds, immutable node metadata, duplicate/self-reference rejection, append-only graph insertion, missing-reference rejection, and reachability over references plus predecessor links. |
 | Kernel object registry | Tagged | `v0.24.0`; no_std fixed-capacity `aesynx-object` registry with memory, endpoint, queue, and task-placeholder objects, local core ownership, create/list/delete operations, generation-backed slot recycling, redacted object debug output, and capability reference resolution against object ID, kind, generation, revocation epoch, and permission. |
-| Service queue model | Active candidate | `v0.25.0`; host-side `aesynx-ipc-model` crate with explicit service kinds, request/completion structures, fixed-capacity ring queue behavior, fail-closed full/empty handling, FIFO wraparound tests, modeled release/acquire publish-observe ordering evidence, and redacted IPC/service debug output before kernel service queues land. |
+| Kernel service queues | Active candidate | `v0.26.0`; no_std `aesynx-ipc` service requests/completions, typed live-core validation before message-header routing, fixed-capacity log/timer/object queue skeletons, fail-closed full/empty/unsupported-service behavior, release/acquire ordering evidence, redacted service debug output, and QEMU `[TEST] service-queue=ok`. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, v0.18.1 entropy policy evidence with `[TEST] entropy-policy=ok`, the v0.18 kernel heap smoke with `[TEST] heap=ok`, the v0.20 kernel capability-table smoke with `[TEST] cap=ok`, the v0.21 memory-capability mapping-descriptor gate with `[TEST] memory-cap=ok`, and the v0.22 capability audit/telemetry gate with `[TEST] cap-audit=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, v0.18.1 entropy policy evidence with `[TEST] entropy-policy=ok`, the v0.18 kernel heap smoke with `[TEST] heap=ok`, the v0.20 kernel capability-table smoke with `[TEST] cap=ok`, the v0.21 memory-capability mapping-descriptor gate with `[TEST] memory-cap=ok`, the v0.22 capability audit/telemetry gate with `[TEST] cap-audit=ok`, and the v0.26 kernel service queue smoke with `[TEST] service-queue=ok` from Rust `_start`. |
 | Fuzz/property smoke | Active candidate | `v0.16.1`; `cargo xtask fuzz-smoke` runs BootInfo fuzz seeds, deterministic BootInfo byte mutations, and mapper property sweeps before live CR3 activation. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
@@ -252,7 +252,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.25.0
+cargo xtask release-ready v0.26.0
 ```
 
 ## Security Posture
@@ -283,7 +283,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [BootInfo Normalization](docs/bootinfo-normalization.md)
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
-- [v0.25.0 Release Candidate Notes](docs/releases/v0.25.0-rc.md)
+- [v0.26.0 Release Candidate Notes](docs/releases/v0.26.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

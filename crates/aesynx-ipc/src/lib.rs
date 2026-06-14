@@ -4,9 +4,22 @@
 #[cfg(test)]
 extern crate alloc;
 
+mod core_set;
+mod service;
+mod service_queue;
+#[cfg(test)]
+mod service_tests;
+
 use core::fmt;
 
 use aesynx_abi::{CapId, CoreId, MessageId, ObjectId};
+
+pub use core_set::{CoreValidationError, LiveCoreSet, ValidatedCoreId};
+pub use service::{CompletionStatus, RequestError, ServiceCompletion, ServiceKind, ServiceRequest};
+pub use service_queue::{
+    ObservedEntry, QueueOrderingEvidence, QueueSetError, RingQueueError, ServiceQueuePair,
+    ServiceQueueSet, ServiceRingQueue,
+};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct MessageHeader {
@@ -19,10 +32,15 @@ pub struct MessageHeader {
 
 impl MessageHeader {
     #[must_use]
-    pub const fn stamp(request: MessageRequest, verified_src: CoreId, assigned_seq: u64) -> Self {
+    pub const fn stamp(
+        request: MessageRequest,
+        verified_src: ValidatedCoreId,
+        assigned_seq: u64,
+        verified_dst: ValidatedCoreId,
+    ) -> Self {
         Self {
-            src: verified_src,
-            dst: request.dst,
+            src: verified_src.get(),
+            dst: verified_dst.get(),
             kind: request.kind,
             seq: assigned_seq,
             reply_to: request.reply_to,
@@ -75,6 +93,15 @@ pub struct MessageRequest {
     pub dst: CoreId,
     pub kind: MessageKind,
     pub reply_to: Option<MessageId>,
+}
+
+impl MessageRequest {
+    pub fn validate_dst(
+        self,
+        live_cores: &impl LiveCoreSet,
+    ) -> Result<ValidatedCoreId, CoreValidationError> {
+        ValidatedCoreId::new(self.dst, live_cores)
+    }
 }
 
 impl fmt::Debug for MessageRequest {
@@ -196,24 +223,53 @@ mod tests {
     use aesynx_abi::{CapId, CoreId, MessageId, ObjectId};
 
     use super::{
-        InlineBytes, IpcError, MAX_INLINE_PAYLOAD_LEN, MessageHeader, MessageKind, MessagePayload,
-        MessageRequest,
+        InlineBytes, IpcError, LiveCoreSet, MAX_INLINE_PAYLOAD_LEN, MessageHeader, MessageKind,
+        MessagePayload, MessageRequest, ValidatedCoreId,
     };
+
+    struct TestCoreSet;
+
+    impl LiveCoreSet for TestCoreSet {
+        fn contains(&self, core: CoreId) -> bool {
+            core == CoreId::new(1) || core == CoreId::new(2)
+        }
+    }
 
     #[test]
     fn message_header_is_kernel_stamped() {
+        let live = TestCoreSet;
         let request = MessageRequest {
             dst: CoreId::new(2),
             kind: MessageKind::Ping,
             reply_to: Some(MessageId::new(9)),
         };
-        let header = MessageHeader::stamp(request, CoreId::new(1), 42);
+        let src = ValidatedCoreId::new(CoreId::new(1), &live);
+        let dst = request.validate_dst(&live);
+        let header = src.and_then(|src| dst.map(|dst| MessageHeader::stamp(request, src, 42, dst)));
 
-        assert_eq!(header.src(), CoreId::new(1));
-        assert_eq!(header.dst(), CoreId::new(2));
-        assert_eq!(header.kind(), MessageKind::Ping);
-        assert_eq!(header.seq(), 42);
-        assert_eq!(header.reply_to(), Some(MessageId::new(9)));
+        assert_eq!(header.map(|value| value.src()), Ok(CoreId::new(1)));
+        assert_eq!(header.map(|value| value.dst()), Ok(CoreId::new(2)));
+        assert_eq!(header.map(|value| value.kind()), Ok(MessageKind::Ping));
+        assert_eq!(header.map(|value| value.seq()), Ok(42));
+        assert_eq!(
+            header.map(|value| value.reply_to()),
+            Ok(Some(MessageId::new(9)))
+        );
+    }
+
+    #[test]
+    fn message_request_rejects_dead_destination_core() {
+        let live = TestCoreSet;
+        let request = MessageRequest {
+            dst: CoreId::new(99),
+            kind: MessageKind::Ping,
+            reply_to: None,
+        };
+
+        assert_eq!(
+            request.validate_dst(&live),
+            Err(super::CoreValidationError::UnknownCore)
+        );
     }
 
     #[test]
@@ -243,21 +299,23 @@ mod tests {
         let payload = MessagePayload::Inline(inline);
         let cap = MessagePayload::Cap(CapId::new(42));
         let object = MessagePayload::Object(ObjectId::new(99));
-        let header = MessageHeader::stamp(
-            MessageRequest {
-                dst: CoreId::new(2),
-                kind: MessageKind::WriteObject,
-                reply_to: Some(MessageId::new(7)),
-            },
-            CoreId::new(1),
-            9,
-        );
+        let live = TestCoreSet;
+        let request = MessageRequest {
+            dst: CoreId::new(2),
+            kind: MessageKind::WriteObject,
+            reply_to: Some(MessageId::new(7)),
+        };
+        let header = ValidatedCoreId::new(CoreId::new(1), &live).and_then(|src| {
+            request
+                .validate_dst(&live)
+                .map(|dst| MessageHeader::stamp(request, src, 9, dst))
+        });
 
         assert_eq!(format!("{payload:?}"), "Inline(<redacted>)");
         assert_eq!(format!("{cap:?}"), "Cap(<redacted>)");
         assert_eq!(format!("{object:?}"), "Object(<redacted>)");
-        assert!(!format!("{header:?}").contains("CoreId"));
-        assert!(!format!("{header:?}").contains("MessageId"));
+        assert!(!format!("{:?}", header.ok()).contains("CoreId"));
+        assert!(!format!("{:?}", header.ok()).contains("MessageId"));
         assert!(!format!("{inline:?}").contains("[1, 2, 3]"));
 
         Ok(())

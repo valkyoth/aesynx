@@ -82,6 +82,14 @@ mod page_table_smoke;
 ))]
 mod page_table_install;
 
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
+))]
+mod service_queue_smoke;
+
 #[cfg(target_os = "none")]
 #[global_allocator]
 static KERNEL_ALLOCATOR: kernel_heap::KernelHeapAllocator = kernel_heap::KernelHeapAllocator::new();

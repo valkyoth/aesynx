@@ -13,6 +13,7 @@ aesynx-arch-x86_64 = { path = "../aesynx-arch-x86_64", version = "0.1.0" }
 aesynx-boot.workspace = true
 aesynx-cap.workspace = true
 aesynx-entropy.workspace = true
+aesynx-ipc.workspace = true
 aesynx-log.workspace = true
 aesynx-mm.workspace = true
 aesynx-telemetry.workspace = true

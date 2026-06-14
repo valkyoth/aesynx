@@ -95,6 +95,7 @@ dependencies = [
  "aesynx-boot",
  "aesynx-cap",
  "aesynx-entropy",
+ "aesynx-ipc",
  "aesynx-log",
  "aesynx-mm",
  "aesynx-telemetry",

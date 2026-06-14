@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.25.0 Service queue model candidate
+Status: v0.26.0 Kernel service queues candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.25.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.26.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -91,30 +91,31 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `slab_reuse_ok=true`, `page_run_ok=true`, `stress_ok=true`,
 `double_free_detected=true`, `invalid_free_detected=true`, `[TEST] heap=ok`,
 `cap-table capacity=`, `[TEST] cap=ok`, `memory-cap map_allowed=`,
-`[TEST] memory-cap=ok`, `cap-audit events=`, `[TEST] cap-audit=ok`, and
+`[TEST] memory-cap=ok`, `cap-audit events=`, `[TEST] cap-audit=ok`,
+`service-queue log_submitted=`, `[TEST] service-queue=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.25.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.26.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.25.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.26.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.25.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.26.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
 `timer delayed-log`, `[TEST] sleep=ok`, `timer tick 3`, and `[TEST] timer=ok`.
 
 `cargo xtask qemu-suite` runs the boot, panic, exception, and timer smoke paths
-in sequence and is the GitHub CI QEMU gate for v0.24.
+in sequence and is the GitHub CI QEMU gate for v0.26.
 
 `cargo xtask fuzz-smoke` runs the bounded v0.16.1 host fuzz/property gate. It
 executes the BootInfo normalization fuzz seeds and deterministic byte-mutation
@@ -182,14 +183,14 @@ activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.25.0 candidate adds the host-side service queue model. It defines
-explicit service kinds, kernel-stamped request metadata, completion statuses,
-fixed-capacity ring queue behavior, FIFO wraparound, fail-closed full/empty
-handling, modeled release/acquire publish-observe ordering evidence, and
-redacted IPC/service debug output. It also hardens object-registry capability
-resolution against stale revocation epochs. This is still host-tested queue
-logic; the live boot path does not yet expose object syscalls or kernel service
-queues.
+The v0.26.0 candidate adds kernel-facing service queues. It defines explicit
+service kinds, kernel-stamped request metadata, completion statuses,
+fixed-capacity ring queue behavior, FIFO wraparound, fail-closed
+full/empty/unsupported-service handling, modeled release/acquire
+publish-observe ordering evidence, and redacted IPC/service debug output. The
+live boot path now submits and completes a log request through the queue set
+before `[TEST] service-queue=ok`; userspace syscalls, blocking receive, SMP
+doorbells, and real service-side work remain future milestones.
 
 ## Target Shape
 
