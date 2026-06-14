@@ -1,4 +1,4 @@
-use core::alloc::{GlobalAlloc, Layout};
+use core::alloc::Layout;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[cfg(feature = "smp")]
@@ -7,13 +7,14 @@ compile_error!(
      explicit interior mutability or per-core ownership before enabling smp"
 );
 
+use super::backing::kernel_heap_start;
 use super::free_list::{
     FREE_LIST_EMPTY, decode_offset, encode_offset, read_free_next, write_free_next, zero_heap_bytes,
 };
 use super::layout::{
-    AlignedKernelHeap, KERNEL_HEAP_BYTES, KERNEL_HEAP_PAGE_SIZE, KERNEL_HEAP_PAGES, PAGE_FREE,
-    PAGE_LARGE_HEAD, PAGE_LARGE_TAIL, PAGE_SLAB_BASE, SLAB_CLASS_COUNT, SLAB_CLASSES,
-    class_for_layout, page_count_for_len, pages_for_size,
+    KERNEL_HEAP_BYTES, KERNEL_HEAP_PAGE_SIZE, KERNEL_HEAP_PAGES, PAGE_FREE, PAGE_LARGE_HEAD,
+    PAGE_LARGE_TAIL, PAGE_SLAB_BASE, SLAB_CLASS_COUNT, SLAB_CLASSES, class_for_layout,
+    page_count_for_len, pages_for_size,
 };
 use super::lock::HeapLockGuard;
 use super::stats::{KernelHeapError, KernelHeapStats};
@@ -351,12 +352,12 @@ impl KernelHeapAllocator {
     fn reclaim_slab_page_locked(&self, class: usize, page: usize) -> Result<(), KernelHeapError> {
         let page_offset = page * KERNEL_HEAP_PAGE_SIZE;
         let page_end = page_offset + KERNEL_HEAP_PAGE_SIZE;
+        self.validate_free_list_locked(class)?;
+
         let mut old_head = self.free_heads[class].load(Ordering::Acquire);
         let mut new_head = FREE_LIST_EMPTY;
         while old_head != FREE_LIST_EMPTY {
-            let Some(offset) = decode_offset(old_head) else {
-                return Err(KernelHeapError::CorruptFreeList);
-            };
+            let offset = decode_offset(old_head).ok_or(KernelHeapError::CorruptFreeList)?;
             let ptr = self.ptr_for_offset(offset);
             let next = read_free_next(ptr);
             if offset < page_offset || offset >= page_end {
@@ -368,6 +369,30 @@ impl KernelHeapAllocator {
         self.free_heads[class].store(new_head, Ordering::Release);
         self.page_live_blocks[page].store(0, Ordering::Release);
         self.page_state[page].store(PAGE_FREE, Ordering::Release);
+        Ok(())
+    }
+
+    fn validate_free_list_locked(&self, class: usize) -> Result<(), KernelHeapError> {
+        let block_size = SLAB_CLASSES[class];
+        let total_bytes = self.total_pages.load(Ordering::Acquire) * KERNEL_HEAP_PAGE_SIZE;
+        let max_blocks = total_bytes / block_size;
+        let mut seen = 0usize;
+        let mut cursor = self.free_heads[class].load(Ordering::Acquire);
+
+        while cursor != FREE_LIST_EMPTY {
+            if seen >= max_blocks {
+                return Err(KernelHeapError::CorruptFreeList);
+            }
+
+            let offset = decode_offset(cursor).ok_or(KernelHeapError::CorruptFreeList)?;
+            if offset >= total_bytes || !offset.is_multiple_of(block_size) {
+                return Err(KernelHeapError::CorruptFreeList);
+            }
+
+            cursor = read_free_next(self.ptr_for_offset(offset));
+            seen += 1;
+        }
+
         Ok(())
     }
 
@@ -463,30 +488,3 @@ impl KernelHeapAllocator {
         HeapLockGuard::lock(&self.locked)
     }
 }
-
-// SAFETY: `KernelHeapAllocator` serializes metadata mutation with a private
-// IRQ-masking spin lock, hands out nonoverlapping blocks from a private
-// page-aligned static heap, and reconstructs the allocation class from the
-// `Layout` supplied by `GlobalAlloc::dealloc`.
-unsafe impl GlobalAlloc for KernelHeapAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.allocate_checked(layout)
-            .unwrap_or(core::ptr::null_mut())
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        let _ = self.deallocate_checked(ptr, layout);
-    }
-}
-
-fn kernel_heap_start() -> usize {
-    // SAFETY: Taking the raw address of the private static heap does not read
-    // or write the heap and does not construct a Rust reference. The address is
-    // used only as a numeric allocator bound during one-shot initialization.
-    let heap = unsafe { core::ptr::addr_of_mut!(KERNEL_HEAP.bytes) as *mut u8 };
-    core::hint::black_box(heap as usize)
-}
-
-#[unsafe(link_section = ".aesynx_kernel_heap")]
-#[used]
-static mut KERNEL_HEAP: AlignedKernelHeap = AlignedKernelHeap::ZERO;

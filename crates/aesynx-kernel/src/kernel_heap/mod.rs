@@ -9,7 +9,9 @@
 )]
 
 mod allocator;
+mod backing;
 mod free_list;
+mod global_alloc;
 mod layout;
 mod lock;
 mod stats;

@@ -16,6 +16,7 @@ pub struct ServiceQueueSmokeStatus {
     pub object_pending: bool,
     pub release_acquire_ok: bool,
     pub unsupported_denied: bool,
+    pub unsupported_pending_denied: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,10 +72,21 @@ pub fn run() -> Result<ServiceQueueSmokeStatus, ServiceQueueSmokeError> {
     queues
         .submit(object)
         .map_err(ServiceQueueSmokeError::Queue)?;
-    let log_submitted = queues.pending_requests(ServiceKind::Log) == 1;
-    let timer_pending = queues.pending_requests(ServiceKind::Timer) == 1;
-    let object_pending = queues.pending_requests(ServiceKind::Object) == 1;
+    let log_submitted = queues
+        .pending_requests(ServiceKind::Log)
+        .map_err(ServiceQueueSmokeError::Queue)?
+        == 1;
+    let timer_pending = queues
+        .pending_requests(ServiceKind::Timer)
+        .map_err(ServiceQueueSmokeError::Queue)?
+        == 1;
+    let object_pending = queues
+        .pending_requests(ServiceKind::Object)
+        .map_err(ServiceQueueSmokeError::Queue)?
+        == 1;
     let unsupported_denied = queues.submit(unsupported) == Err(QueueSetError::UnsupportedService);
+    let unsupported_pending_denied =
+        queues.pending_requests(ServiceKind::Capability) == Err(QueueSetError::UnsupportedService);
     let observed = queues
         .pop_request(ServiceKind::Log)
         .map_err(ServiceQueueSmokeError::Queue)?;
@@ -107,6 +119,7 @@ pub fn run() -> Result<ServiceQueueSmokeStatus, ServiceQueueSmokeError> {
         || !object_pending
         || !release_acquire_ok
         || !unsupported_denied
+        || !unsupported_pending_denied
     {
         return Err(ServiceQueueSmokeError::UnexpectedState);
     }
@@ -119,6 +132,7 @@ pub fn run() -> Result<ServiceQueueSmokeStatus, ServiceQueueSmokeError> {
         object_pending,
         release_acquire_ok,
         unsupported_denied,
+        unsupported_pending_denied,
     })
 }
 

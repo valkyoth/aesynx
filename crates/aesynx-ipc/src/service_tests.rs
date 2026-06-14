@@ -183,9 +183,9 @@ fn service_queue_set_routes_log_timer_and_object_queues() -> Result<(), QueueSet
     queues.submit(timer)?;
     queues.submit(object)?;
 
-    assert_eq!(queues.pending_requests(ServiceKind::Log), 1);
-    assert_eq!(queues.pending_requests(ServiceKind::Timer), 1);
-    assert_eq!(queues.pending_requests(ServiceKind::Object), 1);
+    assert_eq!(queues.pending_requests(ServiceKind::Log), Ok(1));
+    assert_eq!(queues.pending_requests(ServiceKind::Timer), Ok(1));
+    assert_eq!(queues.pending_requests(ServiceKind::Object), Ok(1));
     assert_eq!(
         queues
             .pop_request(ServiceKind::Log)
@@ -232,10 +232,13 @@ fn service_queue_set_rejects_unsupported_services_without_mutation() -> Result<(
             queues.pop_request(service),
             Err(QueueSetError::UnsupportedService)
         );
-        assert_eq!(queues.pending_requests(service), 0);
-        assert_eq!(queues.pending_requests(ServiceKind::Log), 0);
-        assert_eq!(queues.pending_requests(ServiceKind::Timer), 0);
-        assert_eq!(queues.pending_requests(ServiceKind::Object), 0);
+        assert_eq!(
+            queues.pending_requests(service),
+            Err(QueueSetError::UnsupportedService)
+        );
+        assert_eq!(queues.pending_requests(ServiceKind::Log), Ok(0));
+        assert_eq!(queues.pending_requests(ServiceKind::Timer), Ok(0));
+        assert_eq!(queues.pending_requests(ServiceKind::Object), Ok(0));
     }
 
     Ok(())

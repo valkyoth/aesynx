@@ -240,16 +240,15 @@ impl<const REQUESTS: usize, const COMPLETIONS: usize> ServiceQueueSet<REQUESTS, 
             .map_err(QueueSetError::Queue)
     }
 
-    #[must_use]
-    pub const fn pending_requests(&self, service: ServiceKind) -> usize {
+    pub const fn pending_requests(&self, service: ServiceKind) -> Result<usize, QueueSetError> {
         match service {
-            ServiceKind::Log => self.log.pending_requests(),
-            ServiceKind::Timer => self.timer.pending_requests(),
-            ServiceKind::Object => self.object.pending_requests(),
+            ServiceKind::Log => Ok(self.log.pending_requests()),
+            ServiceKind::Timer => Ok(self.timer.pending_requests()),
+            ServiceKind::Object => Ok(self.object.pending_requests()),
             ServiceKind::Capability
             | ServiceKind::Memory
             | ServiceKind::Driver
-            | ServiceKind::Telemetry => 0,
+            | ServiceKind::Telemetry => Err(QueueSetError::UnsupportedService),
         }
     }
 
