@@ -418,4 +418,6 @@ fn command_error(description: &str, output: std::process::Output) -> String {
 }
 
 #[cfg(test)]
+mod marker_tests;
+#[cfg(test)]
 mod tests;

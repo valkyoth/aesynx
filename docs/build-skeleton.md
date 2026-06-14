@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.29.0 Scheduler telemetry baseline candidate
+Status: v0.30.0 Telemetry event schema candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.29.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.30.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -95,23 +95,24 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `[TEST] memory-cap=ok`, `cap-audit events=`, `[TEST] cap-audit=ok`,
 `service-queue log_submitted=`, `[TEST] service-queue=ok`,
 `cooperative-sched task_a=`, `[TEST] cooperative-sched=ok`,
-`scheduler-telemetry decisions=`, `[TEST] scheduler-telemetry=ok`, and
+`scheduler-telemetry decisions=`, `[TEST] scheduler-telemetry=ok`,
+`telemetry-events schema=1 events=`, `[TEST] telemetry-events=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.29.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.30.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.29.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.30.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.29.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.30.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -186,12 +187,13 @@ activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.29.0 candidate adds a scheduler telemetry baseline on top of the v0.28
-cooperative executor. It records bounded scheduler decision records, emits a
-deterministic round-robin decision reason, updates per-task scheduled-run
-counters, samples core run-queue telemetry, and verifies the trace before
-`[TEST] scheduler-telemetry=ok`; coherent multi-core scheduler telemetry,
-preemption accounting, and userspace task traces remain future milestones.
+The v0.30.0 candidate adds a versioned telemetry event schema on top of the
+v0.29 scheduler telemetry baseline. It defines stable event IDs and headers,
+records boot-phase, capability-fault, and scheduler-decision payloads in a
+bounded per-core event ring, redacts selected task identity in debug output, and
+prints a serial dump summary before `[TEST] telemetry-events=ok`; stable trace
+export, persistent event storage, and coherent cross-core telemetry remain
+future milestones.
 
 ## Target Shape
 

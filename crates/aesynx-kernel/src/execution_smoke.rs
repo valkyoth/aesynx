@@ -70,4 +70,27 @@ pub fn run() {
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+
+    match crate::telemetry_events_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "telemetry-events schema={} events={} boot={} cap={} sched={} boot_id={} cap_id={} sched_id={} schema_ok={}",
+                status.schema_version,
+                status.events,
+                status.boot_events,
+                status.capability_events,
+                status.scheduler_events,
+                status.boot_event_id,
+                status.capability_event_id,
+                status.scheduler_event_id,
+                status.schema_ok
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] telemetry-events=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("telemetry-events error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] telemetry-events=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
 }

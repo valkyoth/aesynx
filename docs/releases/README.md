@@ -6,10 +6,12 @@ lands.
 
 ## Current Candidate
 
-- [v0.29.0 - Scheduler Telemetry Baseline](v0.29.0-rc.md)
-- [v0.28.0 - Cooperative Executor](v0.28.0-rc.md)
+- [v0.30.0 - Telemetry Event Schema](v0.30.0-rc.md)
 
 ## History
+
+- [v0.29.0 - Scheduler Telemetry Baseline](v0.29.0-rc.md)
+- [v0.28.0 - Cooperative Executor](v0.28.0-rc.md)
 
 - [v0.27.0 - Kernel Task Model](v0.27.0-rc.md)
 - [v0.26.0 - Kernel Service Queues](v0.26.0-rc.md)

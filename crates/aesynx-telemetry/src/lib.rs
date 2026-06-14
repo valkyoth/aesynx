@@ -1,6 +1,7 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+mod event;
 mod scheduler;
 
 use core::cell::Cell;
@@ -9,6 +10,11 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use aesynx_ai_policy::ScheduleFeatures;
 
+pub use event::{
+    BootPhaseTelemetryEvent, CapabilityFaultTelemetryEvent, PerCoreEventRing,
+    SchedulerDecisionTelemetryEvent, TELEMETRY_SCHEMA_VERSION, TelemetryBootPhase, TelemetryEvent,
+    TelemetryEventHeader, TelemetryEventId, TelemetryEventPayload, TelemetryEventRingSummary,
+};
 pub use scheduler::{
     SchedulerDecisionReason, SchedulerDecisionRecord, SchedulerTelemetry, SchedulerTelemetrySummary,
 };
