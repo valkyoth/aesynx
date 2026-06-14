@@ -1,8 +1,8 @@
 use core::mem::size_of;
 
 use super::{
-    DOUBLE_FAULT_VECTOR, ExceptionFrame, IDT_ENTRIES, INTERRUPT_GATE_PRESENT, IdtEntry,
-    PAGE_FAULT_VECTOR, PageFaultErrorCode, RETURNING_EXCEPTION_GPR_SAVE_BYTES,
+    DOUBLE_FAULT_VECTOR, ExceptionErrorCode, ExceptionFrame, IDT_ENTRIES, INTERRUPT_GATE_PRESENT,
+    IdtEntry, PAGE_FAULT_VECTOR, PageFaultErrorCode, RETURNING_EXCEPTION_GPR_SAVE_BYTES,
     RETURNING_EXCEPTION_GPR_SAVE_COUNT, RawExceptionFrame,
 };
 use crate::descriptors::{InterruptStackTableIndex, SegmentSelector};
@@ -97,4 +97,21 @@ fn page_fault_error_code_decodes_architectural_bits() {
     assert!(error.protection_key());
     assert!(error.shadow_stack());
     assert!(error.sgx());
+}
+
+#[test]
+fn generic_exception_error_code_reports_class_without_exposing_raw_value() {
+    let general_protection = ExceptionErrorCode::new(13, 0x28);
+    let breakpoint = ExceptionErrorCode::new(3, 0);
+    let page_fault = ExceptionErrorCode::new(14, 0b101);
+
+    assert!(general_protection.architectural());
+    assert!(general_protection.selector());
+    assert!(!general_protection.page_fault());
+    assert_eq!(general_protection.raw_for_tests(), 0x28);
+    assert!(!breakpoint.architectural());
+    assert!(!breakpoint.selector());
+    assert!(page_fault.architectural());
+    assert!(!page_fault.selector());
+    assert!(page_fault.page_fault());
 }

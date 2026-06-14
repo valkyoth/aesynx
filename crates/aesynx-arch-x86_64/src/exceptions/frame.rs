@@ -87,6 +87,35 @@ impl PageFaultErrorCode {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ExceptionErrorCode {
+    vector: u8,
+    raw: u64,
+}
+
+impl ExceptionErrorCode {
+    pub(super) const fn new(vector: u8, raw: u64) -> Self {
+        Self { vector, raw }
+    }
+
+    pub(super) const fn architectural(self) -> bool {
+        matches!(self.vector, 8 | 10 | 11 | 12 | 13 | 14 | 17 | 21 | 29 | 30)
+    }
+
+    pub(super) const fn selector(self) -> bool {
+        matches!(self.vector, 10..=13)
+    }
+
+    pub(super) const fn page_fault(self) -> bool {
+        self.vector == 14
+    }
+
+    #[cfg(test)]
+    pub(super) const fn raw_for_tests(self) -> u64 {
+        self.raw
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub(super) struct RawExceptionFrame {

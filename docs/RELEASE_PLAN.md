@@ -1643,6 +1643,9 @@ Deliverables:
 - Receiver CapId allocation.
 - Sender permission check.
 - Cross-core revoke notification.
+- Revoke across IPC must drive the object registry's revocation epoch bump, not
+  only the sender table's local `revoke_with_audit`, so every table holding a
+  capability for the same object observes epoch invalidation.
 - Audit event.
 
 Verification:
@@ -2226,6 +2229,8 @@ Deliverables:
 - Parser model.
 - Verifier model.
 - Fuel model.
+- Explicit non-claim that the verifier is not reachable by untrusted input
+  until an interpreter/service call path is added.
 
 Verification:
 

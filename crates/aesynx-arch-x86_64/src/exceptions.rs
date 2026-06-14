@@ -10,7 +10,7 @@ use crate::registers::FaultRegisterSnapshot;
 mod frame;
 mod idt;
 
-use frame::{ExceptionFrame, PageFaultErrorCode, RawExceptionFrame};
+use frame::{ExceptionErrorCode, ExceptionFrame, PageFaultErrorCode, RawExceptionFrame};
 use idt::{DescriptorTablePointer, IdtEntry};
 
 const IDT_ENTRIES: usize = 256;
@@ -322,8 +322,7 @@ extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) 
             let error = PageFaultErrorCode::new(frame.error_code);
             let registers = FaultRegisterSnapshot::capture_with_fault_address(fault_address);
             crate::serial_println!(
-                "exception vector=page-fault error=0x{:x} rip_present={} rip_offset=0x{:x} cs=0x{:x} frame_rflags=0x{:x} cr2_present={} cr2_offset=0x{:x} cr3_offset=0x{:x} rflags=0x{:x} interrupts_enabled={} present={} write={} user={} reserved={} instruction={} protection_key={} shadow_stack={} sgx={}",
-                frame.error_code,
+                "exception vector=page-fault error=decoded rip_present={} rip_offset=0x{:x} cs=0x{:x} frame_rflags=0x{:x} cr2_present={} cr2_offset=0x{:x} cr3_offset=0x{:x} rflags=0x{:x} interrupts_enabled={} present={} write={} user={} reserved={} instruction={} protection_key={} shadow_stack={} sgx={}",
                 frame.instruction_pointer_present(),
                 frame.instruction_pointer_offset(),
                 frame.code_segment,
@@ -346,15 +345,23 @@ extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) 
             crate::serial::write_str("[TEST] exception=ok\n");
         }
         DOUBLE_FAULT_VECTOR_U8 => {
+            let error = ExceptionErrorCode::new(frame.vector, frame.error_code);
             crate::serial_println!(
-                "exception vector=double-fault error=0x{:x}",
-                frame.error_code
+                "exception vector=double-fault error_code_present={}",
+                error.architectural()
             );
             crate::serial::write_str("[TEST] doublefault=ok\n");
             crate::serial::write_str("[TEST] exception=ok\n");
         }
         vector => {
-            crate::serial_println!("exception vector={} error=0x{:x}", vector, frame.error_code);
+            let error = ExceptionErrorCode::new(vector, frame.error_code);
+            crate::serial_println!(
+                "exception vector={} error_code_present={} selector_error_code={} page_fault_error_code={}",
+                vector,
+                error.architectural(),
+                error.selector(),
+                error.page_fault()
+            );
         }
     }
 }
