@@ -1341,6 +1341,14 @@ Deliverables:
 - TaskState.
 - Local run queue.
 - Wait queues.
+- Linear ownership rule for task movement: failed queue admission returns the
+  rejected task to the caller.
+- Documented queue scaling gate: small fixed queues may use linear membership
+  scans, but large or syscall-hot queues need indexed membership tracking before
+  they become a live hot path.
+- Documented live-scheduler gate: queue mutation must be protected against
+  local interrupt/preemption re-entry before a real executor depends on these
+  queues.
 
 Verification:
 

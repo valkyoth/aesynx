@@ -1141,6 +1141,11 @@ Task identity, ownership, priority, budget, and state are private. State changes
 through checked transitions; scheduling configuration changes require explicit
 future authority paths.
 
+Task values are linear resources. Scheduler APIs that accept a task must either
+commit the ownership transfer or return the rejected task together with the
+error. Dropping a task on a failed queue admission is a resource leak and must
+be treated like dropping an uncommitted capability.
+
 States:
 
 - Runnable.
@@ -1159,6 +1164,12 @@ v0:
 - No global runqueue.
 - No migration.
 - Deterministic.
+- Small fixed queues may use linear membership scans, but any large or
+  syscall-hot run/wait queue needs indexed membership tracking before it enters
+  the fast path.
+- Live queue mutation must be protected against local interrupt/preemption
+  re-entry. SMP queue sharing requires explicit per-core ownership,
+  IRQ-safe locking, and lock-ordering rules.
 
 v1:
 
