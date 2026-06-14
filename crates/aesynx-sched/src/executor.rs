@@ -76,6 +76,7 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
         if self.current.is_some() {
             return Err(ExecutorError::TaskAlreadyRunning);
         }
+        let dispatched = checked_counter_increment(self.dispatched)?;
         let mut task = self.run_queue.pop().map_err(ExecutorError::Queue)?;
         let id = task.id();
         if let Err(error) = task.transition(TaskState::Running) {
@@ -84,14 +85,15 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
         }
 
         self.current = Some(task);
-        self.dispatched = self
-            .dispatched
-            .checked_add(1)
-            .ok_or(ExecutorError::CounterOverflow)?;
+        self.dispatched = dispatched;
         Ok(id)
     }
 
     pub fn yield_current(&mut self) -> Result<(), ExecutorError> {
+        if self.current.is_none() {
+            return Err(ExecutorError::NoCurrentTask);
+        }
+        let yielded = checked_counter_increment(self.yielded)?;
         let Some(mut task) = self.current.take() else {
             return Err(ExecutorError::NoCurrentTask);
         };
@@ -110,14 +112,15 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
             }
         }
 
-        self.yielded = self
-            .yielded
-            .checked_add(1)
-            .ok_or(ExecutorError::CounterOverflow)?;
+        self.yielded = yielded;
         Ok(())
     }
 
     pub fn sleep_current_on_timer(&mut self) -> Result<(), ExecutorError> {
+        if self.current.is_none() {
+            return Err(ExecutorError::NoCurrentTask);
+        }
+        let slept = checked_counter_increment(self.slept)?;
         let Some(mut task) = self.current.take() else {
             return Err(ExecutorError::NoCurrentTask);
         };
@@ -146,10 +149,7 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
             }
         }
 
-        self.slept = self
-            .slept
-            .checked_add(1)
-            .ok_or(ExecutorError::CounterOverflow)?;
+        self.slept = slept;
         Ok(())
     }
 
@@ -165,6 +165,7 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
         if self.run_queue.status().len == self.run_queue.status().capacity {
             return Err(ExecutorError::Queue(TaskQueueError::QueueFull));
         }
+        let woke = checked_counter_increment(self.woke)?;
 
         let task = self.timer_wait.wake_one().map_err(ExecutorError::Queue)?;
         let id = task.id();
@@ -177,10 +178,7 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
             }
         }
 
-        self.woke = self
-            .woke
-            .checked_add(1)
-            .ok_or(ExecutorError::CounterOverflow)?;
+        self.woke = woke;
         Ok(id)
     }
 
@@ -198,9 +196,9 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
     }
 
     fn restore_runnable_task(&mut self, task: Task) -> Result<(), ExecutorError> {
-        self.run_queue
-            .push(task)
-            .map_err(|rejected| ExecutorError::RestoreFailed(rejected.error()))
+        self.run_queue.push(task).map_err(|rejected| {
+            ExecutorError::RestoreFailed(rejected.error(), rejected.into_task())
+        })
     }
 
     fn restore_current_from_runnable(&mut self, mut task: Task) -> Result<(), ExecutorError> {
@@ -224,10 +222,28 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
             .map_err(ExecutorError::Transition)?;
         task.transition(TaskState::WaitingOnTimer)
             .map_err(ExecutorError::Transition)?;
-        self.timer_wait
-            .push(task)
-            .map_err(|rejected| ExecutorError::RestoreFailed(rejected.error()))
+        self.timer_wait.push(task).map_err(|rejected| {
+            ExecutorError::RestoreFailed(rejected.error(), rejected.into_task())
+        })
     }
+
+    #[cfg(test)]
+    pub(crate) fn set_counters_for_test(
+        &mut self,
+        dispatched: u64,
+        yielded: u64,
+        slept: u64,
+        woke: u64,
+    ) {
+        self.dispatched = dispatched;
+        self.yielded = yielded;
+        self.slept = slept;
+        self.woke = woke;
+    }
+}
+
+fn checked_counter_increment(value: u64) -> Result<u64, ExecutorError> {
+    value.checked_add(1).ok_or(ExecutorError::CounterOverflow)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -241,13 +257,13 @@ pub struct ExecutorStatus {
     pub woke: u64,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ExecutorError {
     Queue(TaskQueueError),
     Transition(SchedError),
     TaskAlreadyRunning,
     NoCurrentTask,
     CounterOverflow,
-    RestoreFailed(TaskQueueError),
+    RestoreFailed(TaskQueueError, Task),
     Telemetry(TelemetryError),
 }

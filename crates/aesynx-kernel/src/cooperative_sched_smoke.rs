@@ -18,7 +18,7 @@ pub struct CooperativeSchedSmokeStatus {
     pub sleep_wake_ok: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum CooperativeSchedSmokeError {
     Priority(SchedError),
     Budget(SchedError),

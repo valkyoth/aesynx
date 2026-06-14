@@ -12,4 +12,6 @@ pub use task::{
 };
 
 #[cfg(test)]
+mod executor_tests;
+#[cfg(test)]
 mod tests;

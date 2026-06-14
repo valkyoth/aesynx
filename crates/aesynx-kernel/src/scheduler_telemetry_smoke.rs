@@ -18,7 +18,7 @@ pub struct SchedulerTelemetrySmokeStatus {
     pub trace_ok: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SchedulerTelemetrySmokeError {
     Priority(SchedError),
     Budget(SchedError),
