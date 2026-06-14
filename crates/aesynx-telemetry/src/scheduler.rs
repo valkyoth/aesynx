@@ -16,7 +16,9 @@ pub struct SchedulerDecisionRecord {
     selected_task: TaskId,
     reason: SchedulerDecisionReason,
     runnable_before: u32,
+    runnable_before_saturated: bool,
     timer_wait_before: u32,
+    timer_wait_before_saturated: bool,
 }
 
 impl SchedulerDecisionRecord {
@@ -46,8 +48,18 @@ impl SchedulerDecisionRecord {
     }
 
     #[must_use]
+    pub const fn runnable_before_saturated(self) -> bool {
+        self.runnable_before_saturated
+    }
+
+    #[must_use]
     pub const fn timer_wait_before(self) -> u32 {
         self.timer_wait_before
+    }
+
+    #[must_use]
+    pub const fn timer_wait_before_saturated(self) -> bool {
+        self.timer_wait_before_saturated
     }
 }
 
@@ -60,7 +72,12 @@ impl fmt::Debug for SchedulerDecisionRecord {
             .field("selected_task", &"<redacted>")
             .field("reason", &self.reason)
             .field("runnable_before", &self.runnable_before)
+            .field("runnable_before_saturated", &self.runnable_before_saturated)
             .field("timer_wait_before", &self.timer_wait_before)
+            .field(
+                "timer_wait_before_saturated",
+                &self.timer_wait_before_saturated,
+            )
             .finish()
     }
 }
@@ -108,13 +125,17 @@ impl<const CAPACITY: usize> SchedulerTelemetry<CAPACITY> {
             .checked_add(1)
             .ok_or(TelemetryError::CounterOverflow)?;
 
+        let runnable_before = clamp_usize_to_u32(runnable_before, MAX_SCHEDULE_QUEUE_FEATURE);
+        let timer_wait_before = clamp_usize_to_u32(timer_wait_before, MAX_SCHEDULE_QUEUE_FEATURE);
         let record = SchedulerDecisionRecord {
             sequence,
             core,
             selected_task,
             reason,
-            runnable_before: clamp_usize_to_u32(runnable_before, MAX_SCHEDULE_QUEUE_FEATURE),
-            timer_wait_before: clamp_usize_to_u32(timer_wait_before, MAX_SCHEDULE_QUEUE_FEATURE),
+            runnable_before: runnable_before.value,
+            runnable_before_saturated: runnable_before.saturated,
+            timer_wait_before: timer_wait_before.value,
+            timer_wait_before_saturated: timer_wait_before.saturated,
         };
         self.records[self.len] = Some(record);
         self.len += 1;
@@ -172,11 +193,23 @@ pub struct SchedulerTelemetrySummary {
     pub last_reason: Option<SchedulerDecisionReason>,
 }
 
-const fn clamp_usize_to_u32(value: usize, max: u32) -> u32 {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ClampedQueueDepth {
+    value: u32,
+    saturated: bool,
+}
+
+const fn clamp_usize_to_u32(value: usize, max: u32) -> ClampedQueueDepth {
     if value > max as usize {
-        max
+        ClampedQueueDepth {
+            value: max,
+            saturated: true,
+        }
     } else {
-        value as u32
+        ClampedQueueDepth {
+            value: value as u32,
+            saturated: false,
+        }
     }
 }
 
@@ -216,6 +249,13 @@ mod tests {
         assert_eq!(
             telemetry.get(0).map(|record| record.reason()),
             Some(SchedulerDecisionReason::RoundRobinRunnable)
+        );
+        assert_eq!(
+            telemetry.get(0).map(|record| (
+                record.runnable_before_saturated(),
+                record.timer_wait_before_saturated()
+            )),
+            Some((false, false))
         );
     }
 
@@ -264,6 +304,13 @@ mod tests {
                 )
                 .map(|record| record.runnable_before()),
             Ok(MAX_SCHEDULE_QUEUE_FEATURE)
+        );
+        assert_eq!(
+            telemetry.get(0).map(|record| (
+                record.runnable_before_saturated(),
+                record.timer_wait_before_saturated()
+            )),
+            Some((true, true))
         );
         assert_eq!(
             telemetry.record_decision(
