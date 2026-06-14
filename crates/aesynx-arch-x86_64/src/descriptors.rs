@@ -4,6 +4,13 @@ use core::sync::atomic::{AtomicBool, Ordering};
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 use aesynx_arch::ArchCpu;
 
+#[cfg(feature = "smp")]
+compile_error!(
+    "x86_64 GDT/TSS/double-fault-stack storage is single-core static backing \
+     storage; move descriptor tables and IST stacks to per-core ownership \
+     before enabling smp"
+);
+
 const GDT_ENTRIES: usize = 5;
 const DOUBLE_FAULT_STACK_BYTES: usize = 16 * 1024;
 /// 0-indexed position in `TSS.ist`. The architectural IST number for IDT gates

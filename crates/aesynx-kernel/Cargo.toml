@@ -24,7 +24,7 @@ aesynx-time.workspace = true
 default = []
 exception-smoke = []
 panic-smoke = []
-smp = []
+smp = ["aesynx-arch-x86_64/smp"]
 timer-smoke = []
 
 [lints]

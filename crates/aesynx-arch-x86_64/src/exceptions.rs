@@ -7,6 +7,12 @@ use aesynx_arch::ArchCpu;
 use crate::descriptors::InterruptStackTableIndex;
 use crate::registers::FaultRegisterSnapshot;
 
+#[cfg(feature = "smp")]
+compile_error!(
+    "x86_64 IDT storage is single-core static backing storage; move interrupt \
+     tables to per-core ownership before enabling smp"
+);
+
 mod frame;
 mod idt;
 

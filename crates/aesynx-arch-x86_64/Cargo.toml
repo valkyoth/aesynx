@@ -11,5 +11,9 @@ aesynx-abi.workspace = true
 aesynx-arch.workspace = true
 aesynx-entropy.workspace = true
 
+[features]
+default = []
+smp = []
+
 [lints]
 workspace = true

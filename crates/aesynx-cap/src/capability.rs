@@ -211,7 +211,8 @@ impl Capability {
         Ok(())
     }
 
-    pub fn derive_with_audit(
+    #[cfg(test)]
+    pub(crate) fn derive_with_audit(
         self,
         request: DeriveRequest,
         audit: &mut impl CapAuditLog,
@@ -253,7 +254,8 @@ impl Capability {
         Ok(child)
     }
 
-    pub fn grant_with_audit(
+    #[cfg(test)]
+    pub(crate) fn grant_with_audit(
         self,
         target_owner: PrincipalId,
         audit: &mut impl CapAuditLog,
