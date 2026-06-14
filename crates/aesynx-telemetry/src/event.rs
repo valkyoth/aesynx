@@ -252,7 +252,6 @@ impl TelemetryEvent {
 pub struct PerCoreEventRing<const CAPACITY: usize> {
     core: CoreId,
     events: [Option<TelemetryEvent>; CAPACITY],
-    head: usize,
     len: usize,
     next_sequence: u64,
 }
@@ -266,7 +265,6 @@ impl<const CAPACITY: usize> PerCoreEventRing<CAPACITY> {
         Ok(Self {
             core,
             events: [const { None }; CAPACITY],
-            head: 0,
             len: 0,
             next_sequence: 0,
         })
@@ -294,8 +292,7 @@ impl<const CAPACITY: usize> PerCoreEventRing<CAPACITY> {
             },
             payload,
         };
-        let slot = (self.head + self.len) % CAPACITY;
-        self.events[slot] = Some(event);
+        self.events[self.len] = Some(event);
         self.len += 1;
         Ok(event)
     }
@@ -305,7 +302,7 @@ impl<const CAPACITY: usize> PerCoreEventRing<CAPACITY> {
         if index >= self.len {
             return None;
         }
-        self.events[(self.head + index) % CAPACITY]
+        self.events[index]
     }
 
     #[must_use]

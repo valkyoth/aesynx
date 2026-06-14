@@ -1452,10 +1452,14 @@ Deliverables:
 - Serial trace parser.
 - JSON or line-based output.
 - Event schema docs.
+- Central CoreId redaction/non-redaction export policy.
+- Serialization tests proving scheduler task IDs cannot leak through the trace
+  exporter.
 
 Verification:
 
 - QEMU run produces decodable trace.
+- Exported trace fixture redacts raw task IDs when scheduler events are present.
 
 Exit criteria:
 
