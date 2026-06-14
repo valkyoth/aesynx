@@ -11,6 +11,7 @@ const TRACE_PREFIX: &str = "trace-event ";
 #[derive(Debug, Eq, PartialEq)]
 pub enum TraceDecodeError {
     DuplicateField,
+    InvalidLabel,
     InvalidNumber,
     MissingField(&'static str),
     NoTraceEvents,
@@ -78,6 +79,23 @@ fn decode_boot_phase(
 ) -> Result<String, TraceDecodeError> {
     validate_allowed_fields(fields, &["schema", "event", "sequence", "core", "phase"])?;
     let phase = required_field(fields, "phase")?;
+    validate_label(
+        phase,
+        &[
+            "entry",
+            "cpu-setup",
+            "exception-setup",
+            "interrupt-setup",
+            "bootloader-handoff",
+            "bootinfo-normalized",
+            "running",
+            "panic-smoke",
+            "exception-smoke",
+            "timer-smoke",
+            "panic",
+            "unknown",
+        ],
+    )?;
 
     Ok(format!(
         "trace schema={schema} sequence={sequence} core={core} event=boot-phase phase={phase}"
@@ -103,6 +121,16 @@ fn decode_capability_fault(
     )?;
     let kind = required_field(fields, "kind")?;
     let total = required_field(fields, "total_cap_faults")?;
+    validate_label(
+        kind,
+        &[
+            "invalid-id",
+            "missing-permission",
+            "revoked",
+            "stale-id",
+            "unknown",
+        ],
+    )?;
     parse_u64(total)?;
 
     Ok(format!(
@@ -141,9 +169,10 @@ fn decode_scheduler_decision(
     let runnable_saturated = required_field(fields, "runnable_before_saturated")?;
     let timer_wait = required_field(fields, "timer_wait_before")?;
     let timer_wait_saturated = required_field(fields, "timer_wait_before_saturated")?;
-    parse_u64(runnable)?;
+    validate_label(reason, &["round-robin-runnable"])?;
+    parse_u32(runnable)?;
     parse_bool(runnable_saturated)?;
-    parse_u64(timer_wait)?;
+    parse_u32(timer_wait)?;
     parse_bool(timer_wait_saturated)?;
 
     Ok(format!(
@@ -166,10 +195,8 @@ fn parse_fields(input: &str) -> Result<Vec<(&str, &str)>, TraceDecodeError> {
 }
 
 fn validate_common_fields(fields: &[(&str, &str)]) -> Result<(), TraceDecodeError> {
-    if parse_u64(required_field(fields, "sequence")?)? == u64::MAX {
-        return Err(TraceDecodeError::InvalidNumber);
-    }
-    parse_u64(required_field(fields, "core")?)?;
+    parse_u64(required_field(fields, "sequence")?)?;
+    parse_u32(required_field(fields, "core")?)?;
 
     let schema = parse_u64(required_field(fields, "schema")?)?;
     if schema != u64::from(SUPPORTED_SCHEMA_VERSION) {
@@ -201,9 +228,23 @@ fn required_field<'a>(
         .ok_or(TraceDecodeError::MissingField(key))
 }
 
+fn validate_label(value: &str, allowed: &[&str]) -> Result<(), TraceDecodeError> {
+    if allowed.contains(&value) {
+        Ok(())
+    } else {
+        Err(TraceDecodeError::InvalidLabel)
+    }
+}
+
 fn parse_u64(value: &str) -> Result<u64, TraceDecodeError> {
     value
         .parse::<u64>()
+        .map_err(|_| TraceDecodeError::InvalidNumber)
+}
+
+fn parse_u32(value: &str) -> Result<u32, TraceDecodeError> {
+    value
+        .parse::<u32>()
         .map_err(|_| TraceDecodeError::InvalidNumber)
 }
 
@@ -280,6 +321,39 @@ trace-event schema=1 event=scheduler-decision sequence=2 core=0 selected_task=7 
         assert_eq!(
             decode_serial_trace("telemetry-events schema=1 events=3\n"),
             Err(TraceDecodeError::NoTraceEvents)
+        );
+    }
+
+    #[test]
+    fn trace_decoder_rejects_unknown_labels() {
+        let unknown_phase = "trace-event schema=1 event=boot-phase sequence=0 core=0 phase=admin\n";
+
+        assert_eq!(
+            decode_serial_trace(unknown_phase),
+            Err(TraceDecodeError::InvalidLabel)
+        );
+    }
+
+    #[test]
+    fn trace_decoder_rejects_out_of_range_core_ids() {
+        let out_of_range =
+            "trace-event schema=1 event=boot-phase sequence=0 core=4294967296 phase=running\n";
+
+        assert_eq!(
+            decode_serial_trace(out_of_range),
+            Err(TraceDecodeError::InvalidNumber)
+        );
+    }
+
+    #[test]
+    fn trace_decoder_rejects_out_of_range_queue_depths() {
+        let out_of_range = "\
+trace-event schema=1 event=scheduler-decision sequence=2 core=0 selected_task=<redacted> reason=round-robin-runnable runnable_before=4294967296 runnable_before_saturated=false timer_wait_before=0 timer_wait_before_saturated=false
+";
+
+        assert_eq!(
+            decode_serial_trace(out_of_range),
+            Err(TraceDecodeError::InvalidNumber)
         );
     }
 }
