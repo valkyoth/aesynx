@@ -96,6 +96,7 @@ mod tests {
             MemoryRegion::new(PhysAddr::new(0x1000), 0x1000, MemoryRegionKind::Usable),
             MemoryRegion::new(PhysAddr::new(0x3000), 0x2000, MemoryRegionKind::Usable),
             MemoryRegion::new(PhysAddr::new(0x8000), 0x1000, MemoryRegionKind::Bootloader),
+            MemoryRegion::new(PhysAddr::new(0x200000), 0x2000, MemoryRegionKind::Kernel),
         ];
         let info = BootInfo::normalize(BootMetadata {
             arch: ArchKind::X86_64,
@@ -118,15 +119,15 @@ mod tests {
 
         assert_eq!(summary.arch_label, "arch=x86_64");
         assert_eq!(summary.platform_label, "platform=qemu");
-        assert_eq!(summary.memory_regions, 3);
-        assert_eq!(summary.total_bytes, 0x4000);
-        assert_eq!(summary.total_frames, 4);
+        assert_eq!(summary.memory_regions, 4);
+        assert_eq!(summary.total_bytes, 0x6000);
+        assert_eq!(summary.total_frames, 6);
         assert_eq!(summary.usable_regions, 2);
         assert_eq!(summary.usable_bytes, 0x3000);
         assert_eq!(summary.usable_frames, 3);
-        assert_eq!(summary.reserved_regions, 1);
-        assert_eq!(summary.reserved_bytes, 0x1000);
-        assert_eq!(summary.reserved_frames, 1);
+        assert_eq!(summary.reserved_regions, 2);
+        assert_eq!(summary.reserved_bytes, 0x3000);
+        assert_eq!(summary.reserved_frames, 3);
         assert_eq!(summary.bootloader_bytes, 0x1000);
         assert!(summary.rsdp_present);
         assert!(summary.hhdm_present);

@@ -1,7 +1,7 @@
 use crate::{
     ArchKind, BootInfo, CpuInfo, CpuTopology, FramebufferInfo, HhdmInfo, KernelImageInfo,
-    MAX_EARLY_MEMORY_REGIONS, MemoryAccountingError, MemoryMap, MemoryRegion, PlatformKind,
-    types::BootInfoParts,
+    MAX_EARLY_MEMORY_REGIONS, MemoryAccountingError, MemoryMap, MemoryRegion, MemoryRegionKind,
+    PlatformKind, types::BootInfoParts,
 };
 
 const PAGE_SIZE: u64 = 4096;
@@ -28,6 +28,7 @@ impl<'a> BootInfo<'a> {
             .summary()
             .map_err(BootInfoError::MemoryAccounting)?;
         validate_kernel_image(metadata.arch, metadata.kernel_image)?;
+        validate_kernel_image_against_memory_map(metadata.kernel_image, metadata.memory_regions)?;
 
         Ok(Self::new(BootInfoParts {
             arch: metadata.arch,
@@ -66,6 +67,7 @@ pub enum BootInfoError {
     OverlappingMemoryRegion,
     MemoryAccounting(MemoryAccountingError),
     KernelImageEmpty,
+    KernelImageMemoryMapMismatch,
 }
 
 fn validate_memory_regions(regions: &[MemoryRegion]) -> Result<(), BootInfoError> {
@@ -110,6 +112,10 @@ fn validate_kernel_image(arch: ArchKind, image: KernelImageInfo) -> Result<(), B
         return Err(BootInfoError::KernelImageEmpty);
     }
 
+    if !virt_end.is_multiple_of(PAGE_SIZE) {
+        return Err(BootInfoError::KernelImageEmpty);
+    }
+
     let min_kernel_vma = match arch {
         ArchKind::Aarch64 => AARCH64_KERNEL_VMA_MIN,
         ArchKind::X86_64 => X86_64_KERNEL_VMA_MIN,
@@ -122,6 +128,63 @@ fn validate_kernel_image(arch: ArchKind, image: KernelImageInfo) -> Result<(), B
 
     Ok(())
 }
+
+fn validate_kernel_image_against_memory_map(
+    image: KernelImageInfo,
+    regions: &[MemoryRegion],
+) -> Result<(), BootInfoError> {
+    let phys_start = image.phys_start().get();
+    let image_size = image
+        .virt_end()
+        .get()
+        .checked_sub(image.virt_start().get())
+        .ok_or(BootInfoError::KernelImageEmpty)?;
+    let phys_end = phys_start
+        .checked_add(image_size)
+        .ok_or(BootInfoError::KernelImageEmpty)?;
+
+    for region in regions {
+        let region_end = region.end().ok_or(BootInfoError::InvalidMemoryRegion)?;
+        if ranges_overlap(phys_start, phys_end, region.start().get(), region_end.get())
+            && matches!(region.kind, MemoryRegionKind::Usable)
+        {
+            return Err(BootInfoError::KernelImageMemoryMapMismatch);
+        }
+    }
+
+    let mut cursor = phys_start;
+    while cursor < phys_end {
+        let mut advanced = false;
+        for region in regions {
+            let region_end = region.end().ok_or(BootInfoError::InvalidMemoryRegion)?;
+            let region_start = region.start().get();
+            if region_start <= cursor
+                && cursor < region_end.get()
+                && matches!(
+                    region.kind,
+                    MemoryRegionKind::Kernel | MemoryRegionKind::Reserved
+                )
+            {
+                cursor = core::cmp::min(region_end.get(), phys_end);
+                advanced = true;
+                break;
+            }
+        }
+
+        if !advanced {
+            return Err(BootInfoError::KernelImageMemoryMapMismatch);
+        }
+    }
+
+    Ok(())
+}
+
+const fn ranges_overlap(left_start: u64, left_end: u64, right_start: u64, right_end: u64) -> bool {
+    left_start < right_end && right_start < left_end
+}
+
+#[cfg(test)]
+mod kernel_image_tests;
 
 #[cfg(test)]
 mod tests {
@@ -152,52 +215,6 @@ mod tests {
             ),
             hhdm: None,
         }
-    }
-
-    #[test]
-    fn bootinfo_normalizes_synthetic_memory_map() -> Result<(), BootInfoError> {
-        let regions = [
-            MemoryRegion::new(PhysAddr::new(0x1000), 0x9000, MemoryRegionKind::Usable),
-            MemoryRegion::new(PhysAddr::new(0x10000), 0x2000, MemoryRegionKind::Bootloader),
-        ];
-
-        let info = BootInfo::normalize(BootMetadata {
-            arch: ArchKind::X86_64,
-            platform: PlatformKind::Qemu,
-            memory_regions: &regions,
-            framebuffer: None,
-            rsdp: Some(VirtAddr::new(0xffff800000007000)),
-            device_tree: None,
-            cpu_topology: &[],
-            kernel_image: KernelImageInfo::new(
-                VirtAddr::new(0xffffffff80000000),
-                VirtAddr::new(0xffffffff80002000),
-                PhysAddr::new(0x200000),
-            ),
-            hhdm: None,
-        })?;
-
-        assert_eq!(
-            info.memory_map.summary(),
-            Ok(crate::MemorySummary {
-                region_count: 2,
-                total_bytes: 0xb000,
-                total_frames: 11,
-                usable_regions: 1,
-                usable_bytes: 0x9000,
-                usable_frames: 9,
-                reserved_regions: 1,
-                reserved_bytes: 0x2000,
-                reserved_frames: 2,
-                kernel_bytes: 0,
-                bootloader_bytes: 0x2000,
-                framebuffer_bytes: 0,
-                acpi_bytes: 0,
-                bad_bytes: 0,
-            })
-        );
-        assert!(info.rsdp_present());
-        Ok(())
     }
 
     #[test]
@@ -265,17 +282,6 @@ mod tests {
         let result = BootInfo::normalize(qemu_metadata(&regions));
 
         assert_eq!(result, Err(BootInfoError::OverlappingMemoryRegion));
-    }
-
-    #[test]
-    fn bootinfo_accepts_adjacent_memory_regions() -> Result<(), BootInfoError> {
-        let regions = [
-            MemoryRegion::new(PhysAddr::new(0x1000), 0x4000, MemoryRegionKind::Usable),
-            MemoryRegion::new(PhysAddr::new(0x5000), 0x2000, MemoryRegionKind::Kernel),
-        ];
-        BootInfo::normalize(qemu_metadata(&regions))?;
-
-        Ok(())
     }
 
     #[test]

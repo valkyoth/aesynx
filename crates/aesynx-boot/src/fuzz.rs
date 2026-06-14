@@ -316,6 +316,7 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
                 &[
                     (0x1000, 0x4000, MemoryRegionKind::Usable),
                     (0x5000, 0x2000, MemoryRegionKind::Bootloader),
+                    (0x20_0000, 0x2000, MemoryRegionKind::Kernel),
                 ],
                 ArchKind::X86_64,
                 DEFAULT_X86_KERNEL_VIRT,
@@ -343,7 +344,10 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
         ),
         (
             encoded_region_case(
-                &[(0x1000, 0x9000, MemoryRegionKind::Usable)],
+                &[
+                    (0x1000, 0x9000, MemoryRegionKind::Usable),
+                    (0x20_0000, 0x2000, MemoryRegionKind::Kernel),
+                ],
                 ArchKind::X86_64,
                 0x400000,
                 DEFAULT_KERNEL_LEN,
@@ -354,7 +358,10 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
         ),
         (
             encoded_region_case(
-                &[(0x1000, 0x9000, MemoryRegionKind::Usable)],
+                &[
+                    (0x1000, 0x9000, MemoryRegionKind::Usable),
+                    (0x20_0000, 0x2000, MemoryRegionKind::Kernel),
+                ],
                 ArchKind::Aarch64,
                 DEFAULT_AARCH64_KERNEL_VIRT,
                 DEFAULT_KERNEL_LEN,
@@ -365,7 +372,10 @@ fn bootinfo_fuzz_target_runs_named_seed_corpus() {
         ),
         (
             encoded_region_case(
-                &[(0x1000, 0x9000, MemoryRegionKind::Usable)],
+                &[
+                    (0x1000, 0x9000, MemoryRegionKind::Usable),
+                    (0x20_0000, 0x2000, MemoryRegionKind::Kernel),
+                ],
                 ArchKind::X86_64,
                 DEFAULT_X86_KERNEL_VIRT,
                 DEFAULT_KERNEL_LEN,

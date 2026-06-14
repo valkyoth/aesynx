@@ -40,6 +40,14 @@ impl<'a> BootInfo<'a> {
     }
 
     #[must_use]
+    pub const fn framebuffer_base(self) -> Option<VirtAddr> {
+        match self.framebuffer {
+            Some(framebuffer) => Some(framebuffer.base),
+            None => None,
+        }
+    }
+
+    #[must_use]
     pub const fn rsdp_present(self) -> bool {
         self.rsdp.is_some()
     }

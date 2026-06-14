@@ -3,8 +3,8 @@ use alloc::format;
 use aesynx_abi::{PhysAddr, VirtAddr};
 
 use super::{
-    ArchKind, BootInfo, BootInfoParts, CpuTopology, FRAME_SIZE, HhdmInfo, KernelImageInfo,
-    MemoryMap, MemoryRegion, MemoryRegionKind, PlatformKind,
+    ArchKind, BootInfo, BootInfoParts, CpuTopology, FRAME_SIZE, FramebufferInfo, HhdmInfo,
+    KernelImageInfo, MemoryMap, MemoryRegion, MemoryRegionKind, PlatformKind,
 };
 
 #[test]
@@ -23,6 +23,40 @@ fn kernel_image_translates_virtual_address_to_physical_offset() {
         image.phys_for_virt(VirtAddr::new(0xffff_ffff_8001_0000)),
         None
     );
+}
+
+#[test]
+fn bootinfo_exposes_framebuffer_base_without_debug_leakage() {
+    let region = MemoryRegion::new(PhysAddr::new(0x1000), FRAME_SIZE, MemoryRegionKind::Usable);
+    let memory = [region];
+    let info = BootInfo::new(BootInfoParts {
+        arch: ArchKind::X86_64,
+        platform: PlatformKind::Qemu,
+        memory_map: MemoryMap::new(&memory),
+        framebuffer: Some(FramebufferInfo::new(
+            VirtAddr::new(0xffff_8000_000b_8000),
+            80,
+            25,
+            80,
+        )),
+        rsdp: None,
+        device_tree: None,
+        cpu_topology: CpuTopology::new(&[]),
+        kernel_image: KernelImageInfo::new(
+            VirtAddr::new(0xffff_ffff_8000_0000),
+            VirtAddr::new(0xffff_ffff_8001_0000),
+            PhysAddr::new(0x0040_0000),
+        ),
+        hhdm: None,
+    });
+    let debug = format!("{info:?}");
+
+    assert_eq!(
+        info.framebuffer_base(),
+        Some(VirtAddr::new(0xffff_8000_000b_8000))
+    );
+    assert!(debug.contains("framebuffer_present: true"));
+    assert!(!debug.contains("ffff8000000b8000"));
 }
 
 #[test]

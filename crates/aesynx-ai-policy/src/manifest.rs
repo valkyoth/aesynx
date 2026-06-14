@@ -180,6 +180,10 @@ impl ModelSafetyLimits {
 /// A manifest is data, not executable code. Use
 /// [`ModelObjectManifest::validate_for_domain`] before admitting it to a
 /// policy domain.
+///
+/// `PartialEq` is for structural tests and non-authentication comparisons. It
+/// is not a constant-time manifest verifier; future cryptographic checks must
+/// verify signatures and hashes directly.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ModelObjectManifest {
     pub id: ModelId,
