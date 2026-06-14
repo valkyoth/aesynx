@@ -26,6 +26,13 @@ pub struct TraceExport {
     lines: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CommonFields {
+    schema: u16,
+    sequence: u64,
+    core: u32,
+}
+
 impl TraceExport {
     #[must_use]
     pub fn lines(&self) -> &[String] {
@@ -56,26 +63,21 @@ pub fn decode_serial_trace(input: &str) -> Result<TraceExport, TraceDecodeError>
 
 fn decode_trace_event(input: &str) -> Result<String, TraceDecodeError> {
     let fields = parse_fields(input)?;
-    validate_common_fields(&fields)?;
+    let common = decode_common_fields(&fields)?;
 
-    let schema = required_field(&fields, "schema")?;
     let event = required_field(&fields, "event")?;
-    let sequence = required_field(&fields, "sequence")?;
-    let core = required_field(&fields, "core")?;
 
     match event {
-        "boot-phase" => decode_boot_phase(&fields, schema, sequence, core),
-        "capability-fault" => decode_capability_fault(&fields, schema, sequence, core),
-        "scheduler-decision" => decode_scheduler_decision(&fields, schema, sequence, core),
+        "boot-phase" => decode_boot_phase(&fields, common),
+        "capability-fault" => decode_capability_fault(&fields, common),
+        "scheduler-decision" => decode_scheduler_decision(&fields, common),
         _ => Err(TraceDecodeError::UnsupportedEvent),
     }
 }
 
 fn decode_boot_phase(
     fields: &[(&str, &str)],
-    schema: &str,
-    sequence: &str,
-    core: &str,
+    common: CommonFields,
 ) -> Result<String, TraceDecodeError> {
     validate_allowed_fields(fields, &["schema", "event", "sequence", "core", "phase"])?;
     let phase = required_field(fields, "phase")?;
@@ -98,15 +100,14 @@ fn decode_boot_phase(
     )?;
 
     Ok(format!(
-        "trace schema={schema} sequence={sequence} core={core} event=boot-phase phase={phase}"
+        "trace schema={} sequence={} core={} event=boot-phase phase={phase}",
+        common.schema, common.sequence, common.core
     ))
 }
 
 fn decode_capability_fault(
     fields: &[(&str, &str)],
-    schema: &str,
-    sequence: &str,
-    core: &str,
+    common: CommonFields,
 ) -> Result<String, TraceDecodeError> {
     validate_allowed_fields(
         fields,
@@ -131,18 +132,17 @@ fn decode_capability_fault(
             "unknown",
         ],
     )?;
-    parse_u64(total)?;
+    let total = parse_u64(total)?;
 
     Ok(format!(
-        "trace schema={schema} sequence={sequence} core={core} event=capability-fault kind={kind} total_cap_faults={total}"
+        "trace schema={} sequence={} core={} event=capability-fault kind={kind} total_cap_faults={total}",
+        common.schema, common.sequence, common.core
     ))
 }
 
 fn decode_scheduler_decision(
     fields: &[(&str, &str)],
-    schema: &str,
-    sequence: &str,
-    core: &str,
+    common: CommonFields,
 ) -> Result<String, TraceDecodeError> {
     validate_allowed_fields(
         fields,
@@ -170,13 +170,14 @@ fn decode_scheduler_decision(
     let timer_wait = required_field(fields, "timer_wait_before")?;
     let timer_wait_saturated = required_field(fields, "timer_wait_before_saturated")?;
     validate_label(reason, &["round-robin-runnable"])?;
-    parse_u32(runnable)?;
-    parse_bool(runnable_saturated)?;
-    parse_u32(timer_wait)?;
-    parse_bool(timer_wait_saturated)?;
+    let runnable = parse_u32(runnable)?;
+    let runnable_saturated = parse_bool(runnable_saturated)?;
+    let timer_wait = parse_u32(timer_wait)?;
+    let timer_wait_saturated = parse_bool(timer_wait_saturated)?;
 
     Ok(format!(
-        "trace schema={schema} sequence={sequence} core={core} event=scheduler-decision selected_task=<redacted> reason={reason} runnable_before={runnable} runnable_before_saturated={runnable_saturated} timer_wait_before={timer_wait} timer_wait_before_saturated={timer_wait_saturated}"
+        "trace schema={} sequence={} core={} event=scheduler-decision selected_task=<redacted> reason={reason} runnable_before={runnable} runnable_before_saturated={runnable_saturated} timer_wait_before={timer_wait} timer_wait_before_saturated={timer_wait_saturated}",
+        common.schema, common.sequence, common.core
     ))
 }
 
@@ -194,15 +195,19 @@ fn parse_fields(input: &str) -> Result<Vec<(&str, &str)>, TraceDecodeError> {
     Ok(fields)
 }
 
-fn validate_common_fields(fields: &[(&str, &str)]) -> Result<(), TraceDecodeError> {
-    parse_u64(required_field(fields, "sequence")?)?;
-    parse_u32(required_field(fields, "core")?)?;
+fn decode_common_fields(fields: &[(&str, &str)]) -> Result<CommonFields, TraceDecodeError> {
+    let sequence = parse_u64(required_field(fields, "sequence")?)?;
+    let core = parse_u32(required_field(fields, "core")?)?;
 
     let schema = parse_u64(required_field(fields, "schema")?)?;
     if schema != u64::from(SUPPORTED_SCHEMA_VERSION) {
         return Err(TraceDecodeError::UnsupportedSchema);
     }
-    Ok(())
+    Ok(CommonFields {
+        schema: SUPPORTED_SCHEMA_VERSION,
+        sequence,
+        core,
+    })
 }
 
 fn validate_allowed_fields(
@@ -354,6 +359,33 @@ trace-event schema=1 event=scheduler-decision sequence=2 core=0 selected_task=<r
         assert_eq!(
             decode_serial_trace(out_of_range),
             Err(TraceDecodeError::InvalidNumber)
+        );
+    }
+
+    #[test]
+    fn trace_decoder_canonicalizes_numeric_fields() {
+        let trace = "\
+trace-event schema=01 event=scheduler-decision sequence=0002 core=0000 selected_task=<redacted> reason=round-robin-runnable runnable_before=0002 runnable_before_saturated=false timer_wait_before=0000 timer_wait_before_saturated=true
+";
+
+        let export = match decode_serial_trace(trace) {
+            Ok(export) => export,
+            Err(error) => return assert_eq!(error, TraceDecodeError::NoTraceEvents),
+        };
+
+        assert_eq!(
+            export.lines()[0],
+            "trace schema=1 sequence=2 core=0 event=scheduler-decision selected_task=<redacted> reason=round-robin-runnable runnable_before=2 runnable_before_saturated=false timer_wait_before=0 timer_wait_before_saturated=true"
+        );
+    }
+
+    #[test]
+    fn trace_decoder_rejects_missing_required_fields() {
+        let missing_phase = "trace-event schema=1 event=boot-phase sequence=0 core=0\n";
+
+        assert_eq!(
+            decode_serial_trace(missing_phase),
+            Err(TraceDecodeError::MissingField("phase"))
         );
     }
 }

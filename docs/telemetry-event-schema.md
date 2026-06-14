@@ -34,6 +34,9 @@ Supported event kinds:
   capability-fault kind, and scheduler reason labels.
 - `core`, `runnable_before`, and `timer_wait_before` must fit the kernel's
   current `u32` telemetry fields; `sequence` and `total_cap_faults` are `u64`.
+- Decoded output is canonicalized from typed values, so accepted numeric fields
+  are re-emitted in their normal decimal form rather than copied verbatim from
+  the serial line.
 - `core` remains visible in exported trace lines. It is treated as local
   non-secret scheduling context until SMP tenancy makes core identity a
   boundary.
