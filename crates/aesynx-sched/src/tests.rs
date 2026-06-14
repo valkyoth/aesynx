@@ -1,4 +1,5 @@
 use aesynx_abi::{CoreId, TaskId};
+use aesynx_telemetry::{SchedulerDecisionReason, SchedulerTelemetry, TelemetryError};
 use core::fmt::{self, Write};
 
 use crate::{
@@ -291,6 +292,77 @@ fn cooperative_executor_sleeps_and_wakes_timer_waiters() {
     assert_eq!(status.timer_wait_len, 0);
     assert_eq!(status.slept, 1);
     assert_eq!(status.woke, 1);
+}
+
+#[test]
+fn cooperative_executor_records_round_robin_decision_telemetry() {
+    let mut executor = match LocalExecutor::<3, 1>::new(CoreId::new(0)) {
+        Ok(executor) => executor,
+        Err(error) => return assert_eq!(error, ExecutorError::Queue(TaskQueueError::QueueEmpty)),
+    };
+    let mut telemetry = match SchedulerTelemetry::<3>::new() {
+        Ok(telemetry) => telemetry,
+        Err(error) => return assert_eq!(error, TelemetryError::TelemetryCapacityZero),
+    };
+
+    assert_eq!(executor.spawn(task(1, 0)), Ok(()));
+    assert_eq!(executor.spawn(task(2, 0)), Ok(()));
+    assert_eq!(
+        executor.dispatch_next_with_telemetry(&mut telemetry),
+        Ok(TaskId::new(1))
+    );
+    assert_eq!(executor.yield_current(), Ok(()));
+    assert_eq!(
+        executor.dispatch_next_with_telemetry(&mut telemetry),
+        Ok(TaskId::new(2))
+    );
+
+    assert_eq!(telemetry.len(), 2);
+    assert_eq!(
+        telemetry.get(0).map(|record| record.reason()),
+        Some(SchedulerDecisionReason::RoundRobinRunnable)
+    );
+    assert_eq!(
+        telemetry.get(0).map(|record| record.selected_task()),
+        Some(TaskId::new(1))
+    );
+    assert_eq!(
+        telemetry.get(1).map(|record| record.selected_task()),
+        Some(TaskId::new(2))
+    );
+    assert_eq!(
+        telemetry.get(0).map(|record| record.runnable_before()),
+        Some(2)
+    );
+}
+
+#[test]
+fn cooperative_executor_full_telemetry_buffer_does_not_dispatch() {
+    let mut executor = match LocalExecutor::<2, 1>::new(CoreId::new(0)) {
+        Ok(executor) => executor,
+        Err(error) => return assert_eq!(error, ExecutorError::Queue(TaskQueueError::QueueEmpty)),
+    };
+    let mut telemetry = match SchedulerTelemetry::<1>::new() {
+        Ok(telemetry) => telemetry,
+        Err(error) => return assert_eq!(error, TelemetryError::TelemetryCapacityZero),
+    };
+
+    assert_eq!(executor.spawn(task(1, 0)), Ok(()));
+    assert_eq!(executor.spawn(task(2, 0)), Ok(()));
+    assert_eq!(
+        executor.dispatch_next_with_telemetry(&mut telemetry),
+        Ok(TaskId::new(1))
+    );
+    assert_eq!(executor.yield_current(), Ok(()));
+    let before = executor.status();
+
+    assert_eq!(
+        executor.dispatch_next_with_telemetry(&mut telemetry),
+        Err(ExecutorError::Telemetry(
+            TelemetryError::TelemetryBufferFull
+        ))
+    );
+    assert_eq!(executor.status(), before);
 }
 
 #[test]

@@ -1,4 +1,5 @@
 use aesynx_abi::{CoreId, TaskId};
+use aesynx_telemetry::{SchedulerDecisionReason, SchedulerTelemetry, TelemetryError};
 
 use crate::{
     LocalRunQueue, SchedError, Task, TaskQueueError, TaskRejected, TaskState, WaitQueue, WaitReason,
@@ -35,10 +36,46 @@ impl<const RUN_CAPACITY: usize, const TIMER_CAPACITY: usize>
     }
 
     pub fn dispatch_next(&mut self) -> Result<TaskId, ExecutorError> {
+        self.dispatch_next_inner()
+    }
+
+    pub fn dispatch_next_with_telemetry<const DECISION_CAPACITY: usize>(
+        &mut self,
+        telemetry: &mut SchedulerTelemetry<DECISION_CAPACITY>,
+    ) -> Result<TaskId, ExecutorError> {
         if self.current.is_some() {
             return Err(ExecutorError::TaskAlreadyRunning);
         }
+        if self.run_queue.is_empty() {
+            return Err(ExecutorError::Queue(TaskQueueError::QueueEmpty));
+        }
+        if !telemetry.can_record() {
+            return Err(ExecutorError::Telemetry(if telemetry.is_full() {
+                TelemetryError::TelemetryBufferFull
+            } else {
+                TelemetryError::CounterOverflow
+            }));
+        }
 
+        let runnable_before = self.run_queue.status().len;
+        let timer_wait_before = self.timer_wait.status().len;
+        let id = self.dispatch_next_inner()?;
+        telemetry
+            .record_decision(
+                self.run_queue.owner_core(),
+                id,
+                SchedulerDecisionReason::RoundRobinRunnable,
+                runnable_before,
+                timer_wait_before,
+            )
+            .map_err(ExecutorError::Telemetry)?;
+        Ok(id)
+    }
+
+    fn dispatch_next_inner(&mut self) -> Result<TaskId, ExecutorError> {
+        if self.current.is_some() {
+            return Err(ExecutorError::TaskAlreadyRunning);
+        }
         let mut task = self.run_queue.pop().map_err(ExecutorError::Queue)?;
         let id = task.id();
         if let Err(error) = task.transition(TaskState::Running) {
@@ -212,4 +249,5 @@ pub enum ExecutorError {
     NoCurrentTask,
     CounterOverflow,
     RestoreFailed(TaskQueueError),
+    Telemetry(TelemetryError),
 }

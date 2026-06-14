@@ -148,6 +148,7 @@ name = "aesynx-sched"
 version = "0.1.0"
 dependencies = [
  "aesynx-abi",
+ "aesynx-telemetry",
 ]
 
 [[package]]
@@ -161,6 +162,7 @@ dependencies = [
 name = "aesynx-telemetry"
 version = "0.1.0"
 dependencies = [
+ "aesynx-abi",
  "aesynx-ai-policy",
 ]
 

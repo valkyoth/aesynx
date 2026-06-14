@@ -1,11 +1,17 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+mod scheduler;
+
 use core::cell::Cell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use aesynx_ai_policy::ScheduleFeatures;
+
+pub use scheduler::{
+    SchedulerDecisionReason, SchedulerDecisionRecord, SchedulerTelemetry, SchedulerTelemetrySummary,
+};
 
 pub const MAX_SCHEDULE_QUEUE_FEATURE: u32 = 4096;
 pub const MAX_SCHEDULE_COUNTER_FEATURE: u32 = 1_000_000;
@@ -168,6 +174,7 @@ pub const fn redacted_schedule_features(snapshot: CoreTelemetrySnapshot) -> Sche
 
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct TaskTelemetry {
+    scheduled_runs: u64,
     cpu_time_ns: u64,
     messages_sent: u64,
     messages_received: u64,
@@ -180,6 +187,11 @@ pub struct TaskTelemetry {
 }
 
 impl TaskTelemetry {
+    pub fn inc_scheduled_runs(&mut self) -> Result<(), TelemetryError> {
+        self.scheduled_runs = increment_counter(self.scheduled_runs)?;
+        Ok(())
+    }
+
     pub fn add_cpu_time_ns(&mut self, value: u64) -> Result<(), TelemetryError> {
         self.cpu_time_ns = self
             .cpu_time_ns
@@ -229,6 +241,7 @@ impl TaskTelemetry {
     #[must_use]
     pub const fn snapshot(&self) -> TaskTelemetrySnapshot {
         TaskTelemetrySnapshot {
+            scheduled_runs: self.scheduled_runs,
             cpu_time_ns: self.cpu_time_ns,
             messages_sent: self.messages_sent,
             messages_received: self.messages_received,
@@ -243,6 +256,7 @@ impl TaskTelemetry {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct TaskTelemetrySnapshot {
+    pub scheduled_runs: u64,
     pub cpu_time_ns: u64,
     pub messages_sent: u64,
     pub messages_received: u64,
@@ -256,6 +270,8 @@ pub struct TaskTelemetrySnapshot {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TelemetryError {
     CounterOverflow,
+    TelemetryBufferFull,
+    TelemetryCapacityZero,
 }
 
 fn increment_counter(value: u64) -> Result<u64, TelemetryError> {
@@ -396,6 +412,7 @@ mod tests {
     fn task_telemetry_updates_are_append_only() {
         let mut telemetry = TaskTelemetry::default();
 
+        assert_eq!(telemetry.inc_scheduled_runs(), Ok(()));
         assert_eq!(telemetry.add_cpu_time_ns(10), Ok(()));
         assert_eq!(telemetry.inc_messages_sent(), Ok(()));
         assert_eq!(telemetry.inc_messages_received(), Ok(()));
@@ -406,6 +423,7 @@ mod tests {
         assert_eq!(telemetry.add_queue_wait_ns(20), Ok(()));
 
         let snapshot = telemetry.snapshot();
+        assert_eq!(snapshot.scheduled_runs, 1);
         assert_eq!(snapshot.cpu_time_ns, 10);
         assert_eq!(snapshot.messages_sent, 1);
         assert_eq!(snapshot.messages_received, 1);

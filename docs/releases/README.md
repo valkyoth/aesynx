@@ -6,6 +6,7 @@ lands.
 
 ## Current Candidate
 
+- [v0.29.0 - Scheduler Telemetry Baseline](v0.29.0-rc.md)
 - [v0.28.0 - Cooperative Executor](v0.28.0-rc.md)
 
 ## History

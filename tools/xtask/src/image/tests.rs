@@ -41,8 +41,9 @@ use super::smoke::{
     PAGING_POLICY_MODEL_MARKER, PAGING_POLICY_MODEL_NULL_PAGE_MARKER,
     PAGING_POLICY_MODEL_RODATA_READ_ONLY_MARKER, PAGING_POLICY_MODEL_SECTION_LAYOUT_MARKER,
     PAGING_POLICY_MODEL_STATUS_MARKER, PAGING_POLICY_MODEL_TEXT_RX_MARKER, PANIC_DIAGNOSTIC_MARKER,
-    PANIC_MARKER, PANIC_REGISTERS_MARKER, SERIAL_MARKER, SLEEP_MARKER, SmokeKind,
-    TIMER_DELAYED_LOG_MARKER, TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER,
+    PANIC_MARKER, PANIC_REGISTERS_MARKER, SCHEDULER_TELEMETRY_FAIL_MARKER,
+    SCHEDULER_TELEMETRY_MARKER, SCHEDULER_TELEMETRY_STATUS_MARKER, SERIAL_MARKER, SLEEP_MARKER,
+    SmokeKind, TIMER_DELAYED_LOG_MARKER, TIMER_MARKER, TIMER_SETUP_MARKER, TIMER_TICK_1_MARKER,
     TIMER_TICK_2_MARKER, TIMER_TICK_3_MARKER, parse_qemu_args, serial_log_contents_match,
 };
 use super::{BOOT_CONFIG_MARKERS, KERNEL_PROFILE, KERNEL_TARGET};
@@ -101,6 +102,15 @@ fn qemu_markers_track_current_contracts() {
     assert_eq!(
         HEAP_CORRUPT_FREE_LIST_MARKER,
         "corrupt_free_list_detected=false"
+    );
+    assert_eq!(
+        SCHEDULER_TELEMETRY_FAIL_MARKER,
+        "[TEST] scheduler-telemetry=fail"
+    );
+    assert_eq!(SCHEDULER_TELEMETRY_MARKER, "[TEST] scheduler-telemetry=ok");
+    assert_eq!(
+        SCHEDULER_TELEMETRY_STATUS_MARKER,
+        "scheduler-telemetry decisions="
     );
     assert_eq!(IRQ_SETUP_MARKER, "[TEST] irq=ok");
     assert_eq!(KERNEL_CR3_ACTIVE_MARKER, "kernel-cr3 active=true");
@@ -373,28 +383,28 @@ fn image_kernel_profile_is_release() {
 #[test]
 fn image_artifact_names_track_current_candidate_version() {
     let boot = image_names(SmokeKind::Boot);
-    assert_eq!(boot.image, "aesynx-v0.28.0.iso");
-    assert_eq!(boot.manifest, "aesynx-v0.28.0.manifest");
-    assert_eq!(boot.serial_log, "aesynx-v0.28.0.serial.log");
-    assert_eq!(boot.staging_dir, "aesynx-v0.28.0-iso");
+    assert_eq!(boot.image, "aesynx-v0.29.0.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.29.0.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.29.0.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.29.0-iso");
 
     let panic = image_names(SmokeKind::Panic);
-    assert_eq!(panic.image, "aesynx-v0.28.0-panic.iso");
-    assert_eq!(panic.manifest, "aesynx-v0.28.0-panic.manifest");
-    assert_eq!(panic.serial_log, "aesynx-v0.28.0-panic.serial.log");
-    assert_eq!(panic.staging_dir, "aesynx-v0.28.0-panic-iso");
+    assert_eq!(panic.image, "aesynx-v0.29.0-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.29.0-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.29.0-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.29.0-panic-iso");
 
     let exception = image_names(SmokeKind::Exception);
-    assert_eq!(exception.image, "aesynx-v0.28.0-exception.iso");
-    assert_eq!(exception.manifest, "aesynx-v0.28.0-exception.manifest");
-    assert_eq!(exception.serial_log, "aesynx-v0.28.0-exception.serial.log");
-    assert_eq!(exception.staging_dir, "aesynx-v0.28.0-exception-iso");
+    assert_eq!(exception.image, "aesynx-v0.29.0-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.29.0-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.29.0-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.29.0-exception-iso");
 
     let timer = image_names(SmokeKind::Timer);
-    assert_eq!(timer.image, "aesynx-v0.28.0-timer.iso");
-    assert_eq!(timer.manifest, "aesynx-v0.28.0-timer.manifest");
-    assert_eq!(timer.serial_log, "aesynx-v0.28.0-timer.serial.log");
-    assert_eq!(timer.staging_dir, "aesynx-v0.28.0-timer-iso");
+    assert_eq!(timer.image, "aesynx-v0.29.0-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.29.0-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.29.0-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.29.0-timer-iso");
 }
 
 #[test]
@@ -434,7 +444,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
-    assert!(contents.contains("name=Aesynx v0.28.0 Cooperative executor candidate\n"));
+    assert!(contents.contains("name=Aesynx v0.29.0 Scheduler telemetry baseline candidate\n"));
     assert!(contents.contains("smoke=panic\n"));
     for smoke in [
         SmokeKind::Boot,

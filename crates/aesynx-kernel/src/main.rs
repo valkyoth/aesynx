@@ -1,10 +1,8 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 #![cfg_attr(target_os = "none", allow(unsafe_code))]
-
 #[cfg(any(target_os = "none", test))]
 extern crate alloc;
-
 #[cfg(target_os = "none")]
 use core::panic::PanicInfo;
 
@@ -105,6 +103,17 @@ mod task_smoke;
     not(feature = "timer-smoke")
 ))]
 mod cooperative_sched_smoke;
+
+#[cfg(any(
+    test,
+    all(
+        target_os = "none",
+        not(feature = "panic-smoke"),
+        not(feature = "exception-smoke"),
+        not(feature = "timer-smoke")
+    )
+))]
+mod scheduler_telemetry_smoke;
 
 #[cfg(all(
     target_os = "none",

@@ -49,4 +49,25 @@ pub fn run() {
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+
+    match crate::scheduler_telemetry_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "scheduler-telemetry decisions={} task_a_runs={} task_b_runs={} core_run_queue={} first_reason_round_robin={} last_reason_round_robin={} trace_ok={}",
+                status.decisions,
+                status.task_a_runs,
+                status.task_b_runs,
+                status.core_run_queue_len,
+                status.first_reason_round_robin,
+                status.last_reason_round_robin,
+                status.trace_ok
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] scheduler-telemetry=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("scheduler-telemetry error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] scheduler-telemetry=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
 }
