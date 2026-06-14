@@ -16,7 +16,7 @@ use super::layout::{
     class_for_layout, page_count_for_len, pages_for_size,
 };
 use super::lock::HeapLockGuard;
-use super::stats::KernelHeapError;
+use super::stats::{KernelHeapError, KernelHeapStats};
 
 const HEAP_UNINITIALIZED: usize = 0;
 const HEAP_INITIALIZING: usize = 1;
@@ -38,6 +38,7 @@ pub struct KernelHeapAllocator {
     frees: AtomicUsize,
     double_free_detected: AtomicUsize,
     invalid_free_detected: AtomicUsize,
+    corrupt_free_list_detected: AtomicUsize,
 }
 
 impl KernelHeapAllocator {
@@ -58,6 +59,7 @@ impl KernelHeapAllocator {
             frees: AtomicUsize::new(0),
             double_free_detected: AtomicUsize::new(0),
             invalid_free_detected: AtomicUsize::new(0),
+            corrupt_free_list_detected: AtomicUsize::new(0),
         }
     }
 
@@ -124,6 +126,8 @@ impl KernelHeapAllocator {
             frees: self.frees.load(Ordering::Acquire),
             double_free_detected: self.double_free_detected.load(Ordering::Acquire) != 0,
             invalid_free_detected: self.invalid_free_detected.load(Ordering::Acquire) != 0,
+            corrupt_free_list_detected: self.corrupt_free_list_detected.load(Ordering::Acquire)
+                != 0,
         })
     }
 
@@ -145,8 +149,15 @@ impl KernelHeapAllocator {
 
     pub fn deallocate_checked(&self, ptr: *mut u8, layout: Layout) -> Result<(), KernelHeapError> {
         let result = self.deallocate_checked_inner(ptr, layout);
-        if matches!(result, Err(KernelHeapError::InvalidFree)) {
-            self.invalid_free_detected.fetch_add(1, Ordering::AcqRel);
+        match result {
+            Err(KernelHeapError::InvalidFree) => {
+                self.invalid_free_detected.fetch_add(1, Ordering::AcqRel);
+            }
+            Err(KernelHeapError::CorruptFreeList) => {
+                self.corrupt_free_list_detected
+                    .fetch_add(1, Ordering::AcqRel);
+            }
+            _ => {}
         }
         result
     }
@@ -198,6 +209,7 @@ impl KernelHeapAllocator {
         self.frees.store(0, Ordering::Release);
         self.double_free_detected.store(0, Ordering::Release);
         self.invalid_free_detected.store(0, Ordering::Release);
+        self.corrupt_free_list_detected.store(0, Ordering::Release);
     }
 
     fn allocate_slab_locked(&self, class: usize) -> Result<*mut u8, KernelHeapError> {
@@ -450,17 +462,6 @@ impl KernelHeapAllocator {
     fn lock(&self) -> HeapLockGuard<'_> {
         HeapLockGuard::lock(&self.locked)
     }
-}
-
-pub struct KernelHeapStats {
-    pub heap_bytes: usize,
-    pub allocated_bytes: usize,
-    pub peak_allocated_bytes: usize,
-    pub slab_allocations: usize,
-    pub page_allocations: usize,
-    pub frees: usize,
-    pub double_free_detected: bool,
-    pub invalid_free_detected: bool,
 }
 
 // SAFETY: `KernelHeapAllocator` serializes metadata mutation with a private

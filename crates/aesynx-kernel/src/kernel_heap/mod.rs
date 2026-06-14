@@ -82,6 +82,7 @@ pub fn smoke(allocator: &KernelHeapAllocator) -> Result<KernelHeapStatus, Kernel
         frees: stats.frees,
         double_free_detected: stats.double_free_detected,
         invalid_free_detected: stats.invalid_free_detected,
+        corrupt_free_list_detected: stats.corrupt_free_list_detected,
         box_ok,
         vec_ok,
         btree_ok,

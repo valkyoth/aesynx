@@ -309,7 +309,7 @@ extern "C" fn activate_on_kernel_stack(
     match crate::kernel_heap::smoke(allocator) {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "heap bytes={} allocated={} peak={} slab_classes={} slab_allocations={} page_allocations={} frees={} double_free_detected={} invalid_free_detected={} box_ok={} vec_ok={} btree_ok={} slab_reuse_ok={} page_run_ok={} stress_ok={} oom_rejected={}",
+                "heap bytes={} allocated={} peak={} slab_classes={} slab_allocations={} page_allocations={} frees={} double_free_detected={} invalid_free_detected={} corrupt_free_list_detected={} box_ok={} vec_ok={} btree_ok={} slab_reuse_ok={} page_run_ok={} stress_ok={} oom_rejected={}",
                 status.heap_bytes,
                 status.allocated_bytes,
                 status.peak_allocated_bytes,
@@ -319,6 +319,7 @@ extern "C" fn activate_on_kernel_stack(
                 status.frees,
                 status.double_free_detected,
                 status.invalid_free_detected,
+                status.corrupt_free_list_detected,
                 status.box_ok,
                 status.vec_ok,
                 status.btree_ok,

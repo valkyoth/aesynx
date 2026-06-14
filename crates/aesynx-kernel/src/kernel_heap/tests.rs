@@ -191,6 +191,7 @@ fn stats_track_allocations_frees_and_peak() -> Result<(), KernelHeapError> {
     assert_eq!(stats.slab_allocations, 1);
     assert_eq!(stats.page_allocations, 1);
     assert_eq!(stats.frees, 2);
+    assert!(!stats.corrupt_free_list_detected);
     Ok(())
 }
 
