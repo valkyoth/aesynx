@@ -104,6 +104,6 @@ pub enum PolicyError {
     FallbackRequired,
     ResourceLimitExceeded,
     UnsupportedDomain,
+    UnsupportedModelKind,
     UnsupportedSchema,
-    UnsafeConfidenceLimit,
 }

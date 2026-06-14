@@ -18,9 +18,13 @@ pub struct ScheduleFeatures {
 
 impl ScheduleFeatures {
     pub const fn validate(self) -> Result<Self, PolicyError> {
-        if self.object_locality_score > FIXED_POINT_SCALE
+        if self.run_queue_len > FIXED_POINT_SCALE
+            || self.ipc_depth > FIXED_POINT_SCALE
+            || self.queue_pressure > FIXED_POINT_SCALE
+            || self.object_locality_score > FIXED_POINT_SCALE
             || self.cache_miss_rate > FIXED_POINT_SCALE
             || self.idle_ratio > FIXED_POINT_SCALE
+            || self.migration_cost > FIXED_POINT_SCALE
         {
             return Err(PolicyError::FeatureOutOfRange);
         }
@@ -63,6 +67,8 @@ impl ScheduleAdvice {
 
 #[cfg(test)]
 mod tests {
+    use core::fmt::{self, Write};
+
     use aesynx_abi::{CoreId, ModelId};
 
     use super::ScheduleFeatures;
@@ -73,6 +79,41 @@ mod tests {
     };
 
     struct DenySchedulerPolicy;
+
+    struct DebugBuffer {
+        bytes: [u8; 1024],
+        len: usize,
+    }
+
+    impl DebugBuffer {
+        const fn new() -> Self {
+            Self {
+                bytes: [0; 1024],
+                len: 0,
+            }
+        }
+
+        fn contains(&self, needle: &[u8]) -> bool {
+            if needle.is_empty() || needle.len() > self.len {
+                return false;
+            }
+            self.bytes[..self.len]
+                .windows(needle.len())
+                .any(|window| window == needle)
+        }
+    }
+
+    impl Write for DebugBuffer {
+        fn write_str(&mut self, text: &str) -> fmt::Result {
+            let end = match self.len.checked_add(text.len()) {
+                Some(end) if end <= self.bytes.len() => end,
+                _ => return Err(fmt::Error),
+            };
+            self.bytes[self.len..end].copy_from_slice(text.as_bytes());
+            self.len = end;
+            Ok(())
+        }
+    }
 
     impl PolicyEngine for DenySchedulerPolicy {
         type Input = ScheduleFeatures;
@@ -166,6 +207,43 @@ mod tests {
             ..ScheduleFeatures::default()
         };
         assert_eq!(invalid.validate(), Err(PolicyError::FeatureOutOfRange));
+
+        let invalid_raw_count = ScheduleFeatures {
+            run_queue_len: FIXED_POINT_SCALE + 1,
+            ..ScheduleFeatures::default()
+        };
+        assert_eq!(
+            invalid_raw_count.validate(),
+            Err(PolicyError::FeatureOutOfRange)
+        );
+
+        let invalid_migration_cost = ScheduleFeatures {
+            migration_cost: FIXED_POINT_SCALE + 1,
+            ..ScheduleFeatures::default()
+        };
+        assert_eq!(
+            invalid_migration_cost.validate(),
+            Err(PolicyError::FeatureOutOfRange)
+        );
+    }
+
+    #[test]
+    fn model_manifest_debug_redacts_hashes_signature_and_identity() {
+        let manifest = match scheduler_manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => return assert_eq!(error, PolicyError::EmptyHash),
+        };
+        let mut rendered = DebugBuffer::new();
+        assert!(core::write!(&mut rendered, "{manifest:?}").is_ok());
+
+        assert!(rendered.contains(b"ModelObjectManifest"));
+        assert!(rendered.contains(b"id: \"<redacted>\""));
+        assert!(rendered.contains(b"Hash256(<redacted>)"));
+        assert!(rendered.contains(b"Signature64(<redacted>)"));
+        assert!(!rendered.contains(b"[1, 1"));
+        assert!(!rendered.contains(b"[2, 2"));
+        assert!(!rendered.contains(b"[3, 3"));
+        assert!(!rendered.contains(b"[7, 7"));
     }
 
     #[test]
@@ -221,6 +299,26 @@ mod tests {
         assert_eq!(
             manifest.validate_for_domain(PolicyDomain::Scheduler),
             Err(PolicyError::FeatureOutOfRange)
+        );
+    }
+
+    #[test]
+    fn model_manifest_rejects_unbacked_model_kinds() {
+        let mut manifest = match scheduler_manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => return assert_eq!(error, PolicyError::EmptyHash),
+        };
+
+        manifest.kind = ModelKind::NeuralNetwork;
+        assert_eq!(
+            manifest.validate_for_domain(PolicyDomain::Scheduler),
+            Err(PolicyError::UnsupportedModelKind)
+        );
+
+        manifest.kind = ModelKind::WasmComponent;
+        assert_eq!(
+            manifest.validate_for_domain(PolicyDomain::Scheduler),
+            Err(PolicyError::UnsupportedModelKind)
         );
     }
 

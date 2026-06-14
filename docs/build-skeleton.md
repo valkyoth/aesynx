@@ -101,7 +101,8 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `trace-event schema=1 event=capability-fault`,
 `trace-event schema=1 event=scheduler-decision`,
 `selected_task=<redacted>`, `[TEST] telemetry-events=ok`,
-`ai-policy schema=1`, `safety_gate_ok=true`, `[TEST] ai-policy=ok`, and
+`ai-policy schema=1`, `manifest_metadata_gate_ok=true`,
+`[TEST] ai-policy=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 Decode the captured boot trace:

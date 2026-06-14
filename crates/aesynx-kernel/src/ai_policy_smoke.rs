@@ -13,7 +13,7 @@ pub struct AiPolicySmokeStatus {
     pub fallback_used: bool,
     pub fallback_confidence: u16,
     pub fallback_core: u32,
-    pub safety_gate_ok: bool,
+    pub manifest_metadata_gate_ok: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -79,7 +79,7 @@ pub fn run() -> Result<AiPolicySmokeStatus, AiPolicySmokeError> {
         fallback_used: decision.fallback_used(),
         fallback_confidence: decision.confidence().get(),
         fallback_core: decision.output().target_core().get(),
-        safety_gate_ok: rejected_manifest && fallback_ok,
+        manifest_metadata_gate_ok: rejected_manifest && fallback_ok,
     })
 }
 
@@ -122,6 +122,6 @@ mod tests {
         assert!(status.fallback_used);
         assert_eq!(status.fallback_confidence, 0);
         assert_eq!(status.fallback_core, 0);
-        assert!(status.safety_gate_ok);
+        assert!(status.manifest_metadata_gate_ok);
     }
 }

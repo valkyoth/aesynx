@@ -1,16 +1,20 @@
+use core::fmt;
+
 use aesynx_abi::ModelId;
 
-use crate::{Confidence, MAX_CONFIDENCE, PolicyError};
+use crate::{Confidence, PolicyError};
 
 pub const MODEL_MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MODEL_EVAL_STEPS: u32 = 1_000_000;
 pub const MAX_MODEL_MEMORY_BYTES: u32 = 1_048_576;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq)]
 pub struct Hash256([u8; 32]);
 
 impl Hash256 {
     pub const fn new(bytes: [u8; 32]) -> Result<Self, PolicyError> {
+        // SECURITY: this is a metadata-presence gate only. It is not
+        // cryptographic hash verification.
         if all_zero_32(&bytes) {
             return Err(PolicyError::EmptyHash);
         }
@@ -23,11 +27,25 @@ impl Hash256 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+impl fmt::Debug for Hash256 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Hash256(<redacted>)")
+    }
+}
+
+impl PartialEq for Hash256 {
+    fn eq(&self, other: &Self) -> bool {
+        constant_time_eq(&self.0, &other.0)
+    }
+}
+
+#[derive(Clone, Copy, Eq)]
 pub struct Signature64([u8; 64]);
 
 impl Signature64 {
     pub const fn new(bytes: [u8; 64]) -> Result<Self, PolicyError> {
+        // SECURITY: this is a metadata-presence gate only. Real signature
+        // validation must be added with the future model-loading backend.
         if all_zero_64(&bytes) {
             return Err(PolicyError::EmptySignature);
         }
@@ -37,6 +55,18 @@ impl Signature64 {
     #[must_use]
     pub const fn bytes(self) -> [u8; 64] {
         self.0
+    }
+}
+
+impl fmt::Debug for Signature64 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Signature64(<redacted>)")
+    }
+}
+
+impl PartialEq for Signature64 {
+    fn eq(&self, other: &Self) -> bool {
+        constant_time_eq(&self.0, &other.0)
     }
 }
 
@@ -133,7 +163,7 @@ impl ModelSafetyLimits {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ModelObjectManifest {
     pub id: ModelId,
     pub schema_version: u16,
@@ -144,6 +174,22 @@ pub struct ModelObjectManifest {
     pub weights_hash: Hash256,
     pub signature: Signature64,
     pub safety_limits: ModelSafetyLimits,
+}
+
+impl fmt::Debug for ModelObjectManifest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ModelObjectManifest")
+            .field("id", &"<redacted>")
+            .field("schema_version", &self.schema_version)
+            .field("kind", &self.kind)
+            .field("domain", &self.domain)
+            .field("input_schema_hash", &self.input_schema_hash)
+            .field("output_schema_hash", &self.output_schema_hash)
+            .field("weights_hash", &self.weights_hash)
+            .field("signature", &self.signature)
+            .field("safety_limits", &self.safety_limits)
+            .finish()
+    }
 }
 
 impl ModelObjectManifest {
@@ -159,12 +205,9 @@ impl ModelObjectManifest {
         }
         if !matches!(
             self.kind,
-            ModelKind::FixedPointHeuristic
-                | ModelKind::FixedPointTable
-                | ModelKind::WasmComponent
-                | ModelKind::NeuralNetwork
+            ModelKind::FixedPointHeuristic | ModelKind::FixedPointTable
         ) {
-            return Err(PolicyError::UnsupportedSchema);
+            return Err(PolicyError::UnsupportedModelKind);
         }
         if !same_domain(self.domain, expected_domain) {
             return Err(PolicyError::UnsupportedDomain);
@@ -179,9 +222,6 @@ impl ModelObjectManifest {
         {
             return Err(PolicyError::ResourceLimitExceeded);
         }
-        if self.safety_limits.max_confidence.get() > MAX_CONFIDENCE {
-            return Err(PolicyError::UnsafeConfidenceLimit);
-        }
         if same_domain(expected_domain, PolicyDomain::Scheduler)
             && !self
                 .safety_limits
@@ -195,9 +235,17 @@ impl ModelObjectManifest {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ValidatedModelManifest {
     manifest: ModelObjectManifest,
+}
+
+impl fmt::Debug for ValidatedModelManifest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ValidatedModelManifest")
+            .field("manifest", &self.manifest)
+            .finish()
+    }
 }
 
 impl ValidatedModelManifest {
@@ -237,4 +285,14 @@ const fn all_zero_64(bytes: &[u8; 64]) -> bool {
         index += 1;
     }
     true
+}
+
+fn constant_time_eq<const LEN: usize>(left: &[u8; LEN], right: &[u8; LEN]) -> bool {
+    let mut diff = 0u8;
+    let mut index = 0;
+    while index < LEN {
+        diff |= left[index] ^ right[index];
+        index += 1;
+    }
+    diff == 0
 }
