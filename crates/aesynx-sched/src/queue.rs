@@ -8,7 +8,7 @@ pub struct QueueStatus {
     pub len: usize,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct LocalRunQueue<const CAPACITY: usize> {
     owner_core: CoreId,
     slots: [Option<Task>; CAPACITY],
@@ -24,7 +24,7 @@ impl<const CAPACITY: usize> LocalRunQueue<CAPACITY> {
 
         Ok(Self {
             owner_core,
-            slots: [None; CAPACITY],
+            slots: [const { None }; CAPACITY],
             head: 0,
             len: 0,
         })
@@ -87,7 +87,7 @@ impl<const CAPACITY: usize> LocalRunQueue<CAPACITY> {
         let mut offset = 0usize;
         while offset < self.len {
             let index = (self.head + offset) % CAPACITY;
-            if let Some(task) = self.slots[index]
+            if let Some(task) = self.slots[index].as_ref()
                 && task.id() == id
             {
                 return true;
@@ -99,7 +99,7 @@ impl<const CAPACITY: usize> LocalRunQueue<CAPACITY> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct WaitQueue<const CAPACITY: usize> {
     reason: WaitReason,
     slots: [Option<Task>; CAPACITY],
@@ -115,7 +115,7 @@ impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
 
         Ok(Self {
             reason,
-            slots: [None; CAPACITY],
+            slots: [const { None }; CAPACITY],
             head: 0,
             len: 0,
         })
@@ -160,8 +160,10 @@ impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
         let Some(mut task) = self.slots[self.head].take() else {
             return Err(TaskQueueError::CorruptQueue);
         };
-        task.transition(TaskState::Runnable)
-            .map_err(|_| TaskQueueError::InvalidWakeTransition)?;
+        if task.transition(TaskState::Runnable).is_err() {
+            self.slots[self.head] = Some(task);
+            return Err(TaskQueueError::InvalidWakeTransition);
+        }
         self.head = (self.head + 1) % CAPACITY;
         self.len -= 1;
         Ok(task)
@@ -172,7 +174,7 @@ impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
         let mut offset = 0usize;
         while offset < self.len {
             let index = (self.head + offset) % CAPACITY;
-            if let Some(task) = self.slots[index]
+            if let Some(task) = self.slots[index].as_ref()
                 && task.id() == id
             {
                 return true;
@@ -221,4 +223,17 @@ const fn validate_task_id(id: TaskId) -> Result<(), TaskQueueError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
+    pub(crate) fn inject_head_for_test(&mut self, task: Task) -> Result<(), TaskQueueError> {
+        if self.len != 0 {
+            return Err(TaskQueueError::QueueFull);
+        }
+
+        self.slots[self.head] = Some(task);
+        self.len = 1;
+        Ok(())
+    }
 }

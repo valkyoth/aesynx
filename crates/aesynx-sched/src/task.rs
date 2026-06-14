@@ -5,7 +5,7 @@ use aesynx_abi::{CoreId, TaskId};
 pub const MAX_PRIORITY: u8 = 127;
 pub const MAX_TASK_BUDGET_TICKS: u64 = 1_000_000;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Task {
     id: TaskId,
     owner_core: CoreId,
@@ -32,27 +32,27 @@ impl Task {
     }
 
     #[must_use]
-    pub const fn id(self) -> TaskId {
+    pub const fn id(&self) -> TaskId {
         self.id
     }
 
     #[must_use]
-    pub const fn owner_core(self) -> CoreId {
+    pub const fn owner_core(&self) -> CoreId {
         self.owner_core
     }
 
     #[must_use]
-    pub const fn state(self) -> TaskState {
+    pub const fn state(&self) -> TaskState {
         self.state
     }
 
     #[must_use]
-    pub const fn priority(self) -> Priority {
+    pub const fn priority(&self) -> Priority {
         self.priority
     }
 
     #[must_use]
-    pub const fn budget(self) -> TimeBudget {
+    pub const fn budget(&self) -> TimeBudget {
         self.budget
     }
 

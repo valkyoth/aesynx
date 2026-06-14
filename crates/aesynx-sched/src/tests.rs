@@ -111,9 +111,9 @@ fn local_run_queue_preserves_fifo_for_runnable_local_tasks() {
     assert_eq!(queue.push(task(2, 0)), Ok(()));
     assert_eq!(queue.push(task(3, 0)), Ok(()));
 
-    assert_eq!(queue.pop().map(Task::id), Ok(TaskId::new(1)));
-    assert_eq!(queue.pop().map(Task::id), Ok(TaskId::new(2)));
-    assert_eq!(queue.pop().map(Task::id), Ok(TaskId::new(3)));
+    assert_eq!(queue.pop().map(|task| task.id()), Ok(TaskId::new(1)));
+    assert_eq!(queue.pop().map(|task| task.id()), Ok(TaskId::new(2)));
+    assert_eq!(queue.pop().map(|task| task.id()), Ok(TaskId::new(3)));
     assert_eq!(queue.pop(), Err(TaskQueueError::QueueEmpty));
 }
 
@@ -186,6 +186,21 @@ fn wait_queue_rejects_wrong_reason_without_mutation() {
 
     assert_eq!(queue.push(waiting), Err(TaskQueueError::WaitReasonMismatch));
     assert_eq!(queue.status(), before);
+}
+
+#[test]
+fn wait_queue_failed_wake_transition_restores_task() {
+    let mut queue = match WaitQueue::<2>::new(WaitReason::Message) {
+        Ok(queue) => queue,
+        Err(error) => return assert_eq!(error, TaskQueueError::QueueCapacityZero),
+    };
+    let runnable = task(1, 0);
+    assert_eq!(queue.inject_head_for_test(runnable), Ok(()));
+    let before = queue.status();
+
+    assert_eq!(queue.wake_one(), Err(TaskQueueError::InvalidWakeTransition));
+    assert_eq!(queue.status(), before);
+    assert!(queue.contains(TaskId::new(1)));
 }
 
 #[test]
