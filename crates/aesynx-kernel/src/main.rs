@@ -98,6 +98,22 @@ mod service_queue_smoke;
 ))]
 mod task_smoke;
 
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
+))]
+mod cooperative_sched_smoke;
+
+#[cfg(all(
+    target_os = "none",
+    not(feature = "panic-smoke"),
+    not(feature = "exception-smoke"),
+    not(feature = "timer-smoke")
+))]
+mod execution_smoke;
+
 #[cfg(target_os = "none")]
 #[global_allocator]
 static KERNEL_ALLOCATOR: kernel_heap::KernelHeapAllocator = kernel_heap::KernelHeapAllocator::new();

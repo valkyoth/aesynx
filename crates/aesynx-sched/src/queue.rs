@@ -115,6 +115,14 @@ impl<const CAPACITY: usize> LocalRunQueue<CAPACITY> {
 
         false
     }
+
+    #[must_use]
+    pub fn front_task_id(&self) -> Option<TaskId> {
+        self.slots
+            .get(self.head)
+            .and_then(Option::as_ref)
+            .map(Task::id)
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -214,6 +222,14 @@ impl<const CAPACITY: usize> WaitQueue<CAPACITY> {
         }
 
         false
+    }
+
+    #[must_use]
+    pub fn front_task_id(&self) -> Option<TaskId> {
+        self.slots
+            .get(self.head)
+            .and_then(Option::as_ref)
+            .map(Task::id)
     }
 }
 

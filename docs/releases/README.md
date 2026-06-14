@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.27.0 - Kernel Task Model](v0.27.0-rc.md)
+- [v0.28.0 - Cooperative Executor](v0.28.0-rc.md)
 
 ## History
 
+- [v0.27.0 - Kernel Task Model](v0.27.0-rc.md)
 - [v0.26.0 - Kernel Service Queues](v0.26.0-rc.md)
 - [v0.25.0 - Service Queue Model](v0.25.0-rc.md)
 - [v0.24.0 - Kernel Object Registry](v0.24.0-rc.md)

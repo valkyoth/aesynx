@@ -2,8 +2,8 @@ use aesynx_abi::{CoreId, TaskId};
 use core::fmt::{self, Write};
 
 use crate::{
-    LocalRunQueue, MAX_PRIORITY, MAX_TASK_BUDGET_TICKS, Priority, SchedError, Task, TaskQueueError,
-    TaskRejected, TaskState, TimeBudget, WaitQueue, WaitReason,
+    ExecutorError, LocalExecutor, LocalRunQueue, MAX_PRIORITY, MAX_TASK_BUDGET_TICKS, Priority,
+    SchedError, Task, TaskQueueError, TaskRejected, TaskState, TimeBudget, WaitQueue, WaitReason,
 };
 
 fn task(id: u64, core: u32) -> Task {
@@ -240,9 +240,104 @@ fn zero_capacity_task_queues_are_rejected() {
 }
 
 #[test]
+fn cooperative_executor_round_robins_yielded_tasks() {
+    let mut executor = match LocalExecutor::<3, 1>::new(CoreId::new(0)) {
+        Ok(executor) => executor,
+        Err(error) => return assert_eq!(error, ExecutorError::Queue(TaskQueueError::QueueEmpty)),
+    };
+
+    assert_eq!(executor.spawn(task(1, 0)), Ok(()));
+    assert_eq!(executor.spawn(task(2, 0)), Ok(()));
+
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(1)));
+    assert_eq!(executor.yield_current(), Ok(()));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(2)));
+    assert_eq!(executor.yield_current(), Ok(()));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(1)));
+
+    let status = executor.status();
+    assert_eq!(status.current_task, Some(TaskId::new(1)));
+    assert_eq!(status.dispatched, 3);
+    assert_eq!(status.yielded, 2);
+    assert_eq!(status.run_queue_len, 1);
+}
+
+#[test]
+fn cooperative_executor_sleeps_and_wakes_timer_waiters() {
+    let mut executor = match LocalExecutor::<3, 1>::new(CoreId::new(0)) {
+        Ok(executor) => executor,
+        Err(error) => return assert_eq!(error, ExecutorError::Queue(TaskQueueError::QueueEmpty)),
+    };
+
+    assert_eq!(executor.spawn(task(1, 0)), Ok(()));
+    assert_eq!(executor.spawn(task(2, 0)), Ok(()));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(1)));
+    assert_eq!(executor.sleep_current_on_timer(), Ok(()));
+
+    let sleeping = executor.status();
+    assert_eq!(sleeping.current_task, None);
+    assert_eq!(sleeping.timer_wait_len, 1);
+    assert_eq!(sleeping.slept, 1);
+
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(2)));
+    assert_eq!(executor.yield_current(), Ok(()));
+    assert_eq!(executor.wake_one_timer(), Ok(TaskId::new(1)));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(2)));
+    assert_eq!(executor.yield_current(), Ok(()));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(1)));
+
+    let status = executor.status();
+    assert_eq!(status.current_task, Some(TaskId::new(1)));
+    assert_eq!(status.timer_wait_len, 0);
+    assert_eq!(status.slept, 1);
+    assert_eq!(status.woke, 1);
+}
+
+#[test]
+fn cooperative_executor_rejects_nested_dispatch_without_mutation() {
+    let mut executor = match LocalExecutor::<2, 1>::new(CoreId::new(0)) {
+        Ok(executor) => executor,
+        Err(error) => return assert_eq!(error, ExecutorError::Queue(TaskQueueError::QueueEmpty)),
+    };
+
+    assert_eq!(executor.spawn(task(1, 0)), Ok(()));
+    assert_eq!(executor.spawn(task(2, 0)), Ok(()));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(1)));
+    let before = executor.status();
+
+    assert_eq!(
+        executor.dispatch_next(),
+        Err(ExecutorError::TaskAlreadyRunning)
+    );
+    assert_eq!(executor.status(), before);
+}
+
+#[test]
+fn cooperative_executor_failed_sleep_keeps_current_task() {
+    let mut executor = match LocalExecutor::<2, 1>::new(CoreId::new(0)) {
+        Ok(executor) => executor,
+        Err(error) => return assert_eq!(error, ExecutorError::Queue(TaskQueueError::QueueEmpty)),
+    };
+
+    assert_eq!(executor.spawn(task(1, 0)), Ok(()));
+    assert_eq!(executor.spawn(task(2, 0)), Ok(()));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(1)));
+    assert_eq!(executor.sleep_current_on_timer(), Ok(()));
+    assert_eq!(executor.dispatch_next(), Ok(TaskId::new(2)));
+    let before = executor.status();
+
+    assert_eq!(
+        executor.sleep_current_on_timer(),
+        Err(ExecutorError::Queue(TaskQueueError::QueueFull))
+    );
+    assert_eq!(executor.status(), before);
+}
+
+#[test]
 fn task_queues_remain_send_for_owned_transfer() {
     assert_send::<LocalRunQueue<2>>();
     assert_send::<WaitQueue<2>>();
+    assert_send::<LocalExecutor<2, 1>>();
 }
 
 struct TestBuffer {
