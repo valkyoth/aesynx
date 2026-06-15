@@ -1916,6 +1916,12 @@ Deliverables:
 - Driver manager skeleton.
 - Documented `drivers/` source-tree/package boundary.
 - Driver package identity and trust-track rules.
+- Documented split-out triggers for moving QEMU/virtio drivers to future
+  `aesynx/drivers-qemu` or `aesynx/drivers-virtio` repositories once the driver
+  ABI, manifests, capability grants, package flow, and CI contract are stable.
+- Documented repository evolution option where this repository may become
+  `aesynx/kernel` or `aesynx/multikernel` under a future `aesynx/`
+  organization.
 
 Verification:
 

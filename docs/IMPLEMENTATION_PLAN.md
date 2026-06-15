@@ -8,6 +8,12 @@ Kernel/system name: `Aesynx`
 
 Naming rule: `Aesynx` is the project, kernel, and system name. Use it consistently in code, docs, boot strings, crate names, target names, and user-facing interfaces.
 
+Repository evolution rule: the current monorepo may eventually become
+`aesynx/kernel` or `aesynx/multikernel` under an `aesynx/` organization once
+driver, SDK, package, and app repositories are split out. Until the driver ABI
+is stable, QEMU and virtio drivers may live in-tree under `drivers/` as
+ABI-shaping packages, but not as permanent kernel internals.
+
 Primary 1.0 target: QEMU-hosted research OS, not a daily-driver desktop OS.
 
 This document turns [initial-idea.md](initial-idea.md) and the follow-up design discussion into an implementation plan. It is intentionally concrete. The goal is to build a serious Rust operating-system project without pretending that a general-purpose Linux/Windows replacement can appear early.

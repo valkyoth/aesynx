@@ -85,6 +85,37 @@ when that is necessary for first boot. Once a driver grows beyond boot
 diagnostics or QEMU smoke, move it toward `drivers/` and the driver-service
 model.
 
+The in-tree `drivers/` area is an early ABI-shaping convenience, not the final
+ecosystem boundary. QEMU and virtio drivers should stay in this repository while
+the driver API, capability grants, QEMU CI, package manifests, and service model
+are still changing. They should be split into separate repositories once the
+public driver ABI is stable enough for external packages.
+
+Split-out triggers:
+
+- `aesynx-driver-api` exists and is versioned.
+- Driver manifests are enforced.
+- MMIO, IRQ, DMA, firmware, and bus capability grants are stable.
+- Driver packages can be signed, installed, updated, removed, and rolled back.
+- QEMU driver CI can run against the public driver ABI without kernel-private
+  hooks.
+- Kernel releases no longer require driver source edits for ordinary driver
+  updates.
+
+Likely future organization layout:
+
+```text
+aesynx/kernel          # or aesynx/multikernel
+aesynx/drivers-qemu
+aesynx/drivers-virtio
+aesynx/driver-sdk
+aesynx/drivers-community
+```
+
+The current repository may eventually be renamed under an `aesynx/`
+organization, most likely to `aesynx/kernel` or `aesynx/multikernel`, once the
+broader OS ecosystem has separate repositories.
+
 ## QEMU First Driver Set
 
 The first driver target is QEMU, so the early device set should prefer virtio
