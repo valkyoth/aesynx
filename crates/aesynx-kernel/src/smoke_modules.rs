@@ -2,6 +2,8 @@
 pub mod ai_policy_smoke;
 #[path = "capability_smoke.rs"]
 pub mod capability_smoke;
+#[path = "concurrency_smoke.rs"]
+pub mod concurrency_smoke;
 #[path = "entropy_smoke.rs"]
 pub mod entropy_smoke;
 #[path = "scheduler_telemetry_smoke.rs"]

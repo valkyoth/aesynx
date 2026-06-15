@@ -19,6 +19,7 @@ members = [
     "crates/aesynx-rt",
     "crates/aesynx-sched",
     "crates/aesynx-shell",
+    "crates/aesynx-sync",
     "crates/aesynx-telemetry",
     "crates/aesynx-time",
     "models/aesynx-ipc-model",
@@ -63,6 +64,7 @@ aesynx-platform = { path = "crates/aesynx-platform", version = "0.1.0" }
 aesynx-rt = { path = "crates/aesynx-rt", version = "0.1.0" }
 aesynx-sched = { path = "crates/aesynx-sched", version = "0.1.0" }
 aesynx-shell = { path = "crates/aesynx-shell", version = "0.1.0" }
+aesynx-sync = { path = "crates/aesynx-sync", version = "0.1.0" }
 aesynx-telemetry = { path = "crates/aesynx-telemetry", version = "0.1.0" }
 aesynx-time = { path = "crates/aesynx-time", version = "0.1.0" }
 

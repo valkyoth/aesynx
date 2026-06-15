@@ -100,6 +100,7 @@ dependencies = [
  "aesynx-log",
  "aesynx-mm",
  "aesynx-sched",
+ "aesynx-sync",
  "aesynx-telemetry",
  "aesynx-time",
 ]
@@ -158,6 +159,10 @@ version = "0.1.0"
 dependencies = [
  "aesynx-rt",
 ]
+
+[[package]]
+name = "aesynx-sync"
+version = "0.1.0"
 
 [[package]]
 name = "aesynx-telemetry"

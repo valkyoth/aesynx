@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.33.0 scheduler policy model candidate
+Status: v0.33.1 concurrency discipline candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.33.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.33.1.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -104,29 +104,31 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `ai-policy schema=1`, `manifest_metadata_gate_ok=true`,
 `heuristic_enabled=true`, `heuristic_score=<redacted>`,
 `heuristic_core=<redacted>`, `heuristic_disabled_fallback_ok=true`,
-`[TEST] ai-policy=ok`, and
+`[TEST] ai-policy=ok`, `concurrency irq_guard_ok=true`,
+`nested_irq_guard_ok=true`, `early_lock_ok=true`, `irq_lock_ok=true`,
+`lock_order_ok=true`, `[TEST] concurrency=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 Decode the captured boot trace:
 
 ```bash
-cargo xtask trace-decode build/qemu/aesynx-v0.33.0.serial.log
+cargo xtask trace-decode build/qemu/aesynx-v0.33.1.serial.log
 ```
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.33.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.33.1-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.33.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.33.1-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.33.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.33.1-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -201,17 +203,15 @@ activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.33.0 candidate adds the first non-AI scheduler policy model on top of
-the explicit AI policy interface. The `aesynx-ai-policy` crate provides no_std
-model manifests, nonzero hash/signature wrappers, scheduler-domain safety
-limits, fixed-point scheduler feature validation, bounded confidence, a
-deterministic fallback policy contract, bounded fixed-point heuristic scoring,
-a decision record, and a disable switch that preserves the local round-robin
-fallback path. QEMU accepts a safe scheduler manifest, rejects a manifest
-without required fallback, verifies zero-confidence local fallback, and records
-heuristic enabled plus redacted score/core evidence before `[TEST] ai-policy=ok`. Actual AI
-inference, model loading, online learning, and authority-bearing policy
-decisions remain future milestones.
+The v0.33.1 candidate adds explicit concurrency discipline before SMP work
+begins. The `aesynx-sync` crate provides safe no_std early-lock primitives,
+previous-state interrupt guards, nested interrupt masking behavior, IRQ-lock
+composition, and lock-rank validation. QEMU proves the model compiles into the
+kernel image and validates `irq_guard_ok`, `nested_irq_guard_ok`,
+`early_lock_ok`, `irq_lock_ok`, and `lock_order_ok` before
+`[TEST] concurrency=ok`. This does not enable SMP; the existing SMP tripwires
+remain until descriptor tables, activation storage, heap backing, queues, and
+shared kernel state have explicit per-core or synchronized ownership.
 
 ## Target Shape
 

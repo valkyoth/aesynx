@@ -130,4 +130,23 @@ pub fn run() {
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+
+    match crate::smoke_modules::concurrency_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "concurrency irq_guard_ok={} nested_irq_guard_ok={} early_lock_ok={} irq_lock_ok={} lock_order_ok={}",
+                status.irq_guard_ok,
+                status.nested_irq_guard_ok,
+                status.early_lock_ok,
+                status.irq_lock_ok,
+                status.lock_order_ok
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] concurrency=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("concurrency error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] concurrency=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
 }
