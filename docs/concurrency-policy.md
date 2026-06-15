@@ -33,6 +33,9 @@ a classic shared-everything SMP kernel.
   blindly enable interrupts on exit.
 - Nested interrupt guards must leave interrupts disabled until the outer guard
   exits.
+- Guard release must be strict LIFO. A non-LIFO release is a corrupted local
+  synchronization state and must fail closed instead of rewriting tracker or
+  interrupt-mask state.
 - Lock acquisition must follow the global rank order. Acquiring an equal or
   lower-ranked lock while a higher-ranked lock is held is a policy violation.
 - Lock failures must not partially mutate protected state.

@@ -6,6 +6,22 @@ use super::{FIXED_POINT_SCALE, ScheduleAdvice, ScheduleFeatures};
 
 pub const DEFAULT_HEURISTIC_THRESHOLD: u32 = 5_000;
 
+const IDLE_RATIO_WEIGHT: u32 = 20;
+const RUN_QUEUE_RELIEF_WEIGHT: u32 = 15;
+const IPC_RELIEF_WEIGHT: u32 = 15;
+const OBJECT_LOCALITY_WEIGHT: u32 = 15;
+const CACHE_RELIEF_WEIGHT: u32 = 20;
+const PRIORITY_WEIGHT: u32 = 10;
+const MIGRATION_RELIEF_WEIGHT: u32 = 5;
+const HEURISTIC_WEIGHT_TOTAL: u32 = IDLE_RATIO_WEIGHT
+    + RUN_QUEUE_RELIEF_WEIGHT
+    + IPC_RELIEF_WEIGHT
+    + OBJECT_LOCALITY_WEIGHT
+    + CACHE_RELIEF_WEIGHT
+    + PRIORITY_WEIGHT
+    + MIGRATION_RELIEF_WEIGHT;
+const _: () = assert!(HEURISTIC_WEIGHT_TOTAL == 100);
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct HeuristicScheduleScore(u16);
 
@@ -248,14 +264,18 @@ pub fn score_features(features: ScheduleFeatures) -> Result<HeuristicScheduleSco
     let priority_score = (features.priority as u32 * FIXED_POINT_SCALE) / u8::MAX as u32;
     let weighted = features
         .idle_ratio
-        .saturating_mul(20)
-        .saturating_add(load_relief.saturating_mul(15))
-        .saturating_add(ipc_relief.saturating_mul(15))
-        .saturating_add(features.object_locality_score.saturating_mul(15))
-        .saturating_add(cache_relief.saturating_mul(20))
-        .saturating_add(priority_score.saturating_mul(10))
-        .saturating_add(migration_relief.saturating_mul(5));
-    HeuristicScheduleScore::new(weighted / 100)
+        .saturating_mul(IDLE_RATIO_WEIGHT)
+        .saturating_add(load_relief.saturating_mul(RUN_QUEUE_RELIEF_WEIGHT))
+        .saturating_add(ipc_relief.saturating_mul(IPC_RELIEF_WEIGHT))
+        .saturating_add(
+            features
+                .object_locality_score
+                .saturating_mul(OBJECT_LOCALITY_WEIGHT),
+        )
+        .saturating_add(cache_relief.saturating_mul(CACHE_RELIEF_WEIGHT))
+        .saturating_add(priority_score.saturating_mul(PRIORITY_WEIGHT))
+        .saturating_add(migration_relief.saturating_mul(MIGRATION_RELIEF_WEIGHT));
+    HeuristicScheduleScore::new(weighted / HEURISTIC_WEIGHT_TOTAL)
 }
 
 const fn max_u32(left: u32, right: u32) -> u32 {

@@ -29,6 +29,7 @@ pub enum LockRank {
 pub struct LockOrderTracker {
     current: Cell<Option<LockRank>>,
     depth: Cell<u8>,
+    poisoned: Cell<bool>,
 }
 
 impl LockOrderTracker {
@@ -36,10 +37,15 @@ impl LockOrderTracker {
         Self {
             current: Cell::new(None),
             depth: Cell::new(0),
+            poisoned: Cell::new(false),
         }
     }
 
     pub fn try_enter(&self, rank: LockRank) -> Result<LockOrderGuard<'_>, SyncError> {
+        if self.poisoned.get() {
+            return Err(SyncError::LockOrderViolation);
+        }
+
         if let Some(current) = self.current.get()
             && rank <= current
         {
@@ -71,6 +77,11 @@ impl LockOrderTracker {
     pub fn depth(&self) -> u8 {
         self.depth.get()
     }
+
+    #[must_use]
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned.get()
+    }
 }
 
 impl Default for LockOrderTracker {
@@ -95,6 +106,20 @@ impl LockOrderGuard<'_> {
     fn release_inner(&mut self) -> Result<(), SyncError> {
         if !self.active {
             return Err(SyncError::NotLocked);
+        }
+
+        let expected_depth = match self.previous_depth.checked_add(1) {
+            Some(depth) => depth,
+            None => {
+                self.tracker.poisoned.set(true);
+                self.active = false;
+                return Err(SyncError::LockDepthOverflow);
+            }
+        };
+        if self.tracker.poisoned.get() || self.tracker.depth.get() != expected_depth {
+            self.tracker.poisoned.set(true);
+            self.active = false;
+            return Err(SyncError::LockOrderViolation);
         }
 
         self.tracker.current.set(self.previous);
@@ -133,6 +158,7 @@ impl InterruptSnapshot {
 pub struct LocalInterruptMask {
     enabled: Cell<bool>,
     depth: Cell<u8>,
+    poisoned: Cell<bool>,
 }
 
 impl LocalInterruptMask {
@@ -140,6 +166,7 @@ impl LocalInterruptMask {
         Self {
             enabled: Cell::new(true),
             depth: Cell::new(0),
+            poisoned: Cell::new(false),
         }
     }
 
@@ -147,10 +174,15 @@ impl LocalInterruptMask {
         Self {
             enabled: Cell::new(false),
             depth: Cell::new(0),
+            poisoned: Cell::new(false),
         }
     }
 
     pub fn mask(&self) -> Result<InterruptGuard<'_>, SyncError> {
+        if self.poisoned.get() {
+            return Err(SyncError::LockOrderViolation);
+        }
+
         let depth = self.depth.get();
         let Some(next_depth) = depth.checked_add(1) else {
             return Err(SyncError::LockDepthOverflow);
@@ -175,6 +207,11 @@ impl LocalInterruptMask {
     pub fn depth(&self) -> u8 {
         self.depth.get()
     }
+
+    #[must_use]
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned.get()
+    }
 }
 
 #[derive(Debug)]
@@ -198,6 +235,20 @@ impl InterruptGuard<'_> {
     fn release_inner(&mut self) -> Result<(), SyncError> {
         if !self.active {
             return Err(SyncError::NotLocked);
+        }
+
+        let expected_depth = match self.previous_depth.checked_add(1) {
+            Some(depth) => depth,
+            None => {
+                self.mask.poisoned.set(true);
+                self.active = false;
+                return Err(SyncError::LockDepthOverflow);
+            }
+        };
+        if self.mask.poisoned.get() || self.mask.depth.get() != expected_depth {
+            self.mask.poisoned.set(true);
+            self.active = false;
+            return Err(SyncError::LockOrderViolation);
         }
 
         if self.snapshot.interrupts_were_enabled {
@@ -242,13 +293,7 @@ impl EarlyLock {
         interrupts: &'a LocalInterruptMask,
     ) -> Result<IrqLockGuard<'a>, SyncError> {
         let irq = interrupts.mask()?;
-        let lock = match self.try_lock() {
-            Ok(lock) => lock,
-            Err(error) => {
-                drop(irq);
-                return Err(error);
-            }
-        };
+        let lock = self.try_lock()?;
         Ok(IrqLockGuard {
             lock: Some(lock),
             irq: Some(irq),
@@ -261,13 +306,7 @@ impl EarlyLock {
         rank: LockRank,
     ) -> Result<OrderedLockGuard<'a>, SyncError> {
         let order = tracker.try_enter(rank)?;
-        let lock = match self.try_lock() {
-            Ok(lock) => lock,
-            Err(error) => {
-                drop(order);
-                return Err(error);
-            }
-        };
+        let lock = self.try_lock()?;
         Ok(OrderedLockGuard {
             lock: Some(lock),
             order: Some(order),
@@ -368,132 +407,4 @@ impl Drop for IrqLockGuard<'_> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{EarlyLock, LocalInterruptMask, LockOrderTracker, LockRank, SyncError};
-
-    #[test]
-    fn early_lock_rejects_double_lock_and_release_allows_relock() {
-        let lock = EarlyLock::new();
-        let guard = match lock.try_lock() {
-            Ok(guard) => guard,
-            Err(error) => return assert_eq!(error, SyncError::AlreadyLocked),
-        };
-
-        assert!(lock.is_locked());
-        assert_eq!(lock.try_lock().err(), Some(SyncError::AlreadyLocked));
-        assert!(guard.release().is_ok());
-        assert!(!lock.is_locked());
-        assert!(lock.try_lock().is_ok());
-    }
-
-    #[test]
-    fn explicit_release_does_not_double_unlock_on_drop() {
-        let lock = EarlyLock::new();
-        let guard = match lock.try_lock() {
-            Ok(guard) => guard,
-            Err(error) => return assert_eq!(error, SyncError::AlreadyLocked),
-        };
-
-        assert!(guard.release().is_ok());
-        assert!(!lock.is_locked());
-        assert!(lock.try_lock().is_ok());
-    }
-
-    #[test]
-    fn nested_interrupt_guards_restore_only_outer_enabled_state() {
-        let interrupts = LocalInterruptMask::new_enabled();
-        {
-            let outer = match interrupts.mask() {
-                Ok(guard) => guard,
-                Err(error) => return assert_eq!(error, SyncError::LockDepthOverflow),
-            };
-            assert!(outer.snapshot().interrupts_were_enabled());
-            assert!(!interrupts.interrupts_enabled());
-            {
-                let inner = match interrupts.mask() {
-                    Ok(guard) => guard,
-                    Err(error) => return assert_eq!(error, SyncError::LockDepthOverflow),
-                };
-                assert!(!inner.snapshot().interrupts_were_enabled());
-                assert!(!interrupts.interrupts_enabled());
-            }
-            assert!(!interrupts.interrupts_enabled());
-        }
-        assert!(interrupts.interrupts_enabled());
-        assert_eq!(interrupts.depth(), 0);
-    }
-
-    #[test]
-    fn initially_disabled_interrupts_remain_disabled_after_guard() {
-        let interrupts = LocalInterruptMask::new_disabled();
-        {
-            let guard = match interrupts.mask() {
-                Ok(guard) => guard,
-                Err(error) => return assert_eq!(error, SyncError::LockDepthOverflow),
-            };
-            assert!(!guard.snapshot().interrupts_were_enabled());
-            assert!(!interrupts.interrupts_enabled());
-        }
-        assert!(!interrupts.interrupts_enabled());
-    }
-
-    #[test]
-    fn irq_lock_masks_interrupts_while_held_and_restores_after_release() {
-        let lock = EarlyLock::new();
-        let interrupts = LocalInterruptMask::new_enabled();
-        let guard = match lock.try_lock_irq(&interrupts) {
-            Ok(guard) => guard,
-            Err(error) => return assert_eq!(error, SyncError::AlreadyLocked),
-        };
-
-        assert!(lock.is_locked());
-        assert!(!interrupts.interrupts_enabled());
-        assert!(guard.release().is_ok());
-        assert!(!lock.is_locked());
-        assert!(interrupts.interrupts_enabled());
-    }
-
-    #[test]
-    fn lock_order_rejects_inversion_and_restores_after_drop() {
-        let tracker = LockOrderTracker::new();
-        {
-            let descriptor = match tracker.try_enter(LockRank::DescriptorTables) {
-                Ok(guard) => guard,
-                Err(error) => return assert_eq!(error, SyncError::LockOrderViolation),
-            };
-            assert_eq!(tracker.depth(), 1);
-            assert_eq!(tracker.current_rank(), Some(LockRank::DescriptorTables));
-            assert_eq!(
-                tracker.try_enter(LockRank::InterruptController).err(),
-                Some(SyncError::LockOrderViolation)
-            );
-            let heap = match tracker.try_enter(LockRank::KernelHeap) {
-                Ok(guard) => guard,
-                Err(error) => return assert_eq!(error, SyncError::LockOrderViolation),
-            };
-            assert_eq!(tracker.depth(), 2);
-            drop(heap);
-            assert_eq!(tracker.current_rank(), Some(LockRank::DescriptorTables));
-            drop(descriptor);
-        }
-        assert_eq!(tracker.depth(), 0);
-        assert_eq!(tracker.current_rank(), None);
-    }
-
-    #[test]
-    fn ordered_lock_releases_order_state_after_lock() {
-        let tracker = LockOrderTracker::new();
-        let lock = EarlyLock::new();
-        {
-            let guard = match lock.try_lock_ordered(&tracker, LockRank::Scheduler) {
-                Ok(guard) => guard,
-                Err(error) => return assert_eq!(error, SyncError::AlreadyLocked),
-            };
-            assert!(lock.is_locked());
-            assert_eq!(tracker.current_rank(), Some(LockRank::Scheduler));
-            assert!(guard.release().is_ok());
-        }
-        assert!(!lock.is_locked());
-        assert_eq!(tracker.current_rank(), None);
-    }
-}
+mod tests;
