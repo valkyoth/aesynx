@@ -318,13 +318,18 @@ aesynx/
 |   |-- bus/
 |   |   |-- pci/
 |   |   |-- usb/
+|   |   |-- xhci/
 |   |   `-- virtio/
+|   |-- console/
+|   |   |-- virtio-serial/
+|   |   `-- uart16550/
 |   |-- network/
 |   |   |-- virtio-net/
 |   |   |-- e1000/
 |   |   `-- rtl8139/
 |   |-- storage/
 |   |   |-- virtio-blk/
+|   |   |-- usb-mass-storage/
 |   |   |-- nvme/
 |   |   `-- ahci/
 |   |-- gpu/

@@ -52,13 +52,18 @@ drivers/
 |-- bus/
 |   |-- pci/
 |   |-- usb/
+|   |-- xhci/
 |   `-- virtio/
+|-- console/
+|   |-- virtio-serial/
+|   `-- uart16550/
 |-- network/
 |   |-- virtio-net/
 |   |-- e1000/
 |   `-- rtl8139/
 |-- storage/
 |   |-- virtio-blk/
+|   |-- usb-mass-storage/
 |   |-- nvme/
 |   `-- ahci/
 |-- gpu/
@@ -79,6 +84,42 @@ Early releases can keep tiny bootstrap shims in architecture or kernel crates
 when that is necessary for first boot. Once a driver grows beyond boot
 diagnostics or QEMU smoke, move it toward `drivers/` and the driver-service
 model.
+
+## QEMU First Driver Set
+
+The first driver target is QEMU, so the early device set should prefer virtio
+and simple virtual hardware over legacy PC devices.
+
+Planned early order:
+
+1. Bootstrap serial classification: current COM1 logging remains an early
+   diagnostic path, not the long-term serial service.
+2. Bootloader framebuffer wrapper: enough for early display metadata and simple
+   output; not a GPU stack.
+3. PCI or virtio-mmio discovery, depending on the QEMU machine profile chosen
+   for the release.
+4. MMIO and IRQ capabilities.
+5. Virtio common transport and queue support.
+6. `virtio-rng` for entropy service work.
+7. `virtio-blk` for the first QEMU persistence path.
+8. `virtio-serial` for a non-legacy virtual serial service channel separate
+   from bootstrap COM1 logs.
+9. `virtio-net` for the first QEMU networking path.
+10. `virtio-gpu` for a basic QEMU display resource and scanout path.
+
+Explicit non-goals for the first QEMU driver wave:
+
+- ICH9/Intel HDA audio.
+- Full GPU acceleration, 3D, shader execution, or compositor protocols.
+- Vendor GPU stacks.
+- Old UHCI/OHCI/EHCI-first USB support.
+- USB mass storage as the first storage path.
+
+USB is still planned, but later. The preferred path is xHCI first, then class
+drivers such as USB HID, USB mass storage, and USB serial adapters. Reading a
+USB stick therefore requires the xHCI controller driver, USB enumeration,
+endpoint/transfer management, the mass-storage class, and a block-service
+binding. For QEMU and `v1.0.0`, `virtio-blk` is the simpler first block device.
 
 ## Driver Classes
 

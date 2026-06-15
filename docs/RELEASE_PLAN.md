@@ -2043,6 +2043,39 @@ Exit criteria:
 
 - Storage service path exists.
 
+### v0.43.1 - Virtio Serial
+
+Goal:
+
+Add a structured QEMU communication channel that is separate from bootstrap
+COM1 serial logging.
+
+Deliverables:
+
+- Virtio serial device recognition through the chosen virtio transport.
+- One control/data port model.
+- Capability-scoped console or diagnostic endpoint.
+- Bounded RX/TX queues.
+- Clear policy distinction between bootstrap COM1 logs and virtio-serial
+  service traffic.
+- Redacted diagnostic output for port identity and queue state.
+
+Expected serial:
+
+```text
+[TEST] virtio-serial=ok
+```
+
+Verification:
+
+- QEMU virtio-serial smoke sends and receives one bounded message.
+- Full/empty queue behavior fails closed without corrupting queue state.
+
+Exit criteria:
+
+- Aesynx has a non-legacy virtual serial service path for QEMU diagnostics,
+  shell transport experiments, and later host tooling.
+
 ### v0.44.0 - Virtio Network
 
 Goal:
@@ -2064,7 +2097,68 @@ Exit criteria:
 
 - Network device path exists.
 
-### v0.44.1 - Usercopy And User Memory Access Discipline
+### v0.44.1 - Virtio GPU Display Baseline
+
+Goal:
+
+Add a QEMU-first graphics device path without pretending to have a full desktop
+graphics stack.
+
+Deliverables:
+
+- Virtio GPU device recognition through the chosen virtio transport.
+- Basic resource creation and framebuffer scanout path.
+- Capability-scoped display surface object.
+- Fallback policy to bootloader framebuffer when virtio-gpu is absent.
+- Explicit non-goal for 3D acceleration, shader execution, audio/video sync,
+  compositor protocols, or vendor GPU stacks.
+
+Expected serial:
+
+```text
+[TEST] virtio-gpu=ok
+```
+
+Verification:
+
+- QEMU smoke creates a basic display resource or reports the expected fallback.
+- Driver diagnostics expose dimensions and format while redacting raw backing
+  addresses.
+
+Exit criteria:
+
+- Aesynx has a planned QEMU display-driver path beyond the bootloader
+  framebuffer wrapper.
+
+### v0.44.2 - USB Roadmap And xHCI Discovery Stub
+
+Goal:
+
+Prepare USB support without pulling a large USB stack into the first virtio
+driver path.
+
+Deliverables:
+
+- xHCI controller discovery model.
+- USB device/class roadmap covering HID, mass storage, and serial adapters.
+- Capability model for controller MMIO, IRQ, DMA rings, ports, and attached
+  devices.
+- Explicit statement that early QEMU storage uses virtio-blk; USB mass storage
+  is later.
+- Explicit statement that early QEMU input/diagnostics use serial/framebuffer
+  paths; USB HID is later.
+
+Verification:
+
+- Host tests classify synthetic xHCI controller and USB class descriptors.
+- No USB driver receives broad DMA or all-port authority by default.
+
+Exit criteria:
+
+- Reading from USB is planned through xHCI plus USB mass-storage class support,
+  but not confused with the first QEMU persistence milestone.
+
+### v0.44.3 - Usercopy And User Memory Access Discipline
 
 Goal:
 
