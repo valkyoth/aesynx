@@ -148,7 +148,7 @@ Address-space activation and CPU hardening:
   limits, a deterministic fallback contract, and a non-AI fixed-point
   scheduler heuristic. QEMU accepts a fixed-point scheduler manifest, rejects
   one without fallback, verifies zero-confidence local fallback, and records
-  bounded heuristic enabled/score evidence before
+  bounded heuristic redacted score/core evidence before
   `[TEST] ai-policy=ok`.
 
 Fuzz and property gates:

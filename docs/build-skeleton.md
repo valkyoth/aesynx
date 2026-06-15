@@ -102,8 +102,9 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `trace-event schema=1 event=scheduler-decision`,
 `selected_task=<redacted>`, `[TEST] telemetry-events=ok`,
 `ai-policy schema=1`, `manifest_metadata_gate_ok=true`,
-`heuristic_enabled=true`, `heuristic_score=`,
-`heuristic_disabled_fallback_ok=true`, `[TEST] ai-policy=ok`, and
+`heuristic_enabled=true`, `heuristic_score=<redacted>`,
+`heuristic_core=<redacted>`, `heuristic_disabled_fallback_ok=true`,
+`[TEST] ai-policy=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 Decode the captured boot trace:
@@ -208,7 +209,7 @@ deterministic fallback policy contract, bounded fixed-point heuristic scoring,
 a decision record, and a disable switch that preserves the local round-robin
 fallback path. QEMU accepts a safe scheduler manifest, rejects a manifest
 without required fallback, verifies zero-confidence local fallback, and records
-heuristic enabled/score evidence before `[TEST] ai-policy=ok`. Actual AI
+heuristic enabled plus redacted score/core evidence before `[TEST] ai-policy=ok`. Actual AI
 inference, model loading, online learning, and authority-bearing policy
 decisions remain future milestones.
 

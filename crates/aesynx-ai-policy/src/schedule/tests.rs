@@ -233,6 +233,33 @@ fn heuristic_scheduler_scores_bounded_features() {
 }
 
 #[test]
+fn heuristic_scheduler_penalizes_cache_miss_pressure() {
+    let base = ScheduleFeatures {
+        run_queue_len: 1_000,
+        ipc_depth: 1_000,
+        queue_pressure: 1_000,
+        object_locality_score: 9_000,
+        idle_ratio: 9_000,
+        migration_cost: 500,
+        priority: 200,
+        cache_miss_rate: 0,
+    };
+    let low_cache_miss_score = match super::score_features(base) {
+        Ok(score) => score,
+        Err(error) => return assert_eq!(error, PolicyError::FeatureOutOfRange),
+    };
+    let high_cache_miss_score = match super::score_features(ScheduleFeatures {
+        cache_miss_rate: 9_000,
+        ..base
+    }) {
+        Ok(score) => score,
+        Err(error) => return assert_eq!(error, PolicyError::FeatureOutOfRange),
+    };
+
+    assert!(high_cache_miss_score.get() < low_cache_miss_score.get());
+}
+
+#[test]
 fn heuristic_scheduler_can_be_disabled_for_round_robin_fallback() {
     let policy =
         HeuristicSchedulerPolicy::new(SchedulerPolicyConfig::local_round_robin(CoreId::new(0)));

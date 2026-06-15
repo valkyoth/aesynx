@@ -243,14 +243,16 @@ pub fn score_features(features: ScheduleFeatures) -> Result<HeuristicScheduleSco
     let load_relief = FIXED_POINT_SCALE - features.run_queue_len;
     let ipc_pressure = max_u32(features.ipc_depth, features.queue_pressure);
     let ipc_relief = FIXED_POINT_SCALE - ipc_pressure;
+    let cache_relief = FIXED_POINT_SCALE - features.cache_miss_rate;
     let migration_relief = FIXED_POINT_SCALE - features.migration_cost;
     let priority_score = (features.priority as u32 * FIXED_POINT_SCALE) / u8::MAX as u32;
     let weighted = features
         .idle_ratio
-        .saturating_mul(25)
-        .saturating_add(load_relief.saturating_mul(20))
-        .saturating_add(ipc_relief.saturating_mul(20))
-        .saturating_add(features.object_locality_score.saturating_mul(20))
+        .saturating_mul(20)
+        .saturating_add(load_relief.saturating_mul(15))
+        .saturating_add(ipc_relief.saturating_mul(15))
+        .saturating_add(features.object_locality_score.saturating_mul(15))
+        .saturating_add(cache_relief.saturating_mul(20))
         .saturating_add(priority_score.saturating_mul(10))
         .saturating_add(migration_relief.saturating_mul(5));
     HeuristicScheduleScore::new(weighted / 100)

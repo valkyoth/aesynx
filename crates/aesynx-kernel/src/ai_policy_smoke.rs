@@ -15,8 +15,8 @@ pub struct AiPolicySmokeStatus {
     pub fallback_core: u32,
     pub manifest_metadata_gate_ok: bool,
     pub heuristic_enabled: bool,
-    pub heuristic_score: u16,
-    pub heuristic_core: u32,
+    pub heuristic_score_recorded: bool,
+    pub heuristic_core_selected: bool,
     pub heuristic_disabled_fallback_ok: bool,
 }
 
@@ -73,6 +73,7 @@ pub fn run() -> Result<AiPolicySmokeStatus, AiPolicySmokeError> {
         && heuristic_decision.output().target_core() == CoreId::new(1)
         && heuristic_decision.reason() == DecisionReason::Heuristic
         && heuristic_record.heuristic_enabled()
+        && heuristic_score.get() >= 7_000
         && heuristic_record.selected_core() == CoreId::new(1)
         && heuristic_record.fallback_core() == CoreId::new(0);
     if !heuristic_ok {
@@ -88,8 +89,8 @@ pub fn run() -> Result<AiPolicySmokeStatus, AiPolicySmokeError> {
         fallback_core: decision.output().target_core().get(),
         manifest_metadata_gate_ok: rejected_manifest && fallback_ok,
         heuristic_enabled: heuristic_record.heuristic_enabled(),
-        heuristic_score: heuristic_score.get(),
-        heuristic_core: heuristic_decision.output().target_core().get(),
+        heuristic_score_recorded: heuristic_record.score().is_some(),
+        heuristic_core_selected: heuristic_decision.output().target_core() == CoreId::new(1),
         heuristic_disabled_fallback_ok: fallback_ok,
     })
 }
@@ -148,8 +149,8 @@ mod tests {
         assert_eq!(status.fallback_core, 0);
         assert!(status.manifest_metadata_gate_ok);
         assert!(status.heuristic_enabled);
-        assert!(status.heuristic_score >= 7_000);
-        assert_eq!(status.heuristic_core, 1);
+        assert!(status.heuristic_score_recorded);
+        assert!(status.heuristic_core_selected);
         assert!(status.heuristic_disabled_fallback_ok);
     }
 }
