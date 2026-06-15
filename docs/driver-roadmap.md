@@ -106,6 +106,8 @@ Planned early order:
    from bootstrap COM1 logs.
 9. `virtio-net` for the first QEMU networking path.
 10. `virtio-gpu` for a basic QEMU display resource and scanout path.
+11. Optional PS/2 keyboard/mouse for local QEMU input before the USB stack.
+12. xHCI discovery, then USB HID, USB mass storage, and USB serial classes.
 
 Explicit non-goals for the first QEMU driver wave:
 
@@ -115,11 +117,14 @@ Explicit non-goals for the first QEMU driver wave:
 - Old UHCI/OHCI/EHCI-first USB support.
 - USB mass storage as the first storage path.
 
-USB is still planned, but later. The preferred path is xHCI first, then class
-drivers such as USB HID, USB mass storage, and USB serial adapters. Reading a
-USB stick therefore requires the xHCI controller driver, USB enumeration,
-endpoint/transfer management, the mass-storage class, and a block-service
-binding. For QEMU and `v1.0.0`, `virtio-blk` is the simpler first block device.
+Early keyboard input should not wait for USB. The first interactive paths are
+serial/virtio-serial for CI and automation, then optionally PS/2 keyboard/mouse
+for local QEMU use. USB is still planned, but later. The preferred USB path is
+xHCI first, then class drivers such as USB HID, USB mass storage, and USB serial
+adapters. Reading a USB stick therefore requires the xHCI controller driver,
+USB enumeration, endpoint/transfer management, the mass-storage class, and a
+block-service binding. For QEMU and `v1.0.0`, `virtio-blk` is the simpler first
+block device.
 
 ## Driver Classes
 

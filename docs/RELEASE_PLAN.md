@@ -2130,7 +2130,43 @@ Exit criteria:
 - Aesynx has a planned QEMU display-driver path beyond the bootloader
   framebuffer wrapper.
 
-### v0.44.2 - USB Roadmap And xHCI Discovery Stub
+### v0.44.2 - QEMU Local Input Baseline
+
+Goal:
+
+Provide a simple local keyboard/mouse path for QEMU without requiring the full
+USB stack first.
+
+Deliverables:
+
+- PS/2 i8042 discovery/classification for QEMU local input, or an explicitly
+  documented decision to keep local input serial-only for this milestone.
+- Basic keyboard scancode input path if PS/2 is enabled.
+- Optional PS/2 mouse packet classification for later graphical input.
+- Capability-scoped input endpoint.
+- Clear priority rule: serial and virtio-serial remain the first CI-friendly
+  input paths; PS/2 is for local QEMU interaction; USB HID is later through
+  xHCI.
+- Redacted input diagnostics that report device state without logging raw user
+  keystreams by default.
+
+Expected serial:
+
+```text
+[TEST] qemu-input=ok
+```
+
+Verification:
+
+- QEMU smoke or host model test proves keyboard input can be classified without
+  granting broad port/IRQ authority.
+- Input queues reject overflow without leaking stale input bytes.
+
+Exit criteria:
+
+- Aesynx has a planned local QEMU keyboard path that does not depend on USB.
+
+### v0.44.3 - USB Roadmap And xHCI Discovery Stub
 
 Goal:
 
@@ -2145,8 +2181,8 @@ Deliverables:
   devices.
 - Explicit statement that early QEMU storage uses virtio-blk; USB mass storage
   is later.
-- Explicit statement that early QEMU input/diagnostics use serial/framebuffer
-  paths; USB HID is later.
+- Explicit statement that early QEMU input/diagnostics use serial,
+  virtio-serial, and optionally PS/2; USB HID is later.
 
 Verification:
 
@@ -2158,7 +2194,7 @@ Exit criteria:
 - Reading from USB is planned through xHCI plus USB mass-storage class support,
   but not confused with the first QEMU persistence milestone.
 
-### v0.44.3 - Usercopy And User Memory Access Discipline
+### v0.44.4 - Usercopy And User Memory Access Discipline
 
 Goal:
 
