@@ -16,6 +16,9 @@ Important terminology:
 - **Multikernel fabric:** cross-core communication by bounded messages,
   capability-aware handoff, and directed interrupts instead of broad global
   locks.
+- **Replicated authority state:** capability revocation, service ownership,
+  routing, and global policy changes use epochs and message agreement rather
+  than a hidden writable singleton.
 
 Locks in this document are for unavoidable bootstrap, hardware-control, and
 temporary shared-state boundaries. They are not permission to evolve Aesynx into
@@ -23,7 +26,7 @@ a classic shared-everything SMP kernel.
 
 ## Primitive Rules
 
-- Use `aesynx-sync` early-lock primitives for pre-SMP model work.
+- Use `aesynx-sync` early-lock primitives for pre-multicore model work.
 - Locks must be guard-owned. Public unlock APIs must not exist without a
   non-forgeable guard token.
 - Interrupt-masked sections must restore the previous interrupt state, not
@@ -94,6 +97,40 @@ Cross-core mutation should be modeled as a message to the owning core. Direct
 shared mutation needs a release-note justification and a bounded synchronization
 contract.
 
+## Replicated State Rules
+
+State that must be visible on more than one core must not become an untracked
+global variable. Before adding replicated state, the release notes must define:
+
+- The owner or coordinator.
+- The epoch/version field.
+- The prepare, commit, abort, or equivalent transition.
+- Which peers must acknowledge before commit.
+- What happens on timeout.
+- What happens when a peer is dead or quarantined.
+- How stale replicas fail closed.
+- Which audit event links the proposal to the final state.
+
+Full quorum consensus is not required for early machine-local releases, but
+critical authority changes such as capability revoke, service-owner transfer,
+and routing-policy update need an explicit agreement protocol before they can
+affect multiple cores.
+
+## Fabric Protocol Rules
+
+Fabric messages must be versioned and bounded. Any message that may cross a
+future heterogeneous boundary must avoid Rust-specific layout assumptions and
+must document:
+
+- Endianness.
+- Alignment.
+- Maximum payload size.
+- Sequence handling.
+- Rejection/dead-letter behavior.
+- Redaction rules for diagnostics.
+
+Direct function calls are not a fabric protocol.
+
 ## Service Queues
 
 Current service queues are local fixed-capacity structures. Any future
@@ -163,6 +200,22 @@ Production interrupt routing should follow AMP ownership:
 - Load-balancing IRQs across all cores is a fallback requiring explicit
   justification.
 - A future IOMMU/DMA policy must match the owning driver core and memory domain.
+
+## Fault Containment
+
+Restartable services need a fault-domain contract before they become live:
+
+- Heartbeat interval and timeout.
+- Quarantine state.
+- Capability revoke-on-fault.
+- In-flight message cancel or replay rule.
+- DMA/IOMMU cleanup before restart.
+- Service rebinding rule.
+- Restart budget and escalation path.
+
+Some faults still require a full halt. The policy goal is containment for
+isolated driver/service failure, not pretending corrupted kernel memory is
+recoverable.
 
 ## Release Rule
 

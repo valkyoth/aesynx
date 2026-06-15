@@ -24,7 +24,8 @@ The 1.0 target is a working QEMU version with:
   capability-scoped mappings, revocation, secret memory, DMA isolation, and
   snapshot-aware state. See [Memory Model Roadmap](memory-model-roadmap.md).
 - Software capabilities as the core authority model.
-- Per-core ownership and message-passing design, even before full SMP maturity.
+- Per-core ownership and message-passing design, even before full multicore
+  bring-up.
 - Native service queues instead of Unix syscalls.
 - Native init, shell, runtime, and command utilities.
 - A native OS world service that records kernel-stamped and service-stamped
@@ -1186,7 +1187,7 @@ v0:
   syscall-hot run/wait queue needs indexed membership tracking before it enters
   the fast path.
 - Live queue mutation must be protected against local interrupt/preemption
-  re-entry. SMP queue sharing requires explicit per-core ownership,
+  re-entry. Any multicore queue sharing requires explicit per-core ownership,
   IRQ-safe locking, and lock-ordering rules.
 - Queue model types stay non-`Sync` until a dedicated IRQ-safe/per-core lock
   wrapper exists. Shared statics must not expose raw run/wait queues directly.
@@ -1242,6 +1243,13 @@ The goal is a multikernel shape:
 - Capability-aware authority transfer instead of ambient shared access.
 - Heterogeneous-core metadata for future aarch64 big.LITTLE and x86 P-core/E-core
   systems.
+- Versioned fabric messages that can eventually cross architecture or
+  accelerator-service boundaries.
+- Replicated authority state with epochs and prepare/commit/abort for critical
+  global changes.
+- Topology-aware routing and backpressure once direct core-to-core queues are
+  no longer enough.
+- Fault-domain containment for restartable driver and service domains.
 
 Traditional shared-everything SMP is a compatibility step only. It must not
 become the default design for drivers, scheduling, heap growth, object
@@ -1297,6 +1305,32 @@ Preferred:
 The release plan treats multicore bring-up as a major pre-1.0 milestone. The
 project can decide whether it is required for 1.0 based on complexity, but the
 architecture should remain AMP/multikernel-shaped either way.
+
+### 12.3 Mature Fabric Requirements
+
+The mature fabric is closer to a small in-machine network than a lock-protected
+shared data structure. See [Aesynx Multikernel Fabric Roadmap](multikernel-fabric-roadmap.md).
+
+Required long-term capabilities:
+
+- A stable fabric protocol with versioned headers, endianness rules, bounded
+  payloads, sequence numbers, rejection records, and redacted diagnostics.
+- Peer metadata that can describe x86_64 cores, future aarch64 cores,
+  performance/efficiency cores, driver-service domains, and trusted accelerator
+  bridges.
+- Replicated authority records for capability revocation, service ownership,
+  routing tables, and policy state.
+- Machine-local prepare/commit/abort for critical global authority updates.
+- Fail-closed stale-epoch behavior.
+- Topology facts for clusters, NUMA, device locality, recent latency, queue
+  depth, and service load.
+- Heartbeats, watchdogs, quarantine, revoke-on-fault, service rebinding, and
+  restart budgets for contained service failures.
+
+Early Aesynx should not promise full cloud-style distributed consensus. The
+first target is deterministic owner-core coordination with explicit epochs and
+two-phase critical updates. Quorum algorithms are later work if Aesynx ever
+supports fault-tolerant peer groups or multi-machine clusters.
 
 ## 13. Native Service Queues
 

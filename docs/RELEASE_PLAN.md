@@ -1771,6 +1771,133 @@ Exit criteria:
 - Zero-copy shared assets are possible through explicit capabilities, while
   accidental physical aliasing still fails closed.
 
+### v0.37.2 - Fabric Protocol And Heterogeneous Peer Metadata
+
+Goal:
+
+Define the machine-local message protocol that lets Aesynx treat cores and
+future service domains as fabric peers instead of assuming one shared kernel
+memory model.
+
+Deliverables:
+
+- `docs/multikernel-fabric-roadmap.md`.
+- Versioned fabric message header.
+- Explicit sender, receiver, sequence, message kind, and epoch fields.
+- Core/domain role metadata that can describe x86_64 cores, future aarch64
+  cores, P-core/E-core style heterogeneity, driver service domains, and trusted
+  accelerator bridges.
+- Peer and service identity records with generation/epoch fields so a restarted
+  peer cannot inherit stale authority accidentally.
+- Endianness, alignment, and ABI rules so the protocol does not rely on
+  Rust-specific layout or x86_64-only assumptions.
+- Bounded payload and extension-field policy.
+- Per-peer queue, retry, and outstanding-request bounds.
+- Rejection/dead-letter message shape.
+- Redacted debug output for peer identities and authority-bearing fields.
+
+Verification:
+
+- Host tests encode/decode fabric headers without raw pointer layout.
+- Host tests reject unknown versions, oversized payloads, invalid peer roles,
+  and non-monotonic sequence use where tracked.
+
+Exit criteria:
+
+- Aesynx has one documented internal fabric ABI before adding more cross-core
+  protocols.
+
+### v0.37.3 - Replicated Authority State Protocol
+
+Goal:
+
+Handle global authority changes without a hidden global lock.
+
+Deliverables:
+
+- Owner/coordinator rule for replicated authority records.
+- Monotonic epoch records for capability revocation, service ownership, routing
+  table, and policy updates.
+- Prepare/commit/abort message types for critical authority changes.
+- Fail-closed stale-epoch handling.
+- Timeout and participant-dead handling.
+- Audit events linking proposal, acknowledgement, commit, abort, and revoke.
+- Explicit non-goal that full quorum/distributed consensus is later work unless
+  Aesynx grows fault-tolerant peer groups.
+
+Verification:
+
+- Host model tests prove a revoke proposal cannot commit if a required
+  participant rejects or times out.
+- Host model tests prove stale epochs cannot regain authority after commit.
+- Audit logs preserve proposal-to-commit linkage without exposing raw object
+  IDs.
+
+Exit criteria:
+
+- Cross-core revocation and system policy updates have a machine-local
+  agreement protocol.
+
+### v0.37.4 - Topology-Aware Fabric Routing
+
+Goal:
+
+Move beyond direct ping/pong by recording topology and load facts for routing
+decisions.
+
+Deliverables:
+
+- Topology facts for core, cluster, NUMA node where available, device locality,
+  peer role, queue depth, and recent latency.
+- Deterministic route selection policy.
+- Backpressure signals.
+- Retry and dead-letter policy.
+- Routing telemetry with redacted peer identities.
+- Explicit fallback to direct routing when topology facts are unavailable.
+
+Verification:
+
+- Host tests choose stable routes from synthetic topology facts.
+- Host tests prove overloaded or dead peers are avoided when a valid fallback
+  exists.
+- Routing diagnostics expose reason codes, not raw addresses.
+
+Exit criteria:
+
+- Aesynx can route fabric messages through policy rather than hardcoded
+  core-to-core assumptions.
+
+### v0.37.5 - Component Fault Containment
+
+Goal:
+
+Make driver/service-domain failure a contained event where possible instead of
+an automatic whole-kernel halt.
+
+Deliverables:
+
+- Fabric heartbeat and watchdog records.
+- Fault-domain model for driver/service cores and future accelerator peers.
+- Quarantine state.
+- Capability revoke-on-fault flow.
+- In-flight message cancel/replay policy.
+- DMA/IOMMU cleanup requirement before a driver service restarts.
+- Service rebinding plan.
+- Restart budget and escalation policy.
+- Telemetry for fault, quarantine, revoke, restart, and escalation.
+
+Verification:
+
+- Host model tests simulate a service timeout and prove new grants are rejected
+  while the domain is quarantined.
+- Host model tests prove restart cannot occur until authority and DMA cleanup
+  policy has completed.
+
+Exit criteria:
+
+- The roadmap has an explicit path from isolated drivers to restartable service
+  domains.
+
 ## Phase 10: Driver Foundation
 
 ### v0.38.0 - Device Model
@@ -2759,7 +2886,7 @@ Required deliverables:
 
 Preferred deliverables:
 
-- QEMU SMP boot.
+- QEMU multicore boot through SMP/APIC hardware mechanisms.
 - Core-to-core ping/pong.
 - Capability grant over IPC.
 - Virtio RNG.

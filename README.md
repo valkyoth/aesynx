@@ -310,6 +310,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [OS World Roadmap](docs/os-world-roadmap.md)
 - [Package Manager Roadmap](docs/package-manager-roadmap.md)
 - [Driver Roadmap](docs/driver-roadmap.md)
+- [Multikernel Fabric Roadmap](docs/multikernel-fabric-roadmap.md)
 - [Concurrency Policy](docs/concurrency-policy.md)
 - [Release Plan](docs/RELEASE_PLAN.md)
 - [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md)

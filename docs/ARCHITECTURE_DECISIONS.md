@@ -193,7 +193,8 @@ Decision:
 Aesynx uses platform SMP mechanisms to bring cores online, but the long-term
 kernel model is software-defined AMP and multikernel ownership. Kernel state is
 owned by cores or explicit service domains. Cross-core interaction uses bounded
-messages and capability-aware handoff.
+messages, versioned fabric protocols, replicated authority epochs, and
+capability-aware handoff.
 
 Rationale:
 
@@ -209,6 +210,11 @@ Implications:
 - Device IRQs should route to the driver/service core that owns the device.
 - Heterogeneous cores should be represented by role/capability metadata rather
   than hidden behind a fake "all cores are equal" abstraction.
+- Global authority changes must use owner/coordinator and epoch protocols, not
+  hidden singleton mutation.
+- Routing, backpressure, and service failure become fabric concerns.
+- Restartable driver/service domains require heartbeat, quarantine, revoke, DMA
+  cleanup, and rebinding policy before zero-downtime claims.
 - Early global bootstrap state must be explicitly temporary.
 
 ## ADR-011: Future Bootloader As Minimal Security Gateway
