@@ -103,6 +103,22 @@ current trust domain. Release/acquire ordering evidence must be proven on the
 real shared slot-validity or head/tail atomics, not only on descriptive
 metadata.
 
+## Shared Memory Windows
+
+Shared memory is allowed only as explicit capability-based sharing. It is not a
+license to bypass the multikernel ownership model.
+
+- Applications and services request shared-buffer objects, not raw physical
+  frames.
+- Each dispatcher or address space receives its own derived mapping capability.
+- Read-only sealed buffers are the default for large zero-copy assets.
+- Writable shared windows require `SHARE_WRITE`, a named synchronization
+  protocol, audit events, and a revocation/TLB-shootdown plan.
+- The owner core remains responsible for mutation unless ownership is
+  transferred by message.
+- Mapper policy must treat declared shared-buffer aliasing separately from
+  accidental physical double mapping.
+
 ## Descriptor Tables
 
 Current GDT, TSS, IDT, and double-fault IST storage is single-core. Before a

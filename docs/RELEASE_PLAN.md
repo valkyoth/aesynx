@@ -1711,6 +1711,66 @@ Exit criteria:
 
 - IPC and capabilities are integrated.
 
+### v0.37.1 - Capability-Based Shared Memory Windows
+
+Goal:
+
+Allow explicit zero-copy sharing between dispatchers without weakening the
+AMP/multikernel rule that cores do not casually share kernel state.
+
+Design rule:
+
+Shared memory is never raw physical authority at the user API. A caller asks for
+a typed shared-buffer object or derives authority from an existing memory
+object. The kernel decides the physical backing internally and returns
+capabilities with bounded range, permission, lifetime, and revocation metadata.
+
+Deliverables:
+
+- Shared-buffer object kind or typed memory-object mode.
+- Shared memory capability derivation:
+  - `SHARE_READ` for read-only shared mappings.
+  - `SHARE_WRITE` only with an explicit synchronization protocol.
+  - `MAP` still required before any address-space mapping is created.
+- Multi-address-space mapping request that maps the same backing object into
+  multiple dispatchers through separate capability grants.
+- Read-only seal/freeze operation for large asset buffers, such as geometry,
+  texture, model, or package-block data.
+- Revocation epoch integration so unmapping/revoking a shared buffer
+  invalidates every derived mapping capability.
+- TLB shootdown plan for every core/address space that observed the mapping.
+- Audit events for create, grant, map, seal, downgrade, revoke, and unmap.
+- Redacted diagnostics that expose sizes, permissions, and participant counts
+  without exposing physical frames or raw object IDs.
+- Explicit policy that mutable shared memory is exceptional; ordinary
+  cross-core coordination still uses messages and owner-core mutation.
+
+Example shape:
+
+```text
+create shared-buffer size=2GiB purpose=geometry
+seal shared-buffer read-only
+grant shared-buffer to dispatcher render-core-1 perms=MAP|READ
+grant shared-buffer to dispatcher render-core-2 perms=MAP|READ
+map shared-buffer into render-core-1
+map shared-buffer into render-core-2
+```
+
+Verification:
+
+- Host tests prove read-only shared-buffer grants can be mapped by two
+  dispatchers without copying.
+- Host tests reject writable sharing without `SHARE_WRITE` and a declared
+  synchronization protocol.
+- Revocation invalidates every dispatcher mapping descriptor.
+- Mapper tests distinguish allowed shared-frame aliasing from accidental
+  physical-frame double ownership.
+
+Exit criteria:
+
+- Zero-copy shared assets are possible through explicit capabilities, while
+  accidental physical aliasing still fails closed.
+
 ## Phase 10: Driver Foundation
 
 ### v0.38.0 - Device Model

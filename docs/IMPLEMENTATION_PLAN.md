@@ -749,6 +749,18 @@ Kernel mapping policy:
 - MMIO: non-executable, device/cache-disabled attributes.
 - Null page: unmapped.
 
+Shared memory policy:
+
+- Shared buffers are object-backed capabilities, not raw physical-frame grants
+  exposed to applications.
+- A shared buffer may be mapped into multiple dispatchers only through explicit
+  capability grants.
+- Read-only sealed buffers are the preferred zero-copy path for large assets.
+- Writable shared buffers require `SHARE_WRITE`, a declared synchronization
+  protocol, audit events, and revocation/TLB-shootdown handling.
+- The page-table mapper must distinguish intentional shared-buffer aliasing
+  from accidental duplicate physical-frame ownership.
+
 ### 7.4 Heap
 
 Stage 1:
@@ -815,6 +827,8 @@ EXECUTE
 GRANT
 DERIVE
 MAP
+SHARE_READ
+SHARE_WRITE
 SEND
 REVOKE
 INTROSPECT
@@ -848,6 +862,10 @@ Telemetry
 Required operations:
 
 - `create_memory_cap`.
+- `create_shared_buffer`.
+- `seal_shared_buffer_read_only`.
+- `grant_shared_buffer`.
+- `map_shared_buffer`.
 - `derive_cap`.
 - `check`.
 - `grant_copy`.
