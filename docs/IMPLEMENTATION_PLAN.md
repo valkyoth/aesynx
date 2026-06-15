@@ -1206,7 +1206,28 @@ Preemption comes after:
 
 Do not start with preemption.
 
-## 12. SMP and Per-Core Ownership
+## 12. AMP/Multikernel Ownership On SMP Hardware
+
+Aesynx should treat "SMP" as a hardware bring-up mechanism, not as the final
+kernel architecture. On x86_64, additional cores are started through SMP/APIC
+machinery because that is how the platform works. After a core is online,
+Aesynx should move it into a software-defined AMP model: the core has an
+explicit role, owns local state, and communicates with other cores through the
+Aesynx fabric.
+
+The goal is a multikernel shape:
+
+- Per-core schedulers, allocators, registries, telemetry, and service queues.
+- Explicit owner cores for mutable kernel state.
+- Bounded messages and IPIs for cross-core work.
+- IRQ routing to the core that owns the device or service domain.
+- Capability-aware authority transfer instead of ambient shared access.
+- Heterogeneous-core metadata for future aarch64 big.LITTLE and x86 P-core/E-core
+  systems.
+
+Traditional shared-everything SMP is a compatibility step only. It must not
+become the default design for drivers, scheduling, heap growth, object
+registries, or revocation.
 
 ### 12.1 Per-Core State
 
@@ -1215,6 +1236,7 @@ Do not start with preemption.
 pub struct CoreLocal {
     pub core_id: CoreId,
     pub apic_id_or_mpidr: CpuHardwareId,
+    pub role: CoreRole,
     pub scheduler: LocalScheduler,
     pub allocator: PerCoreAllocator,
     pub object_registry: LocalObjectRegistry,
@@ -1224,26 +1246,39 @@ pub struct CoreLocal {
 }
 ```
 
-### 12.2 1.0 SMP Scope
+Core roles should start simple and become more explicit over time:
+
+- Bootstrap/control-plane core.
+- Scheduler/application core.
+- Driver or device-service core.
+- Idle/reserve core.
+- Future heterogeneous performance/efficiency role.
+
+### 12.2 1.0 Multicore Scope
 
 The 1.0 QEMU release should support one of these two levels:
 
 Minimum acceptable:
 
 - Single-core kernel.
-- Per-core architecture is present.
-- IPC and scheduler abstractions do not block SMP.
-- SMP boot is planned and partially implemented.
+- Per-core/AMP architecture is present.
+- IPC and scheduler abstractions do not block future multicore activation.
+- x86_64 SMP hardware bring-up is planned and partially implemented.
 
 Preferred:
 
 - QEMU boots multiple x86_64 cores.
 - Each core prints online.
 - Each core has local state.
+- Each core has an assigned role.
 - Core-to-core ping/pong works.
 - No global scheduler.
+- No global allocator or object-registry lock is required for the ping/pong
+  path.
 
-The release plan will treat SMP as a major pre-1.0 milestone, but the project can decide whether it is required for 1.0 based on complexity.
+The release plan treats multicore bring-up as a major pre-1.0 milestone. The
+project can decide whether it is required for 1.0 based on complexity, but the
+architecture should remain AMP/multikernel-shaped either way.
 
 ## 13. Native Service Queues
 

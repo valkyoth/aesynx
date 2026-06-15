@@ -1519,8 +1519,17 @@ Exit criteria:
 
 Goal:
 
-Define synchronization rules before SMP makes global single-core assumptions
-dangerous.
+Define synchronization rules before multicore hardware bring-up makes global
+single-core assumptions dangerous.
+
+Architecture note:
+
+Aesynx uses x86_64 SMP mechanisms only as the hardware path for discovering and
+starting additional cores. The intended kernel architecture is not a classic
+shared-everything SMP kernel. The long-term target is software-defined AMP and a
+multikernel fabric: cores have explicit roles, own local state, communicate by
+bounded messages, and avoid shared mutable kernel state except for narrow,
+documented bootstrap or hardware-control paths.
 
 Deliverables:
 
@@ -1540,7 +1549,7 @@ Deliverables:
   such as `SyncUnsafeCell`, or to per-core owned storage, before multi-core
   activation paths can use them.
 - The kernel heap backing store must move away from the current `static mut`
-  raw-address pattern before SMP or material heap growth.
+  raw-address pattern before multicore activation or material heap growth.
 - Heap operations that run with interrupts masked must have bounded latency, or
   use a two-phase design that performs bulk work outside the lock, before the
   heap grows beyond the current fixed static bound.
@@ -1551,43 +1560,68 @@ Verification:
 
 - Host tests cover lock/guard state transitions.
 - QEMU single-core boot remains green with the new primitives compiled in.
-- SMP milestones cannot graduate until the concurrency policy is referenced by
-  their release notes.
+- Multicore milestones cannot graduate until the concurrency policy is
+  referenced by their release notes.
 
 Exit criteria:
 
-- SMP work has an explicit synchronization contract instead of inheriting
+- Multicore work has an explicit synchronization contract instead of inheriting
   accidental single-core behavior.
 
-## Phase 9: SMP And Aesynx Fabric
+## Phase 9: AMP/Multikernel Fabric On SMP Hardware
 
-### v0.34.0 - SMP Data Structures
+Phase intent:
+
+This phase deliberately separates mechanism from architecture:
+
+- **SMP hardware mechanism:** x86_64 QEMU uses SMP/APIC/IPI mechanisms to bring
+  additional cores online.
+- **AMP kernel policy:** once online, cores are not treated as fully
+  interchangeable peers sharing one large kernel state. Aesynx assigns explicit
+  ownership and roles.
+- **Multikernel fabric:** cross-core work moves by bounded messages,
+  capability-aware handoff, and IRQ routing to the owning service core, not by
+  growing global locks.
+- **Heterogeneous readiness:** future aarch64 big.LITTLE and x86 P-core/E-core
+  systems should fit the same model through core capability/role metadata.
+
+Classic SMP behavior is allowed only as a bring-up compatibility step or a
+documented fallback. It must not become the default design for schedulers,
+drivers, heap ownership, object registries, or capability revocation.
+
+### v0.34.0 - AMP Core Data Structures
 
 Goal:
 
-Prepare per-core ownership.
+Prepare per-core ownership and role metadata.
 
 Deliverables:
 
 - CoreId.
+- Core role classification for bootstrap, scheduler, driver/service, and idle
+  roles.
+- Core capability metadata for future heterogeneous systems.
 - CoreLocal.
 - Per-core registries.
 - Per-core telemetry.
 - Boot barriers.
+- Policy that mutable state has a named owning core or a documented shared
+  synchronization boundary.
 
 Verification:
 
-- Single-core boot uses CoreLocal.
+- Single-core boot uses CoreLocal and records the bootstrap core role.
 
 Exit criteria:
 
-- No subsystem assumes only global state.
+- No subsystem assumes only global shared state as the future multicore model.
 
-### v0.35.0 - x86_64 QEMU SMP Boot
+### v0.35.0 - x86_64 QEMU Multicore Bring-Up
 
 Goal:
 
-Bring up multiple cores in QEMU.
+Bring up multiple cores in QEMU using x86_64 SMP/APIC mechanisms, then place
+each core under Aesynx AMP ownership policy.
 
 Deliverables:
 
@@ -1596,6 +1630,10 @@ Deliverables:
 - AP startup path.
 - Per-core GDT/IDT/TSS where needed.
 - Per-core local state.
+- Core online state machine that distinguishes hardware online from assigned
+  Aesynx role.
+- Documentation that this is multicore bring-up, not a commitment to a
+  shared-everything SMP kernel.
 
 Expected serial:
 
@@ -1604,22 +1642,23 @@ core 0 online
 core 1 online
 core 2 online
 core 3 online
-[TEST] smp-boot=ok
+[TEST] multicore-boot=ok
 ```
 
 Verification:
 
 - QEMU `-smp 4` boot smoke.
+- Serial evidence shows each core has a local state block and assigned role.
 
 Exit criteria:
 
-- Multiple cores are online.
+- Multiple cores are online and owned by the AMP/multikernel policy.
 
 ### v0.36.0 - Core-to-Core Ping/Pong
 
 Goal:
 
-Prove message fabric across cores.
+Prove the multikernel message fabric across cores.
 
 Deliverables:
 
@@ -1642,6 +1681,8 @@ Verification:
 Exit criteria:
 
 - Cores communicate by message.
+- No global run queue, allocator lock, or object-registry lock is required for
+  the ping/pong path.
 
 ### v0.37.0 - Capability Grant Over IPC
 

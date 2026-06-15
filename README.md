@@ -26,8 +26,8 @@
 Aesynx is a Rust `no_std` operating-system project with a clean-slate goal: a
 standalone OS that does not begin by copying Unix, Linux, or Windows. Its native
 model is built around explicit capabilities, per-core ownership, service queues,
-driver isolation, an immutable object graph, structured userspace, and AI-ready
-telemetry from day one.
+driver isolation, an immutable object graph, structured userspace, AI-ready
+telemetry, and an AMP/multikernel direction from day one.
 
 The long-term goal is a different kind of general-purpose system, not a compatibility
 skin over old assumptions. Paths, processes, packages, drivers, snapshots, and
@@ -177,7 +177,7 @@ Fuzz and property gates:
 | Telemetry event schema | Tagged | `v0.30.0`; versioned event IDs, event headers, boot-phase/capability/scheduler payloads, bounded per-core event ring, redacted scheduler event debug output, and QEMU `[TEST] telemetry-events=ok`. |
 | Trace export tool | Tagged | `v0.31.0`; kernel emits schema-v1 `trace-event` serial records, `tools/trace-decode` produces line-based offline output, core IDs stay visible as local scheduling context, and scheduler selected-task export must remain `<redacted>`. |
 | Scheduler policy model | Tagged | `v0.33.0`; no_std model manifests, redacted manifest diagnostics, metadata-presence hash/signature wrappers, fixed-point-only accepted model kinds, scheduler-domain metadata and fallback gates, fixed-point feature validation, manifest-enforced model confidence ceilings, deterministic fallback, bounded non-AI scheduler heuristic scoring, decision records, a disable switch, redacted heuristic serial evidence, and QEMU `[TEST] ai-policy=ok` prove fallback and heuristic evidence before any AI model can influence scheduling. |
-| Concurrency discipline | Active candidate | `v0.33.1`; safe `aesynx-sync` early-lock primitives, previous-state interrupt guards, nested interrupt masking behavior, guard-owned release semantics, lock-rank validation, policy docs for lock-held behavior and SMP migrations, and QEMU `[TEST] concurrency=ok`. |
+| Concurrency discipline | Active candidate | `v0.33.1`; safe `aesynx-sync` early-lock primitives, previous-state interrupt guards, nested interrupt masking behavior, guard-owned release semantics, lock-rank validation, policy docs for lock-held behavior and AMP/multikernel-on-SMP-hardware migrations, and QEMU `[TEST] concurrency=ok`. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |

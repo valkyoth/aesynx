@@ -203,15 +203,20 @@ activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.33.1 candidate adds explicit concurrency discipline before SMP work
-begins. The `aesynx-sync` crate provides safe no_std early-lock primitives,
+The v0.33.1 candidate adds explicit concurrency discipline before multicore work
+begins. Aesynx uses x86_64 SMP/APIC mechanisms as the hardware path to start
+additional cores, but the architecture target is software-defined AMP and a
+multikernel fabric: explicit core roles, per-core ownership, directed IRQ
+ownership, and bounded cross-core messages rather than a shared-everything SMP
+kernel. The `aesynx-sync` crate provides safe no_std early-lock primitives,
 previous-state interrupt guards, nested interrupt masking behavior, IRQ-lock
 composition, and lock-rank validation. QEMU proves the model compiles into the
 kernel image and validates `irq_guard_ok`, `nested_irq_guard_ok`,
 `early_lock_ok`, `irq_lock_ok`, and `lock_order_ok` before
-`[TEST] concurrency=ok`. This does not enable SMP; the existing SMP tripwires
-remain until descriptor tables, activation storage, heap backing, queues, and
-shared kernel state have explicit per-core or synchronized ownership.
+`[TEST] concurrency=ok`. This does not enable multicore execution; the existing
+SMP hardware tripwires remain until descriptor tables, activation storage, heap
+backing, queues, and shared kernel state have explicit per-core, role-owned, or
+synchronized ownership.
 
 ## Target Shape
 

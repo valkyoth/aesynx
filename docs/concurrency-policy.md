@@ -2,9 +2,24 @@
 
 Status: v0.33.1 concurrency discipline candidate
 
-This document defines the synchronization contract that future SMP work must
-follow. Current Aesynx boot remains single-core, but shared-state code must not
-grow by accident before the rules exist.
+This document defines the synchronization contract that future multicore work
+must follow. Current Aesynx boot remains single-core, but shared-state code must
+not grow by accident before the rules exist.
+
+Important terminology:
+
+- **SMP hardware bring-up:** the x86_64 mechanism used to discover and start
+  additional cores through APIC/IPI/platform topology support.
+- **AMP kernel policy:** the intended Aesynx model after cores are online. Cores
+  have explicit roles and local ownership rather than acting as interchangeable
+  peers over one shared kernel state.
+- **Multikernel fabric:** cross-core communication by bounded messages,
+  capability-aware handoff, and directed interrupts instead of broad global
+  locks.
+
+Locks in this document are for unavoidable bootstrap, hardware-control, and
+temporary shared-state boundaries. They are not permission to evolve Aesynx into
+a classic shared-everything SMP kernel.
 
 ## Primitive Rules
 
@@ -54,23 +69,39 @@ release state first; that path must be documented at the call site.
 
 ## Per-Core Versus Shared State
 
-Before a subsystem becomes SMP-aware, its release notes must answer:
+Before a subsystem becomes multicore-aware, its release notes must answer:
 
-- Is the state per-core, immutable after boot, or shared?
+- Is the state per-core, role-owned, immutable after boot, or shared?
 - Which core owns mutation?
+- If more than one core can observe it, why is message passing insufficient?
 - Which lock rank protects shared mutation?
 - Can interrupts preempt mutation on the owning core?
 - Can an IRQ handler acquire the same lock?
 - Are lock-held sections bounded by a fixed small capacity?
 - Does `Debug` output redact authority-bearing identifiers?
 
+## AMP Role Rules
+
+Every online core should eventually have an explicit Aesynx role. Early roles
+may be coarse, but the ownership must be visible:
+
+- Bootstrap/control-plane core owns early topology and global handoff.
+- Driver/service cores own their device queues and IRQ routing.
+- Scheduler/application cores own local runnable queues.
+- Idle/reserve cores are explicit capacity, not hidden scheduler spillover.
+
+Cross-core mutation should be modeled as a message to the owning core. Direct
+shared mutation needs a release-note justification and a bounded synchronization
+contract.
+
 ## Service Queues
 
 Current service queues are local fixed-capacity structures. Any future
-shared-memory or multi-core queue must scrub payload storage before a vacated
-slot can be observed outside the current trust domain. Release/acquire ordering
-evidence must be proven on the real shared slot-validity or head/tail atomics,
-not only on descriptive metadata.
+shared-memory or multi-core queue must name the producer/consumer owner roles
+and scrub payload storage before a vacated slot can be observed outside the
+current trust domain. Release/acquire ordering evidence must be proven on the
+real shared slot-validity or head/tail atomics, not only on descriptive
+metadata.
 
 ## Descriptor Tables
 
@@ -95,8 +126,8 @@ owned storage.
 
 ## Kernel Heap
 
-The current heap remains a bounded static heap. Before SMP or material heap
-growth:
+The current heap remains a bounded static heap. Before multicore activation or
+material heap growth:
 
 - The backing store must move away from the current `static mut` raw-address
   pattern.
@@ -107,8 +138,20 @@ growth:
 - Per-core heaps or ownership-partitioned arenas should be preferred over one
   global hot lock.
 
+## IRQ Routing
+
+Production interrupt routing should follow AMP ownership:
+
+- Device IRQs route to the core that owns the driver/service domain.
+- Other cores receive work through messages, not surprise device interrupts.
+- Load-balancing IRQs across all cores is a fallback requiring explicit
+  justification.
+- A future IOMMU/DMA policy must match the owning driver core and memory domain.
+
 ## Release Rule
 
-SMP milestones cannot graduate until their release notes reference this policy
-and identify which single-core assumptions were removed or deliberately kept as
-tripwires.
+Multicore milestones cannot graduate until their release notes reference this
+policy and identify which single-core assumptions were removed or deliberately
+kept as tripwires. Milestones that use the word SMP must state whether they mean
+hardware bring-up or shared-kernel architecture; the latter is not the Aesynx
+goal.
