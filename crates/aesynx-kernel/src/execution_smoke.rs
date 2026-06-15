@@ -109,14 +109,18 @@ pub fn run() {
     match crate::ai_policy_smoke::run() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "ai-policy schema={} accepted_manifest={} rejected_manifest={} fallback_used={} fallback_confidence={} fallback_core={} manifest_metadata_gate_ok={}",
+                "ai-policy schema={} accepted_manifest={} rejected_manifest={} fallback_used={} fallback_confidence={} fallback_core={} manifest_metadata_gate_ok={} heuristic_enabled={} heuristic_score={} heuristic_core={} heuristic_disabled_fallback_ok={}",
                 status.schema_version,
                 status.accepted_manifest,
                 status.rejected_manifest,
                 status.fallback_used,
                 status.fallback_confidence,
                 status.fallback_core,
-                status.manifest_metadata_gate_ok
+                status.manifest_metadata_gate_ok,
+                status.heuristic_enabled,
+                status.heuristic_score,
+                status.heuristic_core,
+                status.heuristic_disabled_fallback_ok
             );
             aesynx_arch_x86_64::serial::write_str("[TEST] ai-policy=ok\n");
         }

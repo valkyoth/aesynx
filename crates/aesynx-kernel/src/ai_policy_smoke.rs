@@ -1,8 +1,8 @@
 use aesynx_abi::{CoreId, ModelId};
 use aesynx_ai_policy::{
-    Confidence, DecisionReason, Hash256, MODEL_MANIFEST_SCHEMA_VERSION, ModelKind,
-    ModelObjectManifest, ModelSafetyLimits, PolicyDecision, PolicyDomain, PolicyEngine,
-    PolicyError, ScheduleAdvice, ScheduleFeatures, Signature64,
+    DecisionReason, Hash256, HeuristicSchedulerPolicy, MODEL_MANIFEST_SCHEMA_VERSION, ModelKind,
+    ModelObjectManifest, ModelSafetyLimits, PolicyDomain, PolicyEngine, PolicyError,
+    ScheduleFeatures, SchedulerPolicyConfig, Signature64,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -14,6 +14,10 @@ pub struct AiPolicySmokeStatus {
     pub fallback_confidence: u16,
     pub fallback_core: u32,
     pub manifest_metadata_gate_ok: bool,
+    pub heuristic_enabled: bool,
+    pub heuristic_score: u16,
+    pub heuristic_core: u32,
+    pub heuristic_disabled_fallback_ok: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23,25 +27,7 @@ pub enum AiPolicySmokeError {
     SafeManifestRejected(PolicyError),
     UnsafeManifestAccepted,
     FallbackFailed,
-}
-
-struct LocalFallbackScheduler;
-
-impl PolicyEngine for LocalFallbackScheduler {
-    type Input = ScheduleFeatures;
-    type Output = ScheduleAdvice;
-
-    fn evaluate(&self, input: Self::Input) -> PolicyDecision<Self::Output> {
-        PolicyDecision::deterministic_fallback(self.fallback(input))
-    }
-
-    fn fallback(&self, _input: Self::Input) -> Self::Output {
-        ScheduleAdvice::new(
-            CoreId::new(0),
-            Confidence::ZERO,
-            DecisionReason::DeterministicFallback,
-        )
-    }
+    HeuristicFailed,
 }
 
 pub fn run() -> Result<AiPolicySmokeStatus, AiPolicySmokeError> {
@@ -61,15 +47,36 @@ pub fn run() -> Result<AiPolicySmokeStatus, AiPolicySmokeError> {
         return Err(AiPolicySmokeError::UnsafeManifestAccepted);
     }
 
-    let policy = LocalFallbackScheduler;
-    let decision = policy.evaluate(ScheduleFeatures::default());
+    let fallback_policy =
+        HeuristicSchedulerPolicy::new(SchedulerPolicyConfig::local_round_robin(CoreId::new(0)));
+    let decision = fallback_policy.evaluate(ScheduleFeatures::default());
     let fallback_ok = decision.fallback_used()
         && decision.model().is_none()
         && decision.confidence().get() == 0
         && decision.output().target_core() == CoreId::new(0)
-        && policy.explain(&decision) == DecisionReason::DeterministicFallback;
+        && fallback_policy.explain(&decision) == DecisionReason::DeterministicFallback;
     if !fallback_ok {
         return Err(AiPolicySmokeError::FallbackFailed);
+    }
+
+    let heuristic_policy = HeuristicSchedulerPolicy::new(SchedulerPolicyConfig::heuristic(
+        CoreId::new(0),
+        CoreId::new(1),
+    ));
+    let (heuristic_decision, heuristic_record) =
+        heuristic_policy.evaluate_with_record(heuristic_features());
+    let Some(heuristic_score) = heuristic_record.score() else {
+        return Err(AiPolicySmokeError::HeuristicFailed);
+    };
+    let heuristic_ok = !heuristic_decision.fallback_used()
+        && heuristic_decision.model().is_none()
+        && heuristic_decision.output().target_core() == CoreId::new(1)
+        && heuristic_decision.reason() == DecisionReason::Heuristic
+        && heuristic_record.heuristic_enabled()
+        && heuristic_record.selected_core() == CoreId::new(1)
+        && heuristic_record.fallback_core() == CoreId::new(0);
+    if !heuristic_ok {
+        return Err(AiPolicySmokeError::HeuristicFailed);
     }
 
     Ok(AiPolicySmokeStatus {
@@ -80,7 +87,24 @@ pub fn run() -> Result<AiPolicySmokeStatus, AiPolicySmokeError> {
         fallback_confidence: decision.confidence().get(),
         fallback_core: decision.output().target_core().get(),
         manifest_metadata_gate_ok: rejected_manifest && fallback_ok,
+        heuristic_enabled: heuristic_record.heuristic_enabled(),
+        heuristic_score: heuristic_score.get(),
+        heuristic_core: heuristic_decision.output().target_core().get(),
+        heuristic_disabled_fallback_ok: fallback_ok,
     })
+}
+
+const fn heuristic_features() -> ScheduleFeatures {
+    ScheduleFeatures {
+        run_queue_len: 500,
+        ipc_depth: 500,
+        queue_pressure: 500,
+        object_locality_score: 9_000,
+        cache_miss_rate: 0,
+        idle_ratio: 9_000,
+        migration_cost: 100,
+        priority: u8::MAX,
+    }
 }
 
 fn scheduler_manifest() -> Result<ModelObjectManifest, AiPolicySmokeError> {
@@ -123,5 +147,9 @@ mod tests {
         assert_eq!(status.fallback_confidence, 0);
         assert_eq!(status.fallback_core, 0);
         assert!(status.manifest_metadata_gate_ok);
+        assert!(status.heuristic_enabled);
+        assert!(status.heuristic_score >= 7_000);
+        assert_eq!(status.heuristic_core, 1);
+        assert!(status.heuristic_disabled_fallback_ok);
     }
 }

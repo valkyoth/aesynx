@@ -12,4 +12,8 @@ pub use manifest::{
     PolicyDomain, RequiredTelemetryFields, Signature64, ValidatedModelManifest,
 };
 pub use policy::{DecisionReason, PolicyDecision, PolicyEngine, PolicyError};
-pub use schedule::{FIXED_POINT_SCALE, ScheduleAdvice, ScheduleFeatures};
+pub use schedule::{
+    DEFAULT_HEURISTIC_THRESHOLD, FIXED_POINT_SCALE, HeuristicScheduleScore,
+    HeuristicSchedulerPolicy, ScheduleAdvice, ScheduleFeatures, SchedulerPolicyConfig,
+    SchedulerPolicyDecisionRecord, score_features,
+};
