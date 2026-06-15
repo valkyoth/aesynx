@@ -36,6 +36,9 @@ a classic shared-everything SMP kernel.
 - Guard release must be strict LIFO. A non-LIFO release is a corrupted local
   synchronization state and must fail closed instead of rewriting tracker or
   interrupt-mask state.
+- Poisoned synchronization state has no local unpoison path. A future real
+  integration that can hit this condition must define recovery as resetting the
+  owning core/domain or rebooting, not silently reusing the tracker or mask.
 - Lock acquisition must follow the global rank order. Acquiring an equal or
   lower-ranked lock while a higher-ranked lock is held is a policy violation.
 - Lock failures must not partially mutate protected state.
