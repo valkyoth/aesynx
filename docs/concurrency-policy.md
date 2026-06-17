@@ -39,6 +39,10 @@ a classic shared-everything SMP kernel.
 - Poisoned synchronization state has no local unpoison path. A future real
   integration that can hit this condition must define recovery as resetting the
   owning core/domain or rebooting, not silently reusing the tracker or mask.
+- `LocalInterruptMask` is a software model for host tests and policy evidence.
+  It does not disable hardware interrupts by itself; real IRQ-safe locking needs
+  an architecture-backed proof token that records actual interrupt masking on
+  the owning core.
 - Lock acquisition must follow the global rank order. Acquiring an equal or
   lower-ranked lock while a higher-ranked lock is held is a policy violation.
 - Lock failures must not partially mutate protected state.

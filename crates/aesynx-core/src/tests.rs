@@ -96,6 +96,31 @@ fn core_registry_is_owner_scoped_and_rejects_duplicates() {
 }
 
 #[test]
+fn core_registry_insert_rejects_epoch_overflow_without_mutation() {
+    let local = CoreLocal::new(
+        ROOT_CORE,
+        CoreRole::Bootstrap,
+        qemu_bootstrap_caps(),
+        CoreState::Online,
+    );
+    let mut registry = match CoreRegistry::<2>::new(ROOT_CORE)
+        .map(|registry| registry.with_epoch_for_test(u64::MAX))
+    {
+        Ok(registry) => registry,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+
+    assert_eq!(
+        registry.insert(local).err(),
+        Some(CoreError::TelemetryOverflow)
+    );
+    assert_eq!(registry.status().len(), 0);
+    assert_eq!(registry.status().epoch(), u64::MAX);
+    assert!(!registry.contains(ROOT_CORE));
+    assert_eq!(registry.live_count(), 0);
+}
+
+#[test]
 fn boot_barrier_is_validate_then_commit() {
     let mut barrier = match BootBarrier::<2>::new(ROOT_CORE) {
         Ok(barrier) => barrier,

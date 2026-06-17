@@ -155,6 +155,12 @@ impl InterruptSnapshot {
 }
 
 #[derive(Debug)]
+/// Local model of interrupt masking state used by host tests and early
+/// synchronization policy.
+///
+/// This type does not execute architecture interrupt instructions. Kernel code
+/// that needs hardware IRQ masking must pair this model with an arch-backed
+/// guard that actually disables interrupts on the owning core.
 pub struct LocalInterruptMask {
     enabled: Cell<bool>,
     depth: Cell<u8>,
@@ -288,6 +294,12 @@ impl EarlyLock {
         })
     }
 
+    /// Takes the lock while updating the local software interrupt model.
+    ///
+    /// This is not, by itself, a hardware IRQ-safe lock. `LocalInterruptMask`
+    /// records the policy state only; an architecture integration must provide
+    /// the real interrupt-disable proof before this pattern is used around
+    /// interrupt handlers.
     pub fn try_lock_irq<'a>(
         &'a self,
         interrupts: &'a LocalInterruptMask,

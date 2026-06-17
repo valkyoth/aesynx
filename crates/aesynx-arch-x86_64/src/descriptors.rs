@@ -36,7 +36,8 @@ static INIT_STATE: AtomicU8 = AtomicU8::new(INIT_UNINITIALIZED);
 static mut GDT: [u64; GDT_ENTRIES] = [0; GDT_ENTRIES];
 // TODO(smp): move TSS storage to per-core ownership before enabling SMP.
 static mut TSS: TaskStateSegment = TaskStateSegment::new();
-// TODO(smp): allocate a dedicated double-fault IST stack per core.
+// TODO(smp): allocate a dedicated double-fault IST stack per core and place an
+// unmapped guard page below each stack once paging owns per-core IST mappings.
 static mut DOUBLE_FAULT_STACK: AlignedStack = AlignedStack::new();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

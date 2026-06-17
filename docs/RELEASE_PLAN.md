@@ -1629,6 +1629,8 @@ Deliverables:
 - AP stacks.
 - AP startup path.
 - Per-core GDT/IDT/TSS where needed.
+- Per-core double-fault IST stacks with an explicit guard-page plan before
+  stack-trace or deep diagnostic work is allowed on the double-fault path.
 - Per-core local state.
 - Core online state machine that distinguishes hardware online from assigned
   Aesynx role.

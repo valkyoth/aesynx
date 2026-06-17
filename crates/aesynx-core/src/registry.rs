@@ -71,13 +71,14 @@ impl<const CAPACITY: usize> CoreRegistry<CAPACITY> {
         if self.contains(local.id()) {
             return Err(CoreError::DuplicateCore);
         }
-
-        self.entries[self.len] = Some(local);
-        self.len += 1;
-        self.epoch = self
+        let next_epoch = self
             .epoch
             .checked_add(1)
             .ok_or(CoreError::TelemetryOverflow)?;
+
+        self.entries[self.len] = Some(local);
+        self.len += 1;
+        self.epoch = next_epoch;
         Ok(())
     }
 
@@ -131,5 +132,11 @@ impl<const CAPACITY: usize> CoreRegistry<CAPACITY> {
             capacity: CAPACITY,
             epoch: self.epoch,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn with_epoch_for_test(mut self, epoch: u64) -> Self {
+        self.epoch = epoch;
+        self
     }
 }

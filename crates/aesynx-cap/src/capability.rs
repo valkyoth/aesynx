@@ -87,7 +87,10 @@ impl fmt::Debug for CapAuditEvent {
 /// The `generation` field is part of live-token validation. Object stores that
 /// create or recycle object generations must fail instead of wrapping the
 /// `u32` generation counter; wrapped generations can let stale capabilities
-/// pass `validate_live`.
+/// pass `validate_live`. The current `aesynx-object` registry enforces that
+/// with checked generation increments. If object-generation state becomes a
+/// public capability-layer input, it must move behind a checked non-wrapping
+/// newtype instead of accepting raw integers from untrusted callers.
 ///
 /// `base = None` and `len = None` denotes unscoped whole-object authority. A
 /// bounded derivation request must carry an `ObjectBoundedRange`, which is the

@@ -433,11 +433,16 @@ impl KernelHeapAllocator {
     }
 
     fn free_list_contains(&self, class: usize, ptr: usize) -> Result<bool, KernelHeapError> {
+        let total_bytes = self.total_pages.load(Ordering::Acquire) * KERNEL_HEAP_PAGE_SIZE;
+        let block_size = SLAB_CLASSES[class];
         let mut head = self.free_heads[class].load(Ordering::Acquire);
         while head != FREE_LIST_EMPTY {
             let Some(offset) = decode_offset(head) else {
                 return Err(KernelHeapError::CorruptFreeList);
             };
+            if offset >= total_bytes || !offset.is_multiple_of(block_size) {
+                return Err(KernelHeapError::CorruptFreeList);
+            }
             let current = self.ptr_for_offset(offset) as usize;
             if current == ptr {
                 return Ok(true);
@@ -447,6 +452,11 @@ impl KernelHeapAllocator {
         Ok(false)
     }
 
+    #[cfg(test)]
+    pub(super) fn corrupt_free_head_for_test(&self, layout: Layout, offset: usize) {
+        let class = class_for_layout(layout.size(), layout.align()).unwrap_or(0);
+        self.free_heads[class].store(encode_offset(offset), Ordering::Release);
+    }
     fn offset_for_ptr(&self, ptr: usize) -> Result<usize, KernelHeapError> {
         let start = self.start.load(Ordering::Acquire);
         let total_bytes = self.total_pages.load(Ordering::Acquire) * KERNEL_HEAP_PAGE_SIZE;

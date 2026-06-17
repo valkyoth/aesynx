@@ -120,6 +120,24 @@ fn double_free_is_reported_without_reallocating_block() -> Result<(), KernelHeap
 }
 
 #[test]
+fn corrupt_free_list_head_is_rejected_before_pointer_deref() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout =
+        Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let ptr = allocator.allocate_checked(layout)?;
+    let out_of_heap_offset = (KERNEL_HEAP_PAGE_SIZE * 8) + 64;
+
+    allocator.corrupt_free_head_for_test(layout, out_of_heap_offset);
+    assert_eq!(
+        allocator.deallocate_checked(ptr, layout),
+        Err(KernelHeapError::CorruptFreeList)
+    );
+    assert!(allocator.stats()?.corrupt_free_list_detected);
+    assert_ne!(allocator.allocated_bytes()?, 0);
+    Ok(())
+}
+
+#[test]
 fn slab_memory_is_zeroed_before_reuse() -> Result<(), KernelHeapError> {
     let (allocator, _heap) = init_test_allocator()?;
     let layout =
