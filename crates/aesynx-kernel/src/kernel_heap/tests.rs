@@ -1,5 +1,6 @@
 use core::alloc::Layout;
 
+use super::free_list::{encode_offset, write_free_next};
 use super::test_support;
 use super::{KERNEL_HEAP_PAGE_SIZE, KernelHeapAllocator, KernelHeapError};
 
@@ -124,16 +125,41 @@ fn corrupt_free_list_head_is_rejected_before_pointer_deref() -> Result<(), Kerne
     let (allocator, _heap) = init_test_allocator()?;
     let layout =
         Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
-    let ptr = allocator.allocate_checked(layout)?;
+    let first = allocator.allocate_checked(layout)?;
+    let second = allocator.allocate_checked(layout)?;
     let out_of_heap_offset = (KERNEL_HEAP_PAGE_SIZE * 8) + 64;
 
-    allocator.corrupt_free_head_for_test(layout, out_of_heap_offset);
+    allocator.deallocate_checked(first, layout)?;
+    write_free_next(first, encode_offset(out_of_heap_offset));
     assert_eq!(
-        allocator.deallocate_checked(ptr, layout),
+        allocator.deallocate_checked(second, layout),
         Err(KernelHeapError::CorruptFreeList)
     );
     assert!(allocator.stats()?.corrupt_free_list_detected);
     assert_ne!(allocator.allocated_bytes()?, 0);
+    Ok(())
+}
+
+#[test]
+fn corrupt_free_list_allocation_head_is_rejected_before_pointer_deref()
+-> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout =
+        Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let ptr = allocator.allocate_checked(layout)?;
+    let live = allocator.allocate_checked(layout)?;
+    let out_of_heap_offset = (KERNEL_HEAP_PAGE_SIZE * 8) + 64;
+
+    allocator.deallocate_checked(ptr, layout)?;
+    write_free_next(ptr, encode_offset(out_of_heap_offset));
+    assert_eq!(allocator.allocate_checked(layout), Ok(ptr));
+    assert_eq!(
+        allocator.allocate_checked(layout),
+        Err(KernelHeapError::CorruptFreeList)
+    );
+    assert!(allocator.stats()?.corrupt_free_list_detected);
+    assert_ne!(allocator.allocated_bytes()?, 0);
+    assert_ne!(ptr, live);
     Ok(())
 }
 

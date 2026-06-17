@@ -9,7 +9,8 @@ compile_error!(
 
 use super::backing::kernel_heap_start;
 use super::free_list::{
-    FREE_LIST_EMPTY, decode_offset, encode_offset, read_free_next, write_free_next, zero_heap_bytes,
+    FREE_LIST_EMPTY, decode_offset, decode_valid_offset, encode_offset, read_free_next,
+    write_free_next, zero_heap_bytes,
 };
 use super::layout::{
     KERNEL_HEAP_BYTES, KERNEL_HEAP_PAGE_SIZE, KERNEL_HEAP_PAGES, PAGE_FREE, PAGE_LARGE_HEAD,
@@ -222,13 +223,16 @@ impl KernelHeapAllocator {
         if head == FREE_LIST_EMPTY {
             return Err(KernelHeapError::OutOfMemory);
         }
-        let Some(offset) = decode_offset(head) else {
+        let total_bytes = self.total_pages.load(Ordering::Acquire) * KERNEL_HEAP_PAGE_SIZE;
+        let block_size = SLAB_CLASSES[class];
+        let Some(offset) = decode_valid_offset(head, total_bytes, block_size) else {
+            self.corrupt_free_list_detected
+                .fetch_add(1, Ordering::AcqRel);
             return Err(KernelHeapError::CorruptFreeList);
         };
         let ptr = self.ptr_for_offset(offset);
         let next = read_free_next(ptr);
         self.free_heads[class].store(next, Ordering::Release);
-        let block_size = SLAB_CLASSES[class];
         let page = offset / KERNEL_HEAP_PAGE_SIZE;
         self.page_live_blocks[page].fetch_add(1, Ordering::AcqRel);
         zero_heap_bytes(ptr, block_size);
@@ -384,10 +388,8 @@ impl KernelHeapAllocator {
                 return Err(KernelHeapError::CorruptFreeList);
             }
 
-            let offset = decode_offset(cursor).ok_or(KernelHeapError::CorruptFreeList)?;
-            if offset >= total_bytes || !offset.is_multiple_of(block_size) {
-                return Err(KernelHeapError::CorruptFreeList);
-            }
+            let offset = decode_valid_offset(cursor, total_bytes, block_size)
+                .ok_or(KernelHeapError::CorruptFreeList)?;
 
             cursor = read_free_next(self.ptr_for_offset(offset));
             seen += 1;
@@ -437,12 +439,8 @@ impl KernelHeapAllocator {
         let block_size = SLAB_CLASSES[class];
         let mut head = self.free_heads[class].load(Ordering::Acquire);
         while head != FREE_LIST_EMPTY {
-            let Some(offset) = decode_offset(head) else {
-                return Err(KernelHeapError::CorruptFreeList);
-            };
-            if offset >= total_bytes || !offset.is_multiple_of(block_size) {
-                return Err(KernelHeapError::CorruptFreeList);
-            }
+            let offset = decode_valid_offset(head, total_bytes, block_size)
+                .ok_or(KernelHeapError::CorruptFreeList)?;
             let current = self.ptr_for_offset(offset) as usize;
             if current == ptr {
                 return Ok(true);
@@ -450,12 +448,6 @@ impl KernelHeapAllocator {
             head = read_free_next(current as *mut u8);
         }
         Ok(false)
-    }
-
-    #[cfg(test)]
-    pub(super) fn corrupt_free_head_for_test(&self, layout: Layout, offset: usize) {
-        let class = class_for_layout(layout.size(), layout.align()).unwrap_or(0);
-        self.free_heads[class].store(encode_offset(offset), Ordering::Release);
     }
     fn offset_for_ptr(&self, ptr: usize) -> Result<usize, KernelHeapError> {
         let start = self.start.load(Ordering::Acquire);

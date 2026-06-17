@@ -8,6 +8,30 @@ pub(super) const fn decode_offset(encoded: usize) -> Option<usize> {
     encoded.checked_sub(1)
 }
 
+pub(super) const fn valid_free_offset(
+    offset: usize,
+    total_bytes: usize,
+    block_size: usize,
+) -> bool {
+    offset < total_bytes && offset.is_multiple_of(block_size)
+}
+
+pub(super) const fn decode_valid_offset(
+    encoded: usize,
+    total_bytes: usize,
+    block_size: usize,
+) -> Option<usize> {
+    let offset = match decode_offset(encoded) {
+        Some(offset) => offset,
+        None => return None,
+    };
+    if valid_free_offset(offset, total_bytes, block_size) {
+        Some(offset)
+    } else {
+        None
+    }
+}
+
 pub(super) fn read_free_next(ptr: *mut u8) -> usize {
     // SAFETY: Free-list links are stored only in currently free heap blocks.
     // All slab classes are at least pointer-sized and naturally aligned.
