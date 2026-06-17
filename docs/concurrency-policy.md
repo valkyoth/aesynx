@@ -1,6 +1,6 @@
 # Aesynx Concurrency Policy
 
-Status: v0.33.1 concurrency discipline candidate
+Status: v0.34.0 AMP core data structures candidate
 
 This document defines the synchronization contract that future multicore work
 must follow. Current Aesynx boot remains single-core, but shared-state code must

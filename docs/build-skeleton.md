@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.33.1 concurrency discipline candidate
+Status: v0.34.0 AMP core data structures candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.33.1.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.34.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
 output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
@@ -106,29 +106,32 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `heuristic_core=<redacted>`, `heuristic_disabled_fallback_ok=true`,
 `[TEST] ai-policy=ok`, `concurrency irq_guard_ok=true`,
 `nested_irq_guard_ok=true`, `early_lock_ok=true`, `irq_lock_ok=true`,
-`lock_order_ok=true`, `[TEST] concurrency=ok`, and
+`lock_order_ok=true`, `[TEST] concurrency=ok`,
+`amp-core bootstrap_role_ok=true`, `capabilities_ok=true`,
+`registry_ok=true`, `telemetry_ok=true`, `barrier_ok=true`,
+`[TEST] amp-core=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 Decode the captured boot trace:
 
 ```bash
-cargo xtask trace-decode build/qemu/aesynx-v0.33.1.serial.log
+cargo xtask trace-decode build/qemu/aesynx-v0.34.0.serial.log
 ```
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.33.1-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.34.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.33.1-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.34.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.33.1-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.34.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -203,20 +206,16 @@ activation, global physical-memory ownership, page-fault recovery, a calibrated
 production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
-The v0.33.1 candidate adds explicit concurrency discipline before multicore work
-begins. Aesynx uses x86_64 SMP/APIC mechanisms as the hardware path to start
-additional cores, but the architecture target is software-defined AMP and a
-multikernel fabric: explicit core roles, per-core ownership, directed IRQ
-ownership, and bounded cross-core messages rather than a shared-everything SMP
-kernel. The `aesynx-sync` crate provides safe no_std early-lock primitives,
-previous-state interrupt guards, nested interrupt masking behavior, IRQ-lock
-composition, and lock-rank validation. QEMU proves the model compiles into the
-kernel image and validates `irq_guard_ok`, `nested_irq_guard_ok`,
-`early_lock_ok`, `irq_lock_ok`, and `lock_order_ok` before
-`[TEST] concurrency=ok`. This does not enable multicore execution; the existing
-SMP hardware tripwires remain until descriptor tables, activation storage, heap
-backing, queues, and shared kernel state have explicit per-core, role-owned, or
-synchronized ownership.
+The v0.33.1 candidate added explicit concurrency discipline before multicore
+work begins. The v0.34.0 candidate adds the first AMP core data structures:
+`aesynx-core` models core roles, heterogeneous capability metadata, `CoreLocal`,
+owner-scoped core registries, local telemetry, and sealed boot barriers. QEMU
+proves the bootstrap core is represented by that model with
+`bootstrap_role_ok`, `capabilities_ok`, `registry_ok`, `telemetry_ok`, and
+`barrier_ok` before `[TEST] amp-core=ok`. This does not enable multicore
+execution; the existing SMP hardware tripwires remain until descriptor tables,
+activation storage, heap backing, queues, and shared kernel state have explicit
+per-core, role-owned, or synchronized ownership.
 
 ## Target Shape
 

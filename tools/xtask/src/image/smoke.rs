@@ -12,6 +12,14 @@ pub const AI_POLICY_HEURISTIC_SCORE_MARKER: &str = "heuristic_score=<redacted>";
 pub const AI_POLICY_MARKER: &str = "[TEST] ai-policy=ok";
 pub const AI_POLICY_METADATA_GATE_MARKER: &str = "manifest_metadata_gate_ok=true";
 pub const AI_POLICY_STATUS_MARKER: &str = "ai-policy schema=1";
+pub const AMP_CORE_BARRIER_MARKER: &str = "barrier_ok=true";
+pub const AMP_CORE_BOOTSTRAP_ROLE_MARKER: &str = "bootstrap_role_ok=true";
+pub const AMP_CORE_CAPABILITIES_MARKER: &str = "capabilities_ok=true";
+pub const AMP_CORE_FAIL_MARKER: &str = "[TEST] amp-core=fail";
+pub const AMP_CORE_MARKER: &str = "[TEST] amp-core=ok";
+pub const AMP_CORE_REGISTRY_MARKER: &str = "registry_ok=true";
+pub const AMP_CORE_STATUS_MARKER: &str = "amp-core bootstrap_role_ok=true";
+pub const AMP_CORE_TELEMETRY_MARKER: &str = "telemetry_ok=true";
 pub const CAP_AUDIT_FAIL_MARKER: &str = "[TEST] cap-audit=fail";
 pub const CAP_AUDIT_MARKER: &str = "[TEST] cap-audit=ok";
 pub const CAP_AUDIT_STATUS_MARKER: &str = "cap-audit events=";
@@ -289,6 +297,13 @@ const BOOT_REQUIRED_MARKERS: &[&str] = &[
     CONCURRENCY_IRQ_LOCK_MARKER,
     CONCURRENCY_ORDER_MARKER,
     CONCURRENCY_MARKER,
+    AMP_CORE_STATUS_MARKER,
+    AMP_CORE_BOOTSTRAP_ROLE_MARKER,
+    AMP_CORE_CAPABILITIES_MARKER,
+    AMP_CORE_REGISTRY_MARKER,
+    AMP_CORE_TELEMETRY_MARKER,
+    AMP_CORE_BARRIER_MARKER,
+    AMP_CORE_MARKER,
     KERNEL_CR3_ACTIVE_MARKER,
     KERNEL_CR3_MARKER,
 ];
@@ -312,6 +327,7 @@ const BOOT_FORBIDDEN_MARKERS: &[&str] = &[
     TELEMETRY_EVENTS_FAIL_MARKER,
     AI_POLICY_FAIL_MARKER,
     CONCURRENCY_FAIL_MARKER,
+    AMP_CORE_FAIL_MARKER,
     KERNEL_CR3_FAIL_MARKER,
 ];
 
@@ -374,7 +390,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, hardware_tables_copied=, hardware_copied=true, kernel_stack_pages=, kernel_stack_guard_ok=true, [TEST] kernel-stack-guard=ok, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok, cpu-hardening nx=, [TEST] cpu-hardening=ok, entropy-policy rdrand=, hardware_self_test=false, hardware_present=, fallback_used=, generation_counter_ok=true, random_tokens_available=, source=, [TEST] entropy-policy=ok, heap bytes=, slab_classes=, slab_reuse_ok=true, page_run_ok=true, stress_ok=true, double_free_detected=true, invalid_free_detected=true, corrupt_free_list_detected=false, [TEST] heap=ok, cap-table capacity=, [TEST] cap=ok, memory-cap map_allowed=, [TEST] memory-cap=ok, cap-audit events=, [TEST] cap-audit=ok, service-queue log_submitted=, [TEST] service-queue=ok, task-model created=, [TEST] task-model=ok, cooperative-sched task_a=, [TEST] cooperative-sched=ok, scheduler-telemetry decisions=, [TEST] scheduler-telemetry=ok, telemetry-events schema=1 events=, trace-event schema=1 event=boot-phase, trace-event schema=1 event=capability-fault, trace-event schema=1 event=scheduler-decision, selected_task=<redacted>, [TEST] telemetry-events=ok, ai-policy schema=1, manifest_metadata_gate_ok=true, heuristic_enabled=true, heuristic_score=<redacted>, heuristic_core=<redacted>, heuristic_disabled_fallback_ok=true, [TEST] ai-policy=ok, concurrency irq_guard_ok=true, nested_irq_guard_ok=true, early_lock_ok=true, irq_lock_ok=true, lock_order_ok=true, [TEST] concurrency=ok, kernel-cr3 active=true, [TEST] kernel-cr3=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, hardware_tables_copied=, hardware_copied=true, kernel_stack_pages=, kernel_stack_guard_ok=true, [TEST] kernel-stack-guard=ok, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok, cpu-hardening nx=, [TEST] cpu-hardening=ok, entropy-policy rdrand=, hardware_self_test=false, hardware_present=, fallback_used=, generation_counter_ok=true, random_tokens_available=, source=, [TEST] entropy-policy=ok, heap bytes=, slab_classes=, slab_reuse_ok=true, page_run_ok=true, stress_ok=true, double_free_detected=true, invalid_free_detected=true, corrupt_free_list_detected=false, [TEST] heap=ok, cap-table capacity=, [TEST] cap=ok, memory-cap map_allowed=, [TEST] memory-cap=ok, cap-audit events=, [TEST] cap-audit=ok, service-queue log_submitted=, [TEST] service-queue=ok, task-model created=, [TEST] task-model=ok, cooperative-sched task_a=, [TEST] cooperative-sched=ok, scheduler-telemetry decisions=, [TEST] scheduler-telemetry=ok, telemetry-events schema=1 events=, trace-event schema=1 event=boot-phase, trace-event schema=1 event=capability-fault, trace-event schema=1 event=scheduler-decision, selected_task=<redacted>, [TEST] telemetry-events=ok, ai-policy schema=1, manifest_metadata_gate_ok=true, heuristic_enabled=true, heuristic_score=<redacted>, heuristic_core=<redacted>, heuristic_disabled_fallback_ok=true, [TEST] ai-policy=ok, concurrency irq_guard_ok=true, nested_irq_guard_ok=true, early_lock_ok=true, irq_lock_ok=true, lock_order_ok=true, [TEST] concurrency=ok, amp-core bootstrap_role_ok=true, capabilities_ok=true, registry_ok=true, telemetry_ok=true, barrier_ok=true, [TEST] amp-core=ok, kernel-cr3 active=true, [TEST] kernel-cr3=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"

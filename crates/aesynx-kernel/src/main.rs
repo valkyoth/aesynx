@@ -50,7 +50,7 @@ mod smoke_modules;
     )
 ))]
 pub use smoke_modules::{
-    ai_policy_smoke, capability_smoke, entropy_smoke, scheduler_telemetry_smoke,
+    ai_policy_smoke, amp_core_smoke, capability_smoke, entropy_smoke, scheduler_telemetry_smoke,
     telemetry_events_smoke,
 };
 #[cfg(all(

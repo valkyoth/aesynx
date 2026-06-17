@@ -149,4 +149,23 @@ pub fn run() {
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+
+    match crate::smoke_modules::amp_core_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "amp-core bootstrap_role_ok={} capabilities_ok={} registry_ok={} telemetry_ok={} barrier_ok={}",
+                status.bootstrap_role_ok,
+                status.capabilities_ok,
+                status.registry_ok,
+                status.telemetry_ok,
+                status.barrier_ok
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] amp-core=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("amp-core error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] amp-core=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
 }
