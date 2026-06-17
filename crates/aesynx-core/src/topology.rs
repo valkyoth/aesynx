@@ -309,15 +309,18 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
                 if entry.hardware_state.is_online() {
                     hardware_online += 1;
                 }
-                if entry.assignment_state.is_assigned() {
+                if entry.hardware_state != CoreHardwareState::Quarantined
+                    && entry.assignment_state.is_assigned()
+                {
                     assigned += 1;
                 }
-                match (entry.role(), entry.assignment_state) {
-                    (CoreRole::Idle, CoreAssignmentState::Unassigned) => {}
-                    (CoreRole::Idle, CoreAssignmentState::Assigned) => idle_roles += 1,
-                    (CoreRole::Bootstrap, _) => bootstrap_roles += 1,
-                    (CoreRole::Scheduler, _) => scheduler_roles += 1,
-                    (CoreRole::DriverService, _) => driver_service_roles += 1,
+                match (entry.hardware_state, entry.role(), entry.assignment_state) {
+                    (CoreHardwareState::Quarantined, _, _) => {}
+                    (_, CoreRole::Idle, CoreAssignmentState::Unassigned) => {}
+                    (_, CoreRole::Idle, CoreAssignmentState::Assigned) => idle_roles += 1,
+                    (_, CoreRole::Bootstrap, _) => bootstrap_roles += 1,
+                    (_, CoreRole::Scheduler, _) => scheduler_roles += 1,
+                    (_, CoreRole::DriverService, _) => driver_service_roles += 1,
                 }
             }
             index += 1;

@@ -103,6 +103,44 @@ fn core_topology_quarantine_is_reachable_and_terminal() {
 }
 
 #[test]
+fn core_topology_status_excludes_quarantined_assigned_roles() {
+    let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
+        Ok(topology) => topology,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+    assert!(
+        topology
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(0),
+                qemu_bootstrap_caps()
+            )
+            .is_ok()
+    );
+    assert!(
+        topology
+            .assign_role(ROOT_CORE, ROOT_CORE, CoreRole::Bootstrap)
+            .is_ok()
+    );
+
+    let assigned_status = topology.status();
+    assert_eq!(assigned_status.assigned(), 1);
+    assert_eq!(assigned_status.bootstrap_roles(), 1);
+
+    assert!(topology.quarantine(ROOT_CORE, ROOT_CORE).is_ok());
+
+    let status = topology.status();
+    assert_eq!(status.discovered(), 1);
+    assert_eq!(status.hardware_online(), 0);
+    assert_eq!(status.assigned(), 0);
+    assert_eq!(status.bootstrap_roles(), 0);
+    assert_eq!(status.scheduler_roles(), 0);
+    assert_eq!(status.driver_service_roles(), 0);
+    assert_eq!(status.idle_roles(), 0);
+}
+
+#[test]
 fn core_topology_does_not_count_unassigned_idle_cores() {
     let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
         Ok(topology) => topology,
