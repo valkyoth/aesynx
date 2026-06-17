@@ -8,6 +8,8 @@ pub mod capability_smoke;
 pub mod concurrency_smoke;
 #[path = "entropy_smoke.rs"]
 pub mod entropy_smoke;
+#[path = "multicore_topology_smoke.rs"]
+pub mod multicore_topology_smoke;
 #[path = "scheduler_telemetry_smoke.rs"]
 pub mod scheduler_telemetry_smoke;
 #[path = "telemetry_events_smoke.rs"]

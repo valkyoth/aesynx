@@ -168,4 +168,26 @@ pub fn run() {
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+
+    match crate::smoke_modules::multicore_topology_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "multicore-topology qemu_smp_cores_ok={} hardware_online_ok={} role_assignment_ok={} bootstrap_ok={} scheduler_ok={} driver_service_ok={} idle_ok={} multicore_barrier_ok={}",
+                status.qemu_smp_cores_ok,
+                status.hardware_online_ok,
+                status.role_assignment_ok,
+                status.bootstrap_ok,
+                status.scheduler_ok,
+                status.driver_service_ok,
+                status.idle_ok,
+                status.barrier_ok
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] multicore-topology=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("multicore-topology error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] multicore-topology=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
 }

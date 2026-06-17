@@ -6,10 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.34.0 - AMP Core Data Structures](v0.34.0-rc.md)
+- [v0.35.0 - QEMU Multicore Topology Baseline](v0.35.0-rc.md)
 
 ## History
 
+- [v0.34.0 - AMP Core Data Structures](v0.34.0-rc.md)
 - [v0.33.1 - Concurrency Discipline](v0.33.1-rc.md)
 - [v0.33.0 - Scheduler Policy Model Prototype](v0.33.0-rc.md)
 - [v0.32.0 - AI Policy Interface](v0.32.0-rc.md)

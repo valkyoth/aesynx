@@ -1,5 +1,9 @@
-use std::fs;
-use std::path::Path;
+#[path = "smoke_match.rs"]
+mod smoke_match;
+
+pub(crate) use smoke_match::serial_log_contains_marker;
+#[cfg(test)]
+pub(crate) use smoke_match::serial_log_contents_match;
 
 pub const BOOTINFO_FAIL_MARKER: &str = "[TEST] bootinfo=fail";
 pub const BOOTINFO_MARKER: &str = "[TEST] bootinfo=ok";
@@ -20,6 +24,17 @@ pub const AMP_CORE_MARKER: &str = "[TEST] amp-core=ok";
 pub const AMP_CORE_REGISTRY_MARKER: &str = "registry_ok=true";
 pub const AMP_CORE_STATUS_MARKER: &str = "amp-core bootstrap_role_ok=true";
 pub const AMP_CORE_TELEMETRY_MARKER: &str = "telemetry_ok=true";
+pub const MULTICORE_TOPOLOGY_BARRIER_MARKER: &str = "multicore_barrier_ok=true";
+pub const MULTICORE_TOPOLOGY_BOOTSTRAP_MARKER: &str = "bootstrap_ok=true";
+pub const MULTICORE_TOPOLOGY_DRIVER_SERVICE_MARKER: &str = "driver_service_ok=true";
+pub const MULTICORE_TOPOLOGY_FAIL_MARKER: &str = "[TEST] multicore-topology=fail";
+pub const MULTICORE_TOPOLOGY_HARDWARE_ONLINE_MARKER: &str = "hardware_online_ok=true";
+pub const MULTICORE_TOPOLOGY_IDLE_MARKER: &str = "idle_ok=true";
+pub const MULTICORE_TOPOLOGY_MARKER: &str = "[TEST] multicore-topology=ok";
+pub const MULTICORE_TOPOLOGY_QEMU_SMP_MARKER: &str = "qemu_smp_cores_ok=true";
+pub const MULTICORE_TOPOLOGY_ROLE_ASSIGNMENT_MARKER: &str = "role_assignment_ok=true";
+pub const MULTICORE_TOPOLOGY_SCHEDULER_MARKER: &str = "scheduler_ok=true";
+pub const MULTICORE_TOPOLOGY_STATUS_MARKER: &str = "multicore-topology qemu_smp_cores_ok=true";
 pub const CAP_AUDIT_FAIL_MARKER: &str = "[TEST] cap-audit=fail";
 pub const CAP_AUDIT_MARKER: &str = "[TEST] cap-audit=ok";
 pub const CAP_AUDIT_STATUS_MARKER: &str = "cap-audit events=";
@@ -304,6 +319,16 @@ const BOOT_REQUIRED_MARKERS: &[&str] = &[
     AMP_CORE_TELEMETRY_MARKER,
     AMP_CORE_BARRIER_MARKER,
     AMP_CORE_MARKER,
+    MULTICORE_TOPOLOGY_STATUS_MARKER,
+    MULTICORE_TOPOLOGY_QEMU_SMP_MARKER,
+    MULTICORE_TOPOLOGY_HARDWARE_ONLINE_MARKER,
+    MULTICORE_TOPOLOGY_ROLE_ASSIGNMENT_MARKER,
+    MULTICORE_TOPOLOGY_BOOTSTRAP_MARKER,
+    MULTICORE_TOPOLOGY_SCHEDULER_MARKER,
+    MULTICORE_TOPOLOGY_DRIVER_SERVICE_MARKER,
+    MULTICORE_TOPOLOGY_IDLE_MARKER,
+    MULTICORE_TOPOLOGY_BARRIER_MARKER,
+    MULTICORE_TOPOLOGY_MARKER,
     KERNEL_CR3_ACTIVE_MARKER,
     KERNEL_CR3_MARKER,
 ];
@@ -328,6 +353,7 @@ const BOOT_FORBIDDEN_MARKERS: &[&str] = &[
     AI_POLICY_FAIL_MARKER,
     CONCURRENCY_FAIL_MARKER,
     AMP_CORE_FAIL_MARKER,
+    MULTICORE_TOPOLOGY_FAIL_MARKER,
     KERNEL_CR3_FAIL_MARKER,
 ];
 
@@ -390,7 +416,7 @@ impl SmokeKind {
     pub fn markers(self) -> &'static str {
         match self {
             Self::Boot => {
-                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, hardware_tables_copied=, hardware_copied=true, kernel_stack_pages=, kernel_stack_guard_ok=true, [TEST] kernel-stack-guard=ok, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok, cpu-hardening nx=, [TEST] cpu-hardening=ok, entropy-policy rdrand=, hardware_self_test=false, hardware_present=, fallback_used=, generation_counter_ok=true, random_tokens_available=, source=, [TEST] entropy-policy=ok, heap bytes=, slab_classes=, slab_reuse_ok=true, page_run_ok=true, stress_ok=true, double_free_detected=true, invalid_free_detected=true, corrupt_free_list_detected=false, [TEST] heap=ok, cap-table capacity=, [TEST] cap=ok, memory-cap map_allowed=, [TEST] memory-cap=ok, cap-audit events=, [TEST] cap-audit=ok, service-queue log_submitted=, [TEST] service-queue=ok, task-model created=, [TEST] task-model=ok, cooperative-sched task_a=, [TEST] cooperative-sched=ok, scheduler-telemetry decisions=, [TEST] scheduler-telemetry=ok, telemetry-events schema=1 events=, trace-event schema=1 event=boot-phase, trace-event schema=1 event=capability-fault, trace-event schema=1 event=scheduler-decision, selected_task=<redacted>, [TEST] telemetry-events=ok, ai-policy schema=1, manifest_metadata_gate_ok=true, heuristic_enabled=true, heuristic_score=<redacted>, heuristic_core=<redacted>, heuristic_disabled_fallback_ok=true, [TEST] ai-policy=ok, concurrency irq_guard_ok=true, nested_irq_guard_ok=true, early_lock_ok=true, irq_lock_ok=true, lock_order_ok=true, [TEST] concurrency=ok, amp-core bootstrap_role_ok=true, capabilities_ok=true, registry_ok=true, telemetry_ok=true, barrier_ok=true, [TEST] amp-core=ok, kernel-cr3 active=true, [TEST] kernel-cr3=ok"
+                "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][INFO] bootinfo normalized, memory total_bytes=, memory usable_bytes=, memory reserved_bytes=, [TEST] memory-map=ok, frame-allocator total_frames=, [TEST] frame-allocator=ok, page-table total_tables=, root_ok=true, checked_root_ok=true, checked_status_ok=true, kernel_candidate_ok=true, user_candidate_ok=true, translate_offset_ok=true, checked_translate_ok=true, mapping_lookup_ok=true, presence_ok=true, protect_ok=true, protect_range_ok=true, range_lookup_ok=true, range_translate_ok=true, mapped_range_ok=true, unmapped_range_ok=true, kernel_range_ok=true, user_range_ok=true, write_protected_range_ok=true, non_executable_range_ok=true, executable_range_ok=true, normal_memory_range_ok=true, local_range_ok=true, kernel_space_range_ok=true, user_space_range_ok=true, no_user_space_ok=true, no_executable_ok=true, no_writable_ok=true, no_device_ok=true, no_global_ok=true, no_alias_ok=true, kernel_user_guard_ok=true, kernel_only_ok=true, audit_ok=true, visit_ok=true, flags_ok=true, reclaim_ok=true, range_ok=true, flush_page=true, [TEST] page-table=ok, paging-policy-model mapped_pages=, section_layout_ok=true, text_rx_ok=true, rodata_read_only_ok=true, data_rw_nx_ok=true, heap_reserved_ok=true, guard_page_ok=true, null_page_ok=true, hardware_image_ok=true, hardware_arena_frames=, hardware_root_allocated=true, hardware_tables_copied=, hardware_copied=true, kernel_stack_pages=, kernel_stack_guard_ok=true, [TEST] kernel-stack-guard=ok, [TEST] paging-policy-model=ok, [TEST] bootinfo=ok, [TEST] boot=ok, cpu-hardening nx=, [TEST] cpu-hardening=ok, entropy-policy rdrand=, hardware_self_test=false, hardware_present=, fallback_used=, generation_counter_ok=true, random_tokens_available=, source=, [TEST] entropy-policy=ok, heap bytes=, slab_classes=, slab_reuse_ok=true, page_run_ok=true, stress_ok=true, double_free_detected=true, invalid_free_detected=true, corrupt_free_list_detected=false, [TEST] heap=ok, cap-table capacity=, [TEST] cap=ok, memory-cap map_allowed=, [TEST] memory-cap=ok, cap-audit events=, [TEST] cap-audit=ok, service-queue log_submitted=, [TEST] service-queue=ok, task-model created=, [TEST] task-model=ok, cooperative-sched task_a=, [TEST] cooperative-sched=ok, scheduler-telemetry decisions=, [TEST] scheduler-telemetry=ok, telemetry-events schema=1 events=, trace-event schema=1 event=boot-phase, trace-event schema=1 event=capability-fault, trace-event schema=1 event=scheduler-decision, selected_task=<redacted>, [TEST] telemetry-events=ok, ai-policy schema=1, manifest_metadata_gate_ok=true, heuristic_enabled=true, heuristic_score=<redacted>, heuristic_core=<redacted>, heuristic_disabled_fallback_ok=true, [TEST] ai-policy=ok, concurrency irq_guard_ok=true, nested_irq_guard_ok=true, early_lock_ok=true, irq_lock_ok=true, lock_order_ok=true, [TEST] concurrency=ok, amp-core bootstrap_role_ok=true, capabilities_ok=true, registry_ok=true, telemetry_ok=true, barrier_ok=true, [TEST] amp-core=ok, multicore-topology qemu_smp_cores_ok=true, hardware_online_ok=true, role_assignment_ok=true, bootstrap_ok=true, scheduler_ok=true, driver_service_ok=true, idle_ok=true, multicore_barrier_ok=true, [TEST] multicore-topology=ok, kernel-cr3 active=true, [TEST] kernel-cr3=ok"
             }
             Self::Panic => {
                 "[TEST] gdt=ok, [TEST] idt=ok, [TEST] irq=ok, [TEST] exception=ok, [kernel][FATAL] panic handler entered, panic registers=, [TEST] panic=ok"
@@ -427,58 +453,6 @@ impl SmokeKind {
             Self::Exception => Some("exception-smoke"),
             Self::Timer => Some("timer-smoke"),
         }
-    }
-}
-
-pub fn serial_log_contains_marker(path: &Path, smoke: SmokeKind) -> bool {
-    fs::read_to_string(path).is_ok_and(|contents| serial_log_contents_match(&contents, smoke))
-}
-
-pub(crate) fn serial_log_contents_match(contents: &str, smoke: SmokeKind) -> bool {
-    contains_all(contents, smoke.required_markers())
-        && contains_none(contents, smoke.forbidden_markers())
-}
-
-fn contains_all(contents: &str, markers: &[&str]) -> bool {
-    markers
-        .iter()
-        .all(|marker| contains_marker(contents, marker))
-}
-
-fn contains_none(contents: &str, markers: &[&str]) -> bool {
-    markers
-        .iter()
-        .all(|marker| !contains_marker(contents, marker))
-}
-
-fn contains_marker(contents: &str, marker: &str) -> bool {
-    if !marker.contains('=') {
-        return contents.contains(marker);
-    }
-
-    let mut offset = 0usize;
-    while let Some(relative_start) = contents[offset..].find(marker) {
-        let start = offset + relative_start;
-        let end = start + marker.len();
-        if is_marker_boundary(contents[..start].chars().next_back())
-            && (is_value_prefix_marker(marker)
-                || is_marker_boundary(contents[end..].chars().next()))
-        {
-            return true;
-        }
-        offset = end;
-    }
-    false
-}
-
-fn is_value_prefix_marker(marker: &str) -> bool {
-    marker.ends_with('=') || marker.ends_with("=0x")
-}
-
-fn is_marker_boundary(character: Option<char>) -> bool {
-    match character {
-        None => true,
-        Some(character) => character.is_ascii_whitespace() || character == ',',
     }
 }
 

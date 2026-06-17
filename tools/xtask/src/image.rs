@@ -22,6 +22,7 @@ const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
 const KERNEL_PROFILE: &str = "release";
+pub(super) const QEMU_SMP_CPUS: &str = "4";
 const QEMU_TIMEOUT: Duration = Duration::from_secs(5);
 
 const BOOT_CONFIG_MARKERS: &[&str] = &[
@@ -328,7 +329,15 @@ fn run_qemu(paths: &ImagePaths, smoke: SmokeKind) -> Result<(), String> {
 
     let serial_arg = format!("file:{}", paths.serial_log.display());
     let mut child = Command::new("qemu-system-x86_64")
-        .args(["-machine", "q35", "-m", "128M", "-cdrom"])
+        .args([
+            "-machine",
+            "q35",
+            "-m",
+            "128M",
+            "-smp",
+            QEMU_SMP_CPUS,
+            "-cdrom",
+        ])
         .arg(&paths.image)
         .args([
             "-boot",

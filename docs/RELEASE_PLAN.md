@@ -1616,24 +1616,72 @@ Exit criteria:
 
 - No subsystem assumes only global shared state as the future multicore model.
 
-### v0.35.0 - x86_64 QEMU Multicore Bring-Up
+### v0.35.0 - QEMU Multicore Topology Baseline
 
 Goal:
 
-Bring up multiple cores in QEMU using x86_64 SMP/APIC mechanisms, then place
-each core under Aesynx AMP ownership policy.
+Run the normal QEMU smoke paths under `-smp 4` and model the four visible
+cores under Aesynx AMP ownership policy before secondary-core execution is
+enabled.
 
 Deliverables:
 
-- CPU topology parsing.
+- QEMU smoke runner uses `-smp 4` and records the virtual CPU count in the
+  generated image manifest.
+- Safe no_std topology model for discovered cores.
+- Hardware state machine that distinguishes discovered, startup-staged, online,
+  and quarantined cores.
+- Assignment state machine that distinguishes hardware online from assigned
+  Aesynx role.
+- Four-core QEMU topology smoke with bootstrap, scheduler, driver/service, and
+  idle roles.
+- Boot barrier evidence covering all four modeled cores.
+- Documentation that this is topology/ownership evidence under a multicore VM,
+  not AP execution and not a commitment to a shared-everything SMP kernel.
+
+Expected serial:
+
+```text
+multicore-topology qemu_smp_cores_ok=true hardware_online_ok=true role_assignment_ok=true bootstrap_ok=true scheduler_ok=true driver_service_ok=true idle_ok=true multicore_barrier_ok=true
+[TEST] multicore-topology=ok
+```
+
+Verification:
+
+- QEMU `-smp 4` boot smoke.
+- Serial evidence shows the modeled four-core topology has hardware online
+  state, local state, and assigned roles.
+- Host tests cover duplicate hardware IDs and failed state transitions.
+
+Exit criteria:
+
+- The boot smoke proves Aesynx can run under a four-vCPU QEMU machine while
+  keeping core ownership explicit and fail-closed.
+
+Non-goals:
+
+- No AP startup trampoline.
+- No secondary core executes Rust code yet.
+- No per-core GDT/IDT/TSS/IST installation yet.
+- No cross-core message fabric yet.
+
+### v0.35.1 - x86_64 QEMU AP Startup
+
+Goal:
+
+Bring up secondary cores in QEMU using x86_64 SMP/APIC mechanisms, then place
+each executing core under Aesynx AMP ownership policy.
+
+Deliverables:
+
+- CPU topology parser backed by firmware or ACPI/MADT data when available.
 - AP stacks.
 - AP startup path.
 - Per-core GDT/IDT/TSS where needed.
 - Per-core double-fault IST stacks with an explicit guard-page plan before
   stack-trace or deep diagnostic work is allowed on the double-fault path.
-- Per-core local state.
-- Core online state machine that distinguishes hardware online from assigned
-  Aesynx role.
+- Per-core local state written by each executing core.
+- Core online state machine tied to actual AP arrival evidence.
 - Documentation that this is multicore bring-up, not a commitment to a
   shared-everything SMP kernel.
 
@@ -1650,11 +1698,13 @@ core 3 online
 Verification:
 
 - QEMU `-smp 4` boot smoke.
-- Serial evidence shows each core has a local state block and assigned role.
+- Serial evidence shows each executing core has a local state block and
+  assigned role.
 
 Exit criteria:
 
-- Multiple cores are online and owned by the AMP/multikernel policy.
+- Multiple cores execute Aesynx code and are owned by the AMP/multikernel
+  policy.
 
 ### v0.36.0 - Core-to-Core Ping/Pong
 

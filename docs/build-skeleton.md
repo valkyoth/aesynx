@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.34.0 AMP core data structures candidate
+Status: v0.35.0 QEMU multicore topology candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,10 +56,11 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.34.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.35.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
-and QEMU version banners. `cargo xtask qemu` starts QEMU, captures serial
-output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
+QEMU version banners, and `qemu_smp_cpus=4`. `cargo xtask qemu` starts QEMU
+with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
+`[TEST] idt=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `memory total_bytes=`,
 `memory usable_bytes=`, `memory reserved_bytes=`, `[TEST] memory-map=ok`,
 `frame-allocator total_frames=`, `[TEST] frame-allocator=ok`,
@@ -109,29 +110,34 @@ output, and expects `[TEST] gdt=ok`, `[TEST] idt=ok`,
 `lock_order_ok=true`, `[TEST] concurrency=ok`,
 `amp-core bootstrap_role_ok=true`, `capabilities_ok=true`,
 `registry_ok=true`, `telemetry_ok=true`, `barrier_ok=true`,
-`[TEST] amp-core=ok`, and
+`[TEST] amp-core=ok`,
+`multicore-topology qemu_smp_cores_ok=true`,
+`hardware_online_ok=true`, `role_assignment_ok=true`,
+`bootstrap_ok=true`, `scheduler_ok=true`, `driver_service_ok=true`,
+`idle_ok=true`, `multicore_barrier_ok=true`,
+`[TEST] multicore-topology=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 Decode the captured boot trace:
 
 ```bash
-cargo xtask trace-decode build/qemu/aesynx-v0.34.0.serial.log
+cargo xtask trace-decode build/qemu/aesynx-v0.35.0.serial.log
 ```
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.34.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.35.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.34.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.35.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.34.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.35.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -207,15 +213,18 @@ production clock service, scheduler preemption, a CSPRNG, or bootloader memory
 reclamation.
 
 The v0.33.1 candidate added explicit concurrency discipline before multicore
-work begins. The v0.34.0 candidate adds the first AMP core data structures:
+work begins. The v0.34.0 candidate added the first AMP core data structures:
 `aesynx-core` models core roles, heterogeneous capability metadata, `CoreLocal`,
 owner-scoped core registries, local telemetry, and sealed boot barriers. QEMU
 proves the bootstrap core is represented by that model with
 `bootstrap_role_ok`, `capabilities_ok`, `registry_ok`, `telemetry_ok`, and
-`barrier_ok` before `[TEST] amp-core=ok`. This does not enable multicore
-execution; the existing SMP hardware tripwires remain until descriptor tables,
-activation storage, heap backing, queues, and shared kernel state have explicit
-per-core, role-owned, or synchronized ownership.
+`barrier_ok` before `[TEST] amp-core=ok`. The v0.35.0 candidate runs QEMU with
+`-smp 4`, records `qemu_smp_cpus=4`, and models a four-core topology with
+separate hardware-online and Aesynx role-assignment state before
+`[TEST] multicore-topology=ok`. This does not enable AP execution; the existing
+SMP hardware tripwires remain until descriptor tables, activation storage, heap
+backing, queues, and shared kernel state have explicit per-core, role-owned, or
+synchronized ownership.
 
 ## Target Shape
 

@@ -6,12 +6,16 @@ mod capabilities;
 mod local;
 mod registry;
 mod role;
+mod topology;
 
 pub use barrier::{BootBarrier, BootBarrierStatus};
 pub use capabilities::{CoreCapabilitySet, CoreIsa, CorePerformanceClass};
 pub use local::{CoreLocal, CoreLocalTelemetry, CoreState};
 pub use registry::{CoreRegistry, CoreRegistryStatus};
 pub use role::CoreRole;
+pub use topology::{
+    CoreAssignmentState, CoreHardwareState, CoreTopology, CoreTopologyEntry, CoreTopologyStatus,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreError {
@@ -20,6 +24,8 @@ pub enum CoreError {
     BarrierSealed,
     CapacityZero,
     DuplicateCore,
+    DuplicateHardwareId,
+    InvalidStateTransition,
     RegistryFull,
     RoleMismatch,
     TelemetryOverflow,
