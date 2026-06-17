@@ -49,14 +49,19 @@ if [ -f Cargo.toml ] && ! grep -q '^members = \[\]$' Cargo.toml; then
 fi
 
 head_commit="$(git rev-parse HEAD)"
+parent_commit=""
+if git rev-parse -q --verify HEAD^ >/dev/null; then
+    parent_commit="$(git rev-parse HEAD^)"
+fi
 
 if ! grep -Fxq "Tag: $tag" "$report"; then
     echo "release readiness: report must contain exact tag line: Tag: $tag" >&2
     exit 1
 fi
 
-if ! grep -Fxq "Commit: $head_commit" "$report"; then
-    echo "release readiness: report must target current HEAD: $head_commit" >&2
+if ! grep -Fxq "Commit: $head_commit" "$report" \
+    && { [ "$parent_commit" = "" ] || ! grep -Fxq "Commit: $parent_commit" "$report"; }; then
+    echo "release readiness: report must target current HEAD or first parent: $head_commit" >&2
     exit 1
 fi
 

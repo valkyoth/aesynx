@@ -47,6 +47,14 @@ write_release_notes
 write_report "$head_commit" "PASS"
 "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null
 
+git add "$report" "$release_notes"
+git -c user.name='Aesynx Test' \
+    -c user.email='aesynx-test@example.invalid' \
+    -c commit.gpgsign=false \
+    commit -m 'record pentest evidence' >/dev/null
+"$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null
+head_commit="$(git rev-parse HEAD)"
+
 rm "$release_notes"
 if "$root/scripts/validate-release-readiness.sh" "$tag" >/dev/null 2>&1; then
     echo "release readiness tests: missing release notes did not block release" >&2
