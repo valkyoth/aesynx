@@ -917,6 +917,9 @@ Deliverables:
 - CPUID-gated SMEP, SMAP, and UMIP detection and enablement when supported.
 - Read-back verification that requested EFER/CR0/CR4 hardening bits actually
   stuck, while serial output remains boolean-only and redacted.
+- Strict high-assurance hardening policy exists as a tested constructor; a
+  future deployment configuration mechanism must select it explicitly before
+  Aesynx claims strict real-hardware enforcement of NX, SMEP, SMAP, and UMIP.
 - Explicit SMAP access-window policy placeholder; no direct user-memory access
   is allowed outside audited helpers once userspace exists.
 - Guard-page-backed boot stack and kernel stack layout for the active core.
@@ -1070,6 +1073,10 @@ Deliverables:
   classifying a hardware path as suitable seed material.
 - Random-token policy requires a DRBG path with separate self-test evidence;
   raw `RDRAND`/`RDSEED` reads are not exposed as tokens directly.
+- Until a DRBG implementation and kernel smoke path set
+  `drbg_self_test_passed=true`, `random_tokens_available=false` is the expected
+  production state and no security-sensitive capability token, ASLR seed, IPC
+  nonce, or package/update secret may consume this interface as randomness.
 - Deterministic boot-local monotonic fallback for identifiers that are
   anti-confusion only.
 - Clear distinction between generation counters used to reject stale authority
@@ -1557,6 +1564,10 @@ Deliverables:
 - Heap operations that run with interrupts masked must have bounded latency, or
   use a two-phase design that performs bulk work outside the lock, before the
   heap grows beyond the current fixed static bound.
+- Heap accounting patterns such as load, saturating arithmetic, then store are
+  safe only while protected by the current single-core heap lock and `smp`
+  compile-time tripwire; per-core heaps or atomic fetch/update accounting are
+  required before SMP heap access is enabled.
 - Tests for double-unlock prevention, nested interrupt guard behavior, and
   lock-order validation where feasible.
 
@@ -1702,6 +1713,12 @@ Deliverables:
 - Watchdog timeout policy that quarantines a non-arriving AP instead of leaving
   startup in an ambiguous state.
 - Recovery/reset story for permanently quarantined core trackers.
+- Confirm the entropy DRBG implementation remains a scheduled blocker before
+  any AP startup work consumes attacker-unpredictable tokens; v0.35.1 must not
+  introduce random-token consumers while QEMU reports `drbg_self_test=false`.
+- Keep the current general CPU-hardening policy for QEMU unless a deployment
+  selector is added; the strict `NX+SMEP+SMAP+UMIP` policy remains tested but
+  not selected by default.
 - Owner-scoped topology mutation remains enforced after AP execution begins;
   APs report arrival through bounded messages or proof tokens, not arbitrary
   topology writes.
