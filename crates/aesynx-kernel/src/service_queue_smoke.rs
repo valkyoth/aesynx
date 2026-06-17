@@ -32,7 +32,8 @@ pub enum ServiceQueueSmokeError {
 pub fn run() -> Result<ServiceQueueSmokeStatus, ServiceQueueSmokeError> {
     let caller =
         ValidatedCoreId::new(ROOT_CORE, &BootCoreSet).map_err(ServiceQueueSmokeError::Core)?;
-    let mut queues = ServiceQueueSet::<4, 4>::new().map_err(ServiceQueueSmokeError::Ring)?;
+    let mut queues =
+        ServiceQueueSet::<4, 4>::new(ROOT_CORE).map_err(ServiceQueueSmokeError::Ring)?;
     let log = request(
         MessageId::new(1),
         caller,
@@ -65,30 +66,33 @@ pub fn run() -> Result<ServiceQueueSmokeStatus, ServiceQueueSmokeError> {
         MessagePayload::Empty,
     )?;
 
-    queues.submit(log).map_err(ServiceQueueSmokeError::Queue)?;
     queues
-        .submit(timer)
+        .submit(ROOT_CORE, log)
         .map_err(ServiceQueueSmokeError::Queue)?;
     queues
-        .submit(object)
+        .submit(ROOT_CORE, timer)
+        .map_err(ServiceQueueSmokeError::Queue)?;
+    queues
+        .submit(ROOT_CORE, object)
         .map_err(ServiceQueueSmokeError::Queue)?;
     let log_submitted = queues
-        .pending_requests(ServiceKind::Log)
+        .pending_requests(ROOT_CORE, ServiceKind::Log)
         .map_err(ServiceQueueSmokeError::Queue)?
         == 1;
     let timer_pending = queues
-        .pending_requests(ServiceKind::Timer)
+        .pending_requests(ROOT_CORE, ServiceKind::Timer)
         .map_err(ServiceQueueSmokeError::Queue)?
         == 1;
     let object_pending = queues
-        .pending_requests(ServiceKind::Object)
+        .pending_requests(ROOT_CORE, ServiceKind::Object)
         .map_err(ServiceQueueSmokeError::Queue)?
         == 1;
-    let unsupported_denied = queues.submit(unsupported) == Err(QueueSetError::UnsupportedService);
-    let unsupported_pending_denied =
-        queues.pending_requests(ServiceKind::Capability) == Err(QueueSetError::UnsupportedService);
+    let unsupported_denied =
+        queues.submit(ROOT_CORE, unsupported) == Err(QueueSetError::UnsupportedService);
+    let unsupported_pending_denied = queues.pending_requests(ROOT_CORE, ServiceKind::Capability)
+        == Err(QueueSetError::UnsupportedService);
     let observed = queues
-        .pop_request(ServiceKind::Log)
+        .pop_request(ROOT_CORE, ServiceKind::Log)
         .map_err(ServiceQueueSmokeError::Queue)?;
     let release_acquire_ok = observed.ordering().producer_publish() == Ordering::Release
         && observed.ordering().consumer_observe() == Ordering::Acquire;
@@ -100,12 +104,13 @@ pub fn run() -> Result<ServiceQueueSmokeStatus, ServiceQueueSmokeError> {
 
     queues
         .complete(
+            ROOT_CORE,
             ServiceKind::Log,
             ServiceCompletion::new(log.id(), CompletionStatus::Completed, MessagePayload::Empty),
         )
         .map_err(ServiceQueueSmokeError::Queue)?;
     let completion = queues
-        .pop_completion(ServiceKind::Log)
+        .pop_completion(ROOT_CORE, ServiceKind::Log)
         .map_err(ServiceQueueSmokeError::Queue)?
         .into_value();
     let completion_observed = completion.request_id() == log.id()

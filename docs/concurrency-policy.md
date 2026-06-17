@@ -144,11 +144,11 @@ Direct function calls are not a fabric protocol.
 ## Service Queues
 
 Current service queues are local fixed-capacity structures. Any future
-shared-memory or multi-core queue must name the producer/consumer owner roles
-and scrub payload storage before a vacated slot can be observed outside the
-current trust domain. Release/acquire ordering evidence must be proven on the
-real shared slot-validity or head/tail atomics, not only on descriptive
-metadata.
+shared-memory or multi-core queue must name the producer/consumer owner roles,
+enforce owner identity before mutation or inspection, and scrub payload storage
+before a vacated slot can be observed outside the current trust domain.
+Release/acquire ordering evidence must be proven on the real shared
+slot-validity or head/tail atomics, not only on descriptive metadata.
 
 ## Shared Memory Windows
 

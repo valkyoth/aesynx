@@ -1,5 +1,7 @@
 use core::sync::atomic::Ordering;
 
+use aesynx_abi::CoreId;
+
 use crate::{ServiceCompletion, ServiceKind, ServiceRequest};
 
 pub const PRODUCER_PUBLISH_ORDERING: Ordering = Ordering::Release;
@@ -60,6 +62,7 @@ pub struct ServiceRingQueue<T: Copy, const CAPACITY: usize> {
     // Non-Sync by design: the current queue is a single-owner `&mut self`
     // structure. Future shared-memory or SMP service rings must add external
     // synchronization and real atomic head/tail or slot-validity ordering.
+    owner_core: CoreId,
     slots: [Option<PublishedEntry<T>>; CAPACITY],
     head: usize,
     tail: usize,
@@ -67,12 +70,13 @@ pub struct ServiceRingQueue<T: Copy, const CAPACITY: usize> {
 }
 
 impl<T: Copy, const CAPACITY: usize> ServiceRingQueue<T, CAPACITY> {
-    pub const fn new() -> Result<Self, RingQueueError> {
+    pub const fn new(owner_core: CoreId) -> Result<Self, RingQueueError> {
         if CAPACITY == 0 {
             return Err(RingQueueError::ZeroCapacity);
         }
 
         Ok(Self {
+            owner_core,
             slots: [None; CAPACITY],
             head: 0,
             tail: 0,
@@ -80,7 +84,8 @@ impl<T: Copy, const CAPACITY: usize> ServiceRingQueue<T, CAPACITY> {
         })
     }
 
-    pub fn push(&mut self, value: T) -> Result<(), RingQueueError> {
+    pub fn push(&mut self, caller: CoreId, value: T) -> Result<(), RingQueueError> {
+        self.require_owner(caller)?;
         if self.is_full() {
             return Err(RingQueueError::Full);
         }
@@ -95,7 +100,8 @@ impl<T: Copy, const CAPACITY: usize> ServiceRingQueue<T, CAPACITY> {
         Ok(())
     }
 
-    pub fn pop(&mut self) -> Result<ObservedEntry<T>, RingQueueError> {
+    pub fn pop(&mut self, caller: CoreId) -> Result<ObservedEntry<T>, RingQueueError> {
+        self.require_owner(caller)?;
         if self.is_empty() {
             return Err(RingQueueError::Empty);
         }
@@ -110,6 +116,11 @@ impl<T: Copy, const CAPACITY: usize> ServiceRingQueue<T, CAPACITY> {
             value: entry.value,
             ordering: QueueOrderingEvidence::new(entry.publish_ordering, CONSUMER_OBSERVE_ORDERING),
         })
+    }
+
+    #[must_use]
+    pub const fn owner_core(&self) -> CoreId {
+        self.owner_core
     }
 
     #[must_use]
@@ -137,6 +148,14 @@ impl<T: Copy, const CAPACITY: usize> ServiceRingQueue<T, CAPACITY> {
         let next = index.wrapping_add(1);
         if next == CAPACITY { 0 } else { next }
     }
+
+    const fn require_owner(&self, caller: CoreId) -> Result<(), RingQueueError> {
+        if caller.get() != self.owner_core.get() {
+            return Err(RingQueueError::OwnerMismatch);
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -146,31 +165,45 @@ pub struct ServiceQueuePair<const REQUESTS: usize, const COMPLETIONS: usize> {
 }
 
 impl<const REQUESTS: usize, const COMPLETIONS: usize> ServiceQueuePair<REQUESTS, COMPLETIONS> {
-    pub const fn new() -> Result<Self, RingQueueError> {
-        let Ok(submit) = ServiceRingQueue::new() else {
+    pub const fn new(owner_core: CoreId) -> Result<Self, RingQueueError> {
+        let Ok(submit) = ServiceRingQueue::new(owner_core) else {
             return Err(RingQueueError::ZeroCapacity);
         };
-        let Ok(complete) = ServiceRingQueue::new() else {
+        let Ok(complete) = ServiceRingQueue::new(owner_core) else {
             return Err(RingQueueError::ZeroCapacity);
         };
 
         Ok(Self { submit, complete })
     }
 
-    pub fn push_request(&mut self, request: ServiceRequest) -> Result<(), RingQueueError> {
-        self.submit.push(request)
+    pub fn push_request(
+        &mut self,
+        caller: CoreId,
+        request: ServiceRequest,
+    ) -> Result<(), RingQueueError> {
+        self.submit.push(caller, request)
     }
 
-    pub fn pop_request(&mut self) -> Result<ObservedEntry<ServiceRequest>, RingQueueError> {
-        self.submit.pop()
+    pub fn pop_request(
+        &mut self,
+        caller: CoreId,
+    ) -> Result<ObservedEntry<ServiceRequest>, RingQueueError> {
+        self.submit.pop(caller)
     }
 
-    pub fn push_completion(&mut self, completion: ServiceCompletion) -> Result<(), RingQueueError> {
-        self.complete.push(completion)
+    pub fn push_completion(
+        &mut self,
+        caller: CoreId,
+        completion: ServiceCompletion,
+    ) -> Result<(), RingQueueError> {
+        self.complete.push(caller, completion)
     }
 
-    pub fn pop_completion(&mut self) -> Result<ObservedEntry<ServiceCompletion>, RingQueueError> {
-        self.complete.pop()
+    pub fn pop_completion(
+        &mut self,
+        caller: CoreId,
+    ) -> Result<ObservedEntry<ServiceCompletion>, RingQueueError> {
+        self.complete.pop(caller)
     }
 
     #[must_use]
@@ -182,6 +215,11 @@ impl<const REQUESTS: usize, const COMPLETIONS: usize> ServiceQueuePair<REQUESTS,
     pub const fn pending_completions(&self) -> usize {
         self.complete.len()
     }
+
+    #[must_use]
+    pub const fn owner_core(&self) -> CoreId {
+        self.submit.owner_core()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -192,55 +230,70 @@ pub struct ServiceQueueSet<const REQUESTS: usize, const COMPLETIONS: usize> {
 }
 
 impl<const REQUESTS: usize, const COMPLETIONS: usize> ServiceQueueSet<REQUESTS, COMPLETIONS> {
-    pub const fn new() -> Result<Self, RingQueueError> {
-        let Ok(log) = ServiceQueuePair::new() else {
+    pub const fn new(owner_core: CoreId) -> Result<Self, RingQueueError> {
+        let Ok(log) = ServiceQueuePair::new(owner_core) else {
             return Err(RingQueueError::ZeroCapacity);
         };
-        let Ok(timer) = ServiceQueuePair::new() else {
+        let Ok(timer) = ServiceQueuePair::new(owner_core) else {
             return Err(RingQueueError::ZeroCapacity);
         };
-        let Ok(object) = ServiceQueuePair::new() else {
+        let Ok(object) = ServiceQueuePair::new(owner_core) else {
             return Err(RingQueueError::ZeroCapacity);
         };
 
         Ok(Self { log, timer, object })
     }
 
-    pub fn submit(&mut self, request: ServiceRequest) -> Result<(), QueueSetError> {
+    pub fn submit(&mut self, caller: CoreId, request: ServiceRequest) -> Result<(), QueueSetError> {
+        self.require_owner(caller)?;
         self.queue_mut(request.service())?
-            .push_request(request)
+            .push_request(caller, request)
             .map_err(QueueSetError::Queue)
     }
 
     pub fn pop_request(
         &mut self,
+        caller: CoreId,
         service: ServiceKind,
     ) -> Result<ObservedEntry<ServiceRequest>, QueueSetError> {
+        self.require_owner(caller)?;
         self.queue_mut(service)?
-            .pop_request()
+            .pop_request(caller)
             .map_err(QueueSetError::Queue)
     }
 
     pub fn complete(
         &mut self,
+        caller: CoreId,
         service: ServiceKind,
         completion: ServiceCompletion,
     ) -> Result<(), QueueSetError> {
+        self.require_owner(caller)?;
         self.queue_mut(service)?
-            .push_completion(completion)
+            .push_completion(caller, completion)
             .map_err(QueueSetError::Queue)
     }
 
     pub fn pop_completion(
         &mut self,
+        caller: CoreId,
         service: ServiceKind,
     ) -> Result<ObservedEntry<ServiceCompletion>, QueueSetError> {
+        self.require_owner(caller)?;
         self.queue_mut(service)?
-            .pop_completion()
+            .pop_completion(caller)
             .map_err(QueueSetError::Queue)
     }
 
-    pub const fn pending_requests(&self, service: ServiceKind) -> Result<usize, QueueSetError> {
+    pub const fn pending_requests(
+        &self,
+        caller: CoreId,
+        service: ServiceKind,
+    ) -> Result<usize, QueueSetError> {
+        if let Err(error) = self.require_owner(caller) {
+            return Err(error);
+        }
+
         match service {
             ServiceKind::Log => Ok(self.log.pending_requests()),
             ServiceKind::Timer => Ok(self.timer.pending_requests()),
@@ -250,6 +303,19 @@ impl<const REQUESTS: usize, const COMPLETIONS: usize> ServiceQueueSet<REQUESTS, 
             | ServiceKind::Driver
             | ServiceKind::Telemetry => Err(QueueSetError::UnsupportedService),
         }
+    }
+
+    #[must_use]
+    pub const fn owner_core(&self) -> CoreId {
+        self.log.owner_core()
+    }
+
+    const fn require_owner(&self, caller: CoreId) -> Result<(), QueueSetError> {
+        if caller.get() != self.owner_core().get() {
+            return Err(QueueSetError::Queue(RingQueueError::OwnerMismatch));
+        }
+
+        Ok(())
     }
 
     fn queue_mut(
@@ -274,6 +340,7 @@ pub enum RingQueueError {
     Full,
     Empty,
     CorruptState,
+    OwnerMismatch,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -103,7 +103,7 @@ fn service_debug_output_redacts_request_identity_and_payloads() -> Result<(), Re
 
 #[test]
 fn service_ring_queue_rejects_zero_capacity() {
-    let queue = ServiceRingQueue::<ServiceRequest, 0>::new();
+    let queue = ServiceRingQueue::<ServiceRequest, 0>::new(CoreId::new(1));
 
     assert_eq!(queue, Err(RingQueueError::ZeroCapacity));
 }
@@ -113,14 +113,15 @@ fn service_ring_queue_preserves_fifo_across_wraparound() -> Result<(), RingQueue
     let first = request(1, ServiceKind::Log)?;
     let second = request(2, ServiceKind::Log)?;
     let third = request(3, ServiceKind::Log)?;
-    let mut queue = ServiceRingQueue::<ServiceRequest, 2>::new()?;
+    let owner = CoreId::new(1);
+    let mut queue = ServiceRingQueue::<ServiceRequest, 2>::new(owner)?;
 
-    assert_eq!(queue.push(first), Ok(()));
-    assert_eq!(queue.push(second), Ok(()));
-    assert_eq!(queue.pop().map(ObservedEntry::into_value), Ok(first));
-    assert_eq!(queue.push(third), Ok(()));
-    assert_eq!(queue.pop().map(ObservedEntry::into_value), Ok(second));
-    assert_eq!(queue.pop().map(ObservedEntry::into_value), Ok(third));
+    assert_eq!(queue.push(owner, first), Ok(()));
+    assert_eq!(queue.push(owner, second), Ok(()));
+    assert_eq!(queue.pop(owner).map(ObservedEntry::into_value), Ok(first));
+    assert_eq!(queue.push(owner, third), Ok(()));
+    assert_eq!(queue.pop(owner).map(ObservedEntry::into_value), Ok(second));
+    assert_eq!(queue.pop(owner).map(ObservedEntry::into_value), Ok(third));
 
     Ok(())
 }
@@ -129,23 +130,25 @@ fn service_ring_queue_preserves_fifo_across_wraparound() -> Result<(), RingQueue
 fn service_ring_queue_full_push_does_not_mutate_state() -> Result<(), RingQueueError> {
     let first = request(1, ServiceKind::Log)?;
     let second = request(2, ServiceKind::Log)?;
-    let mut queue = ServiceRingQueue::<ServiceRequest, 1>::new()?;
+    let owner = CoreId::new(1);
+    let mut queue = ServiceRingQueue::<ServiceRequest, 1>::new(owner)?;
 
-    assert_eq!(queue.push(first), Ok(()));
+    assert_eq!(queue.push(owner, first), Ok(()));
     assert_eq!(queue.len(), 1);
-    assert_eq!(queue.push(second), Err(RingQueueError::Full));
+    assert_eq!(queue.push(owner, second), Err(RingQueueError::Full));
     assert_eq!(queue.len(), 1);
-    assert_eq!(queue.pop().map(ObservedEntry::into_value), Ok(first));
+    assert_eq!(queue.pop(owner).map(ObservedEntry::into_value), Ok(first));
 
     Ok(())
 }
 
 #[test]
 fn service_ring_queue_empty_pop_does_not_mutate_state() -> Result<(), RingQueueError> {
-    let mut queue = ServiceRingQueue::<ServiceRequest, 1>::new()?;
+    let owner = CoreId::new(1);
+    let mut queue = ServiceRingQueue::<ServiceRequest, 1>::new(owner)?;
 
     assert_eq!(queue.len(), 0);
-    assert_eq!(queue.pop(), Err(RingQueueError::Empty));
+    assert_eq!(queue.pop(owner), Err(RingQueueError::Empty));
     assert_eq!(queue.len(), 0);
 
     Ok(())
@@ -153,11 +156,12 @@ fn service_ring_queue_empty_pop_does_not_mutate_state() -> Result<(), RingQueueE
 
 #[test]
 fn service_ring_queue_records_release_acquire_contract() -> Result<(), RingQueueError> {
-    let mut queue = ServiceRingQueue::<ServiceRequest, 1>::new()?;
+    let owner = CoreId::new(1);
+    let mut queue = ServiceRingQueue::<ServiceRequest, 1>::new(owner)?;
 
-    assert_eq!(queue.push(request(1, ServiceKind::Log)?), Ok(()));
+    assert_eq!(queue.push(owner, request(1, ServiceKind::Log)?), Ok(()));
 
-    let observed = queue.pop();
+    let observed = queue.pop(owner);
 
     assert_eq!(
         observed.map(|value| {
@@ -173,34 +177,57 @@ fn service_ring_queue_records_release_acquire_contract() -> Result<(), RingQueue
 }
 
 #[test]
+fn service_ring_queue_rejects_non_owner_without_mutation() -> Result<(), RingQueueError> {
+    let owner = CoreId::new(1);
+    let other = CoreId::new(2);
+    let first = request(1, ServiceKind::Log)?;
+    let second = request(2, ServiceKind::Log)?;
+    let mut queue = ServiceRingQueue::<ServiceRequest, 1>::new(owner)?;
+
+    assert_eq!(queue.owner_core(), owner);
+    assert_eq!(queue.push(other, first), Err(RingQueueError::OwnerMismatch));
+    assert_eq!(queue.len(), 0);
+    assert_eq!(queue.pop(other), Err(RingQueueError::OwnerMismatch));
+    assert_eq!(queue.len(), 0);
+    assert_eq!(queue.push(owner, second), Ok(()));
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue.pop(other), Err(RingQueueError::OwnerMismatch));
+    assert_eq!(queue.len(), 1);
+    assert_eq!(queue.pop(owner).map(ObservedEntry::into_value), Ok(second));
+
+    Ok(())
+}
+
+#[test]
 fn service_queue_set_routes_log_timer_and_object_queues() -> Result<(), QueueSetError> {
-    let mut queues = ServiceQueueSet::<2, 2>::new().map_err(QueueSetError::Queue)?;
+    let owner = CoreId::new(1);
+    let mut queues = ServiceQueueSet::<2, 2>::new(owner).map_err(QueueSetError::Queue)?;
     let log = request(1, ServiceKind::Log).map_err(QueueSetError::Queue)?;
     let timer = request(2, ServiceKind::Timer).map_err(QueueSetError::Queue)?;
     let object = request(3, ServiceKind::Object).map_err(QueueSetError::Queue)?;
 
-    queues.submit(log)?;
-    queues.submit(timer)?;
-    queues.submit(object)?;
+    queues.submit(owner, log)?;
+    queues.submit(owner, timer)?;
+    queues.submit(owner, object)?;
 
-    assert_eq!(queues.pending_requests(ServiceKind::Log), Ok(1));
-    assert_eq!(queues.pending_requests(ServiceKind::Timer), Ok(1));
-    assert_eq!(queues.pending_requests(ServiceKind::Object), Ok(1));
+    assert_eq!(queues.pending_requests(owner, ServiceKind::Log), Ok(1));
+    assert_eq!(queues.pending_requests(owner, ServiceKind::Timer), Ok(1));
+    assert_eq!(queues.pending_requests(owner, ServiceKind::Object), Ok(1));
     assert_eq!(
         queues
-            .pop_request(ServiceKind::Log)
+            .pop_request(owner, ServiceKind::Log)
             .map(ObservedEntry::into_value),
         Ok(log)
     );
     assert_eq!(
         queues
-            .pop_request(ServiceKind::Timer)
+            .pop_request(owner, ServiceKind::Timer)
             .map(ObservedEntry::into_value),
         Ok(timer)
     );
     assert_eq!(
         queues
-            .pop_request(ServiceKind::Object)
+            .pop_request(owner, ServiceKind::Object)
             .map(ObservedEntry::into_value),
         Ok(object)
     );
@@ -210,7 +237,8 @@ fn service_queue_set_routes_log_timer_and_object_queues() -> Result<(), QueueSet
 
 #[test]
 fn service_queue_set_rejects_unsupported_services_without_mutation() -> Result<(), RingQueueError> {
-    let mut queues = ServiceQueueSet::<1, 1>::new()?;
+    let owner = CoreId::new(1);
+    let mut queues = ServiceQueueSet::<1, 1>::new(owner)?;
     let unsupported = [
         ServiceKind::Capability,
         ServiceKind::Memory,
@@ -225,21 +253,64 @@ fn service_queue_set_rejects_unsupported_services_without_mutation() -> Result<(
         let request = request(id, service)?;
 
         assert_eq!(
-            queues.submit(request),
+            queues.submit(owner, request),
             Err(QueueSetError::UnsupportedService)
         );
         assert_eq!(
-            queues.pop_request(service),
+            queues.pop_request(owner, service),
             Err(QueueSetError::UnsupportedService)
         );
         assert_eq!(
-            queues.pending_requests(service),
+            queues.pending_requests(owner, service),
             Err(QueueSetError::UnsupportedService)
         );
-        assert_eq!(queues.pending_requests(ServiceKind::Log), Ok(0));
-        assert_eq!(queues.pending_requests(ServiceKind::Timer), Ok(0));
-        assert_eq!(queues.pending_requests(ServiceKind::Object), Ok(0));
+        assert_eq!(queues.pending_requests(owner, ServiceKind::Log), Ok(0));
+        assert_eq!(queues.pending_requests(owner, ServiceKind::Timer), Ok(0));
+        assert_eq!(queues.pending_requests(owner, ServiceKind::Object), Ok(0));
     }
+
+    Ok(())
+}
+
+#[test]
+fn service_queue_set_rejects_non_owner_without_mutation() -> Result<(), RingQueueError> {
+    let owner = CoreId::new(1);
+    let other = CoreId::new(2);
+    let mut queues = ServiceQueueSet::<1, 1>::new(owner)?;
+    let log = request(1, ServiceKind::Log)?;
+
+    assert_eq!(queues.owner_core(), owner);
+    assert_eq!(
+        queues.submit(other, log),
+        Err(QueueSetError::Queue(RingQueueError::OwnerMismatch))
+    );
+    assert_eq!(
+        queues.submit(other, request(2, ServiceKind::Capability)?),
+        Err(QueueSetError::Queue(RingQueueError::OwnerMismatch))
+    );
+    assert_eq!(
+        queues.pending_requests(other, ServiceKind::Capability),
+        Err(QueueSetError::Queue(RingQueueError::OwnerMismatch))
+    );
+    assert_eq!(queues.pending_requests(owner, ServiceKind::Log), Ok(0));
+    assert_eq!(
+        queues.pop_request(other, ServiceKind::Log),
+        Err(QueueSetError::Queue(RingQueueError::OwnerMismatch))
+    );
+    assert_eq!(
+        queues.pending_requests(other, ServiceKind::Log),
+        Err(QueueSetError::Queue(RingQueueError::OwnerMismatch))
+    );
+    assert_eq!(queues.submit(owner, log), Ok(()));
+    assert_eq!(
+        queues.complete(
+            other,
+            ServiceKind::Log,
+            ServiceCompletion::new(log.id(), CompletionStatus::Completed, MessagePayload::Empty),
+        ),
+        Err(QueueSetError::Queue(RingQueueError::OwnerMismatch))
+    );
+    assert_eq!(queues.pending_requests(owner, ServiceKind::Log), Ok(1));
 
     Ok(())
 }

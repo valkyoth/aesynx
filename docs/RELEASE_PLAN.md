@@ -1310,6 +1310,8 @@ Deliverables:
   selector must first convert it into a validated core identifier through a
   typed live-core-set check; raw `CoreId` values are not valid indexing
   authority.
+- Service queues record an owner core; push, pop, completion, and pending-count
+  inspection reject non-owner callers before queue mutation or observation.
 - Log service queue.
 - Timer service queue.
 - Object service queue skeleton.
@@ -1638,6 +1640,9 @@ Deliverables:
   Aesynx role.
 - Owner-scoped topology, registry, and boot-barrier setup mutation. Non-owner
   callers fail before mutation.
+- Service queue owner checks remain active under the four-vCPU QEMU smoke, so
+  queue mutation and inspection still fail closed on non-owner callers even
+  before shared-memory rings exist.
 - Role assignment allowed only before hardware-online state; startup-staged is
   required before a core can become online.
 - Reachable quarantine transition for modeled failed cores.
