@@ -121,8 +121,28 @@ impl CoreLocal {
         self.state
     }
 
-    pub fn set_state(&mut self, state: CoreState) {
-        self.state = state;
+    pub fn stage_startup(&mut self) -> Result<(), CoreError> {
+        if self.state != CoreState::Offline {
+            return Err(CoreError::InvalidStateTransition);
+        }
+        self.state = CoreState::Booting;
+        Ok(())
+    }
+
+    pub fn mark_online(&mut self) -> Result<(), CoreError> {
+        if self.state != CoreState::Booting {
+            return Err(CoreError::InvalidStateTransition);
+        }
+        self.state = CoreState::Online;
+        Ok(())
+    }
+
+    pub fn quarantine(&mut self) -> Result<(), CoreError> {
+        if self.state == CoreState::Quarantined {
+            return Err(CoreError::InvalidStateTransition);
+        }
+        self.state = CoreState::Quarantined;
+        Ok(())
     }
 
     #[must_use]

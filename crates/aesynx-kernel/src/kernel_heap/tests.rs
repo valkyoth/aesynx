@@ -31,6 +31,21 @@ fn allocation_rejects_before_initialization() -> Result<(), KernelHeapError> {
 }
 
 #[test]
+fn allocation_rejects_reentrant_heap_lock_without_spinning() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout = Layout::from_size_align(8, 8).map_err(|_error| KernelHeapError::InvalidLayout)?;
+
+    allocator.force_lock_for_test(true);
+    assert_eq!(
+        allocator.allocate_checked(layout),
+        Err(KernelHeapError::ReentrantLock)
+    );
+    allocator.force_lock_for_test(false);
+    assert_eq!(allocator.allocated_bytes()?, 0);
+    Ok(())
+}
+
+#[test]
 fn slab_allocations_are_reused_after_free() -> Result<(), KernelHeapError> {
     let (allocator, _heap) = init_test_allocator()?;
     let layout =

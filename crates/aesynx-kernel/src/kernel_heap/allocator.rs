@@ -141,7 +141,7 @@ impl KernelHeapAllocator {
             return Err(KernelHeapError::InvalidLayout);
         }
 
-        let _guard = self.lock();
+        let _guard = self.lock()?;
         if let Some(class) = class_for_layout(layout.size(), layout.align()) {
             self.allocate_slab_locked(class)
         } else {
@@ -164,6 +164,11 @@ impl KernelHeapAllocator {
         result
     }
 
+    #[cfg(test)]
+    pub(crate) fn force_lock_for_test(&self, locked: bool) {
+        self.locked.store(locked, Ordering::Release);
+    }
+
     fn deallocate_checked_inner(
         &self,
         ptr: *mut u8,
@@ -176,7 +181,7 @@ impl KernelHeapAllocator {
             return Err(KernelHeapError::InvalidFree);
         }
 
-        let _guard = self.lock();
+        let _guard = self.lock()?;
         let offset = self.offset_for_ptr(ptr as usize)?;
         let page = offset / KERNEL_HEAP_PAGE_SIZE;
         let state = self.page_state[page].load(Ordering::Acquire);
@@ -482,11 +487,13 @@ impl KernelHeapAllocator {
     }
 
     fn record_free(&self, bytes: usize) {
-        let _ = self.allocated_bytes.fetch_sub(bytes, Ordering::AcqRel);
+        let current = self.allocated_bytes.load(Ordering::Acquire);
+        self.allocated_bytes
+            .store(current.saturating_sub(bytes), Ordering::Release);
         self.frees.fetch_add(1, Ordering::AcqRel);
     }
 
-    fn lock(&self) -> HeapLockGuard<'_> {
-        HeapLockGuard::lock(&self.locked)
+    fn lock(&self) -> Result<HeapLockGuard<'_>, KernelHeapError> {
+        HeapLockGuard::lock(&self.locked).map_err(KernelHeapError::from)
     }
 }

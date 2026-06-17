@@ -110,7 +110,6 @@ pub struct Capability {
 }
 
 impl Capability {
-    #[must_use]
     pub(crate) const fn new_root(
         object_id: ObjectId,
         kind: CapKind,
@@ -118,8 +117,13 @@ impl Capability {
         perms: CapPerms,
         generation: u32,
         revocation_epoch: u64,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CapIdError> {
+        match CapGeneration::new(generation) {
+            Ok(_) => {}
+            Err(error) => return Err(error),
+        }
+
+        Ok(Self {
             object_id,
             base: None,
             len: None,
@@ -128,7 +132,7 @@ impl Capability {
             generation,
             revocation_epoch,
             kind,
-        }
+        })
     }
 
     #[must_use]

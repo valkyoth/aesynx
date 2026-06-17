@@ -2,9 +2,9 @@ use aesynx_abi::{CapId, ObjectId, PrincipalId, VirtAddr};
 use alloc::format;
 
 use crate::{
-    CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapKind, CapPerms, CapTableError,
-    CapabilityTable, DeriveRequest, LiveAuthorityError, LiveAuthorityState, LiveAuthorityView,
-    ObjectBoundedRange, RootCapabilitySpec,
+    CapAuditAction, CapAuditError, CapAuditEvent, CapAuditLog, CapIdError, CapKind, CapPerms,
+    CapTableError, CapabilityTable, DeriveRequest, LiveAuthorityError, LiveAuthorityState,
+    LiveAuthorityView, ObjectBoundedRange, RootCapabilitySpec,
 };
 
 #[derive(Default)]
@@ -226,6 +226,24 @@ fn table_inserts_root_and_checks_permissions() {
         );
         assert_eq!(table.occupied_slots(), 1);
     }
+}
+
+#[test]
+fn table_rejects_zero_object_generation_without_mutation() {
+    let mut table = CapabilityTable::<4>::new();
+
+    assert_eq!(
+        table.insert_root(
+            ObjectId::new(42),
+            CapKind::Memory,
+            PrincipalId::new(1),
+            CapPerms::READ,
+            0,
+            0,
+        ),
+        Err(CapTableError::Id(CapIdError::ZeroGeneration))
+    );
+    assert_eq!(table.occupied_slots(), 0);
 }
 
 #[test]

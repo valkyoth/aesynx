@@ -340,8 +340,8 @@ extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) 
     let fault_address = FaultRegisterSnapshot::capture_fault_address();
 
     let Some(frame) = ExceptionFrame::from_raw(frame) else {
-        crate::serial::write_str("exception frame=invalid\n");
-        return;
+        crate::serial::write_str("exception frame=invalid halt=true\n");
+        halt_invalid_exception_frame();
     };
 
     match frame.vector {
@@ -395,6 +395,10 @@ extern "C" fn aesynx_x86_64_exception_dispatch(frame: *const RawExceptionFrame) 
             );
         }
     }
+}
+
+fn halt_invalid_exception_frame() -> ! {
+    crate::X86_64::halt_forever()
 }
 
 const BREAKPOINT_VECTOR_U8: u8 = BREAKPOINT_VECTOR as u8;

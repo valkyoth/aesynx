@@ -40,5 +40,6 @@ pub enum KernelHeapError {
     InvalidLayout,
     NotInitialized,
     OutOfMemory,
+    ReentrantLock,
     SmokeFailed,
 }

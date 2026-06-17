@@ -5,6 +5,7 @@ mod smoke;
 
 use crate::kernel_flags::apply_kernel_rustflags;
 use crate::workspace;
+use aesynx_core::QEMU_MULTICORE_TOPOLOGY_CORES;
 use host_tools::validate_host_tools;
 use manifest::write_manifest;
 use names::image_names;
@@ -22,7 +23,7 @@ const KERNEL_TARGET: &str = "x86_64-unknown-none";
 const KERNEL_PACKAGE: &str = "aesynx-kernel";
 const KERNEL_BINARY: &str = "aesynx-kernel";
 const KERNEL_PROFILE: &str = "release";
-pub(super) const QEMU_SMP_CPUS: &str = "4";
+pub(super) const QEMU_SMP_CPUS: usize = QEMU_MULTICORE_TOPOLOGY_CORES;
 const QEMU_TIMEOUT: Duration = Duration::from_secs(5);
 
 const BOOT_CONFIG_MARKERS: &[&str] = &[
@@ -328,16 +329,9 @@ fn run_qemu(paths: &ImagePaths, smoke: SmokeKind) -> Result<(), String> {
     let _ = fs::remove_file(&paths.serial_log);
 
     let serial_arg = format!("file:{}", paths.serial_log.display());
+    let smp_arg = QEMU_SMP_CPUS.to_string();
     let mut child = Command::new("qemu-system-x86_64")
-        .args([
-            "-machine",
-            "q35",
-            "-m",
-            "128M",
-            "-smp",
-            QEMU_SMP_CPUS,
-            "-cdrom",
-        ])
+        .args(["-machine", "q35", "-m", "128M", "-smp", &smp_arg, "-cdrom"])
         .arg(&paths.image)
         .args([
             "-boot",

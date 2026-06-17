@@ -20,6 +20,7 @@ pub fn run() -> Result<EntropyPolicyStatus, EntropySmokeError> {
         capabilities,
         generation_counter_ok,
         hardware_self_test_passed: false,
+        drbg_self_test_passed: false,
     });
     verify_random_token_policy(status)?;
 
@@ -63,6 +64,7 @@ mod tests {
             },
             generation_counter_ok: true,
             hardware_self_test_passed: false,
+            drbg_self_test_passed: false,
         });
 
         assert_eq!(verify_random_token_policy(status), Ok(()));
@@ -86,6 +88,7 @@ mod tests {
                     && status.hardware_self_test_passed
             );
             assert!(!status.hardware_self_test_passed);
+            assert!(!status.drbg_self_test_passed);
             assert!(!status.random_tokens_available);
         }
     }

@@ -70,7 +70,7 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
             perms,
             object_generation,
             revocation_epoch,
-        );
+        )?;
         let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
 
         self.slots[slot].cap = Some(cap);
@@ -97,7 +97,7 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
             spec.perms,
             spec.object_generation,
             spec.revocation_epoch,
-        );
+        )?;
         let id = cap_id_for_slot(slot_index, self.slots[slot].generation)?;
 
         audit

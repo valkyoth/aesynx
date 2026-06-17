@@ -56,6 +56,9 @@ pub struct CpuHardeningStatus {
 pub enum CpuHardeningError {
     HardeningWriteDidNotStick,
     NxUnavailable,
+    SmapUnavailable,
+    SmepUnavailable,
+    UmipUnavailable,
 }
 
 pub fn init() -> Result<CpuHardeningStatus, CpuHardeningError> {
@@ -101,6 +104,31 @@ impl CpuHardeningPlan {
             enable_smep: capabilities.smep,
             enable_smap: capabilities.smap,
             enable_umip: capabilities.umip,
+        })
+    }
+
+    pub const fn strict_required(
+        capabilities: CpuHardeningCapabilities,
+    ) -> Result<Self, CpuHardeningError> {
+        if !capabilities.nx {
+            return Err(CpuHardeningError::NxUnavailable);
+        }
+        if !capabilities.smep {
+            return Err(CpuHardeningError::SmepUnavailable);
+        }
+        if !capabilities.smap {
+            return Err(CpuHardeningError::SmapUnavailable);
+        }
+        if !capabilities.umip {
+            return Err(CpuHardeningError::UmipUnavailable);
+        }
+
+        Ok(Self {
+            enable_nx: true,
+            enable_wp: true,
+            enable_smep: true,
+            enable_smap: true,
+            enable_umip: true,
         })
     }
 }
@@ -330,6 +358,62 @@ mod tests {
                 enable_wp: true,
                 enable_smep: true,
                 enable_smap: false,
+                enable_umip: true,
+            })
+        );
+    }
+
+    #[test]
+    fn strict_hardening_policy_rejects_missing_optional_bits() {
+        let no_smep = CpuHardeningCapabilities {
+            nx: true,
+            smep: false,
+            smap: true,
+            umip: true,
+        };
+        let no_smap = CpuHardeningCapabilities {
+            nx: true,
+            smep: true,
+            smap: false,
+            umip: true,
+        };
+        let no_umip = CpuHardeningCapabilities {
+            nx: true,
+            smep: true,
+            smap: true,
+            umip: false,
+        };
+
+        assert_eq!(
+            CpuHardeningPlan::strict_required(no_smep),
+            Err(CpuHardeningError::SmepUnavailable)
+        );
+        assert_eq!(
+            CpuHardeningPlan::strict_required(no_smap),
+            Err(CpuHardeningError::SmapUnavailable)
+        );
+        assert_eq!(
+            CpuHardeningPlan::strict_required(no_umip),
+            Err(CpuHardeningError::UmipUnavailable)
+        );
+    }
+
+    #[test]
+    fn strict_hardening_policy_requires_all_bits() {
+        let capabilities = CpuHardeningCapabilities {
+            nx: true,
+            smep: true,
+            smap: true,
+            umip: true,
+        };
+
+        assert_eq!(
+            CpuHardeningPlan::strict_required(capabilities),
+            Ok(CpuHardeningPlan {
+                enable_nx: true,
+                enable_wp: true,
+                enable_smep: true,
+                enable_smap: true,
                 enable_umip: true,
             })
         );

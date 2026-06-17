@@ -5,6 +5,8 @@ use crate::{
     CoreLocal, CorePerformanceClass, CoreRegistry, CoreRole, CoreState, CoreTopology,
 };
 
+mod topology;
+
 fn qemu_bootstrap_caps() -> CoreCapabilitySet {
     CoreCapabilitySet::new(CoreIsa::X86_64, CorePerformanceClass::Control)
         .with_local_timer(true)
@@ -56,7 +58,7 @@ fn core_local_tracks_role_state_and_telemetry() {
 
     assert!(local.is_live());
     assert!(local.assign_role(CoreRole::Bootstrap).is_ok());
-    local.set_state(CoreState::Online);
+    assert!(local.mark_online().is_ok());
     assert!(local.telemetry_mut().record_local_event().is_ok());
 
     assert_eq!(local.id(), ROOT_CORE);
@@ -79,8 +81,11 @@ fn core_registry_is_owner_scoped_and_rejects_duplicates() {
         Err(error) => return assert_eq!(error, CoreError::CapacityZero),
     };
 
-    assert!(registry.insert(local).is_ok());
-    assert_eq!(registry.insert(local).err(), Some(CoreError::DuplicateCore));
+    assert!(registry.insert(ROOT_CORE, local).is_ok());
+    assert_eq!(
+        registry.insert(ROOT_CORE, local).err(),
+        Some(CoreError::DuplicateCore)
+    );
     assert_eq!(registry.live_count(), 1);
     assert_eq!(registry.status().owner_core(), ROOT_CORE);
     assert_eq!(registry.status().len(), 1);
@@ -119,7 +124,7 @@ fn core_registry_insert_rejects_epoch_overflow_without_mutation() {
     };
 
     assert_eq!(
-        registry.insert(local).err(),
+        registry.insert(ROOT_CORE, local).err(),
         Some(CoreError::TelemetryOverflow)
     );
     assert_eq!(registry.status().len(), 0);
@@ -139,16 +144,16 @@ fn boot_barrier_is_validate_then_commit() {
         barrier.arrive(ROOT_CORE).err(),
         Some(CoreError::BarrierNotSealed)
     );
-    assert!(barrier.add_participant(ROOT_CORE).is_ok());
+    assert!(barrier.add_participant(ROOT_CORE, ROOT_CORE).is_ok());
     assert_eq!(
-        barrier.add_participant(ROOT_CORE).err(),
+        barrier.add_participant(ROOT_CORE, ROOT_CORE).err(),
         Some(CoreError::DuplicateCore)
     );
     assert_eq!(barrier.status().participants(), 1);
     assert_eq!(barrier.status().arrivals(), 0);
-    assert!(barrier.seal().is_ok());
+    assert!(barrier.seal(ROOT_CORE).is_ok());
     assert_eq!(
-        barrier.add_participant(CoreId::new(1)).err(),
+        barrier.add_participant(ROOT_CORE, CoreId::new(1)).err(),
         Some(CoreError::BarrierSealed)
     );
     assert_eq!(
@@ -168,6 +173,39 @@ fn boot_barrier_is_validate_then_commit() {
 }
 
 #[test]
+fn registry_and_barrier_setup_require_owner_core() {
+    let local = CoreLocal::new(
+        ROOT_CORE,
+        CoreRole::Bootstrap,
+        qemu_bootstrap_caps(),
+        CoreState::Online,
+    );
+    let mut registry = match CoreRegistry::<1>::new(ROOT_CORE) {
+        Ok(registry) => registry,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+    assert_eq!(
+        registry.insert(CoreId::new(99), local).err(),
+        Some(CoreError::OwnerMismatch)
+    );
+    assert!(registry.status().is_empty());
+
+    let mut barrier = match BootBarrier::<1>::new(ROOT_CORE) {
+        Ok(barrier) => barrier,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+    assert_eq!(
+        barrier.add_participant(CoreId::new(99), ROOT_CORE).err(),
+        Some(CoreError::OwnerMismatch)
+    );
+    assert_eq!(
+        barrier.seal(CoreId::new(99)).err(),
+        Some(CoreError::OwnerMismatch)
+    );
+    assert!(barrier.status().is_empty());
+}
+
+#[test]
 fn core_topology_tracks_qemu_four_core_ownership() {
     let mut topology = match CoreTopology::<4>::new(ROOT_CORE) {
         Ok(topology) => topology,
@@ -176,12 +214,18 @@ fn core_topology_tracks_qemu_four_core_ownership() {
 
     assert!(
         topology
-            .insert_discovered(ROOT_CORE, CpuHardwareId::new(0), qemu_bootstrap_caps())
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(0),
+                qemu_bootstrap_caps(),
+            )
             .is_ok()
     );
     assert!(
         topology
             .insert_discovered(
+                ROOT_CORE,
                 CoreId::new(1),
                 CpuHardwareId::new(1),
                 qemu_worker_caps(CorePerformanceClass::Performance),
@@ -191,6 +235,7 @@ fn core_topology_tracks_qemu_four_core_ownership() {
     assert!(
         topology
             .insert_discovered(
+                ROOT_CORE,
                 CoreId::new(2),
                 CpuHardwareId::new(2),
                 qemu_worker_caps(CorePerformanceClass::Control),
@@ -200,6 +245,7 @@ fn core_topology_tracks_qemu_four_core_ownership() {
     assert!(
         topology
             .insert_discovered(
+                ROOT_CORE,
                 CoreId::new(3),
                 CpuHardwareId::new(3),
                 qemu_worker_caps(CorePerformanceClass::Efficiency),
@@ -207,26 +253,46 @@ fn core_topology_tracks_qemu_four_core_ownership() {
             .is_ok()
     );
 
-    assert!(topology.stage_startup(ROOT_CORE).is_ok());
-    assert!(topology.stage_startup(CoreId::new(1)).is_ok());
-    assert!(topology.stage_startup(CoreId::new(2)).is_ok());
-    assert!(topology.stage_startup(CoreId::new(3)).is_ok());
-    assert!(topology.assign_role(ROOT_CORE, CoreRole::Bootstrap).is_ok());
+    assert!(topology.stage_startup(ROOT_CORE, ROOT_CORE).is_ok());
+    assert!(topology.stage_startup(ROOT_CORE, CoreId::new(1)).is_ok());
+    assert!(topology.stage_startup(ROOT_CORE, CoreId::new(2)).is_ok());
+    assert!(topology.stage_startup(ROOT_CORE, CoreId::new(3)).is_ok());
     assert!(
         topology
-            .assign_role(CoreId::new(1), CoreRole::Scheduler)
+            .assign_role(ROOT_CORE, ROOT_CORE, CoreRole::Bootstrap)
             .is_ok()
     );
     assert!(
         topology
-            .assign_role(CoreId::new(2), CoreRole::DriverService)
+            .assign_role(ROOT_CORE, CoreId::new(1), CoreRole::Scheduler)
             .is_ok()
     );
-    assert!(topology.assign_role(CoreId::new(3), CoreRole::Idle).is_ok());
-    assert!(topology.mark_hardware_online(ROOT_CORE).is_ok());
-    assert!(topology.mark_hardware_online(CoreId::new(1)).is_ok());
-    assert!(topology.mark_hardware_online(CoreId::new(2)).is_ok());
-    assert!(topology.mark_hardware_online(CoreId::new(3)).is_ok());
+    assert!(
+        topology
+            .assign_role(ROOT_CORE, CoreId::new(2), CoreRole::DriverService)
+            .is_ok()
+    );
+    assert!(
+        topology
+            .assign_role(ROOT_CORE, CoreId::new(3), CoreRole::Idle)
+            .is_ok()
+    );
+    assert!(topology.mark_hardware_online(ROOT_CORE, ROOT_CORE).is_ok());
+    assert!(
+        topology
+            .mark_hardware_online(ROOT_CORE, CoreId::new(1))
+            .is_ok()
+    );
+    assert!(
+        topology
+            .mark_hardware_online(ROOT_CORE, CoreId::new(2))
+            .is_ok()
+    );
+    assert!(
+        topology
+            .mark_hardware_online(ROOT_CORE, CoreId::new(3))
+            .is_ok()
+    );
 
     let status = topology.status();
     assert_eq!(status.owner_core(), ROOT_CORE);
@@ -262,7 +328,12 @@ fn core_topology_rejects_duplicate_hardware_ids_without_mutation() {
 
     assert!(
         topology
-            .insert_discovered(ROOT_CORE, CpuHardwareId::new(7), qemu_bootstrap_caps())
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(7),
+                qemu_bootstrap_caps(),
+            )
             .is_ok()
     );
     let before = topology.status();
@@ -270,6 +341,7 @@ fn core_topology_rejects_duplicate_hardware_ids_without_mutation() {
     assert_eq!(
         topology
             .insert_discovered(
+                ROOT_CORE,
                 CoreId::new(1),
                 CpuHardwareId::new(7),
                 qemu_worker_caps(CorePerformanceClass::Performance),
@@ -289,15 +361,20 @@ fn core_topology_failed_transition_keeps_state_unchanged() {
     };
     assert!(
         topology
-            .insert_discovered(ROOT_CORE, CpuHardwareId::new(0), qemu_bootstrap_caps())
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(0),
+                qemu_bootstrap_caps(),
+            )
             .is_ok()
     );
-    assert!(topology.stage_startup(ROOT_CORE).is_ok());
+    assert!(topology.stage_startup(ROOT_CORE, ROOT_CORE).is_ok());
     let before = topology.status();
     let entry_before = topology.get(ROOT_CORE);
 
     assert_eq!(
-        topology.stage_startup(ROOT_CORE).err(),
+        topology.stage_startup(ROOT_CORE, ROOT_CORE).err(),
         Some(CoreError::InvalidStateTransition)
     );
     assert_eq!(topology.status(), before);
@@ -315,7 +392,12 @@ fn core_topology_epoch_overflow_rejects_commit() {
 
     assert_eq!(
         topology
-            .insert_discovered(ROOT_CORE, CpuHardwareId::new(0), qemu_bootstrap_caps())
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(0),
+                qemu_bootstrap_caps(),
+            )
             .err(),
         Some(CoreError::TelemetryOverflow)
     );

@@ -59,6 +59,7 @@ mod tests {
             },
             generation_counter_ok: true,
             hardware_self_test_passed: true,
+            drbg_self_test_passed: false,
         });
 
         assert!(status.rdrand_supported);

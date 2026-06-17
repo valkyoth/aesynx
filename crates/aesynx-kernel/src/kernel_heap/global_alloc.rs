@@ -7,7 +7,7 @@ use super::allocator::KernelHeapAllocator;
 use super::stats::KernelHeapError;
 
 // SAFETY: `KernelHeapAllocator` serializes metadata mutation with a private
-// IRQ-masking spin lock, hands out nonoverlapping blocks from a private
+// IRQ-masking metadata lock, hands out nonoverlapping blocks from a private
 // page-aligned static heap, and reconstructs the allocation class from the
 // `Layout` supplied by `GlobalAlloc::dealloc`.
 unsafe impl GlobalAlloc for KernelHeapAllocator {
@@ -20,7 +20,8 @@ unsafe impl GlobalAlloc for KernelHeapAllocator {
         if let Err(
             error @ (KernelHeapError::CorruptFreeList
             | KernelHeapError::DoubleFree
-            | KernelHeapError::InvalidFree),
+            | KernelHeapError::InvalidFree
+            | KernelHeapError::ReentrantLock),
         ) = self.deallocate_checked(ptr, layout)
         {
             fail_stop_heap_corruption(error);

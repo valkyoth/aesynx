@@ -15,6 +15,7 @@ pub use registry::{CoreRegistry, CoreRegistryStatus};
 pub use role::CoreRole;
 pub use topology::{
     CoreAssignmentState, CoreHardwareState, CoreTopology, CoreTopologyEntry, CoreTopologyStatus,
+    QEMU_MULTICORE_TOPOLOGY_CORES,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -26,6 +27,7 @@ pub enum CoreError {
     DuplicateCore,
     DuplicateHardwareId,
     InvalidStateTransition,
+    OwnerMismatch,
     RegistryFull,
     RoleMismatch,
     TelemetryOverflow,

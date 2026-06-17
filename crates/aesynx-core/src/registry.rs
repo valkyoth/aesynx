@@ -64,7 +64,8 @@ impl<const CAPACITY: usize> CoreRegistry<CAPACITY> {
         self.owner_core
     }
 
-    pub fn insert(&mut self, local: CoreLocal) -> Result<(), CoreError> {
+    pub fn insert(&mut self, caller: CoreId, local: CoreLocal) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
         if self.len == CAPACITY {
             return Err(CoreError::RegistryFull);
         }
@@ -79,6 +80,13 @@ impl<const CAPACITY: usize> CoreRegistry<CAPACITY> {
         self.entries[self.len] = Some(local);
         self.len += 1;
         self.epoch = next_epoch;
+        Ok(())
+    }
+
+    fn require_owner(&self, caller: CoreId) -> Result<(), CoreError> {
+        if caller != self.owner_core {
+            return Err(CoreError::OwnerMismatch);
+        }
         Ok(())
     }
 

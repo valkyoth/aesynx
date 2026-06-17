@@ -119,7 +119,8 @@ fn image_kernel_profile_is_release() {
 
 #[test]
 fn qemu_smoke_runs_four_virtual_cpus() {
-    assert_eq!(QEMU_SMP_CPUS, "4");
+    assert_eq!(QEMU_SMP_CPUS, aesynx_core::QEMU_MULTICORE_TOPOLOGY_CORES);
+    assert_eq!(QEMU_SMP_CPUS, 4);
 }
 
 #[test]

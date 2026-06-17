@@ -2,6 +2,8 @@ use aesynx_abi::{CoreId, CpuHardwareId};
 
 use crate::{CoreCapabilitySet, CoreError, CoreLocal, CoreLocalTelemetry, CoreRole, CoreState};
 
+pub const QEMU_MULTICORE_TOPOLOGY_CORES: usize = 4;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoreHardwareState {
     Discovered,
@@ -105,7 +107,6 @@ pub struct CoreTopologyStatus {
     driver_service_roles: usize,
     idle_roles: usize,
     capacity: usize,
-    epoch: u64,
 }
 
 impl CoreTopologyStatus {
@@ -153,11 +154,6 @@ impl CoreTopologyStatus {
     pub const fn capacity(self) -> usize {
         self.capacity
     }
-
-    #[must_use]
-    pub const fn epoch(self) -> u64 {
-        self.epoch
-    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -184,10 +180,12 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
 
     pub fn insert_discovered(
         &mut self,
+        caller: CoreId,
         core: CoreId,
         hardware_id: CpuHardwareId,
         capabilities: CoreCapabilitySet,
     ) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
         if self.len == CAPACITY {
             return Err(CoreError::RegistryFull);
         }
@@ -208,7 +206,8 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         Ok(())
     }
 
-    pub fn stage_startup(&mut self, core: CoreId) -> Result<(), CoreError> {
+    pub fn stage_startup(&mut self, caller: CoreId, core: CoreId) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
         let index = self.index_of_core(core).ok_or(CoreError::UnknownCore)?;
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
@@ -216,36 +215,63 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         if entry.hardware_state != CoreHardwareState::Discovered {
             return Err(CoreError::InvalidStateTransition);
         }
+        if entry.local.state() != CoreState::Offline {
+            return Err(CoreError::InvalidStateTransition);
+        }
 
         entry.hardware_state = CoreHardwareState::StartupStaged;
-        entry.local.set_state(CoreState::Booting);
+        entry.local.stage_startup()?;
         entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
         self.entries[index] = Some(entry);
         Ok(())
     }
 
-    pub fn mark_hardware_online(&mut self, core: CoreId) -> Result<(), CoreError> {
+    pub fn mark_hardware_online(&mut self, caller: CoreId, core: CoreId) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
         let index = self.index_of_core(core).ok_or(CoreError::UnknownCore)?;
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
         };
-        if !matches!(
-            entry.hardware_state,
-            CoreHardwareState::Discovered | CoreHardwareState::StartupStaged
-        ) {
+        if entry.hardware_state != CoreHardwareState::StartupStaged {
             return Err(CoreError::InvalidStateTransition);
         }
 
         entry.hardware_state = CoreHardwareState::Online;
-        entry.local.set_state(CoreState::Online);
+        entry.local.mark_online()?;
         entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
         self.entries[index] = Some(entry);
         Ok(())
     }
 
-    pub fn assign_role(&mut self, core: CoreId, role: CoreRole) -> Result<(), CoreError> {
+    pub fn assign_role(
+        &mut self,
+        caller: CoreId,
+        core: CoreId,
+        role: CoreRole,
+    ) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
+        let index = self.index_of_core(core).ok_or(CoreError::UnknownCore)?;
+        let Some(mut entry) = self.entries[index] else {
+            return Err(CoreError::UnknownCore);
+        };
+        match entry.hardware_state {
+            CoreHardwareState::Discovered | CoreHardwareState::StartupStaged => {}
+            CoreHardwareState::Online | CoreHardwareState::Quarantined => {
+                return Err(CoreError::InvalidStateTransition);
+            }
+        }
+
+        entry.local.assign_role(role)?;
+        entry.assignment_state = CoreAssignmentState::Assigned;
+        self.bump_epoch()?;
+        self.entries[index] = Some(entry);
+        Ok(())
+    }
+
+    pub fn quarantine(&mut self, caller: CoreId, core: CoreId) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
         let index = self.index_of_core(core).ok_or(CoreError::UnknownCore)?;
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
@@ -254,8 +280,9 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
             return Err(CoreError::InvalidStateTransition);
         }
 
-        entry.local.assign_role(role)?;
-        entry.assignment_state = CoreAssignmentState::Assigned;
+        entry.hardware_state = CoreHardwareState::Quarantined;
+        entry.local.quarantine()?;
+        entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
         self.entries[index] = Some(entry);
         Ok(())
@@ -285,11 +312,12 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
                 if entry.assignment_state.is_assigned() {
                     assigned += 1;
                 }
-                match entry.role() {
-                    CoreRole::Bootstrap => bootstrap_roles += 1,
-                    CoreRole::Scheduler => scheduler_roles += 1,
-                    CoreRole::DriverService => driver_service_roles += 1,
-                    CoreRole::Idle => idle_roles += 1,
+                match (entry.role(), entry.assignment_state) {
+                    (CoreRole::Idle, CoreAssignmentState::Unassigned) => {}
+                    (CoreRole::Idle, CoreAssignmentState::Assigned) => idle_roles += 1,
+                    (CoreRole::Bootstrap, _) => bootstrap_roles += 1,
+                    (CoreRole::Scheduler, _) => scheduler_roles += 1,
+                    (CoreRole::DriverService, _) => driver_service_roles += 1,
                 }
             }
             index += 1;
@@ -305,8 +333,14 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
             driver_service_roles,
             idle_roles,
             capacity: CAPACITY,
-            epoch: self.epoch,
         }
+    }
+
+    fn require_owner(&self, caller: CoreId) -> Result<(), CoreError> {
+        if caller != self.owner_core {
+            return Err(CoreError::OwnerMismatch);
+        }
+        Ok(())
     }
 
     fn bump_epoch(&mut self) -> Result<(), CoreError> {

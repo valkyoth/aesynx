@@ -1,7 +1,7 @@
 use aesynx_abi::{CoreId, CpuHardwareId, ROOT_CORE};
 use aesynx_core::{
     BootBarrier, CoreCapabilitySet, CoreError, CoreHardwareState, CoreIsa, CorePerformanceClass,
-    CoreRole, CoreTopology,
+    CoreRole, CoreTopology, QEMU_MULTICORE_TOPOLOGY_CORES,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -28,7 +28,7 @@ impl From<CoreError> for MulticoreTopologySmokeError {
 }
 
 pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError> {
-    let mut topology = CoreTopology::<4>::new(ROOT_CORE)?;
+    let mut topology = CoreTopology::<{ QEMU_MULTICORE_TOPOLOGY_CORES }>::new(ROOT_CORE)?;
 
     insert_qemu_core(
         &mut topology,
@@ -56,23 +56,23 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
     )?;
 
     for core in [ROOT_CORE, CoreId::new(1), CoreId::new(2), CoreId::new(3)] {
-        topology.stage_startup(core)?;
+        topology.stage_startup(ROOT_CORE, core)?;
     }
 
-    topology.assign_role(ROOT_CORE, CoreRole::Bootstrap)?;
-    topology.assign_role(CoreId::new(1), CoreRole::Scheduler)?;
-    topology.assign_role(CoreId::new(2), CoreRole::DriverService)?;
-    topology.assign_role(CoreId::new(3), CoreRole::Idle)?;
+    topology.assign_role(ROOT_CORE, ROOT_CORE, CoreRole::Bootstrap)?;
+    topology.assign_role(ROOT_CORE, CoreId::new(1), CoreRole::Scheduler)?;
+    topology.assign_role(ROOT_CORE, CoreId::new(2), CoreRole::DriverService)?;
+    topology.assign_role(ROOT_CORE, CoreId::new(3), CoreRole::Idle)?;
 
     for core in [ROOT_CORE, CoreId::new(1), CoreId::new(2), CoreId::new(3)] {
-        topology.mark_hardware_online(core)?;
+        topology.mark_hardware_online(ROOT_CORE, core)?;
     }
 
     let mut barrier = BootBarrier::<4>::new(ROOT_CORE)?;
     for core in [ROOT_CORE, CoreId::new(1), CoreId::new(2), CoreId::new(3)] {
-        barrier.add_participant(core)?;
+        barrier.add_participant(ROOT_CORE, core)?;
     }
-    barrier.seal()?;
+    barrier.seal(ROOT_CORE)?;
     for core in [ROOT_CORE, CoreId::new(1), CoreId::new(2), CoreId::new(3)] {
         barrier.arrive(core)?;
     }
@@ -104,12 +104,13 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
 }
 
 fn insert_qemu_core(
-    topology: &mut CoreTopology<4>,
+    topology: &mut CoreTopology<{ QEMU_MULTICORE_TOPOLOGY_CORES }>,
     core: CoreId,
     hardware_id: CpuHardwareId,
     performance_class: CorePerformanceClass,
 ) -> Result<(), CoreError> {
     topology.insert_discovered(
+        ROOT_CORE,
         core,
         hardware_id,
         CoreCapabilitySet::new(CoreIsa::X86_64, performance_class)

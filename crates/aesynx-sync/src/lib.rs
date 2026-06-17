@@ -16,6 +16,7 @@ pub enum SyncError {
 pub enum LockRank {
     InterruptController = 10,
     DescriptorTables = 20,
+    CoreTopology = 25,
     AddressSpace = 30,
     FrameAllocator = 40,
     KernelHeap = 50,

@@ -107,9 +107,10 @@ Address-space activation and CPU hardening:
   before `[TEST] cpu-hardening=ok`.
 - Early entropy policy classifies x86_64 `RDRAND`/`RDSEED` support behind
   CPUID checks, distinguishes deterministic anti-confusion generation counters
-  from attacker-unpredictable random tokens, keeps random-token policy disabled
-  until a runtime self-test-backed read path exists, and reports only redacted
-  booleans before `[TEST] entropy-policy=ok`.
+  from attacker-unpredictable random tokens, treats raw hardware entropy as seed
+  evidence only, keeps random-token policy disabled until runtime hardware and
+  DRBG self-tests exist, and reports only redacted booleans before
+  `[TEST] entropy-policy=ok`.
 - A bounded static kernel heap is initialized after CR3 activation and CPU
   hardening; fixed slab classes cover small allocations, page-sized runs cover
   larger allocations, and QEMU smokes `Box`, `Vec`, `BTreeMap`, slab reuse,
@@ -186,7 +187,7 @@ Fuzz and property gates:
 | Scheduler policy model | Tagged | `v0.33.0`; no_std model manifests, redacted manifest diagnostics, metadata-presence hash/signature wrappers, fixed-point-only accepted model kinds, scheduler-domain metadata and fallback gates, fixed-point feature validation, manifest-enforced model confidence ceilings, deterministic fallback, bounded non-AI scheduler heuristic scoring, decision records, a disable switch, redacted heuristic serial evidence, and QEMU `[TEST] ai-policy=ok` prove fallback and heuristic evidence before any AI model can influence scheduling. |
 | Concurrency discipline | Tagged | `v0.33.1`; safe `aesynx-sync` early-lock primitives, previous-state interrupt guards, nested interrupt masking behavior, guard-owned LIFO release with local poison on release-order violation, lock-rank validation, policy docs for lock-held behavior and AMP/multikernel-on-SMP-hardware migrations, and QEMU `[TEST] concurrency=ok`. |
 | AMP core data structures | Tagged | `v0.34.0`; no_std `aesynx-core` models core roles, heterogeneous capability metadata, `CoreLocal`, owner-scoped core registries, per-core local telemetry, boot barriers, and QEMU `[TEST] amp-core=ok` for the bootstrap core without enabling multicore execution. |
-| QEMU multicore topology | Active candidate | `v0.35.0`; xtask launches QEMU with `-smp 4`, manifests record `qemu_smp_cpus=4`, `aesynx-core` models discovered/startup-staged/online/quarantined hardware state separately from role assignment, and QEMU `[TEST] multicore-topology=ok` proves the four-core topology model without AP execution. |
+| QEMU multicore topology | Active candidate | `v0.35.0`; xtask launches QEMU with `-smp 4` from the same constant used by the kernel topology model, manifests record `qemu_smp_cpus=4`, `aesynx-core` models owner-scoped discovered/startup-staged/online/quarantined hardware state separately from role assignment, and QEMU `[TEST] multicore-topology=ok` proves the four-core topology model without AP execution. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
@@ -212,7 +213,7 @@ Fuzz and property gates:
 | Limine handoff module split | Tagged | `v0.16.4`; Limine ABI structs, constants, request statics, link-section markers, and ABI assertions now live in a private `limine/abi.rs` module while normalization flow remains in `limine.rs`. |
 | Early heap | Tagged | `v0.17.0`; bounded static bump allocator, global allocator wrapper, post-CR3 `Box`/`Vec`/`BTreeMap` smoke, and explicit OOM rejection before `[TEST] heap=ok`. |
 | Slab/page heap | Tagged | `v0.18.0`; bounded static reusable kernel heap with fixed slab classes, page-sized runs, aggregate stats, invalid-free and free-while-free double-free telemetry, zero-before-reuse host coverage, and QEMU allocation/free stress before `[TEST] heap=ok`; allocation-epoch stale raw-pointer detection remains future work. |
-| Early entropy semantics | Tagged | `v0.18.1`; safe entropy policy crate, x86_64 CPUID classification for `RDRAND`/`RDSEED`, explicit runtime self-test evidence, deterministic anti-confusion generation counters, random-token gating that rejects CPUID-only evidence, and redacted QEMU telemetry before `[TEST] entropy-policy=ok`. |
+| Early entropy semantics | Tagged | `v0.18.1`; safe entropy policy crate, x86_64 CPUID classification for `RDRAND`/`RDSEED`, explicit runtime hardware and DRBG self-test evidence, deterministic anti-confusion generation counters, random-token gating that rejects CPUID-only evidence and raw hardware entropy without DRBG output, and redacted QEMU telemetry before `[TEST] entropy-policy=ok`. |
 | Native snapshots | Planned | Content-addressed object roots make snapshots and rollback object-layer primitives rather than path-first filesystem features. |
 | Native package manager | Planned | Content-addressed package objects, declarative generations, explicit tracks, SBOM/provenance, and capability manifests. |
 | Future bootloader | Planned | Limine is current; a future Rust UEFI bootloader should be a minimal security gateway for signed/measured Aesynx boot capsules. |

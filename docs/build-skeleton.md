@@ -86,8 +86,8 @@ with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
 `[TEST] kernel-stack-guard=ok`, `[TEST] paging-policy-model=ok`,
 `[TEST] bootinfo=ok`, `[TEST] boot=ok`, `cpu-hardening nx=`,
 `[TEST] cpu-hardening=ok`, `entropy-policy rdrand=`,
-`hardware_self_test=false`, `hardware_present=`, `fallback_used=`,
-`generation_counter_ok=true`, `random_tokens_available=`,
+`hardware_self_test=false`, `drbg_self_test=false`, `hardware_present=`,
+`fallback_used=`, `generation_counter_ok=true`, `random_tokens_available=`,
 `[TEST] entropy-policy=ok`, `heap bytes=`, `slab_classes=`,
 `slab_reuse_ok=true`, `page_run_ok=true`, `stress_ok=true`,
 `double_free_detected=true`, `invalid_free_detected=true`,
@@ -188,10 +188,12 @@ into the activation arena, switches to the private activation stack, loads the
 Aesynx-owned CR3 root, verifies kernel-stack guard evidence, and reports
 read-back CPU hardening booleans. The current candidate then classifies early
 entropy support, verifies generation-counter overflow handling, rejects
-CPUID-only hardware capability evidence for random-token policy, rejects
-deterministic fallback for random-token policy, and emits redacted entropy
-booleans with `hardware_self_test=false` before `[TEST] entropy-policy=ok`.
-Future entropy paths must not log raw entropy or token material. It then
+CPUID-only hardware capability evidence for random-token policy, rejects raw
+hardware entropy without a DRBG self-test, rejects deterministic fallback for
+random-token policy, and emits redacted entropy booleans with
+`hardware_self_test=false` and `drbg_self_test=false` before
+`[TEST] entropy-policy=ok`. Future entropy paths must not log raw entropy or
+token material. It then
 initializes the bounded reusable kernel heap and smokes `Box`, `Vec`,
 `BTreeMap`, slab reuse, page-run allocation, stress allocation/free,
 invalid-free telemetry, double-free detection, and oversized allocation

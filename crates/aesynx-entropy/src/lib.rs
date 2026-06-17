@@ -12,10 +12,12 @@ pub struct EntropyEvidence {
     pub capabilities: EntropyCapabilities,
     pub generation_counter_ok: bool,
     pub hardware_self_test_passed: bool,
+    pub drbg_self_test_passed: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EntropySource {
+    Drbg,
     RdSeed,
     RdRand,
     DeterministicMonotonicFallback,
@@ -25,6 +27,7 @@ impl EntropySource {
     #[must_use]
     pub const fn quality(self) -> EntropyQuality {
         match self {
+            Self::Drbg => EntropyQuality::DrbgOutput,
             Self::RdSeed => EntropyQuality::HardwareSeed,
             Self::RdRand => EntropyQuality::HardwareRandom,
             Self::DeterministicMonotonicFallback => EntropyQuality::DeterministicAntiConfusion,
@@ -34,6 +37,7 @@ impl EntropySource {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EntropyQuality {
+    DrbgOutput,
     HardwareSeed,
     HardwareRandom,
     DeterministicAntiConfusion,
@@ -42,7 +46,10 @@ pub enum EntropyQuality {
 impl EntropyQuality {
     #[must_use]
     pub const fn attacker_unpredictable(self) -> bool {
-        matches!(self, Self::HardwareSeed | Self::HardwareRandom)
+        matches!(
+            self,
+            Self::DrbgOutput | Self::HardwareSeed | Self::HardwareRandom
+        )
     }
 }
 
@@ -52,6 +59,7 @@ pub struct EntropyPolicyStatus {
     pub rdseed_supported: bool,
     pub hardware_entropy_present: bool,
     pub hardware_self_test_passed: bool,
+    pub drbg_self_test_passed: bool,
     pub fallback_used: bool,
     pub generation_counter_ok: bool,
     pub random_tokens_available: bool,
@@ -64,7 +72,10 @@ impl EntropyPolicyStatus {
         let hardware_feature_present = evidence.capabilities.rdrand || evidence.capabilities.rdseed;
         let hardware_entropy_present =
             hardware_feature_present && evidence.hardware_self_test_passed;
-        let primary_source = if hardware_entropy_present && evidence.capabilities.rdseed {
+        let drbg_ready = hardware_entropy_present && evidence.drbg_self_test_passed;
+        let primary_source = if drbg_ready {
+            EntropySource::Drbg
+        } else if hardware_entropy_present && evidence.capabilities.rdseed {
             EntropySource::RdSeed
         } else if hardware_entropy_present && evidence.capabilities.rdrand {
             EntropySource::RdRand
@@ -77,9 +88,11 @@ impl EntropyPolicyStatus {
             rdseed_supported: evidence.capabilities.rdseed,
             hardware_entropy_present,
             hardware_self_test_passed: evidence.hardware_self_test_passed,
+            drbg_self_test_passed: evidence.drbg_self_test_passed,
             fallback_used: !hardware_entropy_present,
             generation_counter_ok: evidence.generation_counter_ok,
             random_tokens_available: evidence.generation_counter_ok
+                && drbg_ready
                 && primary_source.quality().attacker_unpredictable(),
             primary_source,
         }
@@ -87,7 +100,7 @@ impl EntropyPolicyStatus {
 
     pub const fn require_random_tokens(self) -> Result<RandomTokenPolicy, EntropyError> {
         if !self.random_tokens_available {
-            return Err(EntropyError::RandomTokenRequiresHardwareEntropy);
+            return Err(EntropyError::RandomTokenRequiresDrbg);
         }
 
         Ok(RandomTokenPolicy {
@@ -141,6 +154,7 @@ impl GenerationCounter {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EntropyError {
     GenerationCounterOverflow,
+    RandomTokenRequiresDrbg,
     RandomTokenRequiresHardwareEntropy,
 }
 
@@ -153,6 +167,7 @@ mod tests {
 
     #[test]
     fn source_quality_distinguishes_random_from_anti_confusion() {
+        assert_eq!(EntropySource::Drbg.quality(), EntropyQuality::DrbgOutput);
         assert_eq!(
             EntropySource::RdSeed.quality(),
             EntropyQuality::HardwareSeed
@@ -165,6 +180,7 @@ mod tests {
             EntropySource::DeterministicMonotonicFallback.quality(),
             EntropyQuality::DeterministicAntiConfusion
         );
+        assert!(EntropySource::Drbg.quality().attacker_unpredictable());
         assert!(EntropySource::RdSeed.quality().attacker_unpredictable());
         assert!(
             !EntropySource::DeterministicMonotonicFallback
@@ -183,6 +199,7 @@ mod tests {
                 },
                 generation_counter_ok: true,
                 hardware_self_test_passed: true,
+                drbg_self_test_passed: false,
             })
             .primary_source,
             EntropySource::RdSeed
@@ -195,6 +212,7 @@ mod tests {
                 },
                 generation_counter_ok: true,
                 hardware_self_test_passed: true,
+                drbg_self_test_passed: false,
             })
             .primary_source,
             EntropySource::RdRand
@@ -207,6 +225,7 @@ mod tests {
                 },
                 generation_counter_ok: true,
                 hardware_self_test_passed: true,
+                drbg_self_test_passed: false,
             })
             .primary_source,
             EntropySource::DeterministicMonotonicFallback
@@ -222,6 +241,7 @@ mod tests {
             },
             generation_counter_ok: true,
             hardware_self_test_passed: false,
+            drbg_self_test_passed: false,
         });
 
         assert!(status.fallback_used);
@@ -229,12 +249,12 @@ mod tests {
         assert!(!status.random_tokens_available);
         assert_eq!(
             status.require_random_tokens(),
-            Err(EntropyError::RandomTokenRequiresHardwareEntropy)
+            Err(EntropyError::RandomTokenRequiresDrbg)
         );
     }
 
     #[test]
-    fn random_tokens_require_hardware_entropy() {
+    fn random_tokens_require_drbg_seeded_from_hardware_entropy() {
         let status = EntropyPolicyStatus::classify(EntropyEvidence {
             capabilities: EntropyCapabilities {
                 rdrand: true,
@@ -242,13 +262,35 @@ mod tests {
             },
             generation_counter_ok: true,
             hardware_self_test_passed: true,
+            drbg_self_test_passed: true,
         });
 
         assert!(!status.fallback_used);
         assert!(status.random_tokens_available);
         assert_eq!(
             status.require_random_tokens().map(|policy| policy.source()),
-            Ok(EntropySource::RdRand)
+            Ok(EntropySource::Drbg)
+        );
+    }
+
+    #[test]
+    fn hardware_entropy_without_drbg_does_not_enable_random_tokens() {
+        let status = EntropyPolicyStatus::classify(EntropyEvidence {
+            capabilities: EntropyCapabilities {
+                rdrand: true,
+                rdseed: false,
+            },
+            generation_counter_ok: true,
+            hardware_self_test_passed: true,
+            drbg_self_test_passed: false,
+        });
+
+        assert!(!status.fallback_used);
+        assert!(!status.random_tokens_available);
+        assert_eq!(status.primary_source, EntropySource::RdRand);
+        assert_eq!(
+            status.require_random_tokens(),
+            Err(EntropyError::RandomTokenRequiresDrbg)
         );
     }
 
@@ -261,6 +303,7 @@ mod tests {
             },
             generation_counter_ok: true,
             hardware_self_test_passed: false,
+            drbg_self_test_passed: false,
         });
 
         assert!(status.rdrand_supported);
@@ -283,6 +326,7 @@ mod tests {
             },
             generation_counter_ok: false,
             hardware_self_test_passed: true,
+            drbg_self_test_passed: true,
         });
 
         assert!(!status.generation_counter_ok);

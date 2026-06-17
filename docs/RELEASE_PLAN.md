@@ -1067,7 +1067,9 @@ Deliverables:
 - Runtime self-test evidence must be represented separately from CPUID feature
   presence; CPUID alone must not enable random-token policy.
 - Runtime self-tests must detect stuck or repeated sample patterns before
-  classifying a hardware path as suitable for attacker-unpredictable tokens.
+  classifying a hardware path as suitable seed material.
+- Random-token policy requires a DRBG path with separate self-test evidence;
+  raw `RDRAND`/`RDSEED` reads are not exposed as tokens directly.
 - Deterministic boot-local monotonic fallback for identifiers that are
   anti-confusion only.
 - Clear distinction between generation counters used to reject stale authority
@@ -1077,7 +1079,7 @@ Deliverables:
 Expected serial:
 
 ```text
-entropy-policy rdrand=<bool> rdseed=<bool> hardware_self_test=<bool> hardware_present=<bool> fallback_used=<bool> generation_counter_ok=true random_tokens_available=<bool> source=<source>
+entropy-policy rdrand=<bool> rdseed=<bool> hardware_self_test=<bool> drbg_self_test=<bool> hardware_present=<bool> fallback_used=<bool> generation_counter_ok=true random_tokens_available=<bool> source=<source>
 [TEST] entropy-policy=ok
 ```
 
@@ -1086,9 +1088,9 @@ Verification:
 - Host tests cover source classification, fallback behavior, counter overflow,
   and non-claims.
 - QEMU smoke reports whether CPUID hardware entropy features were seen, whether
-  runtime self-test evidence was present, whether fallback mode was used,
-  whether random tokens are available, and whether generation-counter overflow
-  is rejected.
+  runtime hardware self-test and DRBG self-test evidence were present, whether
+  fallback mode was used, whether random tokens are available, and whether
+  generation-counter overflow is rejected.
 
 Exit criteria:
 
@@ -1627,12 +1629,19 @@ enabled.
 Deliverables:
 
 - QEMU smoke runner uses `-smp 4` and records the virtual CPU count in the
-  generated image manifest.
+  generated image manifest from the same `aesynx-core` topology-capacity
+  constant used by the kernel smoke.
 - Safe no_std topology model for discovered cores.
 - Hardware state machine that distinguishes discovered, startup-staged, online,
   and quarantined cores.
 - Assignment state machine that distinguishes hardware online from assigned
   Aesynx role.
+- Owner-scoped topology, registry, and boot-barrier setup mutation. Non-owner
+  callers fail before mutation.
+- Role assignment allowed only before hardware-online state; startup-staged is
+  required before a core can become online.
+- Reachable quarantine transition for modeled failed cores.
+- Public topology status that redacts the internal mutation epoch.
 - Four-core QEMU topology smoke with bootstrap, scheduler, driver/service, and
   idle roles.
 - Boot barrier evidence covering all four modeled cores.
@@ -1651,7 +1660,9 @@ Verification:
 - QEMU `-smp 4` boot smoke.
 - Serial evidence shows the modeled four-core topology has hardware online
   state, local state, and assigned roles.
-- Host tests cover duplicate hardware IDs and failed state transitions.
+- Host tests cover duplicate hardware IDs, owner mismatches, role reassignment
+  rejection after online, direct discovered-to-online rejection, quarantine, and
+  failed state transitions.
 
 Exit criteria:
 
@@ -1675,6 +1686,7 @@ each executing core under Aesynx AMP ownership policy.
 Deliverables:
 
 - CPU topology parser backed by firmware or ACPI/MADT data when available.
+- Formal AP/core state table describing allowed local and hardware transitions.
 - AP stacks.
 - AP startup path.
 - Per-core GDT/IDT/TSS where needed.
@@ -1682,6 +1694,12 @@ Deliverables:
   stack-trace or deep diagnostic work is allowed on the double-fault path.
 - Per-core local state written by each executing core.
 - Core online state machine tied to actual AP arrival evidence.
+- Watchdog timeout policy that quarantines a non-arriving AP instead of leaving
+  startup in an ambiguous state.
+- Recovery/reset story for permanently quarantined core trackers.
+- Owner-scoped topology mutation remains enforced after AP execution begins;
+  APs report arrival through bounded messages or proof tokens, not arbitrary
+  topology writes.
 - Documentation that this is multicore bring-up, not a commitment to a
   shared-everything SMP kernel.
 

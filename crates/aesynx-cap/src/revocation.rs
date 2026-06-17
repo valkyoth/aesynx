@@ -64,7 +64,7 @@ mod tests {
 
     use crate::{
         CapKind, CapPerms, Capability, RevocationEpochStore, RevocationError,
-        ensure_revoke_authority,
+        capability::TestCapabilitySpec, ensure_revoke_authority,
     };
 
     #[derive(Default)]
@@ -83,7 +83,16 @@ mod tests {
     }
 
     fn cap(object_id: ObjectId, perms: CapPerms) -> Capability {
-        Capability::new_root(object_id, CapKind::Object, PrincipalId::new(1), perms, 1, 1)
+        Capability::new_for_test(TestCapabilitySpec {
+            object_id,
+            base: None,
+            len: None,
+            perms,
+            owner: PrincipalId::new(1),
+            generation: 1,
+            revocation_epoch: 1,
+            kind: CapKind::Object,
+        })
     }
 
     #[test]

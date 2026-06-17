@@ -22,6 +22,11 @@ impl BootBarrierStatus {
     }
 
     #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.participants == 0
+    }
+
+    #[must_use]
     pub const fn arrivals(self) -> usize {
         self.arrivals
     }
@@ -63,7 +68,8 @@ impl<const CAPACITY: usize> BootBarrier<CAPACITY> {
         })
     }
 
-    pub fn add_participant(&mut self, core: CoreId) -> Result<(), CoreError> {
+    pub fn add_participant(&mut self, caller: CoreId, core: CoreId) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
         if self.sealed {
             return Err(CoreError::BarrierSealed);
         }
@@ -79,7 +85,8 @@ impl<const CAPACITY: usize> BootBarrier<CAPACITY> {
         Ok(())
     }
 
-    pub fn seal(&mut self) -> Result<(), CoreError> {
+    pub fn seal(&mut self, caller: CoreId) -> Result<(), CoreError> {
+        self.require_owner(caller)?;
         if self.sealed {
             return Err(CoreError::BarrierSealed);
         }
@@ -87,6 +94,13 @@ impl<const CAPACITY: usize> BootBarrier<CAPACITY> {
             return Err(CoreError::UnknownCore);
         }
         self.sealed = true;
+        Ok(())
+    }
+
+    fn require_owner(&self, caller: CoreId) -> Result<(), CoreError> {
+        if caller != self.owner_core {
+            return Err(CoreError::OwnerMismatch);
+        }
         Ok(())
     }
 

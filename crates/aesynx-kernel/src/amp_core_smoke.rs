@@ -32,17 +32,17 @@ pub fn run() -> Result<AmpCoreSmokeStatus, AmpCoreSmokeError> {
         .with_shared_memory_atomics(true);
     let mut local = CoreLocal::new(ROOT_CORE, CoreRole::Idle, capabilities, CoreState::Booting);
     local.assign_role(CoreRole::Bootstrap)?;
-    local.set_state(CoreState::Online);
+    local.mark_online()?;
     local.telemetry_mut().record_boot_barrier_arrival()?;
     local.telemetry_mut().record_local_event()?;
 
     let mut registry = CoreRegistry::<4>::new(ROOT_CORE)?;
-    registry.insert(local)?;
+    registry.insert(ROOT_CORE, local)?;
     let registry_status = registry.status();
 
     let mut barrier = BootBarrier::<4>::new(ROOT_CORE)?;
-    barrier.add_participant(ROOT_CORE)?;
-    barrier.seal()?;
+    barrier.add_participant(ROOT_CORE, ROOT_CORE)?;
+    barrier.seal(ROOT_CORE)?;
     barrier.arrive(ROOT_CORE)?;
     let barrier_status = barrier.status();
 
