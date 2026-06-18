@@ -1889,6 +1889,11 @@ Deliverables:
 - Arch-backed IRQ-disable proof token design so future `try_lock_irq`-style
   APIs cannot be mistaken for hardware interrupt masking when they only carry
   the software model.
+- Root-capability bootstrap token plan: the unaudited
+  `CapabilityTable::insert_root` path must either become crate/private
+  bootstrap scaffolding or require a non-forgeable bootstrap token before
+  authenticated object/capability call paths exist. Audited root insertion
+  remains the normal runtime direction.
 
 Expected serial:
 
