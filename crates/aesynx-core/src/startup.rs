@@ -64,10 +64,16 @@ impl CoreStartupTicket {
 
 impl Drop for CoreStartupTicket {
     fn drop(&mut self) {
+        self.target_core = CoreId::new(0);
         self.hardware_id = CpuHardwareId::new(0);
         self.coordinator_core = CoreId::new(0);
         self.startup_epoch = 0;
-        core::hint::black_box((self.hardware_id, self.coordinator_core, self.startup_epoch));
+        core::hint::black_box((
+            self.target_core,
+            self.hardware_id,
+            self.coordinator_core,
+            self.startup_epoch,
+        ));
     }
 }
 
@@ -129,10 +135,16 @@ impl CoreStartupArrival {
 
 impl Drop for CoreStartupArrival {
     fn drop(&mut self) {
+        self.arrived_core = CoreId::new(0);
         self.hardware_id = CpuHardwareId::new(0);
         self.coordinator_core = CoreId::new(0);
         self.startup_epoch = 0;
-        core::hint::black_box((self.hardware_id, self.coordinator_core, self.startup_epoch));
+        core::hint::black_box((
+            self.arrived_core,
+            self.hardware_id,
+            self.coordinator_core,
+            self.startup_epoch,
+        ));
     }
 }
 

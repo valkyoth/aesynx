@@ -404,12 +404,15 @@ fn core_topology_failed_transition_keeps_state_unchanged() {
             )
             .is_ok()
     );
-    assert!(topology.stage_startup(ROOT_CORE, ROOT_CORE).is_ok());
+    let _ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
     let before = topology.status();
     let entry_before = topology.get(ROOT_CORE);
 
     assert_eq!(
-        topology.stage_startup(ROOT_CORE, ROOT_CORE).err(),
+        topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE).err(),
         Some(CoreError::InvalidStateTransition)
     );
     assert_eq!(topology.status(), before);

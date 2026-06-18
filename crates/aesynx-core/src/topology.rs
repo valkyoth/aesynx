@@ -238,10 +238,6 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         Ok(())
     }
 
-    pub fn stage_startup(&mut self, caller: CoreId, core: CoreId) -> Result<(), CoreError> {
-        self.stage_startup_ticket(caller, core).map(|_| ())
-    }
-
     pub fn stage_startup_ticket(
         &mut self,
         caller: CoreId,

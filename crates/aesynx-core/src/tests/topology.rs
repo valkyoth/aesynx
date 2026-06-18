@@ -242,7 +242,7 @@ fn core_topology_quarantine_is_reachable_and_terminal() {
         Some(CoreError::InvalidStateTransition)
     );
     assert_eq!(
-        topology.stage_startup(ROOT_CORE, ROOT_CORE).err(),
+        topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE).err(),
         Some(CoreError::InvalidStateTransition)
     );
     assert_eq!(
