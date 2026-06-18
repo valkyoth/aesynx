@@ -253,10 +253,22 @@ fn core_topology_tracks_qemu_four_core_ownership() {
             .is_ok()
     );
 
-    assert!(topology.stage_startup(ROOT_CORE, ROOT_CORE).is_ok());
-    assert!(topology.stage_startup(ROOT_CORE, CoreId::new(1)).is_ok());
-    assert!(topology.stage_startup(ROOT_CORE, CoreId::new(2)).is_ok());
-    assert!(topology.stage_startup(ROOT_CORE, CoreId::new(3)).is_ok());
+    let root_ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let scheduler_ticket = match topology.stage_startup_ticket(ROOT_CORE, CoreId::new(1)) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let driver_ticket = match topology.stage_startup_ticket(ROOT_CORE, CoreId::new(2)) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let idle_ticket = match topology.stage_startup_ticket(ROOT_CORE, CoreId::new(3)) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
     assert!(
         topology
             .assign_role(ROOT_CORE, ROOT_CORE, CoreRole::Bootstrap)
@@ -277,20 +289,43 @@ fn core_topology_tracks_qemu_four_core_ownership() {
             .assign_role(ROOT_CORE, CoreId::new(3), CoreRole::Idle)
             .is_ok()
     );
-    assert!(topology.mark_hardware_online(ROOT_CORE, ROOT_CORE).is_ok());
+    let root_arrival = match root_ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0)) {
+        Ok(arrival) => arrival,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let scheduler_arrival =
+        match scheduler_ticket.observe_arrival(CoreId::new(1), CpuHardwareId::new(1)) {
+            Ok(arrival) => arrival,
+            Err(error) => return assert_eq!(Some(error), None),
+        };
+    let driver_arrival = match driver_ticket.observe_arrival(CoreId::new(2), CpuHardwareId::new(2))
+    {
+        Ok(arrival) => arrival,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let idle_arrival = match idle_ticket.observe_arrival(CoreId::new(3), CpuHardwareId::new(3)) {
+        Ok(arrival) => arrival,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+
     assert!(
         topology
-            .mark_hardware_online(ROOT_CORE, CoreId::new(1))
+            .mark_hardware_online(ROOT_CORE, &root_arrival)
             .is_ok()
     );
     assert!(
         topology
-            .mark_hardware_online(ROOT_CORE, CoreId::new(2))
+            .mark_hardware_online(ROOT_CORE, &scheduler_arrival)
             .is_ok()
     );
     assert!(
         topology
-            .mark_hardware_online(ROOT_CORE, CoreId::new(3))
+            .mark_hardware_online(ROOT_CORE, &driver_arrival)
+            .is_ok()
+    );
+    assert!(
+        topology
+            .mark_hardware_online(ROOT_CORE, &idle_arrival)
             .is_ok()
     );
 

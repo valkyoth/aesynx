@@ -6,6 +6,7 @@ mod capabilities;
 mod local;
 mod registry;
 mod role;
+mod startup;
 mod topology;
 
 pub use barrier::{BootBarrier, BootBarrierStatus};
@@ -13,6 +14,7 @@ pub use capabilities::{CoreCapabilitySet, CoreIsa, CorePerformanceClass};
 pub use local::{CoreLocal, CoreLocalTelemetry, CoreState};
 pub use registry::{CoreRegistry, CoreRegistryStatus};
 pub use role::CoreRole;
+pub use startup::{CoreStartupArrival, CoreStartupTicket};
 pub use topology::{
     CoreAssignmentState, CoreHardwareState, CoreTopology, CoreTopologyEntry, CoreTopologyStatus,
     QEMU_MULTICORE_TOPOLOGY_CORES,
@@ -30,6 +32,8 @@ pub enum CoreError {
     OwnerMismatch,
     RegistryFull,
     RoleMismatch,
+    StaleStartupEvidence,
+    StartupEvidenceMismatch,
     TelemetryOverflow,
     UnknownCore,
 }

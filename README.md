@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.35.0` is the current QEMU multicore topology candidate.
+`v0.35.1` is the current AP startup evidence candidate.
 
 Current boot path:
 
@@ -187,7 +187,7 @@ Fuzz and property gates:
 | Scheduler policy model | Tagged | `v0.33.0`; no_std model manifests, redacted manifest diagnostics, metadata-presence hash/signature wrappers, fixed-point-only accepted model kinds, scheduler-domain metadata and fallback gates, fixed-point feature validation, manifest-enforced model confidence ceilings, deterministic fallback, bounded non-AI scheduler heuristic scoring, decision records, a disable switch, redacted heuristic serial evidence, and QEMU `[TEST] ai-policy=ok` prove fallback and heuristic evidence before any AI model can influence scheduling. |
 | Concurrency discipline | Tagged | `v0.33.1`; safe `aesynx-sync` early-lock primitives, previous-state interrupt guards, nested interrupt masking behavior, guard-owned LIFO release with local poison on release-order violation, lock-rank validation, policy docs for lock-held behavior and AMP/multikernel-on-SMP-hardware migrations, and QEMU `[TEST] concurrency=ok`. |
 | AMP core data structures | Tagged | `v0.34.0`; no_std `aesynx-core` models core roles, heterogeneous capability metadata, `CoreLocal`, owner-scoped core registries, per-core local telemetry, boot barriers, and QEMU `[TEST] amp-core=ok` for the bootstrap core without enabling multicore execution. |
-| QEMU multicore topology | Active candidate | `v0.35.0`; xtask launches QEMU with `-smp 4` from the same constant used by the kernel topology model, manifests record `qemu_smp_cpus=4`, `aesynx-core` models owner-scoped discovered/startup-staged/online/quarantined hardware state separately from role assignment, and QEMU `[TEST] multicore-topology=ok` proves the four-core topology model without AP execution. |
+| AP startup evidence | Active candidate | `v0.35.1`; xtask launches QEMU with `-smp 4`, manifests record `qemu_smp_cpus=4`, and `aesynx-core` now requires owner-issued `CoreStartupTicket` plus matching `CoreStartupArrival` evidence before a staged core can become hardware-online. QEMU reports `startup_evidence_ok=true` before `[TEST] multicore-topology=ok`; real AP execution remains planned for `v0.35.2`. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
@@ -297,7 +297,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.35.0
+cargo xtask release-ready v0.35.1
 ```
 
 ## Security Posture
@@ -331,7 +331,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
 - [Telemetry Event Schema](docs/telemetry-event-schema.md)
-- [v0.35.0 Release Candidate Notes](docs/releases/v0.35.0-rc.md)
+- [v0.35.1 Release Candidate Notes](docs/releases/v0.35.1-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

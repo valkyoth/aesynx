@@ -1,6 +1,9 @@
 use aesynx_abi::{CoreId, CpuHardwareId};
 
-use crate::{CoreCapabilitySet, CoreError, CoreLocal, CoreLocalTelemetry, CoreRole, CoreState};
+use crate::{
+    CoreCapabilitySet, CoreError, CoreLocal, CoreLocalTelemetry, CoreRole, CoreStartupArrival,
+    CoreStartupTicket, CoreState,
+};
 
 pub const QEMU_MULTICORE_TOPOLOGY_CORES: usize = 4;
 
@@ -207,6 +210,14 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
     }
 
     pub fn stage_startup(&mut self, caller: CoreId, core: CoreId) -> Result<(), CoreError> {
+        self.stage_startup_ticket(caller, core).map(|_| ())
+    }
+
+    pub fn stage_startup_ticket(
+        &mut self,
+        caller: CoreId,
+        core: CoreId,
+    ) -> Result<CoreStartupTicket, CoreError> {
         self.require_owner(caller)?;
         let index = self.index_of_core(core).ok_or(CoreError::UnknownCore)?;
         let Some(mut entry) = self.entries[index] else {
@@ -223,18 +234,33 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         entry.local.stage_startup()?;
         entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
+        let ticket = CoreStartupTicket::new(core, entry.hardware_id, caller, self.epoch);
         self.entries[index] = Some(entry);
-        Ok(())
+        Ok(ticket)
     }
 
-    pub fn mark_hardware_online(&mut self, caller: CoreId, core: CoreId) -> Result<(), CoreError> {
+    pub fn mark_hardware_online(
+        &mut self,
+        caller: CoreId,
+        arrival: &CoreStartupArrival,
+    ) -> Result<(), CoreError> {
         self.require_owner(caller)?;
+        if arrival.coordinator_core() != self.owner_core {
+            return Err(CoreError::OwnerMismatch);
+        }
+        if arrival.startup_epoch() > self.epoch {
+            return Err(CoreError::StaleStartupEvidence);
+        }
+        let core = arrival.arrived_core();
         let index = self.index_of_core(core).ok_or(CoreError::UnknownCore)?;
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
         };
         if entry.hardware_state != CoreHardwareState::StartupStaged {
             return Err(CoreError::InvalidStateTransition);
+        }
+        if entry.hardware_id != arrival.hardware_id() {
+            return Err(CoreError::StartupEvidenceMismatch);
         }
 
         entry.hardware_state = CoreHardwareState::Online;

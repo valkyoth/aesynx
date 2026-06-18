@@ -1699,7 +1699,59 @@ Non-goals:
 - No per-core GDT/IDT/TSS/IST installation yet.
 - No cross-core message fabric yet.
 
-### v0.35.1 - x86_64 QEMU AP Startup
+### v0.35.1 - AP Startup Evidence Contract
+
+Goal:
+
+Require topology-online transitions to flow through non-forgeable startup
+evidence before the real x86_64 AP trampoline lands.
+
+Deliverables:
+
+- `CoreStartupTicket` issued only by owner-scoped startup staging.
+- `CoreStartupArrival` evidence derived only from a matching ticket.
+- Hardware-online transition requires validated arrival evidence for the target
+  core, hardware ID, coordinator, and startup epoch.
+- Mismatched arrival core or hardware ID fails before topology mutation.
+- Direct online-without-startup is unrepresentable through the public topology
+  API.
+- QEMU topology smoke records `startup_evidence_ok=true` before
+  `[TEST] multicore-topology=ok`.
+- Current candidate metadata and image names move to `v0.35.1`.
+- Documentation keeps this as AP startup evidence, not AP execution.
+- Confirm the entropy DRBG implementation remains a scheduled blocker before
+  any AP startup work consumes attacker-unpredictable tokens; v0.35.1 must not
+  introduce random-token consumers while QEMU reports `drbg_self_test=false`.
+- Keep the current general CPU-hardening policy for QEMU unless a deployment
+  selector is added; the strict `NX+SMEP+SMAP+UMIP` policy remains tested but
+  not selected by default.
+
+Expected serial:
+
+```text
+multicore-topology qemu_smp_cores_ok=true ... startup_evidence_ok=true ...
+[TEST] multicore-topology=ok
+```
+
+Verification:
+
+- Host tests cover ticket issuance, arrival mismatch rejection, role assignment
+  between stage and arrival, and evidence-backed online transition.
+- QEMU `-smp 4` boot smoke includes `startup_evidence_ok=true`.
+
+Exit criteria:
+
+- Aesynx has a fail-closed AP arrival contract for the later hardware startup
+  path.
+
+Non-goals:
+
+- No AP startup trampoline.
+- No secondary core executes Rust code yet.
+- No per-core GDT/IDT/TSS/IST installation yet.
+- No cross-core message fabric yet.
+
+### v0.35.2 - x86_64 QEMU AP Startup
 
 Goal:
 
@@ -1721,7 +1773,7 @@ Deliverables:
   startup in an ambiguous state.
 - Recovery/reset story for permanently quarantined core trackers.
 - Confirm the entropy DRBG implementation remains a scheduled blocker before
-  any AP startup work consumes attacker-unpredictable tokens; v0.35.1 must not
+  any AP startup work consumes attacker-unpredictable tokens; v0.35.2 must not
   introduce random-token consumers while QEMU reports `drbg_self_test=false`.
 - Keep the current general CPU-hardening policy for QEMU unless a deployment
   selector is added; the strict `NX+SMEP+SMAP+UMIP` policy remains tested but

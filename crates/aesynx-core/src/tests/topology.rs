@@ -1,4 +1,5 @@
 use aesynx_abi::{CoreId, CpuHardwareId, ROOT_CORE};
+use core::fmt::{self, Write};
 
 use crate::{CoreError, CoreHardwareState, CoreRole, CoreState, CoreTopology};
 
@@ -20,13 +21,20 @@ fn core_topology_rejects_online_role_reassignment() {
             )
             .is_ok()
     );
-    assert!(topology.stage_startup(ROOT_CORE, ROOT_CORE).is_ok());
+    let ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
     assert!(
         topology
             .assign_role(ROOT_CORE, ROOT_CORE, CoreRole::Bootstrap)
             .is_ok()
     );
-    assert!(topology.mark_hardware_online(ROOT_CORE, ROOT_CORE).is_ok());
+    let arrival = match ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0)) {
+        Ok(arrival) => arrival,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    assert!(topology.mark_hardware_online(ROOT_CORE, &arrival).is_ok());
     let before = topology.get(ROOT_CORE);
 
     assert_eq!(
@@ -39,7 +47,7 @@ fn core_topology_rejects_online_role_reassignment() {
 }
 
 #[test]
-fn core_topology_rejects_online_without_startup_staging() {
+fn core_topology_arrival_evidence_requires_matching_ticket() {
     let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
         Ok(topology) => topology,
         Err(error) => return assert_eq!(error, CoreError::CapacityZero),
@@ -54,13 +62,109 @@ fn core_topology_rejects_online_without_startup_staging() {
             )
             .is_ok()
     );
-    let before = topology.get(ROOT_CORE);
+    let ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
 
     assert_eq!(
-        topology.mark_hardware_online(ROOT_CORE, ROOT_CORE).err(),
-        Some(CoreError::InvalidStateTransition)
+        ticket
+            .observe_arrival(ROOT_CORE, CpuHardwareId::new(99))
+            .err(),
+        Some(CoreError::StartupEvidenceMismatch)
     );
-    assert_eq!(topology.get(ROOT_CORE), before);
+    assert_eq!(
+        ticket
+            .observe_arrival(CoreId::new(99), CpuHardwareId::new(0))
+            .err(),
+        Some(CoreError::StartupEvidenceMismatch)
+    );
+}
+
+#[test]
+fn core_startup_ticket_debug_redacts_hardware_id_and_epoch() {
+    let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
+        Ok(topology) => topology,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+    assert!(
+        topology
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(0xfeed_beef),
+                qemu_bootstrap_caps()
+            )
+            .is_ok()
+    );
+    let ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let arrival = match ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0xfeed_beef)) {
+        Ok(arrival) => arrival,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+
+    let mut ticket_debug = FixedDebugBuffer::new();
+    let mut arrival_debug = FixedDebugBuffer::new();
+    assert!(write!(&mut ticket_debug, "{ticket:?}").is_ok());
+    assert!(write!(&mut arrival_debug, "{arrival:?}").is_ok());
+
+    assert!(
+        ticket_debug
+            .as_str()
+            .contains("hardware_id: \"<redacted>\"")
+    );
+    assert!(
+        ticket_debug
+            .as_str()
+            .contains("startup_epoch: \"<redacted>\"")
+    );
+    assert!(!ticket_debug.as_str().contains("feed"));
+    assert!(!ticket_debug.as_str().contains("48879"));
+    assert!(
+        arrival_debug
+            .as_str()
+            .contains("hardware_id: \"<redacted>\"")
+    );
+    assert!(
+        arrival_debug
+            .as_str()
+            .contains("startup_epoch: \"<redacted>\"")
+    );
+    assert!(!arrival_debug.as_str().contains("feed"));
+    assert!(!arrival_debug.as_str().contains("48879"));
+}
+
+struct FixedDebugBuffer {
+    bytes: [u8; 256],
+    len: usize,
+}
+
+impl FixedDebugBuffer {
+    const fn new() -> Self {
+        Self {
+            bytes: [0; 256],
+            len: 0,
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        core::str::from_utf8(&self.bytes[..self.len]).unwrap_or_default()
+    }
+}
+
+impl Write for FixedDebugBuffer {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        let end = self.len.checked_add(value.len()).ok_or(fmt::Error)?;
+        if end > self.bytes.len() {
+            return Err(fmt::Error);
+        }
+        self.bytes[self.len..end].copy_from_slice(value.as_bytes());
+        self.len = end;
+        Ok(())
+    }
 }
 
 #[test]

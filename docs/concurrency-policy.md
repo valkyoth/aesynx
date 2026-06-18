@@ -1,6 +1,6 @@
 # Aesynx Concurrency Policy
 
-Status: v0.35.0 QEMU multicore topology candidate
+Status: v0.35.1 AP startup evidence candidate
 
 This document defines the synchronization contract that future multicore work
 must follow. Current Aesynx boot remains single-core, but shared-state code must

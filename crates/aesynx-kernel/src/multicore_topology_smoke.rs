@@ -13,6 +13,7 @@ pub struct MulticoreTopologySmokeStatus {
     pub scheduler_ok: bool,
     pub driver_service_ok: bool,
     pub idle_ok: bool,
+    pub startup_evidence_ok: bool,
     pub barrier_ok: bool,
 }
 
@@ -55,18 +56,26 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
         CorePerformanceClass::Efficiency,
     )?;
 
-    for core in [ROOT_CORE, CoreId::new(1), CoreId::new(2), CoreId::new(3)] {
-        topology.stage_startup(ROOT_CORE, core)?;
-    }
+    let root_ticket = topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE)?;
+    let scheduler_ticket = topology.stage_startup_ticket(ROOT_CORE, CoreId::new(1))?;
+    let driver_ticket = topology.stage_startup_ticket(ROOT_CORE, CoreId::new(2))?;
+    let idle_ticket = topology.stage_startup_ticket(ROOT_CORE, CoreId::new(3))?;
 
     topology.assign_role(ROOT_CORE, ROOT_CORE, CoreRole::Bootstrap)?;
     topology.assign_role(ROOT_CORE, CoreId::new(1), CoreRole::Scheduler)?;
     topology.assign_role(ROOT_CORE, CoreId::new(2), CoreRole::DriverService)?;
     topology.assign_role(ROOT_CORE, CoreId::new(3), CoreRole::Idle)?;
 
-    for core in [ROOT_CORE, CoreId::new(1), CoreId::new(2), CoreId::new(3)] {
-        topology.mark_hardware_online(ROOT_CORE, core)?;
-    }
+    let root_arrival = root_ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0))?;
+    let scheduler_arrival =
+        scheduler_ticket.observe_arrival(CoreId::new(1), CpuHardwareId::new(1))?;
+    let driver_arrival = driver_ticket.observe_arrival(CoreId::new(2), CpuHardwareId::new(2))?;
+    let idle_arrival = idle_ticket.observe_arrival(CoreId::new(3), CpuHardwareId::new(3))?;
+
+    topology.mark_hardware_online(ROOT_CORE, &root_arrival)?;
+    topology.mark_hardware_online(ROOT_CORE, &scheduler_arrival)?;
+    topology.mark_hardware_online(ROOT_CORE, &driver_arrival)?;
+    topology.mark_hardware_online(ROOT_CORE, &idle_arrival)?;
 
     let mut barrier = BootBarrier::<4>::new(ROOT_CORE)?;
     for core in [ROOT_CORE, CoreId::new(1), CoreId::new(2), CoreId::new(3)] {
@@ -99,6 +108,10 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
             && driver.is_some_and(|entry| entry.role() == CoreRole::DriverService),
         idle_ok: status.idle_roles() == 1
             && idle.is_some_and(|entry| entry.role() == CoreRole::Idle),
+        startup_evidence_ok: root_arrival.arrived_core() == ROOT_CORE
+            && scheduler_arrival.arrived_core() == CoreId::new(1)
+            && driver_arrival.arrived_core() == CoreId::new(2)
+            && idle_arrival.arrived_core() == CoreId::new(3),
         barrier_ok: barrier.status().all_arrived(),
     })
 }
@@ -139,6 +152,7 @@ mod tests {
         assert!(status.scheduler_ok);
         assert!(status.driver_service_ok);
         assert!(status.idle_ok);
+        assert!(status.startup_evidence_ok);
         assert!(status.barrier_ok);
     }
 }

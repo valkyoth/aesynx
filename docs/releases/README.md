@@ -6,9 +6,11 @@ lands.
 
 ## Current Candidate
 
-- [v0.35.0 - QEMU Multicore Topology Baseline](v0.35.0-rc.md)
+- [v0.35.1 - AP Startup Evidence Contract](v0.35.1-rc.md)
 
 ## History
+
+- [v0.35.0 - QEMU Multicore Topology Baseline](v0.35.0-rc.md)
 
 - [v0.34.0 - AMP Core Data Structures](v0.34.0-rc.md)
 - [v0.33.1 - Concurrency Discipline](v0.33.1-rc.md)
