@@ -41,7 +41,7 @@ impl fmt::Debug for Hash256 {
 
 impl PartialEq for Hash256 {
     fn eq(&self, other: &Self) -> bool {
-        constant_time_eq(&self.0, &other.0)
+        structural_eq_not_crypto(&self.0, &other.0)
     }
 }
 
@@ -78,7 +78,7 @@ impl fmt::Debug for Signature64 {
 
 impl PartialEq for Signature64 {
     fn eq(&self, other: &Self) -> bool {
-        constant_time_eq(&self.0, &other.0)
+        structural_eq_not_crypto(&self.0, &other.0)
     }
 }
 
@@ -217,7 +217,7 @@ impl ModelObjectManifest {
     pub const fn validate_for_domain(
         self,
         expected_domain: PolicyDomain,
-    ) -> Result<ValidatedModelManifest, PolicyError> {
+    ) -> Result<StructurallyCheckedModelManifest, PolicyError> {
         if self.id.get() == 0 {
             return Err(PolicyError::EmptyModel);
         }
@@ -252,11 +252,11 @@ impl ModelObjectManifest {
             return Err(PolicyError::FeatureOutOfRange);
         }
 
-        Ok(ValidatedModelManifest { manifest: self })
+        Ok(StructurallyCheckedModelManifest { manifest: self })
     }
 }
 
-/// A manifest that passed structural and policy validation.
+/// A manifest that passed structural and policy checks.
 ///
 /// Validation covers schema version, policy domain, supported model kind,
 /// bounded resource limits, required fallback, and domain-specific telemetry
@@ -264,23 +264,25 @@ impl ModelObjectManifest {
 ///
 /// # Security
 ///
-/// This does not verify [`Hash256`] or [`Signature64`] cryptographically.
-/// Callers that load model weights must perform real signature/hash
-/// verification before trusting the metadata carried by this type.
+/// This does not verify [`Hash256`] or [`Signature64`] cryptographically and
+/// must not be treated as an authenticated manifest. Callers that load model
+/// weights must perform real signature/hash verification before trusting the
+/// metadata carried by this type.
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct ValidatedModelManifest {
+#[must_use = "structural validation only; cryptographic verification is still required before trust"]
+pub struct StructurallyCheckedModelManifest {
     manifest: ModelObjectManifest,
 }
 
-impl fmt::Debug for ValidatedModelManifest {
+impl fmt::Debug for StructurallyCheckedModelManifest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ValidatedModelManifest")
+        f.debug_struct("StructurallyCheckedModelManifest")
             .field("manifest", &self.manifest)
             .finish()
     }
 }
 
-impl ValidatedModelManifest {
+impl StructurallyCheckedModelManifest {
     #[must_use]
     pub const fn manifest(self) -> ModelObjectManifest {
         self.manifest
@@ -319,12 +321,14 @@ const fn all_zero_64(bytes: &[u8; 64]) -> bool {
     true
 }
 
-fn constant_time_eq<const LEN: usize>(left: &[u8; LEN], right: &[u8; LEN]) -> bool {
+// SECURITY: structural equality only. This is not a cryptographic verifier and
+// must not be used to authenticate manifests, signatures, or model weights.
+fn structural_eq_not_crypto<const LEN: usize>(left: &[u8; LEN], right: &[u8; LEN]) -> bool {
     let mut diff = 0u8;
     let mut index = 0;
     while index < LEN {
         diff |= left[index] ^ right[index];
         index += 1;
     }
-    diff == 0
+    core::hint::black_box(diff) == 0
 }

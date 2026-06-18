@@ -1764,7 +1764,7 @@ Deliverables:
 - `aesynx-core` AP startup preflight model with owner-scoped mutation.
 - Startup resources are accepted only for topology entries already in
   `StartupStaged`/`Booting`.
-- Dedicated AP stack ranges must be page-aligned, large enough for early AP
+- Dedicated AP stack ranges must be page-aligned, at least 32 KiB for early AP
   entry, non-overlapping, and unique per core.
 - Duplicate logical core IDs, duplicate hardware IDs, overlapping startup
   stacks, missing watchdog ticks, and non-owner callers fail before mutation.
@@ -1807,7 +1807,109 @@ Non-goals:
 - No per-core GDT/IDT/TSS/IST installation yet.
 - No cross-core message fabric yet.
 
-### v0.35.3 - x86_64 QEMU AP Startup
+### v0.35.3 - AP Startup State Table
+
+Goal:
+
+Make the AP startup topology state machine explicit and enforce it as the single
+source of truth before any secondary-core execution path lands.
+
+Deliverables:
+
+- `aesynx-core` startup state table covering the cross-product of
+  `CoreHardwareState`, `CoreAssignmentState`, and `CoreState`.
+- Valid combinations are explicit: discovered/offline,
+  startup-staged/booting, online/online, and quarantined/quarantined, each
+  with assigned or unassigned role state.
+- Startup staging, role assignment, hardware-online marking, and quarantine all
+  consult the same table before mutation and revalidate the resulting state
+  before commit.
+- Host tests cover valid and invalid joint states, transition intent helpers,
+  table cardinality, and topology mutation through the table.
+- QEMU topology smoke records `state_table_ok=true` alongside the existing
+  startup evidence and AP preflight markers.
+- Documentation keeps this as state-machine hardening only. It does not start
+  APs and does not weaken the v0.35.2 descriptor-table execution blocker.
+
+Expected serial:
+
+```text
+multicore-topology qemu_smp_cores_ok=true ... role_assignment_ok=true state_table_ok=true startup_evidence_ok=true ap_preflight_ok=true ap_execution_blocked_ok=true ...
+[TEST] multicore-topology=ok
+```
+
+Verification:
+
+- QEMU `-smp 4` boot smoke.
+- Serial evidence shows the state table is audited and every modeled QEMU core
+  remains in a valid joint state.
+- Host tests prove impossible joint states are rejected by the table and cannot
+  be used by topology mutation helpers.
+
+Exit criteria:
+
+- The AP startup state machine has one auditable source of truth before
+  hardware startup code can consume it.
+
+Non-goals:
+
+- No AP startup trampoline.
+- No secondary core executes Rust code yet.
+- No per-core GDT/IDT/TSS/IST installation yet.
+- No cross-core message fabric yet.
+
+### v0.35.4 - Multi-Domain Hardening Blockers
+
+Goal:
+
+Close the hardening gaps that must not be carried into multi-domain execution,
+ring-3 userspace, or real-hardware deployment claims.
+
+Deliverables:
+
+- Spectre-class control policy for x86_64 with CPUID/MSR gates for
+  `IBRS/IBPB`, `STIBP`, `SSBD`, and `ARCH_CAPABILITIES`, plus a documented
+  retpoline/IBRS choice.
+- `IA32_SPEC_CTRL` admitted MSR handling and redacted read-back evidence when
+  supported.
+- KASLR/PIE boot plan: kernel build flags, Limine config, executable-address
+  response use, relocation assumptions, and QEMU evidence. If full KASLR is not
+  implemented in this milestone, it remains a tagged blocker before ring 3.
+- x86_64 `RDRAND`/`RDSEED` instruction path with bounded retries and runtime
+  stuck-sample self-test. Raw hardware output must seed only a DRBG, never be
+  exposed directly as a random token.
+- DRBG implementation plan and smoke path that can make
+  `drbg_self_test=true`; until this lands, `random_tokens_available=false`
+  remains the only acceptable production state.
+- Documentation updates that keep static-address/no-DRBG/no-Spectre-control
+  limitations visible as non-deployment claims.
+- NMI-safe live-IDT mutation plan: either shadow-IDT plus `lidt` swap,
+  platform-specific NMI-source quiescing, or a hard rule that runtime interrupt
+  gate mutation remains unavailable until per-core descriptor ownership lands.
+- Arch-backed IRQ-disable proof token design so future `try_lock_irq`-style
+  APIs cannot be mistaken for hardware interrupt masking when they only carry
+  the software model.
+
+Expected serial:
+
+```text
+[TEST] cpu-hardening=ok
+[TEST] entropy-policy=ok
+```
+
+Verification:
+
+- Host tests for CPUID feature matrix and selected MSR policy.
+- QEMU boot smoke stays honest about unsupported controls.
+- Entropy tests reject stuck or repeated hardware samples.
+
+Exit criteria:
+
+- Aesynx has a concrete, release-gated path for speculative-execution controls,
+  address randomization, and attacker-unpredictable token generation before any
+  multi-domain deployment claim.
+
+### v0.35.5 - x86_64 QEMU AP Startup
 
 Goal:
 
@@ -1817,9 +1919,11 @@ each executing core under Aesynx AMP ownership policy.
 Deliverables:
 
 - CPU topology parser backed by firmware or ACPI/MADT data when available.
-- Formal AP/core state table describing allowed local and hardware transitions.
-- AP stacks backed by the v0.35.2 preflight contract.
+- AP stacks backed by the v0.35.2 preflight contract and v0.35.3 state table.
 - AP startup path.
+- AP startup dispatch token. The APIC INIT/SIPI writer must accept only a
+  consuming token produced from an execution-allowed `ApStartupPreflight`; raw
+  advisory status checks are not enough for the hardware launch path.
 - Per-core GDT/IDT/TSS where needed.
 - The current single-core `static mut` descriptor, TSS, IDT, double-fault IST,
   activation-arena, and activation-stack storage is either migrated to
@@ -1864,51 +1968,6 @@ Exit criteria:
 
 - Multiple cores execute Aesynx code and are owned by the AMP/multikernel
   policy.
-
-### v0.35.4 - Multi-Domain Hardening Blockers
-
-Goal:
-
-Close the hardening gaps that must not be carried into multi-domain execution,
-ring-3 userspace, or real-hardware deployment claims.
-
-Deliverables:
-
-- Spectre-class control policy for x86_64 with CPUID/MSR gates for
-  `IBRS/IBPB`, `STIBP`, `SSBD`, and `ARCH_CAPABILITIES`, plus a documented
-  retpoline/IBRS choice.
-- `IA32_SPEC_CTRL` admitted MSR handling and redacted read-back evidence when
-  supported.
-- KASLR/PIE boot plan: kernel build flags, Limine config, executable-address
-  response use, relocation assumptions, and QEMU evidence. If full KASLR is not
-  implemented in this milestone, it remains a tagged blocker before ring 3.
-- x86_64 `RDRAND`/`RDSEED` instruction path with bounded retries and runtime
-  stuck-sample self-test. Raw hardware output must seed only a DRBG, never be
-  exposed directly as a random token.
-- DRBG implementation plan and smoke path that can make
-  `drbg_self_test=true`; until this lands, `random_tokens_available=false`
-  remains the only acceptable production state.
-- Documentation updates that keep static-address/no-DRBG/no-Spectre-control
-  limitations visible as non-deployment claims.
-
-Expected serial:
-
-```text
-[TEST] cpu-hardening=ok
-[TEST] entropy-policy=ok
-```
-
-Verification:
-
-- Host tests for CPUID feature matrix and selected MSR policy.
-- QEMU boot smoke stays honest about unsupported controls.
-- Entropy tests reject stuck or repeated hardware samples.
-
-Exit criteria:
-
-- Aesynx has a concrete, release-gated path for speculative-execution controls,
-  address randomization, and attacker-unpredictable token generation before any
-  multi-domain deployment claim.
 
 ### v0.36.0 - Core-to-Core Ping/Pong
 

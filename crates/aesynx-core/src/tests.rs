@@ -6,6 +6,7 @@ use crate::{
 };
 
 mod startup_preflight;
+mod startup_state;
 mod topology;
 
 fn qemu_bootstrap_caps() -> CoreCapabilitySet {

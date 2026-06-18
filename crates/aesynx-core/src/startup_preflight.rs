@@ -3,7 +3,7 @@ use core::fmt;
 
 use crate::{CoreError, CoreHardwareState, CoreState, CoreTopologyEntry};
 
-pub const MIN_AP_STACK_BYTES: u64 = 16 * 1024;
+pub const MIN_AP_STACK_BYTES: u64 = 32 * 1024;
 const PAGE_SIZE: u64 = 4096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

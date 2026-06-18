@@ -1,4 +1,6 @@
-use super::{EarlyLock, LocalInterruptMask, LockOrderTracker, LockRank, SyncError};
+use super::{
+    ArchIrqDisableProof, EarlyLock, LocalInterruptMask, LockOrderTracker, LockRank, SyncError,
+};
 
 #[test]
 fn early_lock_rejects_double_lock_and_release_allows_relock() {
@@ -70,7 +72,9 @@ fn initially_disabled_interrupts_remain_disabled_after_guard() {
 fn irq_lock_masks_interrupts_while_held_and_restores_after_release() {
     let lock = EarlyLock::new();
     let interrupts = LocalInterruptMask::new_enabled();
-    let guard = match lock.try_lock_irq(&interrupts) {
+    let proof = ArchIrqDisableProof::model_only_for_single_core_smoke();
+    assert!(proof.is_model_only());
+    let guard = match lock.try_lock_irq(&interrupts, proof) {
         Ok(guard) => guard,
         Err(error) => return assert_eq!(error, SyncError::AlreadyLocked),
     };

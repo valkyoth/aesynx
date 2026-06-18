@@ -126,28 +126,28 @@ fn qemu_smoke_runs_four_virtual_cpus() {
 #[test]
 fn image_artifact_names_track_current_candidate_version() {
     let boot = image_names(SmokeKind::Boot);
-    assert_eq!(boot.image, "aesynx-v0.35.2.iso");
-    assert_eq!(boot.manifest, "aesynx-v0.35.2.manifest");
-    assert_eq!(boot.serial_log, "aesynx-v0.35.2.serial.log");
-    assert_eq!(boot.staging_dir, "aesynx-v0.35.2-iso");
+    assert_eq!(boot.image, "aesynx-v0.35.3.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.35.3.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.35.3.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.35.3-iso");
 
     let panic = image_names(SmokeKind::Panic);
-    assert_eq!(panic.image, "aesynx-v0.35.2-panic.iso");
-    assert_eq!(panic.manifest, "aesynx-v0.35.2-panic.manifest");
-    assert_eq!(panic.serial_log, "aesynx-v0.35.2-panic.serial.log");
-    assert_eq!(panic.staging_dir, "aesynx-v0.35.2-panic-iso");
+    assert_eq!(panic.image, "aesynx-v0.35.3-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.35.3-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.35.3-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.35.3-panic-iso");
 
     let exception = image_names(SmokeKind::Exception);
-    assert_eq!(exception.image, "aesynx-v0.35.2-exception.iso");
-    assert_eq!(exception.manifest, "aesynx-v0.35.2-exception.manifest");
-    assert_eq!(exception.serial_log, "aesynx-v0.35.2-exception.serial.log");
-    assert_eq!(exception.staging_dir, "aesynx-v0.35.2-exception-iso");
+    assert_eq!(exception.image, "aesynx-v0.35.3-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.35.3-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.35.3-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.35.3-exception-iso");
 
     let timer = image_names(SmokeKind::Timer);
-    assert_eq!(timer.image, "aesynx-v0.35.2-timer.iso");
-    assert_eq!(timer.manifest, "aesynx-v0.35.2-timer.manifest");
-    assert_eq!(timer.serial_log, "aesynx-v0.35.2-timer.serial.log");
-    assert_eq!(timer.staging_dir, "aesynx-v0.35.2-timer-iso");
+    assert_eq!(timer.image, "aesynx-v0.35.3-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.35.3-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.35.3-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.35.3-timer-iso");
 }
 
 #[test]
@@ -187,7 +187,8 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
-    assert!(contents.contains("name=Aesynx v0.35.2 AP startup preflight candidate\n"));
+    assert!(contents.contains("name=Aesynx v0.35.3 AP state-table candidate\n"));
+    assert!(contents.contains("multicore_topology_state_table_marker=state_table_ok=true\n"));
     assert!(contents.contains("multicore_topology_ap_preflight_marker=ap_preflight_ok=true\n"));
     assert!(
         contents.contains(
@@ -224,13 +225,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
 #[test]
 fn image_manifest_rejects_newline_path_fields() {
     let manifest = temp_manifest_path("newline-path");
-    let host_tools = HostToolVersions {
-        rustc: String::from("rustc test"),
-        cargo: String::from("cargo test"),
-        limine: String::from("limine test"),
-        xorriso: String::from("xorriso test"),
-        qemu: String::from("qemu test"),
-    };
+    let host_tools = test_host_tools();
 
     let result = write_manifest(
         &manifest,
@@ -253,6 +248,57 @@ fn image_manifest_rejects_newline_path_fields() {
     let _ = fs::remove_file(&manifest);
 
     assert!(result.is_err());
+}
+
+#[test]
+fn image_manifest_rejects_control_and_separator_fields() {
+    let manifest = temp_manifest_path("control-path");
+
+    for image in [
+        "/tmp/aesynx.iso\0truncated",
+        "/tmp/aesynx.iso\x0bvertical-tab",
+        "/tmp/aesynx.iso\x0cform-feed",
+        "/tmp/aesynx.iso=ambiguous",
+    ] {
+        let result = write_manifest(
+            &manifest,
+            &PathBuf::from(image),
+            &PathBuf::from("/tmp/aesynx-kernel"),
+            &test_host_tools(),
+            SmokeKind::Boot,
+        );
+        let _ = fs::remove_file(&manifest);
+
+        assert!(result.is_err());
+    }
+
+    let host_tools = HostToolVersions {
+        rustc: String::from("rustc test\0truncated"),
+        cargo: String::from("cargo test"),
+        limine: String::from("limine test"),
+        xorriso: String::from("xorriso test"),
+        qemu: String::from("qemu test"),
+    };
+    let result = write_manifest(
+        &manifest,
+        &PathBuf::from("/tmp/aesynx.iso"),
+        &PathBuf::from("/tmp/aesynx-kernel"),
+        &host_tools,
+        SmokeKind::Boot,
+    );
+    let _ = fs::remove_file(&manifest);
+
+    assert!(result.is_err());
+}
+
+fn test_host_tools() -> HostToolVersions {
+    HostToolVersions {
+        rustc: String::from("rustc test"),
+        cargo: String::from("cargo test"),
+        limine: String::from("limine test"),
+        xorriso: String::from("xorriso test"),
+        qemu: String::from("qemu test"),
+    }
 }
 
 fn assert_smoke_contract_requires_each_marker(smoke: SmokeKind) {

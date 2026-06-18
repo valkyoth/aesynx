@@ -2,7 +2,7 @@ use aesynx_abi::{CoreId, CpuHardwareId, ROOT_CORE};
 use aesynx_core::{
     ApDescriptorTableReadiness, ApStartupPreflight, BootBarrier, CoreCapabilitySet, CoreError,
     CoreHardwareState, CoreIsa, CorePerformanceClass, CoreRole, CoreTopology,
-    QEMU_MULTICORE_TOPOLOGY_CORES,
+    QEMU_MULTICORE_TOPOLOGY_CORES, audit_startup_state_table,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -10,6 +10,7 @@ pub struct MulticoreTopologySmokeStatus {
     pub qemu_smp_cores_ok: bool,
     pub hardware_online_ok: bool,
     pub role_assignment_ok: bool,
+    pub state_table_ok: bool,
     pub bootstrap_ok: bool,
     pub scheduler_ok: bool,
     pub driver_service_ok: bool,
@@ -102,6 +103,7 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
     }
 
     let status = topology.status();
+    let state_table = audit_startup_state_table();
     let root = topology.get(ROOT_CORE);
     let scheduler = topology.get(CoreId::new(1));
     let driver = topology.get(CoreId::new(2));
@@ -115,6 +117,13 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
             && driver.is_some_and(|entry| entry.hardware_state() == CoreHardwareState::Online)
             && idle.is_some_and(|entry| entry.hardware_state() == CoreHardwareState::Online),
         role_assignment_ok: status.assigned() == 4,
+        state_table_ok: state_table.valid_combinations() == 8
+            && state_table.invalid_combinations() == 24
+            && state_table.total_combinations() == 32
+            && root.is_some_and(|entry| entry.startup_state().is_valid())
+            && scheduler.is_some_and(|entry| entry.startup_state().is_valid())
+            && driver.is_some_and(|entry| entry.startup_state().is_valid())
+            && idle.is_some_and(|entry| entry.startup_state().is_valid()),
         bootstrap_ok: status.bootstrap_roles() == 1
             && root.is_some_and(|entry| entry.role() == CoreRole::Bootstrap),
         scheduler_ok: status.scheduler_roles() == 1
@@ -144,7 +153,7 @@ fn build_ap_preflight(
             ROOT_CORE,
             entry,
             aesynx_abi::VirtAddr::new(0xffff_ffff_9000_0000 + (index * 0x1_0000)),
-            0x4000,
+            0x8000,
             ApDescriptorTableReadiness::SharedBootstrapOnly,
             10_000,
         )?;
@@ -185,6 +194,7 @@ mod tests {
         assert!(status.qemu_smp_cores_ok);
         assert!(status.hardware_online_ok);
         assert!(status.role_assignment_ok);
+        assert!(status.state_table_ok);
         assert!(status.bootstrap_ok);
         assert!(status.scheduler_ok);
         assert!(status.driver_service_ok);

@@ -1,6 +1,6 @@
 # Aesynx Concurrency Policy
 
-Status: v0.35.2 AP startup preflight candidate
+Status: v0.35.3 AP startup state-table candidate
 
 This document defines the synchronization contract that future multicore work
 must follow. Current Aesynx boot remains single-core, but shared-state code must
@@ -47,9 +47,11 @@ story in the release notes.
   integration that can hit this condition must define recovery as resetting the
   owning core/domain or rebooting, not silently reusing the tracker or mask.
 - `LocalInterruptMask` is a software model for host tests and policy evidence.
-  It does not disable hardware interrupts by itself; real IRQ-safe locking needs
-  an architecture-backed proof token that records actual interrupt masking on
-  the owning core.
+  It does not disable hardware interrupts by itself. `try_lock_irq()` requires
+  an explicit `ArchIrqDisableProof` argument so callers cannot accidentally hide
+  that distinction, but the current proof constructor is model-only for
+  single-core smoke/tests. Real IRQ-handler use needs an architecture-backed
+  token that records actual interrupt masking on the owning core.
 - Lock acquisition must follow the global rank order. Acquiring an equal or
   lower-ranked lock while a higher-ranked lock is held is a policy violation.
 - Lock failures must not partially mutate protected state.
@@ -65,6 +67,7 @@ Locks must be acquired from lower rank to higher rank:
 | --- | --- |
 | 10 | Interrupt controller |
 | 20 | Descriptor tables |
+| 25 | Core topology |
 | 30 | Address space |
 | 40 | Frame allocator |
 | 50 | Kernel heap |

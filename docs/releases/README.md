@@ -6,6 +6,7 @@ lands.
 
 ## Current Candidate
 
+- [v0.35.3 - AP Startup State Table](v0.35.3-rc.md)
 - [v0.35.2 - AP Startup Preflight](v0.35.2-rc.md)
 
 ## History

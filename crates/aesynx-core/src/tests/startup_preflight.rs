@@ -43,7 +43,7 @@ fn ap_startup_preflight_blocks_execution_until_per_core_descriptors_exist() {
                 ROOT_CORE,
                 root,
                 VirtAddr::new(0xffff_ffff_9000_0000),
-                0x4000,
+                0x8000,
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -55,7 +55,7 @@ fn ap_startup_preflight_blocks_execution_until_per_core_descriptors_exist() {
                 ROOT_CORE,
                 scheduler,
                 VirtAddr::new(0xffff_ffff_9001_0000),
-                0x4000,
+                0x8000,
                 ApDescriptorTableReadiness::SharedBootstrapOnly,
                 10_000,
             )
@@ -102,7 +102,7 @@ fn ap_startup_preflight_accepts_only_staged_booting_entries() {
                 ROOT_CORE,
                 entry,
                 VirtAddr::new(0xffff_ffff_9000_0000),
-                0x4000,
+                0x8000,
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -149,7 +149,7 @@ fn ap_startup_preflight_rejects_overlapping_stacks_without_mutation() {
                 ROOT_CORE,
                 scheduler,
                 VirtAddr::new(0xffff_ffff_9000_4000),
-                0x4000,
+                0x8000,
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -181,7 +181,7 @@ fn ap_startup_preflight_rejects_missing_watchdog() {
                 ROOT_CORE,
                 root,
                 VirtAddr::new(0xffff_ffff_9000_0000),
-                0x4000,
+                0x8000,
                 ApDescriptorTableReadiness::PerCoreReady,
                 0,
             )

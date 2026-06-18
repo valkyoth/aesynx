@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.35.2` is the current AP startup preflight candidate.
+`v0.35.3` is the current AP startup state-table candidate.
 
 Current boot path:
 
@@ -159,8 +159,10 @@ Address-space activation and CPU hardening:
   boot-barrier arrival before `[TEST] amp-core=ok`.
 - The multicore topology smoke runs under QEMU `-smp 4` and models four visible
   cores with separate hardware-online and Aesynx role-assignment state before
-  `[TEST] multicore-topology=ok`. This is topology/ownership evidence; APs do
-  not execute Rust code yet.
+  `[TEST] multicore-topology=ok`. The AP startup state table now audits the
+  joint hardware/assignment/local-state model and reports `state_table_ok=true`
+  before boot success. This is topology/ownership evidence; APs do not execute
+  Rust code yet.
 
 Fuzz and property gates:
 
@@ -187,7 +189,7 @@ Fuzz and property gates:
 | Scheduler policy model | Tagged | `v0.33.0`; no_std model manifests, redacted manifest diagnostics, metadata-presence hash/signature wrappers, fixed-point-only accepted model kinds, scheduler-domain metadata and fallback gates, fixed-point feature validation, manifest-enforced model confidence ceilings, deterministic fallback, bounded non-AI scheduler heuristic scoring, decision records, a disable switch, redacted heuristic serial evidence, and QEMU `[TEST] ai-policy=ok` prove fallback and heuristic evidence before any AI model can influence scheduling. |
 | Concurrency discipline | Tagged | `v0.33.1`; safe `aesynx-sync` early-lock primitives, previous-state interrupt guards, nested interrupt masking behavior, guard-owned LIFO release with local poison on release-order violation, lock-rank validation, policy docs for lock-held behavior and AMP/multikernel-on-SMP-hardware migrations, and QEMU `[TEST] concurrency=ok`. |
 | AMP core data structures | Tagged | `v0.34.0`; no_std `aesynx-core` models core roles, heterogeneous capability metadata, `CoreLocal`, owner-scoped core registries, per-core local telemetry, boot barriers, and QEMU `[TEST] amp-core=ok` for the bootstrap core without enabling multicore execution. |
-| AP startup preflight | Active candidate | `v0.35.2`; xtask launches QEMU with `-smp 4`, manifests record `qemu_smp_cpus=4`, and `aesynx-core` now requires owner-issued `CoreStartupTicket` plus matching `CoreStartupArrival` evidence before a staged core can become hardware-online. AP launch resources are owner-scoped, staged-only, stack/watchdog checked, and descriptor-table readiness is explicit. QEMU reports `startup_evidence_ok=true`, `ap_preflight_ok=true`, and `ap_execution_blocked_ok=true` before `[TEST] multicore-topology=ok`; real AP execution remains planned for `v0.35.3`. |
+| AP startup state table | Active candidate | `v0.35.3`; xtask launches QEMU with `-smp 4`, manifests record `qemu_smp_cpus=4`, and `aesynx-core` now requires owner-issued `CoreStartupTicket` plus matching `CoreStartupArrival` evidence before a staged core can become hardware-online. AP launch resources are owner-scoped, staged-only, stack/watchdog checked, descriptor-table readiness is explicit, and topology mutation validates the joint hardware/assignment/local-state table before and after state changes. QEMU reports `state_table_ok=true`, `startup_evidence_ok=true`, `ap_preflight_ok=true`, and `ap_execution_blocked_ok=true` before `[TEST] multicore-topology=ok`; real AP execution is now tracked after the v0.35.4 hardening blockers. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
@@ -297,7 +299,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.35.2
+cargo xtask release-ready v0.35.3
 ```
 
 ## Security Posture
@@ -331,7 +333,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Early Diagnostics](docs/early-diagnostics.md)
 - [Release Candidate Notes Archive](docs/releases/README.md)
 - [Telemetry Event Schema](docs/telemetry-event-schema.md)
-- [v0.35.2 Release Candidate Notes](docs/releases/v0.35.2-rc.md)
+- [v0.35.3 Release Candidate Notes](docs/releases/v0.35.3-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)
 - [Hosted Execution Roadmap](docs/hosted-execution-roadmap.md)

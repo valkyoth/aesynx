@@ -273,6 +273,29 @@ impl Drop for InterruptGuard<'_> {
     }
 }
 
+/// Evidence that hardware IRQ delivery is disabled on the current core.
+///
+/// The current constructor is intentionally named as a single-core model/smoke
+/// escape hatch. It must not be treated as a production architecture proof; the
+/// x86_64 integration needs to replace this with a real IF/CLI-backed token
+/// before IRQ locks protect hardware interrupt handlers.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ArchIrqDisableProof {
+    model_only: bool,
+}
+
+impl ArchIrqDisableProof {
+    #[must_use]
+    pub const fn model_only_for_single_core_smoke() -> Self {
+        Self { model_only: true }
+    }
+
+    #[must_use]
+    pub const fn is_model_only(self) -> bool {
+        self.model_only
+    }
+}
+
 #[derive(Debug)]
 pub struct EarlyLock {
     locked: AtomicBool,
@@ -304,6 +327,7 @@ impl EarlyLock {
     pub fn try_lock_irq<'a>(
         &'a self,
         interrupts: &'a LocalInterruptMask,
+        _proof: ArchIrqDisableProof,
     ) -> Result<IrqLockGuard<'a>, SyncError> {
         let irq = interrupts.mask()?;
         let lock = self.try_lock()?;

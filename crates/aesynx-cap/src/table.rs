@@ -240,7 +240,10 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
                 .is_some_and(|cap| cap.object_id() == target_object)
             {
                 self.slots[index].cap = None;
-                self.slots[index].generation += 1;
+                self.slots[index].generation = self.slots[index]
+                    .generation
+                    .checked_add(1)
+                    .ok_or(CapTableError::GenerationOverflow)?;
             }
             index += 1;
         }

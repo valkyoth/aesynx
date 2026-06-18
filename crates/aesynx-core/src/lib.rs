@@ -8,6 +8,7 @@ mod registry;
 mod role;
 mod startup;
 mod startup_preflight;
+mod startup_state;
 mod topology;
 
 pub use barrier::{BootBarrier, BootBarrierStatus};
@@ -19,6 +20,9 @@ pub use startup::{CoreStartupArrival, CoreStartupTicket};
 pub use startup_preflight::{
     ApDescriptorTableReadiness, ApStartupPreflight, ApStartupPreflightStatus, ApStartupResource,
     MIN_AP_STACK_BYTES,
+};
+pub use startup_state::{
+    CoreStartupJointState, CoreStartupStateTableStatus, audit_startup_state_table,
 };
 pub use topology::{
     CoreAssignmentState, CoreHardwareState, CoreTopology, CoreTopologyEntry, CoreTopologyStatus,

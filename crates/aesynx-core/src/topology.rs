@@ -4,7 +4,7 @@ use aesynx_abi::{CoreId, CpuHardwareId};
 
 use crate::{
     CoreCapabilitySet, CoreError, CoreLocal, CoreLocalTelemetry, CoreRole, CoreStartupArrival,
-    CoreStartupTicket, CoreState,
+    CoreStartupJointState, CoreStartupTicket, CoreState,
 };
 
 pub const QEMU_MULTICORE_TOPOLOGY_CORES: usize = 4;
@@ -98,8 +98,21 @@ impl CoreTopologyEntry {
     }
 
     #[must_use]
+    pub const fn startup_state(self) -> CoreStartupJointState {
+        CoreStartupJointState::new(
+            self.hardware_state,
+            self.assignment_state,
+            self.local.state(),
+        )
+    }
+
+    #[must_use]
     pub const fn telemetry(self) -> CoreLocalTelemetry {
         self.local.telemetry()
+    }
+
+    fn validate_startup_state(self) -> Result<(), CoreError> {
+        self.startup_state().validate()
     }
 }
 
@@ -248,18 +261,14 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
         };
-        if entry.hardware_state != CoreHardwareState::Discovered {
-            return Err(CoreError::InvalidStateTransition);
-        }
-        if entry.local.state() != CoreState::Offline {
-            return Err(CoreError::InvalidStateTransition);
-        }
+        entry.startup_state().validate_startup_stage()?;
 
         entry.hardware_state = CoreHardwareState::StartupStaged;
         entry.local.stage_startup()?;
         entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
         entry.staged_epoch = Some(self.epoch);
+        entry.validate_startup_state()?;
         let ticket = CoreStartupTicket::new(core, entry.hardware_id, caller, self.epoch);
         self.entries[index] = Some(entry);
         Ok(ticket)
@@ -279,9 +288,7 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
         };
-        if entry.hardware_state != CoreHardwareState::StartupStaged {
-            return Err(CoreError::InvalidStateTransition);
-        }
+        entry.startup_state().validate_hardware_online()?;
         if entry.staged_epoch != Some(arrival.startup_epoch()) {
             return Err(CoreError::InvalidStartupEpoch);
         }
@@ -293,6 +300,7 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         entry.local.mark_online()?;
         entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
+        entry.validate_startup_state()?;
         self.entries[index] = Some(entry);
         Ok(())
     }
@@ -308,16 +316,12 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
         };
-        match entry.hardware_state {
-            CoreHardwareState::Discovered | CoreHardwareState::StartupStaged => {}
-            CoreHardwareState::Online | CoreHardwareState::Quarantined => {
-                return Err(CoreError::InvalidStateTransition);
-            }
-        }
+        entry.startup_state().validate_role_assignment()?;
 
         entry.local.assign_role(role)?;
         entry.assignment_state = CoreAssignmentState::Assigned;
         self.bump_epoch()?;
+        entry.validate_startup_state()?;
         self.entries[index] = Some(entry);
         Ok(())
     }
@@ -328,14 +332,13 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         let Some(mut entry) = self.entries[index] else {
             return Err(CoreError::UnknownCore);
         };
-        if entry.hardware_state == CoreHardwareState::Quarantined {
-            return Err(CoreError::InvalidStateTransition);
-        }
+        entry.startup_state().validate_quarantine()?;
 
         entry.hardware_state = CoreHardwareState::Quarantined;
         entry.local.quarantine()?;
         entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
+        entry.validate_startup_state()?;
         self.entries[index] = Some(entry);
         Ok(())
     }

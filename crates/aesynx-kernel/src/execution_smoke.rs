@@ -172,10 +172,11 @@ pub fn run() {
     match crate::smoke_modules::multicore_topology_smoke::run() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "multicore-topology qemu_smp_cores_ok={} hardware_online_ok={} role_assignment_ok={} bootstrap_ok={} scheduler_ok={} driver_service_ok={} idle_ok={} startup_evidence_ok={} ap_preflight_ok={} ap_execution_blocked_ok={} multicore_barrier_ok={}",
+                "multicore-topology qemu_smp_cores_ok={} hardware_online_ok={} role_assignment_ok={} state_table_ok={} bootstrap_ok={} scheduler_ok={} driver_service_ok={} idle_ok={} startup_evidence_ok={} ap_preflight_ok={} ap_execution_blocked_ok={} multicore_barrier_ok={}",
                 status.qemu_smp_cores_ok,
                 status.hardware_online_ok,
                 status.role_assignment_ok,
+                status.state_table_ok,
                 status.bootstrap_ok,
                 status.scheduler_ok,
                 status.driver_service_ok,

@@ -1,4 +1,6 @@
-use aesynx_sync::{EarlyLock, LocalInterruptMask, LockOrderTracker, LockRank, SyncError};
+use aesynx_sync::{
+    ArchIrqDisableProof, EarlyLock, LocalInterruptMask, LockOrderTracker, LockRank, SyncError,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ConcurrencySmokeStatus {
@@ -80,7 +82,10 @@ fn irq_lock_smoke() -> Result<bool, ConcurrencySmokeError> {
     let lock = EarlyLock::new();
     let interrupts = LocalInterruptMask::new_enabled();
     let guard = lock
-        .try_lock_irq(&interrupts)
+        .try_lock_irq(
+            &interrupts,
+            ArchIrqDisableProof::model_only_for_single_core_smoke(),
+        )
         .map_err(ConcurrencySmokeError::Sync)?;
     if !lock.is_locked() || interrupts.interrupts_enabled() {
         return Ok(false);

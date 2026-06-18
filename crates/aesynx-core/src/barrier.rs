@@ -116,7 +116,10 @@ impl<const CAPACITY: usize> BootBarrier<CAPACITY> {
         }
 
         self.arrived[index] = true;
-        self.arrivals += 1;
+        self.arrivals = self
+            .arrivals
+            .checked_add(1)
+            .ok_or(CoreError::TelemetryOverflow)?;
         Ok(())
     }
 
