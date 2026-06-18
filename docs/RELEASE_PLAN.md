@@ -1775,9 +1775,9 @@ Deliverables:
 - Confirm the entropy DRBG implementation remains a scheduled blocker before
   any AP startup work consumes attacker-unpredictable tokens; v0.35.2 must not
   introduce random-token consumers while QEMU reports `drbg_self_test=false`.
-- Keep the current general CPU-hardening policy for QEMU unless a deployment
-  selector is added; the strict `NX+SMEP+SMAP+UMIP` policy remains tested but
-  not selected by default.
+- Keep the current general CPU-hardening policy as the default for QEMU while
+  adding an opt-in `strict-cpu-hardening` build selector for deployments that
+  must fail closed unless `NX+SMEP+SMAP+UMIP` are all available.
 - Documentation keeps this as AP startup preflight, not AP execution.
 
 Expected serial:
