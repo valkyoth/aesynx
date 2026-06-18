@@ -9,6 +9,7 @@
 )]
 
 mod allocator;
+mod allocator_helpers;
 mod backing;
 mod free_list;
 mod global_alloc;

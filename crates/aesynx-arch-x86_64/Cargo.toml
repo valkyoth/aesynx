@@ -13,6 +13,7 @@ aesynx-entropy.workspace = true
 
 [features]
 default = []
+strict-cpu-hardening = []
 smp = []
 
 [lints]

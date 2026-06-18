@@ -27,6 +27,7 @@ aesynx-time.workspace = true
 default = []
 exception-smoke = []
 panic-smoke = []
+strict-cpu-hardening = ["aesynx-arch-x86_64/strict-cpu-hardening"]
 smp = ["aesynx-arch-x86_64/smp"]
 timer-smoke = []
 

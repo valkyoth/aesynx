@@ -1821,13 +1821,20 @@ Deliverables:
 - AP stacks backed by the v0.35.2 preflight contract.
 - AP startup path.
 - Per-core GDT/IDT/TSS where needed.
-- Per-core double-fault IST stacks with an explicit guard-page plan before
-  stack-trace or deep diagnostic work is allowed on the double-fault path.
+- The current single-core `static mut` descriptor, TSS, IDT, double-fault IST,
+  activation-arena, and activation-stack storage is either migrated to
+  per-core ownership/explicit interior mutability or remains blocked by the
+  existing `smp` tripwire; AP execution must not run on shared bootstrap
+  descriptor statics.
+- Per-core double-fault IST stacks with unmapped guard pages before stack-trace
+  or deep diagnostic work is allowed on the double-fault path.
 - Per-core local state written by each executing core.
 - Core online state machine tied to actual AP arrival evidence.
 - Watchdog timeout policy that quarantines a non-arriving AP instead of leaving
   startup in an ambiguous state.
 - Recovery/reset story for permanently quarantined core trackers.
+- High-assurance builds can select strict CPU hardening and fail closed when
+  NX, SMEP, SMAP, or UMIP are unavailable.
 - Owner-scoped topology mutation remains enforced after AP execution begins;
   APs report arrival through bounded messages or proof tokens, not arbitrary
   topology writes.
@@ -1857,6 +1864,51 @@ Exit criteria:
 
 - Multiple cores execute Aesynx code and are owned by the AMP/multikernel
   policy.
+
+### v0.35.4 - Multi-Domain Hardening Blockers
+
+Goal:
+
+Close the hardening gaps that must not be carried into multi-domain execution,
+ring-3 userspace, or real-hardware deployment claims.
+
+Deliverables:
+
+- Spectre-class control policy for x86_64 with CPUID/MSR gates for
+  `IBRS/IBPB`, `STIBP`, `SSBD`, and `ARCH_CAPABILITIES`, plus a documented
+  retpoline/IBRS choice.
+- `IA32_SPEC_CTRL` admitted MSR handling and redacted read-back evidence when
+  supported.
+- KASLR/PIE boot plan: kernel build flags, Limine config, executable-address
+  response use, relocation assumptions, and QEMU evidence. If full KASLR is not
+  implemented in this milestone, it remains a tagged blocker before ring 3.
+- x86_64 `RDRAND`/`RDSEED` instruction path with bounded retries and runtime
+  stuck-sample self-test. Raw hardware output must seed only a DRBG, never be
+  exposed directly as a random token.
+- DRBG implementation plan and smoke path that can make
+  `drbg_self_test=true`; until this lands, `random_tokens_available=false`
+  remains the only acceptable production state.
+- Documentation updates that keep static-address/no-DRBG/no-Spectre-control
+  limitations visible as non-deployment claims.
+
+Expected serial:
+
+```text
+[TEST] cpu-hardening=ok
+[TEST] entropy-policy=ok
+```
+
+Verification:
+
+- Host tests for CPUID feature matrix and selected MSR policy.
+- QEMU boot smoke stays honest about unsupported controls.
+- Entropy tests reject stuck or repeated hardware samples.
+
+Exit criteria:
+
+- Aesynx has a concrete, release-gated path for speculative-execution controls,
+  address randomization, and attacker-unpredictable token generation before any
+  multi-domain deployment claim.
 
 ### v0.36.0 - Core-to-Core Ping/Pong
 

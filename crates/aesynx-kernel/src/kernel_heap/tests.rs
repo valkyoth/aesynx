@@ -156,6 +156,26 @@ fn corrupt_free_list_head_is_rejected_before_pointer_deref() -> Result<(), Kerne
 }
 
 #[test]
+fn cyclic_free_list_is_rejected_instead_of_looping() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout =
+        Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+    let first = allocator.allocate_checked(layout)?;
+    let second = allocator.allocate_checked(layout)?;
+
+    allocator.deallocate_checked(first, layout)?;
+    let offset = allocator.offset_for_ptr_for_test(first)?;
+    write_free_next(first, encode_offset(offset));
+    assert_eq!(
+        allocator.deallocate_checked(second, layout),
+        Err(KernelHeapError::CorruptFreeList)
+    );
+    assert!(allocator.stats()?.corrupt_free_list_detected);
+    assert_ne!(allocator.allocated_bytes()?, 0);
+    Ok(())
+}
+
+#[test]
 fn corrupt_free_list_allocation_head_is_rejected_before_pointer_deref()
 -> Result<(), KernelHeapError> {
     let (allocator, _heap) = init_test_allocator()?;
