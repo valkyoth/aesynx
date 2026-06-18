@@ -1,3 +1,5 @@
+use core::fmt;
+
 use aesynx_abi::{CoreId, CpuHardwareId};
 
 use crate::{
@@ -35,12 +37,13 @@ impl CoreAssignmentState {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct CoreTopologyEntry {
     hardware_id: CpuHardwareId,
     local: CoreLocal,
     hardware_state: CoreHardwareState,
     assignment_state: CoreAssignmentState,
+    staged_epoch: Option<u64>,
 }
 
 impl CoreTopologyEntry {
@@ -55,6 +58,7 @@ impl CoreTopologyEntry {
             local: CoreLocal::new(core, CoreRole::Idle, capabilities, CoreState::Offline),
             hardware_state: CoreHardwareState::Discovered,
             assignment_state: CoreAssignmentState::Unassigned,
+            staged_epoch: None,
         }
     }
 
@@ -96,6 +100,19 @@ impl CoreTopologyEntry {
     #[must_use]
     pub const fn telemetry(self) -> CoreLocalTelemetry {
         self.local.telemetry()
+    }
+}
+
+impl fmt::Debug for CoreTopologyEntry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CoreTopologyEntry")
+            .field("hardware_id", &"<redacted>")
+            .field("local", &self.local)
+            .field("hardware_state", &self.hardware_state)
+            .field("assignment_state", &self.assignment_state)
+            .field("staged_epoch", &"<redacted>")
+            .finish()
     }
 }
 
@@ -159,12 +176,24 @@ impl CoreTopologyStatus {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct CoreTopology<const CAPACITY: usize> {
     owner_core: CoreId,
     entries: [Option<CoreTopologyEntry>; CAPACITY],
     len: usize,
     epoch: u64,
+}
+
+impl<const CAPACITY: usize> fmt::Debug for CoreTopology<CAPACITY> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CoreTopology")
+            .field("owner_core", &self.owner_core)
+            .field("len", &self.len)
+            .field("capacity", &CAPACITY)
+            .field("epoch", &"<redacted>")
+            .finish()
+    }
 }
 
 impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
@@ -234,6 +263,7 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         entry.local.stage_startup()?;
         entry.local.telemetry_mut().record_local_event()?;
         self.bump_epoch()?;
+        entry.staged_epoch = Some(self.epoch);
         let ticket = CoreStartupTicket::new(core, entry.hardware_id, caller, self.epoch);
         self.entries[index] = Some(entry);
         Ok(ticket)
@@ -242,14 +272,11 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
     pub fn mark_hardware_online(
         &mut self,
         caller: CoreId,
-        arrival: &CoreStartupArrival,
+        arrival: CoreStartupArrival,
     ) -> Result<(), CoreError> {
         self.require_owner(caller)?;
         if arrival.coordinator_core() != self.owner_core {
             return Err(CoreError::OwnerMismatch);
-        }
-        if arrival.startup_epoch() > self.epoch {
-            return Err(CoreError::StaleStartupEvidence);
         }
         let core = arrival.arrived_core();
         let index = self.index_of_core(core).ok_or(CoreError::UnknownCore)?;
@@ -258,6 +285,9 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         };
         if entry.hardware_state != CoreHardwareState::StartupStaged {
             return Err(CoreError::InvalidStateTransition);
+        }
+        if entry.staged_epoch != Some(arrival.startup_epoch()) {
+            return Err(CoreError::InvalidStartupEpoch);
         }
         if entry.hardware_id != arrival.hardware_id() {
             return Err(CoreError::StartupEvidenceMismatch);

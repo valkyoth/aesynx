@@ -1,7 +1,7 @@
 use aesynx_abi::{CoreId, CpuHardwareId, ROOT_CORE};
 use core::fmt::{self, Write};
 
-use crate::{CoreError, CoreHardwareState, CoreRole, CoreState, CoreTopology};
+use crate::{CoreError, CoreHardwareState, CoreRole, CoreStartupArrival, CoreState, CoreTopology};
 
 use super::qemu_bootstrap_caps;
 
@@ -34,7 +34,7 @@ fn core_topology_rejects_online_role_reassignment() {
         Ok(arrival) => arrival,
         Err(error) => return assert_eq!(Some(error), None),
     };
-    assert!(topology.mark_hardware_online(ROOT_CORE, &arrival).is_ok());
+    assert!(topology.mark_hardware_online(ROOT_CORE, arrival).is_ok());
     let before = topology.get(ROOT_CORE);
 
     assert_eq!(
@@ -79,6 +79,53 @@ fn core_topology_arrival_evidence_requires_matching_ticket() {
             .err(),
         Some(CoreError::StartupEvidenceMismatch)
     );
+}
+
+#[test]
+fn core_topology_rejects_arrival_epoch_that_does_not_match_staging() {
+    let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
+        Ok(topology) => topology,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+    assert!(
+        topology
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(0),
+                qemu_bootstrap_caps()
+            )
+            .is_ok()
+    );
+    let ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let stale_arrival = CoreStartupArrival::new(ROOT_CORE, CpuHardwareId::new(0), ROOT_CORE, 0);
+    let future_arrival =
+        CoreStartupArrival::new(ROOT_CORE, CpuHardwareId::new(0), ROOT_CORE, u64::MAX);
+    let before = topology.get(ROOT_CORE);
+
+    assert_eq!(
+        topology
+            .mark_hardware_online(ROOT_CORE, stale_arrival)
+            .err(),
+        Some(CoreError::InvalidStartupEpoch)
+    );
+    assert_eq!(topology.get(ROOT_CORE), before);
+    assert_eq!(
+        topology
+            .mark_hardware_online(ROOT_CORE, future_arrival)
+            .err(),
+        Some(CoreError::InvalidStartupEpoch)
+    );
+    assert_eq!(topology.get(ROOT_CORE), before);
+
+    let arrival = match ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0)) {
+        Ok(arrival) => arrival,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    assert!(topology.mark_hardware_online(ROOT_CORE, arrival).is_ok());
 }
 
 #[test]

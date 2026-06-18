@@ -215,6 +215,29 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
     Ok(())
 }
 
+#[test]
+fn image_manifest_rejects_newline_path_fields() {
+    let manifest = temp_manifest_path("newline-path");
+    let host_tools = HostToolVersions {
+        rustc: String::from("rustc test"),
+        cargo: String::from("cargo test"),
+        limine: String::from("limine test"),
+        xorriso: String::from("xorriso test"),
+        qemu: String::from("qemu test"),
+    };
+
+    let result = write_manifest(
+        &manifest,
+        &PathBuf::from("/tmp/aesynx.iso\nmulticore_topology_startup_evidence_marker=true"),
+        &PathBuf::from("/tmp/aesynx-kernel"),
+        &host_tools,
+        SmokeKind::Boot,
+    );
+    let _ = fs::remove_file(&manifest);
+
+    assert!(result.is_err());
+}
+
 fn assert_smoke_contract_requires_each_marker(smoke: SmokeKind) {
     let valid = smoke.markers();
     assert!(

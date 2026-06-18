@@ -42,26 +42,32 @@ impl CoreStartupTicket {
         self.coordinator_core
     }
 
-    #[must_use]
-    pub const fn startup_epoch(&self) -> u64 {
-        self.startup_epoch
-    }
-
     pub fn observe_arrival(
         &self,
         arrived_core: CoreId,
         hardware_id: CpuHardwareId,
     ) -> Result<CoreStartupArrival, CoreError> {
-        if arrived_core != self.target_core || hardware_id != self.hardware_id {
+        let core_mismatch = arrived_core != self.target_core;
+        let hardware_mismatch = hardware_id != self.hardware_id;
+        if core_mismatch | hardware_mismatch {
             return Err(CoreError::StartupEvidenceMismatch);
         }
 
-        Ok(CoreStartupArrival {
+        Ok(CoreStartupArrival::new(
             arrived_core,
             hardware_id,
-            coordinator_core: self.coordinator_core,
-            startup_epoch: self.startup_epoch,
-        })
+            self.coordinator_core,
+            self.startup_epoch,
+        ))
+    }
+}
+
+impl Drop for CoreStartupTicket {
+    fn drop(&mut self) {
+        self.hardware_id = CpuHardwareId::new(0);
+        self.coordinator_core = CoreId::new(0);
+        self.startup_epoch = 0;
+        core::hint::black_box((self.hardware_id, self.coordinator_core, self.startup_epoch));
     }
 }
 
@@ -86,6 +92,20 @@ pub struct CoreStartupArrival {
 }
 
 impl CoreStartupArrival {
+    pub(crate) const fn new(
+        arrived_core: CoreId,
+        hardware_id: CpuHardwareId,
+        coordinator_core: CoreId,
+        startup_epoch: u64,
+    ) -> Self {
+        Self {
+            arrived_core,
+            hardware_id,
+            coordinator_core,
+            startup_epoch,
+        }
+    }
+
     #[must_use]
     pub const fn arrived_core(&self) -> CoreId {
         self.arrived_core
@@ -102,8 +122,17 @@ impl CoreStartupArrival {
     }
 
     #[must_use]
-    pub const fn startup_epoch(&self) -> u64 {
+    pub(crate) const fn startup_epoch(&self) -> u64 {
         self.startup_epoch
+    }
+}
+
+impl Drop for CoreStartupArrival {
+    fn drop(&mut self) {
+        self.hardware_id = CpuHardwareId::new(0);
+        self.coordinator_core = CoreId::new(0);
+        self.startup_epoch = 0;
+        core::hint::black_box((self.hardware_id, self.coordinator_core, self.startup_epoch));
     }
 }
 

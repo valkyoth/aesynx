@@ -32,7 +32,7 @@ pub enum CoreError {
     OwnerMismatch,
     RegistryFull,
     RoleMismatch,
-    StaleStartupEvidence,
+    InvalidStartupEpoch,
     StartupEvidenceMismatch,
     TelemetryOverflow,
     UnknownCore,

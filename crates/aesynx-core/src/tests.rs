@@ -310,22 +310,22 @@ fn core_topology_tracks_qemu_four_core_ownership() {
 
     assert!(
         topology
-            .mark_hardware_online(ROOT_CORE, &root_arrival)
+            .mark_hardware_online(ROOT_CORE, root_arrival)
             .is_ok()
     );
     assert!(
         topology
-            .mark_hardware_online(ROOT_CORE, &scheduler_arrival)
+            .mark_hardware_online(ROOT_CORE, scheduler_arrival)
             .is_ok()
     );
     assert!(
         topology
-            .mark_hardware_online(ROOT_CORE, &driver_arrival)
+            .mark_hardware_online(ROOT_CORE, driver_arrival)
             .is_ok()
     );
     assert!(
         topology
-            .mark_hardware_online(ROOT_CORE, &idle_arrival)
+            .mark_hardware_online(ROOT_CORE, idle_arrival)
             .is_ok()
     );
 
