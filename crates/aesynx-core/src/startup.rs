@@ -1,4 +1,6 @@
+use core::cell::Cell;
 use core::fmt;
+use core::marker::PhantomData;
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use aesynx_abi::{CoreId, CpuHardwareId};
@@ -10,6 +12,7 @@ pub struct CoreStartupTicket {
     hardware_id: AtomicU64,
     coordinator_core: AtomicU32,
     startup_epoch: AtomicU64,
+    _not_sync: PhantomData<Cell<()>>,
 }
 
 impl CoreStartupTicket {
@@ -24,6 +27,7 @@ impl CoreStartupTicket {
             hardware_id: AtomicU64::new(hardware_id.get()),
             coordinator_core: AtomicU32::new(coordinator_core.get()),
             startup_epoch: AtomicU64::new(startup_epoch),
+            _not_sync: PhantomData,
         }
     }
 
@@ -104,6 +108,7 @@ pub struct CoreStartupArrival {
     hardware_id: AtomicU64,
     coordinator_core: AtomicU32,
     startup_epoch: AtomicU64,
+    _not_sync: PhantomData<Cell<()>>,
 }
 
 impl CoreStartupArrival {
@@ -118,6 +123,7 @@ impl CoreStartupArrival {
             hardware_id: AtomicU64::new(hardware_id.get()),
             coordinator_core: AtomicU32::new(coordinator_core.get()),
             startup_epoch: AtomicU64::new(startup_epoch),
+            _not_sync: PhantomData,
         }
     }
 
