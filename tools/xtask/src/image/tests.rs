@@ -236,6 +236,17 @@ fn image_manifest_rejects_newline_path_fields() {
     let _ = fs::remove_file(&manifest);
 
     assert!(result.is_err());
+
+    let result = write_manifest(
+        &manifest,
+        &PathBuf::from("/tmp/aesynx.iso"),
+        &PathBuf::from("/tmp/aesynx-kernel\rkernel_cr3_marker=true"),
+        &host_tools,
+        SmokeKind::Boot,
+    );
+    let _ = fs::remove_file(&manifest);
+
+    assert!(result.is_err());
 }
 
 fn assert_smoke_contract_requires_each_marker(smoke: SmokeKind) {
