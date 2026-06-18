@@ -88,6 +88,14 @@ Separate capabilities should exist for:
 No service should gain executable, DMA, persistent, or cross-service sharing
 rights by accident.
 
+Low-level raw frame allocation is different from authority to use memory. The
+Barrelfish experience is a warning here: making every physical-memory operation
+a fine-grained, globally coordinated capability protocol adds complexity and
+coordination latency. Aesynx should keep per-core or owner-local frame
+allocation fast and simple, while capabilities govern higher-level memory
+objects, mappings, sharing, DMA visibility, ownership transfer, executable
+permission, and revocation.
+
 ## Required Invariants
 
 These invariants should become release-gated as the memory subsystem matures:

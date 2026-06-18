@@ -10,6 +10,14 @@ interchangeable threads inside one shared kernel.
 This document tracks requirements that must exist before Aesynx can honestly
 claim a mature multikernel design.
 
+The SOSP 2009 Barrelfish paper is useful evidence for this direction, but
+Aesynx is not trying to clone Barrelfish. The lessons we should keep are:
+explicit inter-core messages, hardware-neutral protocols, replicated state with
+agreement, topology-aware routing, user-space service domains, and a small
+per-core privileged component. The mistakes we should avoid are turning physical
+RAM allocation into a hot global capability protocol and letting distributed
+policy bloat ring 0.
+
 ## Core Principles
 
 - Cores and execution domains have explicit roles and local ownership.
@@ -20,6 +28,37 @@ claim a mature multikernel design.
 - Failed components are isolated, revoked, and restarted where possible.
 - Heterogeneous peers are represented by capability metadata, not hidden behind
   a fake "all cores are identical" abstraction.
+- Ring 0 stays local and minimal; distributed policy runs in isolated monitor or
+  service domains.
+
+## CPU Driver And Monitor Boundary
+
+The long-term privileged component on each core should look more like a local
+CPU driver than a monolithic shared kernel. Its job is to enforce protection and
+perform local mechanism:
+
+- Trap, exception, and interrupt dispatch for the owning core.
+- Local address-space switch and page-table install.
+- Local capability checks for operations it directly enforces.
+- Local scheduler dispatch primitives.
+- Local message endpoint delivery and doorbell/IPI handling.
+- Local hardware access mediation for APIC/MMU/CPU state.
+
+The following do not belong in the permanent ring-0 TCB:
+
+- LLM/model execution or rich AI scoring.
+- Package/store policy.
+- World graph queries or search.
+- Global capability agreement protocols.
+- Rich telemetry aggregation and projections.
+- Driver policy beyond local hardware enforcement.
+- Distributed routing policy beyond validated local message delivery.
+
+Those functions should run as monitor, driver, world, telemetry, package, or AI
+service domains with explicit capabilities. Current in-kernel smokes and models
+are allowed as scaffolding while there is no userspace, but each authority
+surface must have a migration path out of ring 0 before it becomes a production
+claim.
 
 ## Fabric Peers
 
@@ -75,6 +114,11 @@ machine-local design can use owner-core coordination plus two-phase commit for
 critical state. Quorum/consensus algorithms are later work if Aesynx supports
 fault-tolerant peer groups or machine-to-machine clusters.
 
+The coordinator should usually be a monitor/service domain, not arbitrary kernel
+code on every core. The local kernel validates and applies the final local
+mechanism only after the authority protocol has produced a bounded, auditable
+decision.
+
 ## Topology And Routing
 
 Early Aesynx can send direct core-to-core messages. A mature fabric should learn
@@ -91,6 +135,10 @@ and use topology facts:
 
 Routing decisions must remain deterministic and auditable. AI may advise later,
 but a bounded non-AI policy must always exist.
+
+These facts are Aesynx's system-knowledge layer. They should be deterministic,
+bounded, and queryable by monitor/world services. The kernel emits and enforces
+facts; it must not become a general-purpose knowledge database.
 
 ## Naming And Discovery
 
@@ -166,6 +214,31 @@ Zero-copy sharing is useful, but it must stay explicit:
 - The mapper distinguishes declared shared-buffer aliasing from accidental
   physical double ownership.
 
+Raw physical frame allocation should remain local allocator work wherever
+possible. Capabilities authorize memory objects, mapping rights, sharing, DMA,
+ownership transfer, and revocation. They must not turn every hot frame
+allocation/free into a global cross-core agreement path.
+
+## Formal Verification Targets
+
+Testing and pentesting remain required, but they are not enough for
+authority-bearing multikernel primitives. The fabric roadmap should keep the
+core protocols shaped so they can be model-checked or formally verified in
+small pieces.
+
+Priority proof targets:
+
+- AP/core state-machine valid combinations.
+- Local capability checks and unforgeable authority transitions.
+- Fabric message decode/reject behavior.
+- Grant/revoke agreement protocols and stale-epoch failure.
+- Shared-buffer alias rules.
+- Owner-core mutation and quarantine transitions.
+- Topology route selection invariants.
+
+Host model tests should come first; Kani, Verus, Prusti, Coq, or similar tools
+can then be applied where the code shape is stable enough.
+
 ## Security Gates
 
 Before any fabric milestone graduates, release notes must answer:
@@ -192,5 +265,7 @@ The current kernel does not yet implement:
 - Topology-aware routing.
 - Service restart after core failure.
 - Shared-buffer user mappings.
+- User-space monitor domains.
+- Formal proofs of fabric/capability protocols.
 
 Those are roadmap items, not present controls.

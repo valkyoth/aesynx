@@ -13,6 +13,11 @@ security decisions. A native userspace service records those facts, indexes
 them, answers questions, builds context packs, and exposes them to the shell,
 GUI, package manager, diagnostics, and bounded AI helpers.
 
+For the multikernel path, this world layer is also the Aesynx equivalent of a
+system knowledge base: it can hold topology, latency, device locality, package,
+policy, and service-health facts for monitor services to query. The kernel emits
+bounded facts and enforces local decisions; it must not become the query engine.
+
 The goal is not a Linux-style pile of logs plus package databases plus tracing
 tools bolted together later. The goal is a first-class Aesynx concept: the OS
 has a causal memory of what happened, why it happened, who had authority, which

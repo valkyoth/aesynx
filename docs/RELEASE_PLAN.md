@@ -1597,12 +1597,19 @@ This phase deliberately separates mechanism from architecture:
 - **Multikernel fabric:** cross-core work moves by bounded messages,
   capability-aware handoff, and IRQ routing to the owning service core, not by
   growing global locks.
+- **CPU-driver/monitor split:** long-term ring 0 is a local per-core mechanism
+  layer; global policy, topology knowledge, capability agreement, AI, package,
+  telemetry aggregation, and world queries move to isolated monitor/service
+  domains as userspace arrives.
 - **Heterogeneous readiness:** future aarch64 big.LITTLE and x86 P-core/E-core
   systems should fit the same model through core capability/role metadata.
 
 Classic SMP behavior is allowed only as a bring-up compatibility step or a
 documented fallback. It must not become the default design for schedulers,
 drivers, heap ownership, object registries, or capability revocation.
+Cross-core shared locks are not an accepted production mechanism for mutable OS
+state; use owner-core messages, replicated-state protocols, or explicit
+capability-scoped shared buffers.
 
 ### v0.34.0 - AMP Core Data Structures
 
@@ -1722,6 +1729,9 @@ Deliverables:
 - Owner-scoped topology mutation remains enforced after AP execution begins;
   APs report arrival through bounded messages or proof tokens, not arbitrary
   topology writes.
+- AP-side ring-0 work remains within the local CPU-driver subset: local
+  protection, local descriptor/stack setup, local interrupt handling, local
+  message delivery, and local evidence reporting.
 - Documentation that this is multicore bring-up, not a commitment to a
   shared-everything SMP kernel.
 
@@ -1989,6 +1999,45 @@ Exit criteria:
 
 - The roadmap has an explicit path from isolated drivers to restartable service
   domains.
+
+### v0.37.6 - Monitor Boundary And Minimal Ring-0 TCB
+
+Goal:
+
+Define the boundary between the per-core privileged CPU-driver layer and the
+user-space monitor/service domains before the fabric becomes rich enough to
+tempt ring-0 policy growth.
+
+Deliverables:
+
+- CPU-driver contract for local traps, interrupts, address-space switching,
+  capability enforcement, and message endpoint delivery.
+- Monitor/service-domain contract for global capability agreement, routing
+  policy, topology/world queries, telemetry aggregation, package decisions, AI
+  advice, driver policy, and restart orchestration.
+- Migration inventory for current in-kernel scaffolds that must move or split
+  once native userspace exists.
+- Explicit rule that AI/model execution and rich world queries never run in
+  ring 0.
+- Explicit rule that raw physical frame allocation stays owner-local/per-core
+  where possible; capabilities govern memory objects, mappings, sharing, DMA,
+  transfer, executable authority, and revocation.
+- Formal-verification target list for local capability checks, fabric message
+  decoding, shared-buffer alias rules, and replicated authority protocols.
+- Updated security controls that distinguish current QEMU scaffolding from
+  future production TCB claims.
+
+Verification:
+
+- Documentation gate proves every planned fabric authority path names its
+  privileged local mechanism and its monitor/service policy owner.
+- Host model tests or static checks reject new fabric protocol definitions that
+  lack an owner, timeout, stale-epoch behavior, and redaction rule.
+
+Exit criteria:
+
+- Aesynx has a documented path to a small per-core kernel plus isolated
+  monitor/services before distributed policy becomes live.
 
 ## Phase 10: Driver Foundation
 

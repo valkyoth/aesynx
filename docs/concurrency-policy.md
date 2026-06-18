@@ -20,9 +20,16 @@ Important terminology:
   routing, and global policy changes use epochs and message agreement rather
   than a hidden writable singleton.
 
-Locks in this document are for unavoidable bootstrap, hardware-control, and
-temporary shared-state boundaries. They are not permission to evolve Aesynx into
-a classic shared-everything SMP kernel.
+Locks in this document are for unavoidable bootstrap, local owner-core,
+hardware-control, and temporary shared-state boundaries. They are not permission
+to evolve Aesynx into a classic shared-everything SMP kernel.
+
+Production Aesynx must not use a cross-core shared lock to make mutable OS state
+coherent. If a structure can be mutated by more than one core, the default fix is
+an owner-core message, a replicated-state protocol, or an explicitly
+capability-scoped shared-buffer protocol. A shared lock is only acceptable as a
+documented bootstrap or hardware-control exception with a removal/migration
+story in the release notes.
 
 ## Primitive Rules
 
@@ -46,6 +53,9 @@ a classic shared-everything SMP kernel.
 - Lock acquisition must follow the global rank order. Acquiring an equal or
   lower-ranked lock while a higher-ranked lock is held is a policy violation.
 - Lock failures must not partially mutate protected state.
+- A lock that is visible to more than one core must document why owner-core
+  messaging is insufficient and why the exception does not become a permanent
+  shared-kernel design.
 
 ## Lock Rank Order
 
@@ -88,6 +98,8 @@ Before a subsystem becomes multicore-aware, its release notes must answer:
 - Which core owns mutation?
 - If more than one core can observe it, why is message passing insufficient?
 - Which lock rank protects shared mutation?
+- If cross-core mutation is proposed, why is it not modeled as a message to the
+  owner core?
 - Can interrupts preempt mutation on the owning core?
 - Can an IRQ handler acquire the same lock?
 - Are lock-held sections bounded by a fixed small capacity?
@@ -106,6 +118,12 @@ may be coarse, but the ownership must be visible:
 Cross-core mutation should be modeled as a message to the owning core. Direct
 shared mutation needs a release-note justification and a bounded synchronization
 contract.
+
+The long-term per-core privileged component should be CPU-driver-like: local
+trap/interrupt dispatch, local protection checks, local address-space switching,
+and local message delivery. Complex distributed policy belongs in monitor or
+service domains above that local kernel boundary, not in a broad ring-0
+cross-core subsystem.
 
 ## Replicated State Rules
 
