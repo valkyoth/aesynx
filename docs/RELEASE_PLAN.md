@@ -1751,7 +1751,63 @@ Non-goals:
 - No per-core GDT/IDT/TSS/IST installation yet.
 - No cross-core message fabric yet.
 
-### v0.35.2 - x86_64 QEMU AP Startup
+### v0.35.2 - AP Startup Preflight
+
+Goal:
+
+Define and smoke-test the fail-closed resource contract that a future x86_64 AP
+startup path must satisfy before any secondary core is allowed to execute
+Aesynx Rust code.
+
+Deliverables:
+
+- `aesynx-core` AP startup preflight model with owner-scoped mutation.
+- Startup resources are accepted only for topology entries already in
+  `StartupStaged`/`Booting`.
+- Dedicated AP stack ranges must be page-aligned, large enough for early AP
+  entry, non-overlapping, and unique per core.
+- Duplicate logical core IDs, duplicate hardware IDs, overlapping startup
+  stacks, missing watchdog ticks, and non-owner callers fail before mutation.
+- Descriptor-table readiness is explicit. Shared bootstrap-only descriptors are
+  allowed as a documented blocker but make execution disallowed.
+- QEMU topology smoke records `ap_preflight_ok=true` and
+  `ap_execution_blocked_ok=true` before `[TEST] multicore-topology=ok`.
+- Confirm the entropy DRBG implementation remains a scheduled blocker before
+  any AP startup work consumes attacker-unpredictable tokens; v0.35.2 must not
+  introduce random-token consumers while QEMU reports `drbg_self_test=false`.
+- Keep the current general CPU-hardening policy for QEMU unless a deployment
+  selector is added; the strict `NX+SMEP+SMAP+UMIP` policy remains tested but
+  not selected by default.
+- Documentation keeps this as AP startup preflight, not AP execution.
+
+Expected serial:
+
+```text
+multicore-topology qemu_smp_cores_ok=true ... startup_evidence_ok=true ap_preflight_ok=true ap_execution_blocked_ok=true ...
+[TEST] multicore-topology=ok
+```
+
+Verification:
+
+- Host tests cover staged-only preflight resources, non-owner rejection,
+  duplicate stack rejection without mutation, missing watchdog rejection, and
+  descriptor-readiness blocking.
+- QEMU `-smp 4` boot smoke requires the AP preflight markers.
+
+Exit criteria:
+
+- A later AP startup trampoline has a typed, fail-closed launch-resource gate
+  and cannot honestly claim execution readiness while descriptor tables remain
+  shared-bootstrap-only.
+
+Non-goals:
+
+- No AP startup trampoline.
+- No secondary core executes Rust code yet.
+- No per-core GDT/IDT/TSS/IST installation yet.
+- No cross-core message fabric yet.
+
+### v0.35.3 - x86_64 QEMU AP Startup
 
 Goal:
 
@@ -1762,7 +1818,7 @@ Deliverables:
 
 - CPU topology parser backed by firmware or ACPI/MADT data when available.
 - Formal AP/core state table describing allowed local and hardware transitions.
-- AP stacks.
+- AP stacks backed by the v0.35.2 preflight contract.
 - AP startup path.
 - Per-core GDT/IDT/TSS where needed.
 - Per-core double-fault IST stacks with an explicit guard-page plan before
@@ -1772,12 +1828,6 @@ Deliverables:
 - Watchdog timeout policy that quarantines a non-arriving AP instead of leaving
   startup in an ambiguous state.
 - Recovery/reset story for permanently quarantined core trackers.
-- Confirm the entropy DRBG implementation remains a scheduled blocker before
-  any AP startup work consumes attacker-unpredictable tokens; v0.35.2 must not
-  introduce random-token consumers while QEMU reports `drbg_self_test=false`.
-- Keep the current general CPU-hardening policy for QEMU unless a deployment
-  selector is added; the strict `NX+SMEP+SMAP+UMIP` policy remains tested but
-  not selected by default.
 - Owner-scoped topology mutation remains enforced after AP execution begins;
   APs report arrival through bounded messages or proof tokens, not arbitrary
   topology writes.

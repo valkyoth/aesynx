@@ -1,21 +1,21 @@
 use super::smoke::SmokeKind;
 
-const STAGING_DIR_NAME: &str = "aesynx-v0.35.1-iso";
-const IMAGE_NAME: &str = "aesynx-v0.35.1.iso";
-const MANIFEST_NAME: &str = "aesynx-v0.35.1.manifest";
-const SERIAL_LOG_NAME: &str = "aesynx-v0.35.1.serial.log";
-const PANIC_STAGING_DIR_NAME: &str = "aesynx-v0.35.1-panic-iso";
-const PANIC_IMAGE_NAME: &str = "aesynx-v0.35.1-panic.iso";
-const PANIC_MANIFEST_NAME: &str = "aesynx-v0.35.1-panic.manifest";
-const PANIC_SERIAL_LOG_NAME: &str = "aesynx-v0.35.1-panic.serial.log";
-const EXCEPTION_STAGING_DIR_NAME: &str = "aesynx-v0.35.1-exception-iso";
-const EXCEPTION_IMAGE_NAME: &str = "aesynx-v0.35.1-exception.iso";
-const EXCEPTION_MANIFEST_NAME: &str = "aesynx-v0.35.1-exception.manifest";
-const EXCEPTION_SERIAL_LOG_NAME: &str = "aesynx-v0.35.1-exception.serial.log";
-const TIMER_STAGING_DIR_NAME: &str = "aesynx-v0.35.1-timer-iso";
-const TIMER_IMAGE_NAME: &str = "aesynx-v0.35.1-timer.iso";
-const TIMER_MANIFEST_NAME: &str = "aesynx-v0.35.1-timer.manifest";
-const TIMER_SERIAL_LOG_NAME: &str = "aesynx-v0.35.1-timer.serial.log";
+const STAGING_DIR_NAME: &str = "aesynx-v0.35.2-iso";
+const IMAGE_NAME: &str = "aesynx-v0.35.2.iso";
+const MANIFEST_NAME: &str = "aesynx-v0.35.2.manifest";
+const SERIAL_LOG_NAME: &str = "aesynx-v0.35.2.serial.log";
+const PANIC_STAGING_DIR_NAME: &str = "aesynx-v0.35.2-panic-iso";
+const PANIC_IMAGE_NAME: &str = "aesynx-v0.35.2-panic.iso";
+const PANIC_MANIFEST_NAME: &str = "aesynx-v0.35.2-panic.manifest";
+const PANIC_SERIAL_LOG_NAME: &str = "aesynx-v0.35.2-panic.serial.log";
+const EXCEPTION_STAGING_DIR_NAME: &str = "aesynx-v0.35.2-exception-iso";
+const EXCEPTION_IMAGE_NAME: &str = "aesynx-v0.35.2-exception.iso";
+const EXCEPTION_MANIFEST_NAME: &str = "aesynx-v0.35.2-exception.manifest";
+const EXCEPTION_SERIAL_LOG_NAME: &str = "aesynx-v0.35.2-exception.serial.log";
+const TIMER_STAGING_DIR_NAME: &str = "aesynx-v0.35.2-timer-iso";
+const TIMER_IMAGE_NAME: &str = "aesynx-v0.35.2-timer.iso";
+const TIMER_MANIFEST_NAME: &str = "aesynx-v0.35.2-timer.manifest";
+const TIMER_SERIAL_LOG_NAME: &str = "aesynx-v0.35.2-timer.serial.log";
 
 pub struct ImageNames {
     pub image: &'static str,

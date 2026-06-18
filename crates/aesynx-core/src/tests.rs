@@ -5,6 +5,7 @@ use crate::{
     CoreLocal, CorePerformanceClass, CoreRegistry, CoreRole, CoreState, CoreTopology,
 };
 
+mod startup_preflight;
 mod topology;
 
 fn qemu_bootstrap_caps() -> CoreCapabilitySet {

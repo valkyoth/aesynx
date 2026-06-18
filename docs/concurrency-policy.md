@@ -1,6 +1,6 @@
 # Aesynx Concurrency Policy
 
-Status: v0.35.1 AP startup evidence candidate
+Status: v0.35.2 AP startup preflight candidate
 
 This document defines the synchronization contract that future multicore work
 must follow. Current Aesynx boot remains single-core, but shared-state code must

@@ -1,7 +1,8 @@
 use aesynx_abi::{CoreId, CpuHardwareId, ROOT_CORE};
 use aesynx_core::{
-    BootBarrier, CoreCapabilitySet, CoreError, CoreHardwareState, CoreIsa, CorePerformanceClass,
-    CoreRole, CoreTopology, QEMU_MULTICORE_TOPOLOGY_CORES,
+    ApDescriptorTableReadiness, ApStartupPreflight, BootBarrier, CoreCapabilitySet, CoreError,
+    CoreHardwareState, CoreIsa, CorePerformanceClass, CoreRole, CoreTopology,
+    QEMU_MULTICORE_TOPOLOGY_CORES,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -14,6 +15,8 @@ pub struct MulticoreTopologySmokeStatus {
     pub driver_service_ok: bool,
     pub idle_ok: bool,
     pub startup_evidence_ok: bool,
+    pub ap_preflight_ok: bool,
+    pub ap_execution_blocked_ok: bool,
     pub barrier_ok: bool,
 }
 
@@ -66,6 +69,14 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
     topology.assign_role(ROOT_CORE, CoreId::new(2), CoreRole::DriverService)?;
     topology.assign_role(ROOT_CORE, CoreId::new(3), CoreRole::Idle)?;
 
+    let preflight = build_ap_preflight(&topology)?;
+    let preflight_status = preflight.status();
+    let ap_preflight_ok = preflight_status.planned() == 4
+        && preflight_status.stack_ready() == 4
+        && preflight_status.watchdog_ready() == 4
+        && preflight_status.descriptor_ready() == 0;
+    let ap_execution_blocked_ok = !preflight_status.execution_allowed();
+
     let root_arrival = root_ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0))?;
     let scheduler_arrival =
         scheduler_ticket.observe_arrival(CoreId::new(1), CpuHardwareId::new(1))?;
@@ -113,8 +124,33 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
         idle_ok: status.idle_roles() == 1
             && idle.is_some_and(|entry| entry.role() == CoreRole::Idle),
         startup_evidence_ok,
+        ap_preflight_ok,
+        ap_execution_blocked_ok,
         barrier_ok: barrier.status().all_arrived(),
     })
+}
+
+fn build_ap_preflight(
+    topology: &CoreTopology<{ QEMU_MULTICORE_TOPOLOGY_CORES }>,
+) -> Result<ApStartupPreflight<{ QEMU_MULTICORE_TOPOLOGY_CORES }>, CoreError> {
+    let mut preflight = ApStartupPreflight::<{ QEMU_MULTICORE_TOPOLOGY_CORES }>::new(ROOT_CORE)?;
+    let mut index = 0u64;
+    while index < QEMU_MULTICORE_TOPOLOGY_CORES as u64 {
+        let core = CoreId::new(index as u32);
+        let Some(entry) = topology.get(core) else {
+            return Err(CoreError::UnknownCore);
+        };
+        preflight.add_staged_core(
+            ROOT_CORE,
+            entry,
+            aesynx_abi::VirtAddr::new(0xffff_ffff_9000_0000 + (index * 0x1_0000)),
+            0x4000,
+            ApDescriptorTableReadiness::SharedBootstrapOnly,
+            10_000,
+        )?;
+        index += 1;
+    }
+    Ok(preflight)
 }
 
 fn insert_qemu_core(
@@ -154,6 +190,8 @@ mod tests {
         assert!(status.driver_service_ok);
         assert!(status.idle_ok);
         assert!(status.startup_evidence_ok);
+        assert!(status.ap_preflight_ok);
+        assert!(status.ap_execution_blocked_ok);
         assert!(status.barrier_ok);
     }
 }

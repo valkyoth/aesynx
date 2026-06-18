@@ -7,6 +7,7 @@ mod local;
 mod registry;
 mod role;
 mod startup;
+mod startup_preflight;
 mod topology;
 
 pub use barrier::{BootBarrier, BootBarrierStatus};
@@ -15,6 +16,10 @@ pub use local::{CoreLocal, CoreLocalTelemetry, CoreState};
 pub use registry::{CoreRegistry, CoreRegistryStatus};
 pub use role::CoreRole;
 pub use startup::{CoreStartupArrival, CoreStartupTicket};
+pub use startup_preflight::{
+    ApDescriptorTableReadiness, ApStartupPreflight, ApStartupPreflightStatus, ApStartupResource,
+    MIN_AP_STACK_BYTES,
+};
 pub use topology::{
     CoreAssignmentState, CoreHardwareState, CoreTopology, CoreTopologyEntry, CoreTopologyStatus,
     QEMU_MULTICORE_TOPOLOGY_CORES,
@@ -28,7 +33,10 @@ pub enum CoreError {
     CapacityZero,
     DuplicateCore,
     DuplicateHardwareId,
+    DuplicateStartupStack,
     InvalidStateTransition,
+    InvalidStartupStack,
+    MissingStartupWatchdog,
     OwnerMismatch,
     RegistryFull,
     RoleMismatch,
