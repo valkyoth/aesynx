@@ -107,6 +107,29 @@ impl KernelHeapAllocator {
         slab_pages * blocks_per_page
     }
 
+    pub(super) fn release_slab_page_count_locked(
+        &self,
+        class: usize,
+    ) -> Result<(), KernelHeapError> {
+        let mut current = self.slab_pages_by_class[class].load(Ordering::Acquire);
+        loop {
+            let Some(next) = current.checked_sub(1) else {
+                self.corrupt_free_list_detected
+                    .fetch_add(1, Ordering::AcqRel);
+                return Err(KernelHeapError::CorruptFreeList);
+            };
+            match self.slab_pages_by_class[class].compare_exchange_weak(
+                current,
+                next,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => return Ok(()),
+                Err(actual) => current = actual,
+            }
+        }
+    }
+
     pub(super) fn offset_for_ptr(&self, ptr: usize) -> Result<usize, KernelHeapError> {
         let start = self.start.load(Ordering::Acquire);
         let total_bytes = self.total_pages.load(Ordering::Acquire) * KERNEL_HEAP_PAGE_SIZE;

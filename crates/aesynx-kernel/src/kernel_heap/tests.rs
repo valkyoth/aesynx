@@ -180,6 +180,20 @@ fn heap_accounting_overflow_is_visible_without_panic() -> Result<(), KernelHeapE
 }
 
 #[test]
+fn slab_page_counter_underflow_is_visible_without_wrapping() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+
+    assert_eq!(
+        allocator.release_slab_page_count_locked(2),
+        Err(KernelHeapError::CorruptFreeList)
+    );
+
+    assert_eq!(allocator.free_list_step_limit_locked(2), 0);
+    assert!(allocator.stats()?.corrupt_free_list_detected);
+    Ok(())
+}
+
+#[test]
 fn corrupt_free_list_head_is_rejected_before_pointer_deref() -> Result<(), KernelHeapError> {
     let (allocator, _heap) = init_test_allocator()?;
     let layout =

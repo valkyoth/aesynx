@@ -345,6 +345,7 @@ impl KernelHeapAllocator {
         let page_offset = page * KERNEL_HEAP_PAGE_SIZE;
         let page_end = page_offset + KERNEL_HEAP_PAGE_SIZE;
         self.validate_free_list_locked(class)?;
+        self.release_slab_page_count_locked(class)?;
 
         let mut old_head = self.free_heads[class].load(Ordering::Acquire);
         let mut new_head = FREE_LIST_EMPTY;
@@ -361,7 +362,6 @@ impl KernelHeapAllocator {
         self.free_heads[class].store(new_head, Ordering::Release);
         self.page_live_blocks[page].store(0, Ordering::Release);
         self.page_state[page].store(PAGE_FREE, Ordering::Release);
-        self.slab_pages_by_class[class].fetch_sub(1, Ordering::AcqRel);
         Ok(())
     }
 
