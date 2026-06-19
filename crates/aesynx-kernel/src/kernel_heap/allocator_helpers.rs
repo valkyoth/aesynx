@@ -3,8 +3,7 @@ use core::sync::atomic::Ordering;
 use super::allocator::KernelHeapAllocator;
 use super::free_list::{FREE_LIST_EMPTY, decode_valid_offset, read_free_next};
 use super::layout::{
-    KERNEL_HEAP_PAGE_SIZE, KERNEL_HEAP_PAGES, PAGE_FREE, PAGE_SLAB_BASE, SLAB_CLASS_COUNT,
-    SLAB_CLASSES,
+    KERNEL_HEAP_PAGE_SIZE, KERNEL_HEAP_PAGES, PAGE_FREE, SLAB_CLASS_COUNT, SLAB_CLASSES,
 };
 use super::lock::HeapLockGuard;
 use super::stats::KernelHeapError;
@@ -30,7 +29,14 @@ impl KernelHeapAllocator {
         self.frees.store(0, Ordering::Release);
         self.double_free_detected.store(0, Ordering::Release);
         self.invalid_free_detected.store(0, Ordering::Release);
+        self.accounting_overflow_detected
+            .store(0, Ordering::Release);
         self.corrupt_free_list_detected.store(0, Ordering::Release);
+        let mut class = 0usize;
+        while class < SLAB_CLASS_COUNT {
+            self.slab_pages_by_class[class].store(0, Ordering::Release);
+            class += 1;
+        }
     }
 
     pub(super) fn find_free_page_locked(&self) -> Result<usize, KernelHeapError> {
@@ -96,17 +102,8 @@ impl KernelHeapAllocator {
     }
 
     pub(super) fn free_list_step_limit_locked(&self, class: usize) -> usize {
-        let total_pages = self.total_pages.load(Ordering::Acquire);
-        let page_state = PAGE_SLAB_BASE + class;
         let blocks_per_page = KERNEL_HEAP_PAGE_SIZE / SLAB_CLASSES[class];
-        let mut slab_pages = 0usize;
-        let mut page = 0usize;
-        while page < total_pages {
-            if self.page_state[page].load(Ordering::Acquire) == page_state {
-                slab_pages += 1;
-            }
-            page += 1;
-        }
+        let slab_pages = self.slab_pages_by_class[class].load(Ordering::Acquire);
         slab_pages * blocks_per_page
     }
 
@@ -130,7 +127,7 @@ impl KernelHeapAllocator {
         let mut current = self.allocated_bytes.load(Ordering::Acquire);
         let current = loop {
             let Some(next) = current.checked_add(bytes) else {
-                self.corrupt_free_list_detected
+                self.accounting_overflow_detected
                     .fetch_add(1, Ordering::AcqRel);
                 return;
             };

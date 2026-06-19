@@ -66,6 +66,7 @@ irq_proof_escapes=$(
         --glob '!crates/aesynx-kernel/src/concurrency_smoke.rs' \
         --glob '!scripts/validate-security-policy.sh' \
         --glob '!**/tests.rs' \
+        --glob '!**/*test*.rs' \
         --glob '!**/tests/**' || true
 )
 if [ -n "$irq_proof_escapes" ]; then

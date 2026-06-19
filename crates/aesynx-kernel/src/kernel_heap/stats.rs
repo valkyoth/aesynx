@@ -9,6 +9,7 @@ pub struct KernelHeapStatus {
     pub frees: usize,
     pub double_free_detected: bool,
     pub invalid_free_detected: bool,
+    pub accounting_overflow_detected: bool,
     pub corrupt_free_list_detected: bool,
     pub box_ok: bool,
     pub vec_ok: bool,
@@ -28,6 +29,7 @@ pub struct KernelHeapStats {
     pub frees: usize,
     pub double_free_detected: bool,
     pub invalid_free_detected: bool,
+    pub accounting_overflow_detected: bool,
     pub corrupt_free_list_detected: bool,
 }
 

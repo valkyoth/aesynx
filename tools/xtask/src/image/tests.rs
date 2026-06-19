@@ -88,6 +88,12 @@ fn boot_smoke_requires_full_current_marker_set() {
         &missing_heap_invalid_free,
         SmokeKind::Boot
     ));
+    let missing_heap_accounting_overflow =
+        valid.replacen("accounting_overflow_detected=false", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_heap_accounting_overflow,
+        SmokeKind::Boot
+    ));
     let missing_heap_corrupt_free_list = valid.replacen("corrupt_free_list_detected=false", "", 1);
     assert!(!serial_log_contents_match(
         &missing_heap_corrupt_free_list,

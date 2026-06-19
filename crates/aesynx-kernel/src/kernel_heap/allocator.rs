@@ -32,6 +32,7 @@ pub struct KernelHeapAllocator {
     pub(super) page_state: [AtomicUsize; KERNEL_HEAP_PAGES],
     pub(super) run_pages: [AtomicUsize; KERNEL_HEAP_PAGES],
     pub(super) page_live_blocks: [AtomicUsize; KERNEL_HEAP_PAGES],
+    pub(super) slab_pages_by_class: [AtomicUsize; SLAB_CLASS_COUNT],
     pub(super) allocated_bytes: AtomicUsize,
     pub(super) peak_allocated_bytes: AtomicUsize,
     pub(super) slab_allocations: AtomicUsize,
@@ -39,6 +40,7 @@ pub struct KernelHeapAllocator {
     pub(super) frees: AtomicUsize,
     pub(super) double_free_detected: AtomicUsize,
     pub(super) invalid_free_detected: AtomicUsize,
+    pub(super) accounting_overflow_detected: AtomicUsize,
     pub(super) corrupt_free_list_detected: AtomicUsize,
 }
 
@@ -53,6 +55,7 @@ impl KernelHeapAllocator {
             page_state: [const { AtomicUsize::new(PAGE_FREE) }; KERNEL_HEAP_PAGES],
             run_pages: [const { AtomicUsize::new(0) }; KERNEL_HEAP_PAGES],
             page_live_blocks: [const { AtomicUsize::new(0) }; KERNEL_HEAP_PAGES],
+            slab_pages_by_class: [const { AtomicUsize::new(0) }; SLAB_CLASS_COUNT],
             allocated_bytes: AtomicUsize::new(0),
             peak_allocated_bytes: AtomicUsize::new(0),
             slab_allocations: AtomicUsize::new(0),
@@ -60,6 +63,7 @@ impl KernelHeapAllocator {
             frees: AtomicUsize::new(0),
             double_free_detected: AtomicUsize::new(0),
             invalid_free_detected: AtomicUsize::new(0),
+            accounting_overflow_detected: AtomicUsize::new(0),
             corrupt_free_list_detected: AtomicUsize::new(0),
         }
     }
@@ -127,6 +131,8 @@ impl KernelHeapAllocator {
             frees: self.frees.load(Ordering::Acquire),
             double_free_detected: self.double_free_detected.load(Ordering::Acquire) != 0,
             invalid_free_detected: self.invalid_free_detected.load(Ordering::Acquire) != 0,
+            accounting_overflow_detected: self.accounting_overflow_detected.load(Ordering::Acquire)
+                != 0,
             corrupt_free_list_detected: self.corrupt_free_list_detected.load(Ordering::Acquire)
                 != 0,
         })
@@ -225,6 +231,7 @@ impl KernelHeapAllocator {
     fn populate_slab_page_locked(&self, class: usize) -> Result<(), KernelHeapError> {
         let page = self.find_free_page_locked()?;
         self.page_state[page].store(PAGE_SLAB_BASE + class, Ordering::Release);
+        self.slab_pages_by_class[class].fetch_add(1, Ordering::AcqRel);
         self.page_live_blocks[page].store(0, Ordering::Release);
         let block_size = SLAB_CLASSES[class];
         let page_offset = page * KERNEL_HEAP_PAGE_SIZE;
@@ -354,6 +361,7 @@ impl KernelHeapAllocator {
         self.free_heads[class].store(new_head, Ordering::Release);
         self.page_live_blocks[page].store(0, Ordering::Release);
         self.page_state[page].store(PAGE_FREE, Ordering::Release);
+        self.slab_pages_by_class[class].fetch_sub(1, Ordering::AcqRel);
         Ok(())
     }
 

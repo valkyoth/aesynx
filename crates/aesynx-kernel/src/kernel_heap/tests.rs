@@ -149,6 +149,7 @@ fn free_list_scan_limit_tracks_allocated_slab_pages() -> Result<(), KernelHeapEr
         KERNEL_HEAP_PAGE_SIZE / 64
     );
     allocator.deallocate_checked(ptr, layout)?;
+    assert_eq!(allocator.free_list_step_limit_locked(2), 0);
     Ok(())
 }
 
@@ -173,7 +174,8 @@ fn heap_accounting_overflow_is_visible_without_panic() -> Result<(), KernelHeapE
     allocator.record_allocation(16);
 
     assert_eq!(allocator.allocated_bytes()?, usize::MAX - 1);
-    assert!(allocator.stats()?.corrupt_free_list_detected);
+    assert!(allocator.stats()?.accounting_overflow_detected);
+    assert!(!allocator.stats()?.corrupt_free_list_detected);
     Ok(())
 }
 
@@ -312,6 +314,7 @@ fn stats_track_allocations_frees_and_peak() -> Result<(), KernelHeapError> {
     assert_eq!(stats.slab_allocations, 1);
     assert_eq!(stats.page_allocations, 1);
     assert_eq!(stats.frees, 2);
+    assert!(!stats.accounting_overflow_detected);
     assert!(!stats.corrupt_free_list_detected);
     Ok(())
 }
