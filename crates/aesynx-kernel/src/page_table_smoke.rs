@@ -244,11 +244,11 @@ pub fn run() -> Result<PageTableSmokeStatus, PageTableSmokeError> {
     let visited_pages = mapper
         .visit_mappings(|entry| {
             let mapping = entry.mapping();
-            if entry.virt() == SMOKE_RANGE_VIRT && mapping == expected_range_first {
-                visited_range_pages += 1;
-            } else if entry.virt() == aesynx_abi::VirtAddr::new(SMOKE_RANGE_VIRT.get() + 0x1000)
-                && mapping == expected_range_second
-            {
+            let visits_expected_range_page = (entry.virt() == SMOKE_RANGE_VIRT
+                && mapping == expected_range_first)
+                || (entry.virt() == aesynx_abi::VirtAddr::new(SMOKE_RANGE_VIRT.get() + 0x1000)
+                    && mapping == expected_range_second);
+            if visits_expected_range_page {
                 visited_range_pages += 1;
             }
             Ok(())

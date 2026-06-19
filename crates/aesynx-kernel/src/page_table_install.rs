@@ -256,12 +256,13 @@ extern "C" fn activate_on_kernel_stack(
     root_phys: u64,
     allocator: &'static crate::kernel_heap::KernelHeapAllocator,
 ) -> ! {
-    // SAFETY: The caller switched to the private activation stack and passes
-    // the physical root of the static activation arena populated from the
-    // audited mapper immediately before this terminal handoff.
-    if let Err(error) =
+    let load_result = {
+        // SAFETY: The caller switched to the private activation stack and
+        // passes the physical root of the static activation arena populated
+        // from the audited mapper immediately before this terminal handoff.
         unsafe { aesynx_arch_x86_64::registers::load_cr3(aesynx_abi::PhysAddr::new(root_phys)) }
-    {
+    };
+    if let Err(error) = load_result {
         aesynx_arch_x86_64::serial_println!("kernel-cr3 load_error={:?}", error);
         aesynx_arch_x86_64::serial::write_str("[TEST] kernel-cr3=fail\n");
         aesynx_arch_x86_64::X86_64::halt_forever()
@@ -270,12 +271,17 @@ extern "C" fn activate_on_kernel_stack(
     match aesynx_arch_x86_64::cpu_hardening::init() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "cpu-hardening nx={} wp={} smep={} smap={} umip={}",
+                "cpu-hardening nx={} wp={} smep={} smap={} umip={} ibrs={} ibpb_supported={} stibp={} ssbd={} arch_capabilities={}",
                 status.nx_enabled,
                 status.wp_enabled,
                 status.smep_enabled,
                 status.smap_enabled,
-                status.umip_enabled
+                status.umip_enabled,
+                status.ibrs_enabled,
+                status.ibpb_supported,
+                status.stibp_enabled,
+                status.ssbd_enabled,
+                status.arch_capabilities_supported
             );
             aesynx_arch_x86_64::serial::write_str("[TEST] cpu-hardening=ok\n");
         }

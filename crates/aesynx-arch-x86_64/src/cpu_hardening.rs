@@ -5,9 +5,17 @@ const CPUID_EXT_FEATURE_EDX_NX: u32 = 1 << 20;
 const CPUID_LEAF_7_EBX_SMEP: u32 = 1 << 7;
 const CPUID_LEAF_7_EBX_SMAP: u32 = 1 << 20;
 const CPUID_LEAF_7_ECX_UMIP: u32 = 1 << 2;
+const CPUID_LEAF_7_EDX_IBRS_IBPB: u32 = 1 << 26;
+const CPUID_LEAF_7_EDX_STIBP: u32 = 1 << 27;
+const CPUID_LEAF_7_EDX_ARCH_CAPABILITIES: u32 = 1 << 29;
+const CPUID_LEAF_7_EDX_SSBD: u32 = 1 << 31;
 
 const MSR_EFER: u32 = 0xc000_0080;
+const MSR_IA32_SPEC_CTRL: u32 = 0x0000_0048;
 const EFER_NXE: u64 = 1 << 11;
+const SPEC_CTRL_IBRS: u64 = 1 << 0;
+const SPEC_CTRL_STIBP: u64 = 1 << 1;
+const SPEC_CTRL_SSBD: u64 = 1 << 2;
 const CR0_WP: u64 = 1 << 16;
 const CR4_UMIP: u64 = 1 << 11;
 const CR4_SMEP: u64 = 1 << 20;
@@ -16,12 +24,14 @@ const CR4_SMAP: u64 = 1 << 21;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AdmittedMsr {
     Efer,
+    SpecCtrl,
 }
 
 impl AdmittedMsr {
     const fn index(self) -> u32 {
         match self {
             Self::Efer => MSR_EFER,
+            Self::SpecCtrl => MSR_IA32_SPEC_CTRL,
         }
     }
 }
@@ -32,6 +42,16 @@ pub struct CpuHardeningCapabilities {
     pub smep: bool,
     pub smap: bool,
     pub umip: bool,
+    pub ibrs_ibpb: bool,
+    pub stibp: bool,
+    pub ssbd: bool,
+    pub arch_capabilities: bool,
+}
+
+impl CpuHardeningCapabilities {
+    const fn spec_ctrl_supported(self) -> bool {
+        self.ibrs_ibpb || self.stibp || self.ssbd
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -41,6 +61,10 @@ pub struct CpuHardeningPlan {
     pub enable_smep: bool,
     pub enable_smap: bool,
     pub enable_umip: bool,
+    pub enable_ibrs: bool,
+    pub enable_stibp: bool,
+    pub enable_ssbd: bool,
+    pub arch_capabilities_supported: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -50,25 +74,36 @@ pub struct CpuHardeningStatus {
     pub smep_enabled: bool,
     pub smap_enabled: bool,
     pub umip_enabled: bool,
+    pub ibrs_enabled: bool,
+    pub ibpb_supported: bool,
+    pub stibp_enabled: bool,
+    pub ssbd_enabled: bool,
+    pub arch_capabilities_supported: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CpuHardeningError {
     HardeningWriteDidNotStick,
     NxUnavailable,
+    ArchCapabilitiesUnavailable,
+    IbrsIbpbUnavailable,
     SmapUnavailable,
     SmepUnavailable,
+    SsbdUnavailable,
+    StibpUnavailable,
     UmipUnavailable,
 }
 
 pub fn init() -> Result<CpuHardeningStatus, CpuHardeningError> {
-    let plan = selected_boot_plan(detect_capabilities())?;
+    let capabilities = detect_capabilities();
+    let plan = selected_boot_plan(capabilities)?;
     // SAFETY: The plan is derived from CPUID feature bits and requires NX
     // support before EFER.NXE is written. Optional CR4 features are enabled
-    // only when CPUID reports support. This function is called during the
+    // only when CPUID reports support. IA32_SPEC_CTRL bits are requested only
+    // when CPUID reports their controls. This function is called during the
     // terminal single-core boot smoke after Aesynx owns CR3.
     unsafe { apply_plan(plan) };
-    let status = read_status();
+    let status = read_status(capabilities);
     verify_applied(plan, status)?;
     Ok(status)
 }
@@ -91,12 +126,25 @@ pub fn detect_capabilities() -> CpuHardeningCapabilities {
     let smep = leaf_7_supported && cpuid_ebx(CPUID_LEAF_7, 0) & CPUID_LEAF_7_EBX_SMEP != 0;
     let smap = leaf_7_supported && cpuid_ebx(CPUID_LEAF_7, 0) & CPUID_LEAF_7_EBX_SMAP != 0;
     let umip = leaf_7_supported && cpuid_ecx(CPUID_LEAF_7, 0) & CPUID_LEAF_7_ECX_UMIP != 0;
+    let leaf_7_edx = if leaf_7_supported {
+        cpuid_edx(CPUID_LEAF_7, 0)
+    } else {
+        0
+    };
+    let ibrs_ibpb = leaf_7_edx & CPUID_LEAF_7_EDX_IBRS_IBPB != 0;
+    let stibp = leaf_7_edx & CPUID_LEAF_7_EDX_STIBP != 0;
+    let ssbd = leaf_7_edx & CPUID_LEAF_7_EDX_SSBD != 0;
+    let arch_capabilities = leaf_7_edx & CPUID_LEAF_7_EDX_ARCH_CAPABILITIES != 0;
 
     CpuHardeningCapabilities {
         nx,
         smep,
         smap,
         umip,
+        ibrs_ibpb,
+        stibp,
+        ssbd,
+        arch_capabilities,
     }
 }
 
@@ -114,6 +162,10 @@ impl CpuHardeningPlan {
             enable_smep: capabilities.smep,
             enable_smap: capabilities.smap,
             enable_umip: capabilities.umip,
+            enable_ibrs: capabilities.ibrs_ibpb,
+            enable_stibp: capabilities.stibp,
+            enable_ssbd: capabilities.ssbd,
+            arch_capabilities_supported: capabilities.arch_capabilities,
         })
     }
 
@@ -132,6 +184,18 @@ impl CpuHardeningPlan {
         if !capabilities.umip {
             return Err(CpuHardeningError::UmipUnavailable);
         }
+        if !capabilities.ibrs_ibpb {
+            return Err(CpuHardeningError::IbrsIbpbUnavailable);
+        }
+        if !capabilities.stibp {
+            return Err(CpuHardeningError::StibpUnavailable);
+        }
+        if !capabilities.ssbd {
+            return Err(CpuHardeningError::SsbdUnavailable);
+        }
+        if !capabilities.arch_capabilities {
+            return Err(CpuHardeningError::ArchCapabilitiesUnavailable);
+        }
 
         Ok(Self {
             enable_nx: true,
@@ -139,24 +203,50 @@ impl CpuHardeningPlan {
             enable_smep: true,
             enable_smap: true,
             enable_umip: true,
+            enable_ibrs: true,
+            enable_stibp: true,
+            enable_ssbd: true,
+            arch_capabilities_supported: true,
         })
     }
 }
 
 impl CpuHardeningStatus {
-    const fn from_registers(efer: u64, cr0: u64, cr4: u64) -> Self {
+    const fn from_registers(
+        efer: u64,
+        cr0: u64,
+        cr4: u64,
+        spec_ctrl: u64,
+        capabilities: CpuHardeningCapabilities,
+    ) -> Self {
         Self {
             nx_enabled: efer & EFER_NXE != 0,
             wp_enabled: cr0 & CR0_WP != 0,
             smep_enabled: cr4 & CR4_SMEP != 0,
             smap_enabled: cr4 & CR4_SMAP != 0,
             umip_enabled: cr4 & CR4_UMIP != 0,
+            ibrs_enabled: spec_ctrl & SPEC_CTRL_IBRS != 0,
+            ibpb_supported: capabilities.ibrs_ibpb,
+            stibp_enabled: spec_ctrl & SPEC_CTRL_STIBP != 0,
+            ssbd_enabled: spec_ctrl & SPEC_CTRL_SSBD != 0,
+            arch_capabilities_supported: capabilities.arch_capabilities,
         }
     }
 }
 
-fn read_status() -> CpuHardeningStatus {
-    CpuHardeningStatus::from_registers(read_msr(AdmittedMsr::Efer), read_cr0(), read_cr4())
+fn read_status(capabilities: CpuHardeningCapabilities) -> CpuHardeningStatus {
+    let spec_ctrl = if capabilities.spec_ctrl_supported() {
+        read_msr(AdmittedMsr::SpecCtrl)
+    } else {
+        0
+    };
+    CpuHardeningStatus::from_registers(
+        read_msr(AdmittedMsr::Efer),
+        read_cr0(),
+        read_cr4(),
+        spec_ctrl,
+        capabilities,
+    )
 }
 
 const fn verify_applied(
@@ -168,6 +258,10 @@ const fn verify_applied(
         || (plan.enable_smep && !status.smep_enabled)
         || (plan.enable_smap && !status.smap_enabled)
         || (plan.enable_umip && !status.umip_enabled)
+        || (plan.enable_ibrs && !status.ibrs_enabled)
+        || (plan.enable_stibp && !status.stibp_enabled)
+        || (plan.enable_ssbd && !status.ssbd_enabled)
+        || (plan.arch_capabilities_supported && !status.arch_capabilities_supported)
     {
         return Err(CpuHardeningError::HardeningWriteDidNotStick);
     }
@@ -210,6 +304,28 @@ unsafe fn apply_plan(plan: CpuHardeningPlan) {
     // CPUID-gated hardening features.
     unsafe {
         write_cr4(cr4);
+    }
+
+    let mut spec_ctrl = 0u64;
+    if plan.enable_ibrs || plan.enable_stibp || plan.enable_ssbd {
+        spec_ctrl = read_msr(AdmittedMsr::SpecCtrl);
+    }
+    if plan.enable_ibrs {
+        spec_ctrl |= SPEC_CTRL_IBRS;
+    }
+    if plan.enable_stibp {
+        spec_ctrl |= SPEC_CTRL_STIBP;
+    }
+    if plan.enable_ssbd {
+        spec_ctrl |= SPEC_CTRL_SSBD;
+    }
+    if plan.enable_ibrs || plan.enable_stibp || plan.enable_ssbd {
+        // SAFETY: `AdmittedMsr::SpecCtrl` is the architectural IA32_SPEC_CTRL
+        // MSR. The plan enables only CPUID-gated speculative-execution control
+        // bits and preserves all existing bits read from the register.
+        unsafe {
+            write_msr(AdmittedMsr::SpecCtrl, spec_ctrl);
+        }
     }
 }
 

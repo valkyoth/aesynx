@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.35.3 AP startup state-table candidate
+Status: v0.35.4 hardening blockers candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.35.3.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.35.4.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 QEMU version banners, and `qemu_smp_cpus=4`. `cargo xtask qemu` starts QEMU
 with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
@@ -123,23 +123,23 @@ with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
 Decode the captured boot trace:
 
 ```bash
-cargo xtask trace-decode build/qemu/aesynx-v0.35.3.serial.log
+cargo xtask trace-decode build/qemu/aesynx-v0.35.4.serial.log
 ```
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.35.3-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.35.4-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.35.3-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.35.4-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.35.3-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.35.4-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -222,7 +222,7 @@ work begins. The v0.34.0 candidate added the first AMP core data structures:
 owner-scoped core registries, local telemetry, and sealed boot barriers. QEMU
 proves the bootstrap core is represented by that model with
 `bootstrap_role_ok`, `capabilities_ok`, `registry_ok`, `telemetry_ok`, and
-`barrier_ok` before `[TEST] amp-core=ok`. The v0.35.3 candidate runs QEMU with
+`barrier_ok` before `[TEST] amp-core=ok`. The v0.35.4 candidate runs QEMU with
 `-smp 4`, records `qemu_smp_cpus=4`, and models a four-core topology with
 separate hardware-online and Aesynx role-assignment state. Hardware-online
 transitions now require owner-issued startup tickets and matching AP arrival

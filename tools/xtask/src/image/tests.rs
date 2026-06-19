@@ -126,28 +126,28 @@ fn qemu_smoke_runs_four_virtual_cpus() {
 #[test]
 fn image_artifact_names_track_current_candidate_version() {
     let boot = image_names(SmokeKind::Boot);
-    assert_eq!(boot.image, "aesynx-v0.35.3.iso");
-    assert_eq!(boot.manifest, "aesynx-v0.35.3.manifest");
-    assert_eq!(boot.serial_log, "aesynx-v0.35.3.serial.log");
-    assert_eq!(boot.staging_dir, "aesynx-v0.35.3-iso");
+    assert_eq!(boot.image, "aesynx-v0.35.4.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.35.4.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.35.4.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.35.4-iso");
 
     let panic = image_names(SmokeKind::Panic);
-    assert_eq!(panic.image, "aesynx-v0.35.3-panic.iso");
-    assert_eq!(panic.manifest, "aesynx-v0.35.3-panic.manifest");
-    assert_eq!(panic.serial_log, "aesynx-v0.35.3-panic.serial.log");
-    assert_eq!(panic.staging_dir, "aesynx-v0.35.3-panic-iso");
+    assert_eq!(panic.image, "aesynx-v0.35.4-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.35.4-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.35.4-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.35.4-panic-iso");
 
     let exception = image_names(SmokeKind::Exception);
-    assert_eq!(exception.image, "aesynx-v0.35.3-exception.iso");
-    assert_eq!(exception.manifest, "aesynx-v0.35.3-exception.manifest");
-    assert_eq!(exception.serial_log, "aesynx-v0.35.3-exception.serial.log");
-    assert_eq!(exception.staging_dir, "aesynx-v0.35.3-exception-iso");
+    assert_eq!(exception.image, "aesynx-v0.35.4-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.35.4-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.35.4-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.35.4-exception-iso");
 
     let timer = image_names(SmokeKind::Timer);
-    assert_eq!(timer.image, "aesynx-v0.35.3-timer.iso");
-    assert_eq!(timer.manifest, "aesynx-v0.35.3-timer.manifest");
-    assert_eq!(timer.serial_log, "aesynx-v0.35.3-timer.serial.log");
-    assert_eq!(timer.staging_dir, "aesynx-v0.35.3-timer-iso");
+    assert_eq!(timer.image, "aesynx-v0.35.4-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.35.4-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.35.4-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.35.4-timer-iso");
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
-    assert!(contents.contains("name=Aesynx v0.35.3 AP state-table candidate\n"));
+    assert!(contents.contains("name=Aesynx v0.35.4 hardening blockers candidate\n"));
     assert!(contents.contains("multicore_topology_state_table_marker=state_table_ok=true\n"));
     assert!(contents.contains("multicore_topology_ap_preflight_marker=ap_preflight_ok=true\n"));
     assert!(
