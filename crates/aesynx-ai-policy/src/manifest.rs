@@ -14,7 +14,7 @@ pub const MAX_MODEL_MEMORY_BYTES: u32 = 1_048_576;
 ///
 /// Construction only proves the field is present and nonzero. It does not
 /// verify that bytes loaded from storage match this hash.
-#[derive(Clone, Copy, Eq)]
+#[derive(Clone, Copy)]
 pub struct Hash256([u8; 32]);
 
 impl Hash256 {
@@ -39,19 +39,13 @@ impl fmt::Debug for Hash256 {
     }
 }
 
-impl PartialEq for Hash256 {
-    fn eq(&self, other: &Self) -> bool {
-        structural_eq_not_crypto(&self.0, &other.0)
-    }
-}
-
 /// A nonzero 64-byte signature metadata field.
 ///
 /// # Security
 ///
 /// Construction only proves the field is present and nonzero. It does not
 /// cryptographically verify a manifest, model object, or model weights.
-#[derive(Clone, Copy, Eq)]
+#[derive(Clone, Copy)]
 pub struct Signature64([u8; 64]);
 
 impl Signature64 {
@@ -73,12 +67,6 @@ impl Signature64 {
 impl fmt::Debug for Signature64 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Signature64(<redacted>)")
-    }
-}
-
-impl PartialEq for Signature64 {
-    fn eq(&self, other: &Self) -> bool {
-        structural_eq_not_crypto(&self.0, &other.0)
     }
 }
 
@@ -181,10 +169,11 @@ impl ModelSafetyLimits {
 /// [`ModelObjectManifest::validate_for_domain`] before admitting it to a
 /// policy domain.
 ///
-/// `PartialEq` is for structural tests and non-authentication comparisons. It
-/// is not a constant-time manifest verifier; future cryptographic checks must
-/// verify signatures and hashes directly.
-#[derive(Clone, Copy, Eq, PartialEq)]
+/// This type intentionally does not implement equality because it contains
+/// hash and signature metadata that must never be compared as an authentication
+/// shortcut. Future cryptographic checks must verify signatures and hashes
+/// directly.
+#[derive(Clone, Copy)]
 pub struct ModelObjectManifest {
     pub id: ModelId,
     pub schema_version: u16,
@@ -268,7 +257,7 @@ impl ModelObjectManifest {
 /// must not be treated as an authenticated manifest. Callers that load model
 /// weights must perform real signature/hash verification before trusting the
 /// metadata carried by this type.
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy)]
 #[must_use = "structural validation only; cryptographic verification is still required before trust"]
 pub struct StructurallyCheckedModelManifest {
     manifest: ModelObjectManifest,
@@ -319,16 +308,4 @@ const fn all_zero_64(bytes: &[u8; 64]) -> bool {
         index += 1;
     }
     true
-}
-
-// SECURITY: structural equality only. This is not a cryptographic verifier and
-// must not be used to authenticate manifests, signatures, or model weights.
-fn structural_eq_not_crypto<const LEN: usize>(left: &[u8; LEN], right: &[u8; LEN]) -> bool {
-    let mut diff = 0u8;
-    let mut index = 0;
-    while index < LEN {
-        diff |= left[index] ^ right[index];
-        index += 1;
-    }
-    core::hint::black_box(diff) == 0
 }

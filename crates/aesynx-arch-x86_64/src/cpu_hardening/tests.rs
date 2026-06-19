@@ -1,12 +1,14 @@
 use super::{
     AdmittedMsr, CR0_WP, CR4_SMAP, CR4_SMEP, CR4_UMIP, CpuHardeningCapabilities, CpuHardeningError,
-    CpuHardeningPlan, CpuHardeningStatus, EFER_NXE, MSR_EFER, MSR_IA32_SPEC_CTRL, SPEC_CTRL_IBRS,
-    SPEC_CTRL_SSBD, SPEC_CTRL_STIBP, selected_boot_plan, verify_applied,
+    CpuHardeningPlan, CpuHardeningStatus, EFER_NXE, MSR_EFER, MSR_IA32_PRED_CMD,
+    MSR_IA32_SPEC_CTRL, SPEC_CTRL_IBRS, SPEC_CTRL_SSBD, SPEC_CTRL_STIBP, selected_boot_plan,
+    verify_applied,
 };
 
 #[test]
 fn admitted_msr_set_is_explicit() {
     assert_eq!(AdmittedMsr::Efer.index(), MSR_EFER);
+    assert_eq!(AdmittedMsr::PredCmd.index(), MSR_IA32_PRED_CMD);
     assert_eq!(AdmittedMsr::SpecCtrl.index(), MSR_IA32_SPEC_CTRL);
 }
 
@@ -16,7 +18,8 @@ const fn base_capabilities() -> CpuHardeningCapabilities {
         smep: true,
         smap: true,
         umip: true,
-        ibrs_ibpb: true,
+        ibrs: true,
+        ibpb: true,
         stibp: true,
         ssbd: true,
         arch_capabilities: true,
@@ -43,7 +46,8 @@ fn hardening_policy_enables_required_and_supported_bits() {
         smep: true,
         smap: false,
         umip: true,
-        ibrs_ibpb: true,
+        ibrs: true,
+        ibpb: true,
         stibp: false,
         ssbd: true,
         arch_capabilities: true,
@@ -58,6 +62,7 @@ fn hardening_policy_enables_required_and_supported_bits() {
             enable_smep: true,
             enable_smap: false,
             enable_umip: true,
+            enable_ibpb: true,
             enable_ibrs: true,
             enable_stibp: false,
             enable_ssbd: true,
@@ -101,7 +106,11 @@ fn strict_hardening_policy_rejects_missing_optional_bits() {
 #[test]
 fn strict_hardening_policy_rejects_missing_speculative_controls() {
     let no_ibrs = CpuHardeningCapabilities {
-        ibrs_ibpb: false,
+        ibrs: false,
+        ..base_capabilities()
+    };
+    let no_ibpb = CpuHardeningCapabilities {
+        ibpb: false,
         ..base_capabilities()
     };
     let no_stibp = CpuHardeningCapabilities {
@@ -119,6 +128,10 @@ fn strict_hardening_policy_rejects_missing_speculative_controls() {
 
     assert_eq!(
         CpuHardeningPlan::strict_required(no_ibrs),
+        Err(CpuHardeningError::IbrsIbpbUnavailable)
+    );
+    assert_eq!(
+        CpuHardeningPlan::strict_required(no_ibpb),
         Err(CpuHardeningError::IbrsIbpbUnavailable)
     );
     assert_eq!(
@@ -149,6 +162,7 @@ fn strict_hardening_policy_requires_all_bits() {
             enable_smep: true,
             enable_smap: true,
             enable_umip: true,
+            enable_ibpb: true,
             enable_ibrs: true,
             enable_stibp: true,
             enable_ssbd: true,
@@ -165,7 +179,8 @@ fn default_boot_plan_allows_missing_optional_bits_for_qemu() {
         smep: false,
         smap: false,
         umip: false,
-        ibrs_ibpb: false,
+        ibrs: false,
+        ibpb: false,
         stibp: false,
         ssbd: false,
         arch_capabilities: false,
@@ -179,6 +194,7 @@ fn default_boot_plan_allows_missing_optional_bits_for_qemu() {
             enable_smep: false,
             enable_smap: false,
             enable_umip: false,
+            enable_ibpb: false,
             enable_ibrs: false,
             enable_stibp: false,
             enable_ssbd: false,
@@ -195,7 +211,8 @@ fn strict_boot_plan_rejects_missing_optional_bits() {
         smep: false,
         smap: true,
         umip: true,
-        ibrs_ibpb: true,
+        ibrs: true,
+        ibpb: true,
         stibp: true,
         ssbd: true,
         arch_capabilities: true,
@@ -216,7 +233,8 @@ fn hardening_status_reports_read_back_register_bits() {
             CR4_SMAP,
             SPEC_CTRL_IBRS | SPEC_CTRL_SSBD,
             CpuHardeningCapabilities {
-                ibrs_ibpb: true,
+                ibrs: true,
+                ibpb: true,
                 ssbd: true,
                 arch_capabilities: true,
                 ..base_capabilities()
@@ -245,6 +263,7 @@ fn hardening_readback_verification_requires_requested_bits() {
         enable_smep: true,
         enable_smap: false,
         enable_umip: true,
+        enable_ibpb: true,
         enable_ibrs: true,
         enable_stibp: false,
         enable_ssbd: true,
@@ -291,6 +310,7 @@ fn hardening_readback_allows_unrequested_extra_bits() {
         enable_smep: false,
         enable_smap: false,
         enable_umip: false,
+        enable_ibpb: false,
         enable_ibrs: false,
         enable_stibp: false,
         enable_ssbd: false,

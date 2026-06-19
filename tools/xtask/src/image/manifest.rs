@@ -104,10 +104,12 @@ fn manifest_path_field(name: &str, path: &Path) -> Result<String, String> {
 }
 
 fn manifest_text_field(name: &str, value: &str) -> Result<String, String> {
-    if value
-        .chars()
-        .any(|character| character.is_ascii_control() || character == '=')
-    {
+    if value.chars().any(|character| {
+        character.is_ascii_control()
+            || character == '='
+            || character == '\u{2028}'
+            || character == '\u{2029}'
+    }) {
         return Err(format!(
             "{name} contains disallowed control character or manifest separator"
         ));

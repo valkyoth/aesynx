@@ -12,10 +12,12 @@ const CPUID_LEAF_7_EDX_SSBD: u32 = 1 << 31;
 
 const MSR_EFER: u32 = 0xc000_0080;
 const MSR_IA32_SPEC_CTRL: u32 = 0x0000_0048;
+const MSR_IA32_PRED_CMD: u32 = 0x0000_0049;
 const EFER_NXE: u64 = 1 << 11;
 const SPEC_CTRL_IBRS: u64 = 1 << 0;
 const SPEC_CTRL_STIBP: u64 = 1 << 1;
 const SPEC_CTRL_SSBD: u64 = 1 << 2;
+const PRED_CMD_IBPB: u64 = 1 << 0;
 const CR0_WP: u64 = 1 << 16;
 const CR4_UMIP: u64 = 1 << 11;
 const CR4_SMEP: u64 = 1 << 20;
@@ -24,6 +26,7 @@ const CR4_SMAP: u64 = 1 << 21;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AdmittedMsr {
     Efer,
+    PredCmd,
     SpecCtrl,
 }
 
@@ -31,9 +34,27 @@ impl AdmittedMsr {
     const fn index(self) -> u32 {
         match self {
             Self::Efer => MSR_EFER,
+            Self::PredCmd => MSR_IA32_PRED_CMD,
             Self::SpecCtrl => MSR_IA32_SPEC_CTRL,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CpuidSnapshot {
+    eax: u32,
+    ebx: u32,
+    ecx: u32,
+    edx: u32,
+}
+
+impl CpuidSnapshot {
+    const ZERO: Self = Self {
+        eax: 0,
+        ebx: 0,
+        ecx: 0,
+        edx: 0,
+    };
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -42,7 +63,8 @@ pub struct CpuHardeningCapabilities {
     pub smep: bool,
     pub smap: bool,
     pub umip: bool,
-    pub ibrs_ibpb: bool,
+    pub ibrs: bool,
+    pub ibpb: bool,
     pub stibp: bool,
     pub ssbd: bool,
     pub arch_capabilities: bool,
@@ -50,7 +72,7 @@ pub struct CpuHardeningCapabilities {
 
 impl CpuHardeningCapabilities {
     const fn spec_ctrl_supported(self) -> bool {
-        self.ibrs_ibpb || self.stibp || self.ssbd
+        self.ibrs || self.stibp || self.ssbd
     }
 }
 
@@ -61,6 +83,7 @@ pub struct CpuHardeningPlan {
     pub enable_smep: bool,
     pub enable_smap: bool,
     pub enable_umip: bool,
+    pub enable_ibpb: bool,
     pub enable_ibrs: bool,
     pub enable_stibp: bool,
     pub enable_ssbd: bool,
@@ -121,27 +144,28 @@ fn selected_boot_plan(
 pub fn detect_capabilities() -> CpuHardeningCapabilities {
     let extended_max = cpuid_eax(CPUID_LEAF_EXTENDED_MAX, 0);
     let nx = extended_max >= CPUID_LEAF_EXTENDED_FEATURES
-        && cpuid_edx(CPUID_LEAF_EXTENDED_FEATURES, 0) & CPUID_EXT_FEATURE_EDX_NX != 0;
+        && cpuid_snapshot(CPUID_LEAF_EXTENDED_FEATURES, 0).edx & CPUID_EXT_FEATURE_EDX_NX != 0;
     let leaf_7_supported = cpuid_eax(0, 0) >= CPUID_LEAF_7;
-    let smep = leaf_7_supported && cpuid_ebx(CPUID_LEAF_7, 0) & CPUID_LEAF_7_EBX_SMEP != 0;
-    let smap = leaf_7_supported && cpuid_ebx(CPUID_LEAF_7, 0) & CPUID_LEAF_7_EBX_SMAP != 0;
-    let umip = leaf_7_supported && cpuid_ecx(CPUID_LEAF_7, 0) & CPUID_LEAF_7_ECX_UMIP != 0;
-    let leaf_7_edx = if leaf_7_supported {
-        cpuid_edx(CPUID_LEAF_7, 0)
+    let leaf_7 = if leaf_7_supported {
+        cpuid_snapshot(CPUID_LEAF_7, 0)
     } else {
-        0
+        CpuidSnapshot::ZERO
     };
-    let ibrs_ibpb = leaf_7_edx & CPUID_LEAF_7_EDX_IBRS_IBPB != 0;
-    let stibp = leaf_7_edx & CPUID_LEAF_7_EDX_STIBP != 0;
-    let ssbd = leaf_7_edx & CPUID_LEAF_7_EDX_SSBD != 0;
-    let arch_capabilities = leaf_7_edx & CPUID_LEAF_7_EDX_ARCH_CAPABILITIES != 0;
+    let smep = leaf_7.ebx & CPUID_LEAF_7_EBX_SMEP != 0;
+    let smap = leaf_7.ebx & CPUID_LEAF_7_EBX_SMAP != 0;
+    let umip = leaf_7.ecx & CPUID_LEAF_7_ECX_UMIP != 0;
+    let ibrs_ibpb = leaf_7.edx & CPUID_LEAF_7_EDX_IBRS_IBPB != 0;
+    let stibp = leaf_7.edx & CPUID_LEAF_7_EDX_STIBP != 0;
+    let ssbd = leaf_7.edx & CPUID_LEAF_7_EDX_SSBD != 0;
+    let arch_capabilities = leaf_7.edx & CPUID_LEAF_7_EDX_ARCH_CAPABILITIES != 0;
 
     CpuHardeningCapabilities {
         nx,
         smep,
         smap,
         umip,
-        ibrs_ibpb,
+        ibrs: ibrs_ibpb,
+        ibpb: ibrs_ibpb,
         stibp,
         ssbd,
         arch_capabilities,
@@ -162,7 +186,8 @@ impl CpuHardeningPlan {
             enable_smep: capabilities.smep,
             enable_smap: capabilities.smap,
             enable_umip: capabilities.umip,
-            enable_ibrs: capabilities.ibrs_ibpb,
+            enable_ibpb: capabilities.ibpb,
+            enable_ibrs: capabilities.ibrs,
             enable_stibp: capabilities.stibp,
             enable_ssbd: capabilities.ssbd,
             arch_capabilities_supported: capabilities.arch_capabilities,
@@ -184,7 +209,7 @@ impl CpuHardeningPlan {
         if !capabilities.umip {
             return Err(CpuHardeningError::UmipUnavailable);
         }
-        if !capabilities.ibrs_ibpb {
+        if !capabilities.ibrs || !capabilities.ibpb {
             return Err(CpuHardeningError::IbrsIbpbUnavailable);
         }
         if !capabilities.stibp {
@@ -203,6 +228,7 @@ impl CpuHardeningPlan {
             enable_smep: true,
             enable_smap: true,
             enable_umip: true,
+            enable_ibpb: true,
             enable_ibrs: true,
             enable_stibp: true,
             enable_ssbd: true,
@@ -226,7 +252,7 @@ impl CpuHardeningStatus {
             smap_enabled: cr4 & CR4_SMAP != 0,
             umip_enabled: cr4 & CR4_UMIP != 0,
             ibrs_enabled: spec_ctrl & SPEC_CTRL_IBRS != 0,
-            ibpb_supported: capabilities.ibrs_ibpb,
+            ibpb_supported: capabilities.ibpb,
             stibp_enabled: spec_ctrl & SPEC_CTRL_STIBP != 0,
             ssbd_enabled: spec_ctrl & SPEC_CTRL_SSBD != 0,
             arch_capabilities_supported: capabilities.arch_capabilities,
@@ -327,6 +353,14 @@ unsafe fn apply_plan(plan: CpuHardeningPlan) {
             write_msr(AdmittedMsr::SpecCtrl, spec_ctrl);
         }
     }
+    if plan.enable_ibpb {
+        // SAFETY: `AdmittedMsr::PredCmd` is the architectural IA32_PRED_CMD
+        // MSR and CPUID reported the shared IBRS/IBPB feature bit. Writing
+        // bit 0 issues a one-shot indirect-branch predictor barrier.
+        unsafe {
+            write_msr(AdmittedMsr::PredCmd, PRED_CMD_IBPB);
+        }
+    }
 }
 
 fn read_msr(msr: AdmittedMsr) -> u64 {
@@ -359,7 +393,7 @@ unsafe fn write_msr(msr: AdmittedMsr, value: u64) {
             in("ecx") index,
             in("eax") low,
             in("edx") high,
-            options(nomem, nostack, preserves_flags)
+            options(nostack, preserves_flags)
         );
     }
 }
@@ -410,33 +444,19 @@ const fn cpuid_eax(_leaf: u32, _subleaf: u32) -> u32 {
 }
 
 #[cfg(target_arch = "x86_64")]
-fn cpuid_ebx(leaf: u32, subleaf: u32) -> u32 {
-    core::arch::x86_64::__cpuid_count(leaf, subleaf).ebx
+fn cpuid_snapshot(leaf: u32, subleaf: u32) -> CpuidSnapshot {
+    let result = core::arch::x86_64::__cpuid_count(leaf, subleaf);
+    CpuidSnapshot {
+        eax: result.eax,
+        ebx: result.ebx,
+        ecx: result.ecx,
+        edx: result.edx,
+    }
 }
 
 #[cfg(not(target_arch = "x86_64"))]
-const fn cpuid_ebx(_leaf: u32, _subleaf: u32) -> u32 {
-    0
-}
-
-#[cfg(target_arch = "x86_64")]
-fn cpuid_ecx(leaf: u32, subleaf: u32) -> u32 {
-    core::arch::x86_64::__cpuid_count(leaf, subleaf).ecx
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-const fn cpuid_ecx(_leaf: u32, _subleaf: u32) -> u32 {
-    0
-}
-
-#[cfg(target_arch = "x86_64")]
-fn cpuid_edx(leaf: u32, subleaf: u32) -> u32 {
-    core::arch::x86_64::__cpuid_count(leaf, subleaf).edx
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-const fn cpuid_edx(_leaf: u32, _subleaf: u32) -> u32 {
-    0
+const fn cpuid_snapshot(_leaf: u32, _subleaf: u32) -> CpuidSnapshot {
+    CpuidSnapshot::ZERO
 }
 
 #[cfg(test)]

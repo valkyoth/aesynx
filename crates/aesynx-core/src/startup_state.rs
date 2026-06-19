@@ -120,13 +120,10 @@ impl CoreStartupJointState {
 
     pub fn validate_quarantine(self) -> Result<(), CoreError> {
         self.validate()?;
-        if matches!(
-            (self.hardware_state, self.local_state),
-            (CoreHardwareState::Quarantined, CoreState::Quarantined)
-        ) {
-            Err(CoreError::InvalidStateTransition)
-        } else {
-            Ok(())
+        match (self.hardware_state, self.local_state) {
+            (CoreHardwareState::Discovered, CoreState::Offline)
+            | (CoreHardwareState::StartupStaged, CoreState::Booting) => Ok(()),
+            _ => Err(CoreError::InvalidStateTransition),
         }
     }
 }

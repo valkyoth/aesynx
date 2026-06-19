@@ -60,6 +60,20 @@ if ! grep -q 'unsafe' docs/unsafe-policy.md; then
     exit 1
 fi
 
+irq_proof_escapes=$(
+    rg -n "model_only_for_single_core_smoke" crates tools scripts \
+        --glob '!crates/aesynx-sync/src/lib.rs' \
+        --glob '!crates/aesynx-kernel/src/concurrency_smoke.rs' \
+        --glob '!scripts/validate-security-policy.sh' \
+        --glob '!**/tests.rs' \
+        --glob '!**/tests/**' || true
+)
+if [ -n "$irq_proof_escapes" ]; then
+    echo "security policy: model-only IRQ proof used outside audited smoke/test context" >&2
+    printf '%s\n' "$irq_proof_escapes" >&2
+    exit 1
+fi
+
 if ! grep -Fxq '/PENTEST.md' .gitignore; then
     echo "security policy: root PENTEST.md must stay ignored" >&2
     exit 1

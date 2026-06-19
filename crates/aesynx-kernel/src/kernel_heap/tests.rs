@@ -1,4 +1,5 @@
 use core::alloc::Layout;
+use core::sync::atomic::Ordering;
 
 use super::free_list::{encode_offset, write_free_next};
 use super::test_support;
@@ -132,6 +133,47 @@ fn double_free_is_reported_without_reallocating_block() -> Result<(), KernelHeap
         Err(KernelHeapError::DoubleFree)
     );
     assert!(allocator.stats()?.double_free_detected);
+    Ok(())
+}
+
+#[test]
+fn free_list_scan_limit_tracks_allocated_slab_pages() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+    let layout =
+        Layout::from_size_align(64, 64).map_err(|_error| KernelHeapError::InvalidLayout)?;
+
+    assert_eq!(allocator.free_list_step_limit_locked(2), 0);
+    let ptr = allocator.allocate_checked(layout)?;
+    assert_eq!(
+        allocator.free_list_step_limit_locked(2),
+        KERNEL_HEAP_PAGE_SIZE / 64
+    );
+    allocator.deallocate_checked(ptr, layout)?;
+    Ok(())
+}
+
+#[test]
+fn heap_accounting_underflow_is_visible_without_saturating() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+
+    allocator.record_free(16);
+
+    assert_eq!(allocator.allocated_bytes()?, 0);
+    assert!(allocator.stats()?.invalid_free_detected);
+    Ok(())
+}
+
+#[test]
+fn heap_accounting_overflow_is_visible_without_panic() -> Result<(), KernelHeapError> {
+    let (allocator, _heap) = init_test_allocator()?;
+
+    allocator
+        .allocated_bytes
+        .store(usize::MAX - 1, Ordering::Release);
+    allocator.record_allocation(16);
+
+    assert_eq!(allocator.allocated_bytes()?, usize::MAX - 1);
+    assert!(allocator.stats()?.corrupt_free_list_detected);
     Ok(())
 }
 

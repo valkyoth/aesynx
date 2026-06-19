@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::fmt;
 use core::marker::PhantomData;
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering, fence};
 
 use aesynx_abi::{CoreId, CpuHardwareId};
 
@@ -72,10 +72,12 @@ impl CoreStartupTicket {
 
 impl Drop for CoreStartupTicket {
     fn drop(&mut self) {
-        self.target_core.store(0, Ordering::Release);
-        self.hardware_id.store(0, Ordering::Release);
-        self.coordinator_core.store(0, Ordering::Release);
-        self.startup_epoch.store(0, Ordering::Release);
+        fence(Ordering::SeqCst);
+        self.target_core.store(0, Ordering::Relaxed);
+        self.hardware_id.store(0, Ordering::Relaxed);
+        self.coordinator_core.store(0, Ordering::Relaxed);
+        self.startup_epoch.store(0, Ordering::Relaxed);
+        fence(Ordering::SeqCst);
     }
 }
 
@@ -150,10 +152,12 @@ impl CoreStartupArrival {
 
 impl Drop for CoreStartupArrival {
     fn drop(&mut self) {
-        self.arrived_core.store(0, Ordering::Release);
-        self.hardware_id.store(0, Ordering::Release);
-        self.coordinator_core.store(0, Ordering::Release);
-        self.startup_epoch.store(0, Ordering::Release);
+        fence(Ordering::SeqCst);
+        self.arrived_core.store(0, Ordering::Relaxed);
+        self.hardware_id.store(0, Ordering::Relaxed);
+        self.coordinator_core.store(0, Ordering::Relaxed);
+        self.startup_epoch.store(0, Ordering::Relaxed);
+        fence(Ordering::SeqCst);
     }
 }
 

@@ -48,10 +48,11 @@ story in the release notes.
   owning core/domain or rebooting, not silently reusing the tracker or mask.
 - `LocalInterruptMask` is a software model for host tests and policy evidence.
   It does not disable hardware interrupts by itself. `try_lock_irq()` requires
-  an explicit `ArchIrqDisableProof` argument so callers cannot accidentally hide
-  that distinction, but the current proof constructor is model-only for
-  single-core smoke/tests. Real IRQ-handler use needs an architecture-backed
-  token that records actual interrupt masking on the owning core.
+  an explicit linear non-`Clone`/non-`Copy` `ArchIrqDisableProof` argument so
+  callers cannot accidentally hide that distinction, but the current proof
+  constructor is model-only for single-core smoke/tests and repository-policy
+  gated to that context. Real IRQ-handler use needs an architecture-backed token
+  that records actual interrupt masking on the owning core.
 - Lock acquisition must follow the global rank order. Acquiring an equal or
   lower-ranked lock while a higher-ranked lock is held is a policy violation.
 - Lock failures must not partially mutate protected state.

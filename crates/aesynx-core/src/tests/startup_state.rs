@@ -128,7 +128,10 @@ fn startup_state_table_rejects_invalid_transition_intents() {
         online.validate_startup_stage().err(),
         Some(CoreError::InvalidStateTransition)
     );
-    assert!(online.validate_quarantine().is_ok());
+    assert_eq!(
+        online.validate_quarantine().err(),
+        Some(CoreError::InvalidStateTransition)
+    );
 
     assert_eq!(
         quarantined.validate_quarantine().err(),

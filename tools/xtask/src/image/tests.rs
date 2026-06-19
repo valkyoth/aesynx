@@ -258,6 +258,8 @@ fn image_manifest_rejects_control_and_separator_fields() {
         "/tmp/aesynx.iso\0truncated",
         "/tmp/aesynx.iso\x0bvertical-tab",
         "/tmp/aesynx.iso\x0cform-feed",
+        "/tmp/aesynx.iso\u{2028}unicode-line-separator",
+        "/tmp/aesynx.iso\u{2029}unicode-paragraph-separator",
         "/tmp/aesynx.iso=ambiguous",
     ] {
         let result = write_manifest(

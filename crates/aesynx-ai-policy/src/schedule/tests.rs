@@ -376,8 +376,8 @@ fn model_manifest_rejects_wrong_domain() {
     };
 
     assert_eq!(
-        manifest.validate_for_domain(PolicyDomain::Capability),
-        Err(PolicyError::UnsupportedDomain)
+        manifest.validate_for_domain(PolicyDomain::Capability).err(),
+        Some(PolicyError::UnsupportedDomain)
     );
 }
 
@@ -390,8 +390,8 @@ fn model_manifest_rejects_missing_fallback() {
     manifest.safety_limits.fallback_required = false;
 
     assert_eq!(
-        manifest.validate_for_domain(PolicyDomain::Scheduler),
-        Err(PolicyError::FallbackRequired)
+        manifest.validate_for_domain(PolicyDomain::Scheduler).err(),
+        Some(PolicyError::FallbackRequired)
     );
 }
 
@@ -405,8 +405,8 @@ fn model_manifest_rejects_missing_scheduler_features() {
         RequiredTelemetryFields::RUN_QUEUE_LEN.union(RequiredTelemetryFields::IPC_DEPTH);
 
     assert_eq!(
-        manifest.validate_for_domain(PolicyDomain::Scheduler),
-        Err(PolicyError::FeatureOutOfRange)
+        manifest.validate_for_domain(PolicyDomain::Scheduler).err(),
+        Some(PolicyError::FeatureOutOfRange)
     );
 }
 
@@ -419,14 +419,14 @@ fn model_manifest_rejects_unbacked_model_kinds() {
 
     manifest.kind = ModelKind::NeuralNetwork;
     assert_eq!(
-        manifest.validate_for_domain(PolicyDomain::Scheduler),
-        Err(PolicyError::UnsupportedModelKind)
+        manifest.validate_for_domain(PolicyDomain::Scheduler).err(),
+        Some(PolicyError::UnsupportedModelKind)
     );
 
     manifest.kind = ModelKind::WasmComponent;
     assert_eq!(
-        manifest.validate_for_domain(PolicyDomain::Scheduler),
-        Err(PolicyError::UnsupportedModelKind)
+        manifest.validate_for_domain(PolicyDomain::Scheduler).err(),
+        Some(PolicyError::UnsupportedModelKind)
     );
 }
 

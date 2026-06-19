@@ -47,6 +47,40 @@ fn core_topology_rejects_online_role_reassignment() {
 }
 
 #[test]
+fn core_topology_rejects_online_quarantine_without_fault_path() {
+    let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
+        Ok(topology) => topology,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+    assert!(
+        topology
+            .insert_discovered(
+                ROOT_CORE,
+                ROOT_CORE,
+                CpuHardwareId::new(0),
+                qemu_bootstrap_caps()
+            )
+            .is_ok()
+    );
+    let ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let arrival = match ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0)) {
+        Ok(arrival) => arrival,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    assert!(topology.mark_hardware_online(ROOT_CORE, arrival).is_ok());
+    let before = topology.get(ROOT_CORE);
+
+    assert_eq!(
+        topology.quarantine(ROOT_CORE, ROOT_CORE).err(),
+        Some(CoreError::InvalidStateTransition)
+    );
+    assert_eq!(topology.get(ROOT_CORE), before);
+}
+
+#[test]
 fn core_topology_arrival_evidence_requires_matching_ticket() {
     let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
         Ok(topology) => topology,

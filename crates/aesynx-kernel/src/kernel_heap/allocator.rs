@@ -360,7 +360,7 @@ impl KernelHeapAllocator {
     fn validate_free_list_locked(&self, class: usize) -> Result<(), KernelHeapError> {
         let block_size = SLAB_CLASSES[class];
         let total_bytes = self.total_pages.load(Ordering::Acquire) * KERNEL_HEAP_PAGE_SIZE;
-        let max_blocks = total_bytes / block_size;
+        let max_blocks = self.free_list_step_limit_locked(class);
         let mut seen = 0usize;
         let mut cursor = self.free_heads[class].load(Ordering::Acquire);
 

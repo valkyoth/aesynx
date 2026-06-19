@@ -81,11 +81,9 @@ fn early_lock_smoke() -> Result<bool, ConcurrencySmokeError> {
 fn irq_lock_smoke() -> Result<bool, ConcurrencySmokeError> {
     let lock = EarlyLock::new();
     let interrupts = LocalInterruptMask::new_enabled();
+    let proof = ArchIrqDisableProof::model_only_for_single_core_smoke();
     let guard = lock
-        .try_lock_irq(
-            &interrupts,
-            ArchIrqDisableProof::model_only_for_single_core_smoke(),
-        )
+        .try_lock_irq(&interrupts, proof)
         .map_err(ConcurrencySmokeError::Sync)?;
     if !lock.is_locked() || interrupts.interrupts_enabled() {
         return Ok(false);

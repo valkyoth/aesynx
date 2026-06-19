@@ -3,7 +3,8 @@ use core::sync::atomic::Ordering;
 use super::allocator::KernelHeapAllocator;
 use super::free_list::{FREE_LIST_EMPTY, decode_valid_offset, read_free_next};
 use super::layout::{
-    KERNEL_HEAP_PAGE_SIZE, KERNEL_HEAP_PAGES, PAGE_FREE, SLAB_CLASS_COUNT, SLAB_CLASSES,
+    KERNEL_HEAP_PAGE_SIZE, KERNEL_HEAP_PAGES, PAGE_FREE, PAGE_SLAB_BASE, SLAB_CLASS_COUNT,
+    SLAB_CLASSES,
 };
 use super::lock::HeapLockGuard;
 use super::stats::KernelHeapError;
@@ -75,7 +76,7 @@ impl KernelHeapAllocator {
     ) -> Result<bool, KernelHeapError> {
         let total_bytes = self.total_pages.load(Ordering::Acquire) * KERNEL_HEAP_PAGE_SIZE;
         let block_size = SLAB_CLASSES[class];
-        let max_blocks = total_bytes / block_size;
+        let max_blocks = self.free_list_step_limit_locked(class);
         let mut head = self.free_heads[class].load(Ordering::Acquire);
         let mut seen = 0usize;
         while head != FREE_LIST_EMPTY {
@@ -92,6 +93,21 @@ impl KernelHeapAllocator {
             seen += 1;
         }
         Ok(false)
+    }
+
+    pub(super) fn free_list_step_limit_locked(&self, class: usize) -> usize {
+        let total_pages = self.total_pages.load(Ordering::Acquire);
+        let page_state = PAGE_SLAB_BASE + class;
+        let blocks_per_page = KERNEL_HEAP_PAGE_SIZE / SLAB_CLASSES[class];
+        let mut slab_pages = 0usize;
+        let mut page = 0usize;
+        while page < total_pages {
+            if self.page_state[page].load(Ordering::Acquire) == page_state {
+                slab_pages += 1;
+            }
+            page += 1;
+        }
+        slab_pages * blocks_per_page
     }
 
     pub(super) fn offset_for_ptr(&self, ptr: usize) -> Result<usize, KernelHeapError> {
@@ -111,7 +127,23 @@ impl KernelHeapAllocator {
     }
 
     pub(super) fn record_allocation(&self, bytes: usize) {
-        let current = self.allocated_bytes.fetch_add(bytes, Ordering::AcqRel) + bytes;
+        let mut current = self.allocated_bytes.load(Ordering::Acquire);
+        let current = loop {
+            let Some(next) = current.checked_add(bytes) else {
+                self.corrupt_free_list_detected
+                    .fetch_add(1, Ordering::AcqRel);
+                return;
+            };
+            match self.allocated_bytes.compare_exchange_weak(
+                current,
+                next,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => break next,
+                Err(actual) => current = actual,
+            }
+        };
         let mut peak = self.peak_allocated_bytes.load(Ordering::Acquire);
         while current > peak {
             match self.peak_allocated_bytes.compare_exchange(
@@ -129,7 +161,10 @@ impl KernelHeapAllocator {
     pub(super) fn record_free(&self, bytes: usize) {
         let mut current = self.allocated_bytes.load(Ordering::Acquire);
         loop {
-            let next = current.saturating_sub(bytes);
+            let Some(next) = current.checked_sub(bytes) else {
+                self.invalid_free_detected.fetch_add(1, Ordering::AcqRel);
+                return;
+            };
             match self.allocated_bytes.compare_exchange_weak(
                 current,
                 next,
