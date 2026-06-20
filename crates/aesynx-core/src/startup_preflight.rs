@@ -6,8 +6,6 @@ use core::marker::PhantomData;
 use crate::{CoreError, CoreHardwareState, CoreState, CoreTopologyEntry};
 
 pub const MIN_AP_STACK_BYTES: u64 = 32 * 1024;
-pub const AP_STACK_REGION_START: u64 = 0xffff_ffff_8000_0000;
-pub const AP_STACK_REGION_END: u64 = 0xffff_ffff_c000_0000;
 const PAGE_SIZE: u64 = 4096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -24,11 +22,111 @@ impl ApDescriptorTableReadiness {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
+pub struct ApStackRegion {
+    start: VirtAddr,
+    end: VirtAddr,
+}
+
+impl fmt::Debug for ApStackRegion {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ApStackRegion")
+            .field("start", &"<redacted>")
+            .field("end", &"<redacted>")
+            .finish()
+    }
+}
+
+impl ApStackRegion {
+    pub const fn new(start: VirtAddr, end: VirtAddr) -> Result<Self, CoreError> {
+        if start.get() >= end.get() || !is_page_aligned(start.get()) || !is_page_aligned(end.get())
+        {
+            return Err(CoreError::InvalidStartupStack);
+        }
+
+        Ok(Self { start, end })
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn test_only(start: VirtAddr, end: VirtAddr) -> Self {
+        Self { start, end }
+    }
+
+    #[must_use]
+    pub const fn start(self) -> VirtAddr {
+        self.start
+    }
+
+    #[must_use]
+    pub const fn end(self) -> VirtAddr {
+        self.end
+    }
+
+    const fn contains_stack(self, stack_base: VirtAddr, stack_end: u64) -> bool {
+        stack_base.get() >= self.start.get() && stack_end <= self.end.get()
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct ApStackPlan {
+    base: VirtAddr,
+    len: u64,
+    region: ApStackRegion,
+}
+
+impl fmt::Debug for ApStackPlan {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ApStackPlan")
+            .field("base", &"<redacted>")
+            .field("len", &self.len)
+            .field("region", &"<redacted>")
+            .finish()
+    }
+}
+
+impl ApStackPlan {
+    pub const fn new(base: VirtAddr, len: u64, region: ApStackRegion) -> Result<Self, CoreError> {
+        if validate_stack(base, len, region).is_err() {
+            return Err(CoreError::InvalidStartupStack);
+        }
+
+        Ok(Self { base, len, region })
+    }
+
+    #[must_use]
+    pub const fn base(self) -> VirtAddr {
+        self.base
+    }
+
+    #[must_use]
+    pub const fn byte_len(self) -> u64 {
+        self.len
+    }
+
+    #[must_use]
+    pub const fn region(self) -> ApStackRegion {
+        self.region
+    }
+
+    fn end(self) -> Result<u64, CoreError> {
+        self.base
+            .get()
+            .checked_add(self.len)
+            .ok_or(CoreError::InvalidStartupStack)
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn test_only(base: VirtAddr, len: u64, region: ApStackRegion) -> Self {
+        Self { base, len, region }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ApStartupResource {
     core: CoreId,
     hardware_id: CpuHardwareId,
-    stack_base: VirtAddr,
-    stack_len: u64,
+    stack: ApStackPlan,
     descriptor_tables: ApDescriptorTableReadiness,
     watchdog_ticks: u64,
 }
@@ -39,8 +137,7 @@ impl fmt::Debug for ApStartupResource {
             .debug_struct("ApStartupResource")
             .field("core", &self.core)
             .field("hardware_id", &"<redacted>")
-            .field("stack_base", &"<redacted>")
-            .field("stack_len", &self.stack_len)
+            .field("stack", &"<redacted>")
             .field("descriptor_tables", &self.descriptor_tables)
             .field("watchdog_ticks", &self.watchdog_ticks)
             .finish()
@@ -60,12 +157,17 @@ impl ApStartupResource {
 
     #[must_use]
     pub const fn stack_base(self) -> VirtAddr {
-        self.stack_base
+        self.stack.base()
     }
 
     #[must_use]
     pub const fn stack_len(self) -> u64 {
-        self.stack_len
+        self.stack.byte_len()
+    }
+
+    #[must_use]
+    pub const fn stack_region(self) -> ApStackRegion {
+        self.stack.region()
     }
 
     #[must_use]
@@ -79,10 +181,7 @@ impl ApStartupResource {
     }
 
     fn stack_end(self) -> Result<u64, CoreError> {
-        self.stack_base
-            .get()
-            .checked_add(self.stack_len)
-            .ok_or(CoreError::InvalidStartupStack)
+        self.stack.end()
     }
 }
 
@@ -220,8 +319,7 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
         &mut self,
         caller: CoreId,
         entry: CoreTopologyEntry,
-        stack_base: VirtAddr,
-        stack_len: u64,
+        stack: ApStackPlan,
         descriptor_tables: ApDescriptorTableReadiness,
         watchdog_ticks: u64,
     ) -> Result<(), CoreError> {
@@ -234,7 +332,6 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
         {
             return Err(CoreError::InvalidStateTransition);
         }
-        validate_stack(stack_base, stack_len)?;
         if watchdog_ticks == 0 {
             return Err(CoreError::MissingStartupWatchdog);
         }
@@ -242,8 +339,7 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
         let resource = ApStartupResource {
             core: entry.core(),
             hardware_id: entry.hardware_id(),
-            stack_base,
-            stack_len,
+            stack,
             descriptor_tables,
             watchdog_ticks,
         };
@@ -263,7 +359,13 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
 
         while index < self.len {
             if let Some(resource) = self.resources[index] {
-                if validate_stack(resource.stack_base, resource.stack_len).is_ok() {
+                if validate_stack(
+                    resource.stack_base(),
+                    resource.stack_len(),
+                    resource.stack_region(),
+                )
+                .is_ok()
+                {
                     stack_ready += 1;
                 }
                 if resource.descriptor_tables.is_per_core_ready() {
@@ -337,7 +439,7 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
                 }
 
                 let existing_end = existing.stack_end()?;
-                if resource.stack_base.get() < existing_end && existing.stack_base.get() < end {
+                if resource.stack_base().get() < existing_end && existing.stack_base().get() < end {
                     return Err(CoreError::DuplicateStartupStack);
                 }
             }
@@ -347,7 +449,7 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
     }
 }
 
-fn validate_stack(base: VirtAddr, len: u64) -> Result<(), CoreError> {
+const fn validate_stack(base: VirtAddr, len: u64, region: ApStackRegion) -> Result<(), CoreError> {
     let base_raw = base.get();
     if len < MIN_AP_STACK_BYTES {
         return Err(CoreError::InvalidStartupStack);
@@ -355,10 +457,10 @@ fn validate_stack(base: VirtAddr, len: u64) -> Result<(), CoreError> {
     if !is_page_aligned(base_raw) || !is_page_aligned(len) {
         return Err(CoreError::InvalidStartupStack);
     }
-    let end = base_raw
-        .checked_add(len)
-        .ok_or(CoreError::InvalidStartupStack)?;
-    if base_raw < AP_STACK_REGION_START || end > AP_STACK_REGION_END {
+    let Some(end) = base_raw.checked_add(len) else {
+        return Err(CoreError::InvalidStartupStack);
+    };
+    if !region.contains_stack(base, end) {
         return Err(CoreError::InvalidStartupStack);
     }
     Ok(())

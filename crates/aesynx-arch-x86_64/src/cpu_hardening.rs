@@ -85,7 +85,8 @@ pub enum CpuHardeningError {
     HardeningWriteDidNotStick,
     NxUnavailable,
     ArchCapabilitiesUnavailable,
-    IbrsIbpbUnavailable,
+    IbrsUnavailable,
+    IbpbUnavailable,
     SmapUnavailable,
     SmepUnavailable,
     SsbdUnavailable,
@@ -156,8 +157,11 @@ impl CpuHardeningPlan {
         if !capabilities.umip {
             return Err(CpuHardeningError::UmipUnavailable);
         }
-        if !capabilities.ibrs || !capabilities.ibpb {
-            return Err(CpuHardeningError::IbrsIbpbUnavailable);
+        if !capabilities.ibrs {
+            return Err(CpuHardeningError::IbrsUnavailable);
+        }
+        if !capabilities.ibpb {
+            return Err(CpuHardeningError::IbpbUnavailable);
         }
         if !capabilities.stibp {
             return Err(CpuHardeningError::StibpUnavailable);

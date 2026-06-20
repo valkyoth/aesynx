@@ -1765,7 +1765,8 @@ Deliverables:
 - Startup resources are accepted only for topology entries already in
   `StartupStaged`/`Booting`.
 - Dedicated AP stack ranges must be page-aligned, at least 32 KiB for early AP
-  entry, non-overlapping, and unique per core.
+  entry, inside caller-supplied platform stack bounds, non-overlapping, and
+  unique per core.
 - Duplicate logical core IDs, duplicate hardware IDs, overlapping startup
   stacks, missing watchdog ticks, and non-owner callers fail before mutation.
 - Descriptor-table readiness is explicit. Shared bootstrap-only descriptors are

@@ -2,8 +2,8 @@ use aesynx_abi::{CoreId, CpuHardwareId, ROOT_CORE, VirtAddr};
 use core::fmt::{self, Write as _};
 
 use crate::{
-    ApDescriptorTableReadiness, ApStartupPreflight, CoreError, CorePerformanceClass, CoreRole,
-    CoreTopology,
+    ApDescriptorTableReadiness, ApStackPlan, ApStackRegion, ApStartupPreflight, CoreError,
+    CorePerformanceClass, CoreRole, CoreTopology,
 };
 
 use super::{qemu_bootstrap_caps, qemu_worker_caps};
@@ -43,8 +43,7 @@ fn ap_startup_preflight_blocks_execution_until_per_core_descriptors_exist() {
             .add_staged_core(
                 ROOT_CORE,
                 root,
-                VirtAddr::new(0xffff_ffff_9000_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9000_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -55,8 +54,7 @@ fn ap_startup_preflight_blocks_execution_until_per_core_descriptors_exist() {
             .add_staged_core(
                 ROOT_CORE,
                 scheduler,
-                VirtAddr::new(0xffff_ffff_9001_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9001_0000), 0x8000),
                 ApDescriptorTableReadiness::SharedBootstrapOnly,
                 10_000,
             )
@@ -106,8 +104,7 @@ fn ap_startup_preflight_accepts_only_staged_booting_entries() {
             .add_staged_core(
                 ROOT_CORE,
                 entry,
-                VirtAddr::new(0xffff_ffff_9000_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9000_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -140,8 +137,7 @@ fn ap_startup_preflight_rejects_overlapping_stacks_without_mutation() {
             .add_staged_core(
                 ROOT_CORE,
                 root,
-                VirtAddr::new(0xffff_ffff_9000_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9000_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -153,8 +149,7 @@ fn ap_startup_preflight_rejects_overlapping_stacks_without_mutation() {
             .add_staged_core(
                 ROOT_CORE,
                 scheduler,
-                VirtAddr::new(0xffff_ffff_9000_4000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9000_4000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -185,8 +180,7 @@ fn ap_startup_preflight_rejects_missing_watchdog() {
             .add_staged_core(
                 ROOT_CORE,
                 root,
-                VirtAddr::new(0xffff_ffff_9000_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9000_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 0,
             )
@@ -205,24 +199,16 @@ fn ap_startup_preflight_rejects_stack_outside_ap_region() {
         Some(entry) => entry,
         None => return assert_eq!(Some(CoreError::UnknownCore), None),
     };
-    let mut preflight = match ApStartupPreflight::<1>::new(ROOT_CORE) {
+    let preflight = match ApStartupPreflight::<1>::new(ROOT_CORE) {
         Ok(preflight) => preflight,
         Err(error) => return assert_eq!(error, CoreError::CapacityZero),
     };
 
     assert_eq!(
-        preflight
-            .add_staged_core(
-                ROOT_CORE,
-                root,
-                VirtAddr::new(0),
-                0x8000,
-                ApDescriptorTableReadiness::PerCoreReady,
-                10_000,
-            )
-            .err(),
+        ApStackPlan::new(VirtAddr::new(0), 0x8000, test_ap_stack_region()).err(),
         Some(CoreError::InvalidStartupStack)
     );
+    assert!(preflight.resource(root.core()).is_none());
     assert_eq!(
         preflight.status().planned(),
         0,
@@ -254,8 +240,7 @@ fn ap_startup_preflight_dispatch_token_requires_owner_and_execution_ready() {
             .add_staged_core(
                 ROOT_CORE,
                 root,
-                VirtAddr::new(0xffff_ffff_9000_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9000_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -266,8 +251,7 @@ fn ap_startup_preflight_dispatch_token_requires_owner_and_execution_ready() {
             .add_staged_core(
                 ROOT_CORE,
                 scheduler,
-                VirtAddr::new(0xffff_ffff_9001_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9001_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -287,8 +271,7 @@ fn ap_startup_preflight_dispatch_token_requires_owner_and_execution_ready() {
             .add_staged_core(
                 ROOT_CORE,
                 root,
-                VirtAddr::new(0xffff_ffff_9000_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9000_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -299,8 +282,7 @@ fn ap_startup_preflight_dispatch_token_requires_owner_and_execution_ready() {
             .add_staged_core(
                 ROOT_CORE,
                 scheduler,
-                VirtAddr::new(0xffff_ffff_9001_0000),
-                0x8000,
+                test_ap_stack_plan(VirtAddr::new(0xffff_ffff_9001_0000), 0x8000),
                 ApDescriptorTableReadiness::PerCoreReady,
                 10_000,
             )
@@ -338,6 +320,17 @@ fn staged_two_core_topology() -> Result<CoreTopology<2>, CoreError> {
     let _root_ticket = topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE)?;
     let _scheduler_ticket = topology.stage_startup_ticket(ROOT_CORE, CoreId::new(1))?;
     Ok(topology)
+}
+
+fn test_ap_stack_plan(base: VirtAddr, len: u64) -> ApStackPlan {
+    ApStackPlan::test_only(base, len, test_ap_stack_region())
+}
+
+fn test_ap_stack_region() -> ApStackRegion {
+    ApStackRegion::test_only(
+        VirtAddr::new(0xffff_ffff_8000_0000),
+        VirtAddr::new(0xffff_ffff_c000_0000),
+    )
 }
 
 struct DebugBuffer {

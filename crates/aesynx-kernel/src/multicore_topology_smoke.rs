@@ -1,8 +1,8 @@
 use aesynx_abi::{CoreId, CpuHardwareId, ROOT_CORE};
 use aesynx_core::{
-    ApDescriptorTableReadiness, ApStartupPreflight, BootBarrier, CoreCapabilitySet, CoreError,
-    CoreHardwareState, CoreIsa, CorePerformanceClass, CoreRole, CoreTopology,
-    QEMU_MULTICORE_TOPOLOGY_CORES, audit_startup_state_table,
+    ApDescriptorTableReadiness, ApStackPlan, ApStackRegion, ApStartupPreflight, BootBarrier,
+    CoreCapabilitySet, CoreError, CoreHardwareState, CoreIsa, CorePerformanceClass, CoreRole,
+    CoreTopology, QEMU_MULTICORE_TOPOLOGY_CORES, audit_startup_state_table,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -147,6 +147,10 @@ fn build_ap_preflight(
     topology: &CoreTopology<{ QEMU_MULTICORE_TOPOLOGY_CORES }>,
 ) -> Result<ApStartupPreflight<{ QEMU_MULTICORE_TOPOLOGY_CORES }>, CoreError> {
     let mut preflight = ApStartupPreflight::<{ QEMU_MULTICORE_TOPOLOGY_CORES }>::new(ROOT_CORE)?;
+    let ap_stack_region = ApStackRegion::new(
+        aesynx_abi::VirtAddr::new(0xffff_ffff_8000_0000),
+        aesynx_abi::VirtAddr::new(0xffff_ffff_c000_0000),
+    )?;
     let mut index = 0u64;
     while index < QEMU_MULTICORE_TOPOLOGY_CORES as u64 {
         let core = CoreId::new(index as u32);
@@ -156,8 +160,11 @@ fn build_ap_preflight(
         preflight.add_staged_core(
             ROOT_CORE,
             entry,
-            aesynx_abi::VirtAddr::new(0xffff_ffff_9000_0000 + (index * 0x1_0000)),
-            0x8000,
+            ApStackPlan::new(
+                aesynx_abi::VirtAddr::new(0xffff_ffff_9000_0000 + (index * 0x1_0000)),
+                0x8000,
+                ap_stack_region,
+            )?,
             ApDescriptorTableReadiness::SharedBootstrapOnly,
             10_000,
         )?;

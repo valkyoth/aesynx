@@ -105,7 +105,7 @@ Address-space activation and CPU hardening:
 - Post-CR3 CPU hardening enables NX, write-protect, and CPUID-gated
   SMEP/SMAP/UMIP where supported, requests CPUID-gated Spectre-class
   `IA32_SPEC_CTRL` bits for IBRS/STIBP/SSBD where available, detects Intel and
-  AMD IBPB support, reports boot-time IBPB attempt evidence separately from
+  AMD speculative-control support, reports boot-time IBPB attempt evidence separately from
   read-back-verifiable state, and keeps `ARCH_CAPABILITIES` evidence redacted
   before `[TEST] cpu-hardening=ok`.
 - Early entropy policy classifies x86_64 `RDRAND`/`RDSEED` support behind

@@ -18,8 +18,8 @@ pub use registry::{CoreRegistry, CoreRegistryStatus};
 pub use role::CoreRole;
 pub use startup::{CoreStartupArrival, CoreStartupTicket};
 pub use startup_preflight::{
-    ApDescriptorTableReadiness, ApStartupDispatchToken, ApStartupPreflight,
-    ApStartupPreflightStatus, ApStartupResource, MIN_AP_STACK_BYTES,
+    ApDescriptorTableReadiness, ApStackPlan, ApStackRegion, ApStartupDispatchToken,
+    ApStartupPreflight, ApStartupPreflightStatus, ApStartupResource, MIN_AP_STACK_BYTES,
 };
 pub use startup_state::{
     CoreStartupJointState, CoreStartupStateTableStatus, audit_startup_state_table,

@@ -4,6 +4,8 @@ pub(super) const CPUID_LEAF_7_EDX_IBRS_IBPB: u32 = 1 << 26;
 pub(super) const CPUID_LEAF_7_EDX_ARCH_CAPABILITIES: u32 = 1 << 29;
 pub(super) const CPUID_AMD_EXTENDED_EBX_IBRS: u32 = 1 << 9;
 pub(super) const CPUID_AMD_EXTENDED_EBX_IBPB: u32 = 1 << 12;
+pub(super) const CPUID_AMD_EXTENDED_EBX_STIBP: u32 = 1 << 15;
+pub(super) const CPUID_AMD_EXTENDED_EBX_SSBD: u32 = 1 << 24;
 
 const CPUID_LEAF_7: u32 = 7;
 const CPUID_LEAF_EXTENDED_MAX: u32 = 0x8000_0000;
@@ -71,8 +73,10 @@ pub(super) const fn capabilities_from_cpuid(
     let intel_ibrs_ibpb = leaf_7.edx & CPUID_LEAF_7_EDX_IBRS_IBPB != 0;
     let amd_ibrs = amd_extended.ebx & CPUID_AMD_EXTENDED_EBX_IBRS != 0;
     let amd_ibpb = amd_extended.ebx & CPUID_AMD_EXTENDED_EBX_IBPB != 0;
-    let stibp = leaf_7.edx & CPUID_LEAF_7_EDX_STIBP != 0;
-    let ssbd = leaf_7.edx & CPUID_LEAF_7_EDX_SSBD != 0;
+    let stibp = leaf_7.edx & CPUID_LEAF_7_EDX_STIBP != 0
+        || amd_extended.ebx & CPUID_AMD_EXTENDED_EBX_STIBP != 0;
+    let ssbd = leaf_7.edx & CPUID_LEAF_7_EDX_SSBD != 0
+        || amd_extended.ebx & CPUID_AMD_EXTENDED_EBX_SSBD != 0;
     let arch_capabilities = leaf_7.edx & CPUID_LEAF_7_EDX_ARCH_CAPABILITIES != 0;
 
     CpuHardeningCapabilities {

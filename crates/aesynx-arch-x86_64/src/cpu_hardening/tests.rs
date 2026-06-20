@@ -1,6 +1,7 @@
 use super::cpuid::{
-    CPUID_AMD_EXTENDED_EBX_IBPB, CPUID_AMD_EXTENDED_EBX_IBRS, CPUID_LEAF_7_EDX_ARCH_CAPABILITIES,
-    CPUID_LEAF_7_EDX_IBRS_IBPB, CpuidSnapshot, capabilities_from_cpuid,
+    CPUID_AMD_EXTENDED_EBX_IBPB, CPUID_AMD_EXTENDED_EBX_IBRS, CPUID_AMD_EXTENDED_EBX_SSBD,
+    CPUID_AMD_EXTENDED_EBX_STIBP, CPUID_LEAF_7_EDX_ARCH_CAPABILITIES, CPUID_LEAF_7_EDX_IBRS_IBPB,
+    CpuidSnapshot, capabilities_from_cpuid,
 };
 use super::{
     AdmittedMsr, CR0_WP, CR4_SMAP, CR4_SMEP, CR4_UMIP, CpuHardeningCapabilities, CpuHardeningError,
@@ -83,17 +84,22 @@ fn capability_detection_keeps_intel_and_amd_ibrs_ibpb_paths_distinct() {
         0,
         CPUID_LEAF_7_EDX_IBRS_IBPB | CPUID_LEAF_7_EDX_ARCH_CAPABILITIES,
     );
-    let amd_ibpb_only = CpuidSnapshot::from_regs(0, CPUID_AMD_EXTENDED_EBX_IBPB, 0, 0);
+    let amd_ibpb_stibp_ssbd = CpuidSnapshot::from_regs(
+        0,
+        CPUID_AMD_EXTENDED_EBX_IBPB | CPUID_AMD_EXTENDED_EBX_STIBP | CPUID_AMD_EXTENDED_EBX_SSBD,
+        0,
+        0,
+    );
     let amd_ibrs_only = CpuidSnapshot::from_regs(0, CPUID_AMD_EXTENDED_EBX_IBRS, 0, 0);
 
     let intel = capabilities_from_cpuid(true, true, true, true, intel_leaf, CpuidSnapshot::ZERO);
-    let amd_ibpb = capabilities_from_cpuid(
+    let amd_extended = capabilities_from_cpuid(
         true,
         false,
         false,
         false,
         CpuidSnapshot::ZERO,
-        amd_ibpb_only,
+        amd_ibpb_stibp_ssbd,
     );
     let amd_ibrs = capabilities_from_cpuid(
         true,
@@ -107,10 +113,14 @@ fn capability_detection_keeps_intel_and_amd_ibrs_ibpb_paths_distinct() {
     assert!(intel.ibrs);
     assert!(intel.ibpb);
     assert!(intel.arch_capabilities);
-    assert!(!amd_ibpb.ibrs);
-    assert!(amd_ibpb.ibpb);
+    assert!(!amd_extended.ibrs);
+    assert!(amd_extended.ibpb);
+    assert!(amd_extended.stibp);
+    assert!(amd_extended.ssbd);
     assert!(amd_ibrs.ibrs);
     assert!(!amd_ibrs.ibpb);
+    assert!(!amd_ibrs.stibp);
+    assert!(!amd_ibrs.ssbd);
 }
 
 #[test]
@@ -170,11 +180,11 @@ fn strict_hardening_policy_rejects_missing_speculative_controls() {
 
     assert_eq!(
         CpuHardeningPlan::strict_required(no_ibrs),
-        Err(CpuHardeningError::IbrsIbpbUnavailable)
+        Err(CpuHardeningError::IbrsUnavailable)
     );
     assert_eq!(
         CpuHardeningPlan::strict_required(no_ibpb),
-        Err(CpuHardeningError::IbrsIbpbUnavailable)
+        Err(CpuHardeningError::IbpbUnavailable)
     );
     assert_eq!(
         CpuHardeningPlan::strict_required(no_stibp),
