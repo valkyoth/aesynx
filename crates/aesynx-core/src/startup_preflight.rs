@@ -139,6 +139,65 @@ pub struct ApStartupPreflight<const CAPACITY: usize> {
     len: usize,
 }
 
+pub struct ApStartupDispatchToken<const CAPACITY: usize> {
+    owner_core: CoreId,
+    resources: [Option<ApStartupResource>; CAPACITY],
+    len: usize,
+}
+
+impl<const CAPACITY: usize> fmt::Debug for ApStartupDispatchToken<CAPACITY> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ApStartupDispatchToken")
+            .field("owner_core", &self.owner_core)
+            .field("planned", &self.len)
+            .field("resources", &"<redacted>")
+            .finish()
+    }
+}
+
+impl<const CAPACITY: usize> Drop for ApStartupDispatchToken<CAPACITY> {
+    fn drop(&mut self) {
+        let mut index = 0usize;
+        while index < CAPACITY {
+            self.resources[index] = None;
+            index += 1;
+        }
+        self.len = 0;
+    }
+}
+
+impl<const CAPACITY: usize> ApStartupDispatchToken<CAPACITY> {
+    #[must_use]
+    pub const fn owner_core(&self) -> CoreId {
+        self.owner_core
+    }
+
+    #[must_use]
+    pub const fn planned(&self) -> usize {
+        self.len
+    }
+
+    #[must_use]
+    pub const fn capacity(&self) -> usize {
+        CAPACITY
+    }
+
+    #[must_use]
+    pub fn resource(&self, core: CoreId) -> Option<ApStartupResource> {
+        let mut index = 0usize;
+        while index < self.len {
+            if let Some(resource) = self.resources[index]
+                && resource.core == core
+            {
+                return Some(resource);
+            }
+            index += 1;
+        }
+        None
+    }
+}
+
 impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
     pub const fn new(owner_core: CoreId) -> Result<Self, CoreError> {
         if CAPACITY == 0 {
@@ -234,6 +293,22 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
             index += 1;
         }
         None
+    }
+
+    pub fn into_dispatch_token(
+        self,
+        caller: CoreId,
+    ) -> Result<ApStartupDispatchToken<CAPACITY>, CoreError> {
+        self.require_owner(caller)?;
+        if !self.status().execution_allowed() {
+            return Err(CoreError::StartupPreflightBlocked);
+        }
+
+        Ok(ApStartupDispatchToken {
+            owner_core: self.owner_core,
+            resources: self.resources,
+            len: self.len,
+        })
     }
 
     fn require_owner(&self, caller: CoreId) -> Result<(), CoreError> {

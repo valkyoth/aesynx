@@ -18,6 +18,7 @@ pub struct MulticoreTopologySmokeStatus {
     pub startup_evidence_ok: bool,
     pub ap_preflight_ok: bool,
     pub ap_execution_blocked_ok: bool,
+    pub ap_dispatch_token_blocked_ok: bool,
     pub barrier_ok: bool,
 }
 
@@ -77,6 +78,8 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
         && preflight_status.watchdog_ready() == 4
         && preflight_status.descriptor_ready() == 0;
     let ap_execution_blocked_ok = !preflight_status.execution_allowed();
+    let ap_dispatch_token_blocked_ok =
+        preflight.into_dispatch_token(ROOT_CORE).err() == Some(CoreError::StartupPreflightBlocked);
 
     let root_arrival = root_ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0))?;
     let scheduler_arrival =
@@ -135,6 +138,7 @@ pub fn run() -> Result<MulticoreTopologySmokeStatus, MulticoreTopologySmokeError
         startup_evidence_ok,
         ap_preflight_ok,
         ap_execution_blocked_ok,
+        ap_dispatch_token_blocked_ok,
         barrier_ok: barrier.status().all_arrived(),
     })
 }
@@ -202,6 +206,7 @@ mod tests {
         assert!(status.startup_evidence_ok);
         assert!(status.ap_preflight_ok);
         assert!(status.ap_execution_blocked_ok);
+        assert!(status.ap_dispatch_token_blocked_ok);
         assert!(status.barrier_ok);
     }
 }
