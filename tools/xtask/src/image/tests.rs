@@ -209,6 +209,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
     assert!(contents.contains(
         "multicore_topology_ap_dispatch_token_blocked_marker=ap_dispatch_token_blocked_ok=true\n"
     ));
+    assert!(contents.contains("cpu_hardening_ibpb_attempted_marker=ibpb_attempted=\n"));
     assert!(contents.contains("smoke=panic\n"));
     assert!(contents.contains("qemu_smp_cpus=4\n"));
     for smoke in [

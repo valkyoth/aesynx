@@ -74,6 +74,39 @@ fn signature() -> Result<Signature64, PolicyError> {
     Signature64::new([7; 64])
 }
 
+#[test]
+fn hash_and_signature_expose_explicit_timing_safe_comparison() {
+    let hash_a = match hash(1) {
+        Ok(hash) => hash,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let hash_b = match hash(1) {
+        Ok(hash) => hash,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let hash_c = match hash(2) {
+        Ok(hash) => hash,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let signature_a = match Signature64::new([7; 64]) {
+        Ok(signature) => signature,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let signature_b = match Signature64::new([7; 64]) {
+        Ok(signature) => signature,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let signature_c = match Signature64::new([8; 64]) {
+        Ok(signature) => signature,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+
+    assert!(hash_a.timing_safe_eq(&hash_b));
+    assert!(!hash_a.timing_safe_eq(&hash_c));
+    assert!(signature_a.timing_safe_eq(&signature_b));
+    assert!(!signature_a.timing_safe_eq(&signature_c));
+}
+
 fn scheduler_manifest() -> Result<ModelObjectManifest, PolicyError> {
     Ok(ModelObjectManifest {
         id: ModelId::new(1),

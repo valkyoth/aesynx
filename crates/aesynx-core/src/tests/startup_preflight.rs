@@ -196,6 +196,41 @@ fn ap_startup_preflight_rejects_missing_watchdog() {
 }
 
 #[test]
+fn ap_startup_preflight_rejects_stack_outside_ap_region() {
+    let topology = match staged_two_core_topology() {
+        Ok(topology) => topology,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
+    let root = match topology.get(ROOT_CORE) {
+        Some(entry) => entry,
+        None => return assert_eq!(Some(CoreError::UnknownCore), None),
+    };
+    let mut preflight = match ApStartupPreflight::<1>::new(ROOT_CORE) {
+        Ok(preflight) => preflight,
+        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
+    };
+
+    assert_eq!(
+        preflight
+            .add_staged_core(
+                ROOT_CORE,
+                root,
+                VirtAddr::new(0),
+                0x8000,
+                ApDescriptorTableReadiness::PerCoreReady,
+                10_000,
+            )
+            .err(),
+        Some(CoreError::InvalidStartupStack)
+    );
+    assert_eq!(
+        preflight.status().planned(),
+        0,
+        "failed stack validation must not mutate preflight resources"
+    );
+}
+
+#[test]
 fn ap_startup_preflight_dispatch_token_requires_owner_and_execution_ready() {
     let topology = match staged_two_core_topology() {
         Ok(topology) => topology,

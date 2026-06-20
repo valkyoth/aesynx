@@ -88,8 +88,12 @@ impl CoreStartupJointState {
     pub fn validate_startup_stage(self) -> Result<(), CoreError> {
         self.validate()?;
         if matches!(
-            (self.hardware_state, self.local_state),
-            (CoreHardwareState::Discovered, CoreState::Offline)
+            (self.hardware_state, self.assignment_state, self.local_state),
+            (
+                CoreHardwareState::Discovered,
+                CoreAssignmentState::Unassigned,
+                CoreState::Offline
+            )
         ) {
             Ok(())
         } else {

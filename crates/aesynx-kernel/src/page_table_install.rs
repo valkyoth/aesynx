@@ -271,7 +271,7 @@ extern "C" fn activate_on_kernel_stack(
     match aesynx_arch_x86_64::cpu_hardening::init() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "cpu-hardening nx={} wp={} smep={} smap={} umip={} ibrs={} ibpb_supported={} stibp={} ssbd={} arch_capabilities={}",
+                "cpu-hardening nx={} wp={} smep={} smap={} umip={} ibrs={} ibpb_supported={} ibpb_attempted={} stibp={} ssbd={} arch_capabilities={}",
                 status.nx_enabled,
                 status.wp_enabled,
                 status.smep_enabled,
@@ -279,6 +279,7 @@ extern "C" fn activate_on_kernel_stack(
                 status.umip_enabled,
                 status.ibrs_enabled,
                 status.ibpb_supported,
+                status.ibpb_attempted,
                 status.stibp_enabled,
                 status.ssbd_enabled,
                 status.arch_capabilities_supported

@@ -266,10 +266,11 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         entry.hardware_state = CoreHardwareState::StartupStaged;
         entry.local.stage_startup()?;
         entry.local.telemetry_mut().record_local_event()?;
-        self.bump_epoch()?;
-        entry.staged_epoch = Some(self.epoch);
+        let next_epoch = self.next_epoch()?;
+        entry.staged_epoch = Some(next_epoch);
         entry.validate_startup_state()?;
-        let ticket = CoreStartupTicket::new(core, entry.hardware_id, caller, self.epoch);
+        let ticket = CoreStartupTicket::new(core, entry.hardware_id, caller, next_epoch);
+        self.epoch = next_epoch;
         self.entries[index] = Some(entry);
         Ok(ticket)
     }
@@ -299,8 +300,8 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         entry.hardware_state = CoreHardwareState::Online;
         entry.local.mark_online()?;
         entry.local.telemetry_mut().record_local_event()?;
-        self.bump_epoch()?;
         entry.validate_startup_state()?;
+        self.bump_epoch()?;
         self.entries[index] = Some(entry);
         Ok(())
     }
@@ -320,8 +321,8 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
 
         entry.local.assign_role(role)?;
         entry.assignment_state = CoreAssignmentState::Assigned;
-        self.bump_epoch()?;
         entry.validate_startup_state()?;
+        self.bump_epoch()?;
         self.entries[index] = Some(entry);
         Ok(())
     }
@@ -337,8 +338,8 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
         entry.hardware_state = CoreHardwareState::Quarantined;
         entry.local.quarantine()?;
         entry.local.telemetry_mut().record_local_event()?;
-        self.bump_epoch()?;
         entry.validate_startup_state()?;
+        self.bump_epoch()?;
         self.entries[index] = Some(entry);
         Ok(())
     }
@@ -402,11 +403,14 @@ impl<const CAPACITY: usize> CoreTopology<CAPACITY> {
     }
 
     fn bump_epoch(&mut self) -> Result<(), CoreError> {
-        self.epoch = self
-            .epoch
-            .checked_add(1)
-            .ok_or(CoreError::TelemetryOverflow)?;
+        self.epoch = self.next_epoch()?;
         Ok(())
+    }
+
+    fn next_epoch(&self) -> Result<u64, CoreError> {
+        self.epoch
+            .checked_add(1)
+            .ok_or(CoreError::TelemetryOverflow)
     }
 
     fn index_of_core(&self, core: CoreId) -> Option<usize> {

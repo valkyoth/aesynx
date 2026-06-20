@@ -112,6 +112,17 @@ fn startup_state_table_rejects_invalid_transition_intents() {
         Some(CoreError::InvalidStateTransition)
     );
 
+    let assigned_discovered = CoreStartupJointState::new(
+        CoreHardwareState::Discovered,
+        CoreAssignmentState::Assigned,
+        CoreState::Offline,
+    );
+    assert_eq!(
+        assigned_discovered.validate_startup_stage().err(),
+        Some(CoreError::InvalidStateTransition)
+    );
+    assert!(assigned_discovered.validate_role_assignment().is_ok());
+
     assert!(staged.validate_hardware_online().is_ok());
     assert!(staged.validate_role_assignment().is_ok());
     assert!(staged.validate_quarantine().is_ok());

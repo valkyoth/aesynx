@@ -47,7 +47,7 @@ impl CoreStartupTicket {
     }
 
     pub fn observe_arrival(
-        &self,
+        self,
         arrived_core: CoreId,
         hardware_id: CpuHardwareId,
     ) -> Result<CoreStartupArrival, CoreError> {
@@ -55,6 +55,9 @@ impl CoreStartupTicket {
         let target_hardware_id = self.hardware_id();
         let coordinator_core = self.coordinator_core();
         let startup_epoch = self.startup_epoch.load(Ordering::Acquire);
+        // Startup evidence fields are CPU topology identifiers, not
+        // cryptographic secrets. Constant-time comparison is not required
+        // here; bitwise OR still evaluates both mismatch checks.
         let core_mismatch = arrived_core != target_core;
         let hardware_mismatch = hardware_id != target_hardware_id;
         if core_mismatch | hardware_mismatch {

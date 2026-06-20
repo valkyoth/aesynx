@@ -1,3 +1,7 @@
+use super::cpuid::{
+    CPUID_AMD_EXTENDED_EBX_IBPB, CPUID_AMD_EXTENDED_EBX_IBRS, CPUID_LEAF_7_EDX_ARCH_CAPABILITIES,
+    CPUID_LEAF_7_EDX_IBRS_IBPB, CpuidSnapshot, capabilities_from_cpuid,
+};
 use super::{
     AdmittedMsr, CR0_WP, CR4_SMAP, CR4_SMEP, CR4_UMIP, CpuHardeningCapabilities, CpuHardeningError,
     CpuHardeningPlan, CpuHardeningStatus, EFER_NXE, MSR_EFER, MSR_IA32_PRED_CMD,
@@ -69,6 +73,44 @@ fn hardening_policy_enables_required_and_supported_bits() {
             arch_capabilities_supported: true,
         })
     );
+}
+
+#[test]
+fn capability_detection_keeps_intel_and_amd_ibrs_ibpb_paths_distinct() {
+    let intel_leaf = CpuidSnapshot::from_regs(
+        0,
+        0,
+        0,
+        CPUID_LEAF_7_EDX_IBRS_IBPB | CPUID_LEAF_7_EDX_ARCH_CAPABILITIES,
+    );
+    let amd_ibpb_only = CpuidSnapshot::from_regs(0, CPUID_AMD_EXTENDED_EBX_IBPB, 0, 0);
+    let amd_ibrs_only = CpuidSnapshot::from_regs(0, CPUID_AMD_EXTENDED_EBX_IBRS, 0, 0);
+
+    let intel = capabilities_from_cpuid(true, true, true, true, intel_leaf, CpuidSnapshot::ZERO);
+    let amd_ibpb = capabilities_from_cpuid(
+        true,
+        false,
+        false,
+        false,
+        CpuidSnapshot::ZERO,
+        amd_ibpb_only,
+    );
+    let amd_ibrs = capabilities_from_cpuid(
+        true,
+        false,
+        false,
+        false,
+        CpuidSnapshot::ZERO,
+        amd_ibrs_only,
+    );
+
+    assert!(intel.ibrs);
+    assert!(intel.ibpb);
+    assert!(intel.arch_capabilities);
+    assert!(!amd_ibpb.ibrs);
+    assert!(amd_ibpb.ibpb);
+    assert!(amd_ibrs.ibrs);
+    assert!(!amd_ibrs.ibpb);
 }
 
 #[test]
@@ -239,6 +281,7 @@ fn hardening_status_reports_read_back_register_bits() {
                 arch_capabilities: true,
                 ..base_capabilities()
             },
+            true,
         ),
         CpuHardeningStatus {
             nx_enabled: true,
@@ -248,6 +291,7 @@ fn hardening_status_reports_read_back_register_bits() {
             umip_enabled: false,
             ibrs_enabled: true,
             ibpb_supported: true,
+            ibpb_attempted: true,
             stibp_enabled: false,
             ssbd_enabled: true,
             arch_capabilities_supported: true,
@@ -275,6 +319,7 @@ fn hardening_readback_verification_requires_requested_bits() {
         CR4_UMIP,
         SPEC_CTRL_IBRS | SPEC_CTRL_SSBD,
         base_capabilities(),
+        true,
     );
     let missing_ibrs = CpuHardeningStatus::from_registers(
         EFER_NXE,
@@ -282,6 +327,7 @@ fn hardening_readback_verification_requires_requested_bits() {
         CR4_SMEP | CR4_UMIP,
         SPEC_CTRL_SSBD,
         base_capabilities(),
+        true,
     );
     let applied = CpuHardeningStatus::from_registers(
         EFER_NXE,
@@ -289,6 +335,7 @@ fn hardening_readback_verification_requires_requested_bits() {
         CR4_SMEP | CR4_UMIP,
         SPEC_CTRL_IBRS | SPEC_CTRL_SSBD,
         base_capabilities(),
+        true,
     );
 
     assert_eq!(
@@ -322,6 +369,7 @@ fn hardening_readback_allows_unrequested_extra_bits() {
         CR4_SMEP | CR4_SMAP | CR4_UMIP,
         SPEC_CTRL_IBRS | SPEC_CTRL_STIBP | SPEC_CTRL_SSBD,
         base_capabilities(),
+        false,
     );
 
     assert_eq!(verify_applied(plan, status), Ok(()));

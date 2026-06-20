@@ -1,9 +1,13 @@
 use aesynx_abi::{CoreId, CpuHardwareId, VirtAddr};
+use core::cell::Cell;
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::{CoreError, CoreHardwareState, CoreState, CoreTopologyEntry};
 
 pub const MIN_AP_STACK_BYTES: u64 = 32 * 1024;
+pub const AP_STACK_REGION_START: u64 = 0xffff_ffff_8000_0000;
+pub const AP_STACK_REGION_END: u64 = 0xffff_ffff_c000_0000;
 const PAGE_SIZE: u64 = 4096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -143,6 +147,7 @@ pub struct ApStartupDispatchToken<const CAPACITY: usize> {
     owner_core: CoreId,
     resources: [Option<ApStartupResource>; CAPACITY],
     len: usize,
+    _not_sync: PhantomData<Cell<()>>,
 }
 
 impl<const CAPACITY: usize> fmt::Debug for ApStartupDispatchToken<CAPACITY> {
@@ -308,6 +313,7 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
             owner_core: self.owner_core,
             resources: self.resources,
             len: self.len,
+            _not_sync: PhantomData,
         })
     }
 
@@ -342,15 +348,19 @@ impl<const CAPACITY: usize> ApStartupPreflight<CAPACITY> {
 }
 
 fn validate_stack(base: VirtAddr, len: u64) -> Result<(), CoreError> {
+    let base_raw = base.get();
     if len < MIN_AP_STACK_BYTES {
         return Err(CoreError::InvalidStartupStack);
     }
-    if !is_page_aligned(base.get()) || !is_page_aligned(len) {
+    if !is_page_aligned(base_raw) || !is_page_aligned(len) {
         return Err(CoreError::InvalidStartupStack);
     }
-    base.get()
+    let end = base_raw
         .checked_add(len)
         .ok_or(CoreError::InvalidStartupStack)?;
+    if base_raw < AP_STACK_REGION_START || end > AP_STACK_REGION_END {
+        return Err(CoreError::InvalidStartupStack);
+    }
     Ok(())
 }
 

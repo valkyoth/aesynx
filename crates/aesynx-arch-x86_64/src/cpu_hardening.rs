@@ -1,14 +1,6 @@
-const CPUID_LEAF_7: u32 = 7;
-const CPUID_LEAF_EXTENDED_MAX: u32 = 0x8000_0000;
-const CPUID_LEAF_EXTENDED_FEATURES: u32 = 0x8000_0001;
-const CPUID_EXT_FEATURE_EDX_NX: u32 = 1 << 20;
-const CPUID_LEAF_7_EBX_SMEP: u32 = 1 << 7;
-const CPUID_LEAF_7_EBX_SMAP: u32 = 1 << 20;
-const CPUID_LEAF_7_ECX_UMIP: u32 = 1 << 2;
-const CPUID_LEAF_7_EDX_IBRS_IBPB: u32 = 1 << 26;
-const CPUID_LEAF_7_EDX_STIBP: u32 = 1 << 27;
-const CPUID_LEAF_7_EDX_ARCH_CAPABILITIES: u32 = 1 << 29;
-const CPUID_LEAF_7_EDX_SSBD: u32 = 1 << 31;
+mod cpuid;
+
+pub use cpuid::detect_capabilities;
 
 const MSR_EFER: u32 = 0xc000_0080;
 const MSR_IA32_SPEC_CTRL: u32 = 0x0000_0048;
@@ -38,23 +30,6 @@ impl AdmittedMsr {
             Self::SpecCtrl => MSR_IA32_SPEC_CTRL,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct CpuidSnapshot {
-    eax: u32,
-    ebx: u32,
-    ecx: u32,
-    edx: u32,
-}
-
-impl CpuidSnapshot {
-    const ZERO: Self = Self {
-        eax: 0,
-        ebx: 0,
-        ecx: 0,
-        edx: 0,
-    };
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -99,6 +74,7 @@ pub struct CpuHardeningStatus {
     pub umip_enabled: bool,
     pub ibrs_enabled: bool,
     pub ibpb_supported: bool,
+    pub ibpb_attempted: bool,
     pub stibp_enabled: bool,
     pub ssbd_enabled: bool,
     pub arch_capabilities_supported: bool,
@@ -123,10 +99,12 @@ pub fn init() -> Result<CpuHardeningStatus, CpuHardeningError> {
     // SAFETY: The plan is derived from CPUID feature bits and requires NX
     // support before EFER.NXE is written. Optional CR4 features are enabled
     // only when CPUID reports support. IA32_SPEC_CTRL bits are requested only
-    // when CPUID reports their controls. This function is called during the
-    // terminal single-core boot smoke after Aesynx owns CR3.
+    // when CPUID reports their controls. IA32_PRED_CMD is write-only; the
+    // boot-time IBPB write can be attempted and #GP-fail if unsupported, but
+    // cannot be confirmed effective by readback. This function is called
+    // during the terminal single-core boot smoke after Aesynx owns CR3.
     unsafe { apply_plan(plan) };
-    let status = read_status(capabilities);
+    let status = read_status(capabilities, plan);
     verify_applied(plan, status)?;
     Ok(status)
 }
@@ -138,37 +116,6 @@ fn selected_boot_plan(
         CpuHardeningPlan::strict_required(capabilities)
     } else {
         CpuHardeningPlan::required(capabilities)
-    }
-}
-
-pub fn detect_capabilities() -> CpuHardeningCapabilities {
-    let extended_max = cpuid_eax(CPUID_LEAF_EXTENDED_MAX, 0);
-    let nx = extended_max >= CPUID_LEAF_EXTENDED_FEATURES
-        && cpuid_snapshot(CPUID_LEAF_EXTENDED_FEATURES, 0).edx & CPUID_EXT_FEATURE_EDX_NX != 0;
-    let leaf_7_supported = cpuid_eax(0, 0) >= CPUID_LEAF_7;
-    let leaf_7 = if leaf_7_supported {
-        cpuid_snapshot(CPUID_LEAF_7, 0)
-    } else {
-        CpuidSnapshot::ZERO
-    };
-    let smep = leaf_7.ebx & CPUID_LEAF_7_EBX_SMEP != 0;
-    let smap = leaf_7.ebx & CPUID_LEAF_7_EBX_SMAP != 0;
-    let umip = leaf_7.ecx & CPUID_LEAF_7_ECX_UMIP != 0;
-    let ibrs_ibpb = leaf_7.edx & CPUID_LEAF_7_EDX_IBRS_IBPB != 0;
-    let stibp = leaf_7.edx & CPUID_LEAF_7_EDX_STIBP != 0;
-    let ssbd = leaf_7.edx & CPUID_LEAF_7_EDX_SSBD != 0;
-    let arch_capabilities = leaf_7.edx & CPUID_LEAF_7_EDX_ARCH_CAPABILITIES != 0;
-
-    CpuHardeningCapabilities {
-        nx,
-        smep,
-        smap,
-        umip,
-        ibrs: ibrs_ibpb,
-        ibpb: ibrs_ibpb,
-        stibp,
-        ssbd,
-        arch_capabilities,
     }
 }
 
@@ -244,6 +191,7 @@ impl CpuHardeningStatus {
         cr4: u64,
         spec_ctrl: u64,
         capabilities: CpuHardeningCapabilities,
+        ibpb_attempted: bool,
     ) -> Self {
         Self {
             nx_enabled: efer & EFER_NXE != 0,
@@ -253,6 +201,7 @@ impl CpuHardeningStatus {
             umip_enabled: cr4 & CR4_UMIP != 0,
             ibrs_enabled: spec_ctrl & SPEC_CTRL_IBRS != 0,
             ibpb_supported: capabilities.ibpb,
+            ibpb_attempted,
             stibp_enabled: spec_ctrl & SPEC_CTRL_STIBP != 0,
             ssbd_enabled: spec_ctrl & SPEC_CTRL_SSBD != 0,
             arch_capabilities_supported: capabilities.arch_capabilities,
@@ -260,7 +209,10 @@ impl CpuHardeningStatus {
     }
 }
 
-fn read_status(capabilities: CpuHardeningCapabilities) -> CpuHardeningStatus {
+fn read_status(
+    capabilities: CpuHardeningCapabilities,
+    plan: CpuHardeningPlan,
+) -> CpuHardeningStatus {
     let spec_ctrl = if capabilities.spec_ctrl_supported() {
         read_msr(AdmittedMsr::SpecCtrl)
     } else {
@@ -272,6 +224,7 @@ fn read_status(capabilities: CpuHardeningCapabilities) -> CpuHardeningStatus {
         read_cr4(),
         spec_ctrl,
         capabilities,
+        plan.enable_ibpb,
     )
 }
 
@@ -292,6 +245,13 @@ const fn verify_applied(
         return Err(CpuHardeningError::HardeningWriteDidNotStick);
     }
 
+    // IA32_PRED_CMD.IBPB is intentionally absent from register read-back
+    // verification. The architectural MSR is write-only: a supported write is
+    // a one-shot barrier, not sticky state. A failed unsupported write should
+    // raise #GP before this function is reached, but non-conformant hardware or
+    // a hypervisor that silently drops WRMSR cannot be detected here. Status
+    // therefore separates `ibpb_supported` from the boot-time
+    // `ibpb_attempted` evidence and makes no per-context-switch IBPB claim.
     Ok(())
 }
 
@@ -355,8 +315,8 @@ unsafe fn apply_plan(plan: CpuHardeningPlan) {
     }
     if plan.enable_ibpb {
         // SAFETY: `AdmittedMsr::PredCmd` is the architectural IA32_PRED_CMD
-        // MSR and CPUID reported the shared IBRS/IBPB feature bit. Writing
-        // bit 0 issues a one-shot indirect-branch predictor barrier.
+        // MSR and CPUID reported Intel or AMD IBPB support. Writing bit 0
+        // issues a one-shot indirect-branch predictor barrier.
         unsafe {
             write_msr(AdmittedMsr::PredCmd, PRED_CMD_IBPB);
         }
@@ -431,32 +391,6 @@ unsafe fn write_cr4(value: u64) {
     unsafe {
         core::arch::asm!("mov cr4, {value}", value = in(reg) value, options(nostack, preserves_flags));
     }
-}
-
-#[cfg(target_arch = "x86_64")]
-fn cpuid_eax(leaf: u32, subleaf: u32) -> u32 {
-    core::arch::x86_64::__cpuid_count(leaf, subleaf).eax
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-const fn cpuid_eax(_leaf: u32, _subleaf: u32) -> u32 {
-    0
-}
-
-#[cfg(target_arch = "x86_64")]
-fn cpuid_snapshot(leaf: u32, subleaf: u32) -> CpuidSnapshot {
-    let result = core::arch::x86_64::__cpuid_count(leaf, subleaf);
-    CpuidSnapshot {
-        eax: result.eax,
-        ebx: result.ebx,
-        ecx: result.ecx,
-        edx: result.edx,
-    }
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-const fn cpuid_snapshot(_leaf: u32, _subleaf: u32) -> CpuidSnapshot {
-    CpuidSnapshot::ZERO
 }
 
 #[cfg(test)]

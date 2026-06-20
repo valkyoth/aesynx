@@ -82,21 +82,7 @@ fn core_topology_rejects_online_quarantine_without_fault_path() {
 
 #[test]
 fn core_topology_arrival_evidence_requires_matching_ticket() {
-    let mut topology = match CoreTopology::<1>::new(ROOT_CORE) {
-        Ok(topology) => topology,
-        Err(error) => return assert_eq!(error, CoreError::CapacityZero),
-    };
-    assert!(
-        topology
-            .insert_discovered(
-                ROOT_CORE,
-                ROOT_CORE,
-                CpuHardwareId::new(0),
-                qemu_bootstrap_caps()
-            )
-            .is_ok()
-    );
-    let ticket = match topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE) {
+    let ticket = match staged_single_core_ticket() {
         Ok(ticket) => ticket,
         Err(error) => return assert_eq!(Some(error), None),
     };
@@ -107,6 +93,11 @@ fn core_topology_arrival_evidence_requires_matching_ticket() {
             .err(),
         Some(CoreError::StartupEvidenceMismatch)
     );
+
+    let ticket = match staged_single_core_ticket() {
+        Ok(ticket) => ticket,
+        Err(error) => return assert_eq!(Some(error), None),
+    };
     assert_eq!(
         ticket
             .observe_arrival(CoreId::new(99), CpuHardwareId::new(0))
@@ -182,14 +173,14 @@ fn core_startup_ticket_debug_redacts_hardware_id_and_epoch() {
         Ok(ticket) => ticket,
         Err(error) => return assert_eq!(Some(error), None),
     };
+
+    let mut ticket_debug = FixedDebugBuffer::new();
+    assert!(write!(&mut ticket_debug, "{ticket:?}").is_ok());
     let arrival = match ticket.observe_arrival(ROOT_CORE, CpuHardwareId::new(0xfeed_beef)) {
         Ok(arrival) => arrival,
         Err(error) => return assert_eq!(Some(error), None),
     };
-
-    let mut ticket_debug = FixedDebugBuffer::new();
     let mut arrival_debug = FixedDebugBuffer::new();
-    assert!(write!(&mut ticket_debug, "{ticket:?}").is_ok());
     assert!(write!(&mut arrival_debug, "{arrival:?}").is_ok());
 
     assert!(
@@ -216,6 +207,17 @@ fn core_startup_ticket_debug_redacts_hardware_id_and_epoch() {
     );
     assert!(!arrival_debug.as_str().contains("feed"));
     assert!(!arrival_debug.as_str().contains("48879"));
+}
+
+fn staged_single_core_ticket() -> Result<crate::CoreStartupTicket, CoreError> {
+    let mut topology = CoreTopology::<1>::new(ROOT_CORE)?;
+    topology.insert_discovered(
+        ROOT_CORE,
+        ROOT_CORE,
+        CpuHardwareId::new(0),
+        qemu_bootstrap_caps(),
+    )?;
+    topology.stage_startup_ticket(ROOT_CORE, ROOT_CORE)
 }
 
 struct FixedDebugBuffer {

@@ -31,6 +31,17 @@ impl Hash256 {
     pub const fn bytes(self) -> [u8; 32] {
         self.0
     }
+
+    #[must_use]
+    pub const fn timing_safe_eq(&self, other: &Self) -> bool {
+        let mut diff = 0u8;
+        let mut index = 0usize;
+        while index < self.0.len() {
+            diff |= self.0[index] ^ other.0[index];
+            index += 1;
+        }
+        diff == 0
+    }
 }
 
 impl fmt::Debug for Hash256 {
@@ -61,6 +72,17 @@ impl Signature64 {
     #[must_use]
     pub const fn bytes(self) -> [u8; 64] {
         self.0
+    }
+
+    #[must_use]
+    pub const fn timing_safe_eq(&self, other: &Self) -> bool {
+        let mut diff = 0u8;
+        let mut index = 0usize;
+        while index < self.0.len() {
+            diff |= self.0[index] ^ other.0[index];
+            index += 1;
+        }
+        diff == 0
     }
 }
 
