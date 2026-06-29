@@ -59,7 +59,7 @@ mod tests {
 
         assert_eq!(status.map(|value| value.ping_seq), Ok(1));
         assert_eq!(status.map(|value| value.pong_seq), Ok(2));
-        assert_eq!(status.map(|value| value.backpressure_events), Ok(1));
+        assert_eq!(status.map(|value| value.backpressure_events), Ok(2));
         assert_eq!(status.map(|value| value.backpressure_ok), Ok(true));
         assert_eq!(status.map(|value| value.release_acquire_ok), Ok(true));
         assert_eq!(status.map(|value| value.pairwise_route_ok), Ok(true));

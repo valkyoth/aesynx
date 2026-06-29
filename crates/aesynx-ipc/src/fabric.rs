@@ -41,6 +41,8 @@ pub struct PairwiseSpscQueue<const CAPACITY: usize> {
     // Non-Sync by design: this is the single-producer/single-consumer fabric
     // model. A live multicore ring must replace the plain indices with
     // architecture-backed atomic slot ownership and cache-line layout rules.
+    // Copy is model-only here because no sequence allocator lives in this type;
+    // live shared-memory rings must become linear ownership objects.
     producer_core: CoreId,
     consumer_core: CoreId,
     slots: [Option<PublishedFabricMessage>; CAPACITY],
@@ -97,6 +99,9 @@ impl<const CAPACITY: usize> PairwiseSpscQueue<CAPACITY> {
             return Err(FabricError::Empty);
         }
 
+        // FUTURE-SAFETY: before Cap/Object/Inline payloads cross trust
+        // domains, vacated slots must be explicitly scrubbed with a
+        // zero-before-observe primitive rather than relying on `Option::take`.
         let Some(entry) = self.slots[self.head].take() else {
             return Err(FabricError::CorruptState);
         };
@@ -168,8 +173,10 @@ impl<const CAPACITY: usize> PairwiseSpscQueue<CAPACITY> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CorePairPingPong<const CAPACITY: usize> {
+    // Deliberately non-Copy: `next_seq` is the sole authoritative sequence
+    // allocator for this pair. Copying it would fork the sequence space.
     root_core: ValidatedCoreId,
     peer_core: ValidatedCoreId,
     root_to_peer: PairwiseSpscQueue<CAPACITY>,
@@ -203,25 +210,31 @@ impl<const CAPACITY: usize> CorePairPingPong<CAPACITY> {
     }
 
     pub fn run_once(&mut self) -> Result<PingPongReport, FabricError> {
-        let ping = self.message(self.root_core, self.peer_core, MessageKind::Ping, None)?;
-        let ping_seq = ping.header().seq();
-        self.root_to_peer.push(self.root_core.get(), ping)?;
+        let ping_seq = push_message(
+            &mut self.root_to_peer,
+            &mut self.next_seq,
+            self.root_core,
+            self.peer_core,
+            MessageKind::Ping,
+            None,
+        )?;
         let observed_ping = self.root_to_peer.pop(self.peer_core.get())?;
         let ordering = observed_ping.ordering();
         let ping = observed_ping.into_value();
         self.require_kind(ping, MessageKind::Ping)?;
 
-        let pong = self.message(
+        let pong_seq = push_message(
+            &mut self.peer_to_root,
+            &mut self.next_seq,
             self.peer_core,
             self.root_core,
             MessageKind::Pong,
             Some(MessageId::new(ping_seq)),
         )?;
-        let pong_seq = pong.header().seq();
-        self.peer_to_root.push(self.peer_core.get(), pong)?;
         let observed_pong = self.peer_to_root.pop(self.root_core.get())?;
         let pong = observed_pong.into_value();
         self.require_kind(pong, MessageKind::Pong)?;
+        self.require_reply_to(pong, MessageId::new(ping_seq))?;
 
         let backpressure_ok = self.prove_backpressure()?;
         let release_acquire_ok = ordering.producer_publish() == Ordering::Release
@@ -236,44 +249,23 @@ impl<const CAPACITY: usize> CorePairPingPong<CAPACITY> {
         })
     }
 
-    fn message(
-        &mut self,
-        src: ValidatedCoreId,
-        dst: ValidatedCoreId,
-        kind: MessageKind,
-        reply_to: Option<MessageId>,
-    ) -> Result<FabricMessage, FabricError> {
-        let seq = self.next_seq;
-        self.next_seq = self
-            .next_seq
-            .checked_add(1)
-            .ok_or(FabricError::SequenceOverflow)?;
-        let request = MessageRequest {
-            dst: dst.get(),
-            kind,
-            reply_to,
-        };
-        Ok(FabricMessage::new(
-            MessageHeader::stamp(request, src, seq, dst),
-            MessagePayload::Empty,
-        ))
-    }
-
     fn prove_backpressure(&mut self) -> Result<bool, FabricError> {
-        let fill = self.message(self.root_core, self.peer_core, MessageKind::Ping, None)?;
-        self.root_to_peer.push(self.root_core.get(), fill)?;
-        let blocked = self.message(self.root_core, self.peer_core, MessageKind::Ping, None)?;
-        let backpressure_ok =
-            self.root_to_peer.push(self.root_core.get(), blocked) == Err(FabricError::Backpressure);
-        if backpressure_ok {
-            self.backpressure_events = self
-                .backpressure_events
-                .checked_add(1)
-                .ok_or(FabricError::SequenceOverflow)?;
-        }
-        let _ = self.root_to_peer.pop(self.peer_core.get())?;
+        let forward = prove_backpressure_on(
+            &mut self.root_to_peer,
+            &mut self.next_seq,
+            &mut self.backpressure_events,
+            self.root_core,
+            self.peer_core,
+        )?;
+        let reverse = prove_backpressure_on(
+            &mut self.peer_to_root,
+            &mut self.next_seq,
+            &mut self.backpressure_events,
+            self.peer_core,
+            self.root_core,
+        )?;
 
-        Ok(backpressure_ok)
+        Ok(forward && reverse)
     }
 
     fn require_kind(
@@ -287,6 +279,81 @@ impl<const CAPACITY: usize> CorePairPingPong<CAPACITY> {
 
         Ok(())
     }
+
+    fn require_reply_to(
+        &self,
+        message: FabricMessage,
+        expected: MessageId,
+    ) -> Result<(), FabricError> {
+        if message.header().reply_to() != Some(expected) {
+            return Err(FabricError::UnexpectedMessage);
+        }
+
+        Ok(())
+    }
+}
+
+fn push_message<const CAPACITY: usize>(
+    queue: &mut PairwiseSpscQueue<CAPACITY>,
+    next_seq: &mut u64,
+    src: ValidatedCoreId,
+    dst: ValidatedCoreId,
+    kind: MessageKind,
+    reply_to: Option<MessageId>,
+) -> Result<u64, FabricError> {
+    let seq = *next_seq;
+    let message = message_with_seq(seq, src, dst, kind, reply_to);
+    queue.push(src.get(), message)?;
+    *next_seq = seq.checked_add(1).ok_or(FabricError::SequenceOverflow)?;
+
+    Ok(seq)
+}
+
+fn prove_backpressure_on<const CAPACITY: usize>(
+    queue: &mut PairwiseSpscQueue<CAPACITY>,
+    next_seq: &mut u64,
+    backpressure_events: &mut u64,
+    src: ValidatedCoreId,
+    dst: ValidatedCoreId,
+) -> Result<bool, FabricError> {
+    let mut enqueued = 0usize;
+    while !queue.is_full() {
+        let _ = push_message(queue, next_seq, src, dst, MessageKind::Ping, None)?;
+        enqueued += 1;
+    }
+
+    let blocked = message_with_seq(*next_seq, src, dst, MessageKind::Ping, None);
+    let backpressure_ok = queue.push(src.get(), blocked) == Err(FabricError::Backpressure);
+    if backpressure_ok {
+        *backpressure_events = backpressure_events
+            .checked_add(1)
+            .ok_or(FabricError::SequenceOverflow)?;
+    }
+
+    while enqueued > 0 {
+        let _ = queue.pop(dst.get())?;
+        enqueued -= 1;
+    }
+
+    Ok(backpressure_ok)
+}
+
+fn message_with_seq(
+    seq: u64,
+    src: ValidatedCoreId,
+    dst: ValidatedCoreId,
+    kind: MessageKind,
+    reply_to: Option<MessageId>,
+) -> FabricMessage {
+    let request = MessageRequest {
+        dst: dst.get(),
+        kind,
+        reply_to,
+    };
+    FabricMessage::new(
+        MessageHeader::stamp(request, src, seq, dst),
+        MessagePayload::Empty,
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -339,7 +406,7 @@ mod tests {
 
         assert_eq!(report.ping_seq, 1);
         assert_eq!(report.pong_seq, 2);
-        assert_eq!(report.backpressure_events, 1);
+        assert_eq!(report.backpressure_events, 2);
         assert!(report.backpressure_ok);
         assert!(report.release_acquire_ok);
 
@@ -356,5 +423,24 @@ mod tests {
             root.and_then(|root| PairwiseSpscQueue::<1>::new(root, root)),
             Err(FabricError::LoopbackPair)
         );
+    }
+
+    #[test]
+    fn ping_pong_backpressure_drains_generic_capacity() -> Result<(), FabricError> {
+        let live = TwoCoreSet;
+        let root = ValidatedCoreId::new(CoreId::new(0), &live)
+            .map_err(|_| FabricError::UnexpectedMessage)?;
+        let peer = ValidatedCoreId::new(CoreId::new(1), &live)
+            .map_err(|_| FabricError::UnexpectedMessage)?;
+        let mut fabric = CorePairPingPong::<4>::new(root, peer)?;
+
+        let report = fabric.run_once()?;
+
+        assert!(report.backpressure_ok);
+        assert_eq!(report.backpressure_events, 2);
+        assert_eq!(fabric.root_to_peer.len(), 0);
+        assert_eq!(fabric.peer_to_root.len(), 0);
+
+        Ok(())
     }
 }

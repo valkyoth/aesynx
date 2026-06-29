@@ -210,9 +210,9 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         "multicore_topology_ap_dispatch_token_blocked_marker=ap_dispatch_token_blocked_ok=true\n"
     ));
     assert!(contents.contains("ipc_pingpong_status_marker=ipc-pingpong ping_seq=\n"));
-    assert!(contents.contains("ipc_pingpong_backpressure_marker=backpressure_ok=true\n"));
-    assert!(contents.contains("ipc_pingpong_release_acquire_marker=release_acquire_ok=true\n"));
-    assert!(contents.contains("ipc_pingpong_pairwise_marker=pairwise_route_ok=true\n"));
+    assert!(contents.contains("ipc_pingpong_backpressure_marker=ipc_backpressure_ok=true\n"));
+    assert!(contents.contains("ipc_pingpong_release_acquire_marker=ipc_release_acquire_ok=true\n"));
+    assert!(contents.contains("ipc_pingpong_pairwise_marker=ipc_pairwise_route_ok=true\n"));
     assert!(contents.contains("ipc_pingpong_marker=[TEST] ipc-pingpong=ok\n"));
     assert!(contents.contains("cpu_hardening_ibpb_attempted_marker=ibpb_attempted=\n"));
     assert!(contents.contains("smoke=panic\n"));

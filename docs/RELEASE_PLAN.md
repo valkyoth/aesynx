@@ -1992,13 +1992,18 @@ Deliverables:
 - Producer/consumer core identity checks.
 - Route validation against kernel-stamped message headers.
 - Release/acquire publish-observe evidence.
-- QEMU marker gating for `ipc-pingpong ping_seq=`, `backpressure_ok=true`,
-  `release_acquire_ok=true`, and `pairwise_route_ok=true`.
+- Non-`Copy` ping/pong state so the sequence allocator cannot be forked.
+- Sequence commit only after successful enqueue.
+- Pong correlation through `reply_to`.
+- Bidirectional backpressure evidence.
+- QEMU marker gating for `ipc-pingpong ping_seq=`,
+  `ipc_backpressure_ok=true`, `ipc_release_acquire_ok=true`, and
+  `ipc_pairwise_route_ok=true`.
 
 Expected serial:
 
 ```text
-ipc-pingpong ping_seq=1 pong_seq=2 backpressure_events=1 backpressure_ok=true release_acquire_ok=true pairwise_route_ok=true
+ipc-pingpong ping_seq=1 pong_seq=2 backpressure_events=2 ipc_backpressure_ok=true ipc_release_acquire_ok=true ipc_pairwise_route_ok=true
 [TEST] ipc-pingpong=ok
 ```
 
@@ -2006,7 +2011,7 @@ Verification:
 
 - Core 0 pings core 1.
 - Core 1 replies.
-- Full queue reports backpressure without overwriting unread messages.
+- Both link directions report backpressure without overwriting unread messages.
 - Wrong producer, wrong consumer, loopback, empty, and mismatched-route cases
   fail before mutation in host tests.
 

@@ -207,6 +207,11 @@ impl InlineBytes {
         &self.bytes[..self.len as usize]
     }
 
+    /// Returns the full backing buffer, including zero-padding beyond `len`.
+    ///
+    /// Protocol serialization, hashing, equality checks, and MAC inputs should
+    /// prefer [`Self::as_slice`], which is bounded to the declared payload
+    /// length. This helper is for fixed-size buffer inspection only.
     #[must_use]
     pub fn as_full_buffer(&self) -> &[u8; MAX_INLINE_PAYLOAD_LEN] {
         &self.bytes

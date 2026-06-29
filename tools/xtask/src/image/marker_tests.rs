@@ -149,12 +149,12 @@ fn qemu_markers_track_current_contracts() {
     );
     assert_eq!(MULTICORE_TOPOLOGY_MARKER, "[TEST] multicore-topology=ok");
     assert_eq!(IPC_PINGPONG_STATUS_MARKER, "ipc-pingpong ping_seq=");
-    assert_eq!(IPC_PINGPONG_BACKPRESSURE_MARKER, "backpressure_ok=true");
+    assert_eq!(IPC_PINGPONG_BACKPRESSURE_MARKER, "ipc_backpressure_ok=true");
     assert_eq!(
         IPC_PINGPONG_RELEASE_ACQUIRE_MARKER,
-        "release_acquire_ok=true"
+        "ipc_release_acquire_ok=true"
     );
-    assert_eq!(IPC_PINGPONG_PAIRWISE_MARKER, "pairwise_route_ok=true");
+    assert_eq!(IPC_PINGPONG_PAIRWISE_MARKER, "ipc_pairwise_route_ok=true");
     assert_eq!(IPC_PINGPONG_FAIL_MARKER, "[TEST] ipc-pingpong=fail");
     assert_eq!(IPC_PINGPONG_MARKER, "[TEST] ipc-pingpong=ok");
     assert_eq!(CAP_AUDIT_FAIL_MARKER, "[TEST] cap-audit=fail");

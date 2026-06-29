@@ -120,8 +120,8 @@ with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
 `ap_execution_blocked_ok=true`, `ap_dispatch_token_blocked_ok=true`,
 `multicore_barrier_ok=true`,
 `[TEST] multicore-topology=ok`, and
-`ipc-pingpong ping_seq=`, `backpressure_ok=true`,
-`release_acquire_ok=true`, `pairwise_route_ok=true`,
+`ipc-pingpong ping_seq=`, `ipc_backpressure_ok=true`,
+`ipc_release_acquire_ok=true`, `ipc_pairwise_route_ok=true`,
 `[TEST] ipc-pingpong=ok`, and
 `[TEST] kernel-cr3=ok`.
 
@@ -240,12 +240,12 @@ table before QEMU reports
 `ap_execution_blocked_ok=true` plus `ap_dispatch_token_blocked_ok=true` before
 `[TEST] multicore-topology=ok`. The v0.36.0 candidate adds the first pairwise
 core-to-core fabric smoke: core 0 sends a kernel-stamped Ping to core 1, core 1
-replies with Pong, sequence numbers advance monotonically, release/acquire
-evidence is recorded, and a full SPSC link reports fail-closed backpressure
-before `[TEST] ipc-pingpong=ok`. This does not enable AP execution; the
-existing SMP hardware tripwires remain until descriptor tables, activation
-storage, heap backing, queues, and shared kernel state have explicit per-core,
-role-owned, or synchronized ownership.
+replies with a correlated Pong, sequence numbers commit only after successful
+enqueue, release/acquire evidence is recorded, and both SPSC link directions
+report fail-closed backpressure before `[TEST] ipc-pingpong=ok`. This does not
+enable AP execution; the existing SMP hardware tripwires remain until
+descriptor tables, activation storage, heap backing, queues, and shared kernel
+state have explicit per-core, role-owned, or synchronized ownership.
 
 ## Target Shape
 

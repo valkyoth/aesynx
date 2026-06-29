@@ -395,7 +395,7 @@ extern "C" fn activate_on_kernel_stack(
     match crate::ipc_pingpong_smoke::run() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
-                "ipc-pingpong ping_seq={} pong_seq={} backpressure_events={} backpressure_ok={} release_acquire_ok={} pairwise_route_ok={}",
+                "ipc-pingpong ping_seq={} pong_seq={} backpressure_events={} ipc_backpressure_ok={} ipc_release_acquire_ok={} ipc_pairwise_route_ok={}",
                 status.ping_seq,
                 status.pong_seq,
                 status.backpressure_events,
