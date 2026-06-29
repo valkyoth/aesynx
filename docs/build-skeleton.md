@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.35.5 AP startup dispatch candidate
+Status: v0.36.0 core-to-core ping/pong candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.35.5.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.36.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 QEMU version banners, and `qemu_smp_cpus=4`. `cargo xtask qemu` starts QEMU
 with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
@@ -120,28 +120,31 @@ with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
 `ap_execution_blocked_ok=true`, `ap_dispatch_token_blocked_ok=true`,
 `multicore_barrier_ok=true`,
 `[TEST] multicore-topology=ok`, and
+`ipc-pingpong ping_seq=`, `backpressure_ok=true`,
+`release_acquire_ok=true`, `pairwise_route_ok=true`,
+`[TEST] ipc-pingpong=ok`, and
 `[TEST] kernel-cr3=ok`.
 
 Decode the captured boot trace:
 
 ```bash
-cargo xtask trace-decode build/qemu/aesynx-v0.35.5.serial.log
+cargo xtask trace-decode build/qemu/aesynx-v0.36.0.serial.log
 ```
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.35.5-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.36.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.35.5-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.36.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.35.5-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.36.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -235,10 +238,14 @@ consume startup resources, and audits the joint hardware/assignment/local-state
 table before QEMU reports
 `state_table_ok=true`, `startup_evidence_ok=true`, `ap_preflight_ok=true`, and
 `ap_execution_blocked_ok=true` plus `ap_dispatch_token_blocked_ok=true` before
-`[TEST] multicore-topology=ok`. This does not enable AP execution; the existing
-SMP hardware tripwires remain until descriptor tables, activation storage, heap
-backing, queues, and shared kernel state have explicit per-core, role-owned, or
-synchronized ownership.
+`[TEST] multicore-topology=ok`. The v0.36.0 candidate adds the first pairwise
+core-to-core fabric smoke: core 0 sends a kernel-stamped Ping to core 1, core 1
+replies with Pong, sequence numbers advance monotonically, release/acquire
+evidence is recorded, and a full SPSC link reports fail-closed backpressure
+before `[TEST] ipc-pingpong=ok`. This does not enable AP execution; the
+existing SMP hardware tripwires remain until descriptor tables, activation
+storage, heap backing, queues, and shared kernel state have explicit per-core,
+role-owned, or synchronized ownership.
 
 ## Target Shape
 

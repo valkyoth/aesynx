@@ -21,6 +21,11 @@ pub struct ObservedEntry<T> {
 
 impl<T> ObservedEntry<T> {
     #[must_use]
+    pub(crate) const fn new(value: T, ordering: QueueOrderingEvidence) -> Self {
+        Self { value, ordering }
+    }
+
+    #[must_use]
     pub fn into_value(self) -> T {
         self.value
     }
@@ -112,10 +117,10 @@ impl<T: Copy, const CAPACITY: usize> ServiceRingQueue<T, CAPACITY> {
         self.head = self.next_index(self.head);
         self.len -= 1;
 
-        Ok(ObservedEntry {
-            value: entry.value,
-            ordering: QueueOrderingEvidence::new(entry.publish_ordering, CONSUMER_OBSERVE_ORDERING),
-        })
+        Ok(ObservedEntry::new(
+            entry.value,
+            QueueOrderingEvidence::new(entry.publish_ordering, CONSUMER_OBSERVE_ORDERING),
+        ))
     }
 
     #[must_use]

@@ -1979,7 +1979,9 @@ Exit criteria:
 
 Goal:
 
-Prove the multikernel message fabric across cores.
+Prove the first pairwise multikernel message-fabric contract. Until secondary
+cores execute Aesynx code, this is a model-backed QEMU smoke that the later live
+hardware path must preserve.
 
 Deliverables:
 
@@ -1987,10 +1989,16 @@ Deliverables:
 - Ping/Pong messages.
 - Sequence numbers.
 - Backpressure event.
+- Producer/consumer core identity checks.
+- Route validation against kernel-stamped message headers.
+- Release/acquire publish-observe evidence.
+- QEMU marker gating for `ipc-pingpong ping_seq=`, `backpressure_ok=true`,
+  `release_acquire_ok=true`, and `pairwise_route_ok=true`.
 
 Expected serial:
 
 ```text
+ipc-pingpong ping_seq=1 pong_seq=2 backpressure_events=1 backpressure_ok=true release_acquire_ok=true pairwise_route_ok=true
 [TEST] ipc-pingpong=ok
 ```
 
@@ -1998,12 +2006,21 @@ Verification:
 
 - Core 0 pings core 1.
 - Core 1 replies.
+- Full queue reports backpressure without overwriting unread messages.
+- Wrong producer, wrong consumer, loopback, empty, and mismatched-route cases
+  fail before mutation in host tests.
 
 Exit criteria:
 
 - Cores communicate by message.
 - No global run queue, allocator lock, or object-registry lock is required for
   the ping/pong path.
+
+Non-goals:
+
+- No APIC IPI delivery path.
+- No live cross-core atomics yet.
+- No secondary core executes Aesynx code yet.
 
 ### v0.37.0 - Capability Grant Over IPC
 

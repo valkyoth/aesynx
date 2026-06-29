@@ -5,6 +5,7 @@
 extern crate alloc;
 
 mod core_set;
+mod fabric;
 mod service;
 mod service_queue;
 #[cfg(test)]
@@ -15,6 +16,7 @@ use core::fmt;
 use aesynx_abi::{CapId, CoreId, MessageId, ObjectId};
 
 pub use core_set::{CoreValidationError, LiveCoreSet, ValidatedCoreId};
+pub use fabric::{CorePairPingPong, FabricError, FabricMessage, PairwiseSpscQueue, PingPongReport};
 pub use service::{CompletionStatus, RequestError, ServiceCompletion, ServiceKind, ServiceRequest};
 pub use service_queue::{
     ObservedEntry, QueueOrderingEvidence, QueueSetError, RingQueueError, ServiceQueuePair,

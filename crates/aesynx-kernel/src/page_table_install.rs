@@ -392,6 +392,25 @@ extern "C" fn activate_on_kernel_stack(
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+    match crate::ipc_pingpong_smoke::run() {
+        Ok(status) => {
+            aesynx_arch_x86_64::serial_println!(
+                "ipc-pingpong ping_seq={} pong_seq={} backpressure_events={} backpressure_ok={} release_acquire_ok={} pairwise_route_ok={}",
+                status.ping_seq,
+                status.pong_seq,
+                status.backpressure_events,
+                status.backpressure_ok,
+                status.release_acquire_ok,
+                status.pairwise_route_ok
+            );
+            aesynx_arch_x86_64::serial::write_str("[TEST] ipc-pingpong=ok\n");
+        }
+        Err(error) => {
+            aesynx_arch_x86_64::serial_println!("ipc-pingpong error={:?}", error);
+            aesynx_arch_x86_64::serial::write_str("[TEST] ipc-pingpong=fail\n");
+            aesynx_arch_x86_64::X86_64::halt_forever()
+        }
+    }
     match crate::service_queue_smoke::run() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(
