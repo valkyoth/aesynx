@@ -186,6 +186,31 @@ impl<const SLOTS: usize> CapabilityTable<SLOTS> {
         Ok(id)
     }
 
+    pub fn grant_to_table_with_audit<const TARGET_SLOTS: usize>(
+        &self,
+        source_id: CapId,
+        target: &mut CapabilityTable<TARGET_SLOTS>,
+        target_owner: PrincipalId,
+        live: &impl LiveAuthorityView,
+        audit: &mut impl CapAuditLog,
+    ) -> Result<CapId, CapTableError> {
+        let slot = target.vacant_slot().ok_or(CapTableError::TableFull)?;
+        let slot_index = slot_index(slot)?;
+        let id = cap_id_for_slot(slot_index, target.slots[slot].generation)?;
+        let source = self.get(source_id)?;
+        let current = live.live_authority(source.object_id())?;
+        let child = source.grant_live_with_audit(
+            target_owner,
+            current.generation(),
+            current.revocation_epoch(),
+            audit,
+        )?;
+
+        target.slots[slot].cap = Some(child);
+
+        Ok(id)
+    }
+
     /// Revokes every in-table capability for the target object's authority
     /// epoch, including the authority capability used for the revoke.
     ///

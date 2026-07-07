@@ -7,6 +7,8 @@ use crate::{
     LiveAuthorityView, ObjectBoundedRange, RootCapabilitySpec,
 };
 
+mod grant;
+
 #[derive(Default)]
 struct TestAudit {
     events: [Option<CapAuditEvent>; 4],

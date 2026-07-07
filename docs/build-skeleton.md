@@ -1,6 +1,6 @@
 # Aesynx Build Skeleton
 
-Status: v0.36.0 core-to-core ping/pong candidate
+Status: v0.37.0 capability grant over IPC candidate
 
 The repository contains the first x86_64 kernel build shape:
 
@@ -56,7 +56,7 @@ cargo xtask qemu --exception-smoke
 cargo xtask qemu --timer-smoke
 ```
 
-`cargo xtask image` creates `build/qemu/aesynx-v0.36.0.iso` with Limine and the
+`cargo xtask image` creates `build/qemu/aesynx-v0.37.0.iso` with Limine and the
 release Rust kernel ELF. The image manifest records the Rust, Limine, xorriso,
 QEMU version banners, and `qemu_smp_cpus=4`. `cargo xtask qemu` starts QEMU
 with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
@@ -128,23 +128,23 @@ with `-smp 4`, captures serial output, and expects `[TEST] gdt=ok`,
 Decode the captured boot trace:
 
 ```bash
-cargo xtask trace-decode build/qemu/aesynx-v0.36.0.serial.log
+cargo xtask trace-decode build/qemu/aesynx-v0.37.0.serial.log
 ```
 
 `cargo xtask qemu --panic-smoke` creates a separate
-`build/qemu/aesynx-v0.36.0-panic.iso`, enables the kernel `panic-smoke` feature,
+`build/qemu/aesynx-v0.37.0-panic.iso`, enables the kernel `panic-smoke` feature,
 and expects `[TEST] idt=ok`, `[TEST] irq=ok`, `[TEST] exception=ok`, and
 `[TEST] panic=ok`.
 
 `cargo xtask qemu --exception-smoke` creates a separate
-`build/qemu/aesynx-v0.36.0-exception.iso`, enables the kernel
+`build/qemu/aesynx-v0.37.0-exception.iso`, enables the kernel
 `exception-smoke` feature, and expects `[TEST] pagefault=ok`,
 `[TEST] irq=ok`, `[TEST] exception=ok`, `cr2_present=`, `cr2_offset=0x`,
 `cr3_offset=0x`, `rflags=0x`, `interrupts_enabled=`, and decoded page-fault
 error fields.
 
 `cargo xtask qemu --timer-smoke` creates a separate
-`build/qemu/aesynx-v0.36.0-timer.iso`, enables the kernel `timer-smoke` feature,
+`build/qemu/aesynx-v0.37.0-timer.iso`, enables the kernel `timer-smoke` feature,
 programs PIT IRQ0 as the chosen QEMU timer source, enables interrupts only for
 that controlled smoke path, converts ticks into monotonic instants, wakes one
 bounded sleep request, and expects `timer tick 1`, `timer tick 2`,
@@ -242,10 +242,15 @@ table before QEMU reports
 core-to-core fabric smoke: core 0 sends a kernel-stamped Ping to core 1, core 1
 replies with a correlated Pong, sequence numbers commit only after successful
 enqueue, release/acquire evidence is recorded, and both SPSC link directions
-report fail-closed backpressure before `[TEST] ipc-pingpong=ok`. This does not
-enable AP execution; the existing SMP hardware tripwires remain until
-descriptor tables, activation storage, heap backing, queues, and shared kernel
-state have explicit per-core, role-owned, or synchronized ownership.
+report fail-closed backpressure before `[TEST] ipc-pingpong=ok`. The v0.37.0
+candidate grants a READ capability into a receiver table, sends the
+receiver-allocated `CapId` through a stamped `GrantCap` IPC message, proves
+receiver WRITE and sender missing-GRANT attempts fail closed, sends a
+`RevokeCap` notification, and invalidates the receiver by bumping the object
+registry revocation epoch before `[TEST] cap-ipc=ok`. This does not enable AP
+execution; the existing SMP hardware tripwires remain until descriptor tables,
+activation storage, heap backing, queues, and shared kernel state have explicit
+per-core, role-owned, or synchronized ownership.
 
 ## Target Shape
 

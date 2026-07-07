@@ -411,6 +411,7 @@ extern "C" fn activate_on_kernel_stack(
             aesynx_arch_x86_64::X86_64::halt_forever()
         }
     }
+    super::capability_ipc_report::run_or_halt();
     match crate::service_queue_smoke::run() {
         Ok(status) => {
             aesynx_arch_x86_64::serial_println!(

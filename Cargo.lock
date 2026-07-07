@@ -107,6 +107,7 @@ dependencies = [
  "aesynx-ipc",
  "aesynx-log",
  "aesynx-mm",
+ "aesynx-object",
  "aesynx-sched",
  "aesynx-sync",
  "aesynx-telemetry",

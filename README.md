@@ -48,7 +48,7 @@ Aesynx is licensed under the European Union Public Licence 1.2.
 
 ## What Works Today
 
-`v0.36.0` is the current core-to-core ping/pong candidate.
+`v0.37.0` is the current capability grant over IPC candidate.
 
 Current boot path:
 
@@ -170,6 +170,11 @@ Address-space activation and CPU hardening:
   routes a Pong back with a later sequence number, records release/acquire
   publish-observe evidence, and proves a full pairwise queue fails closed with
   `ipc_backpressure_ok=true` before `[TEST] ipc-pingpong=ok`.
+- The cap-IPC smoke grants a READ capability from the sender table into a
+  receiver table, sends the receiver-allocated `CapId` through a stamped IPC
+  message, proves missing WRITE and missing sender-GRANT paths fail closed, and
+  invalidates the receiver by bumping the object registry revocation epoch
+  before `[TEST] cap-ipc=ok`.
 
 Fuzz and property gates:
 
@@ -198,14 +203,15 @@ Fuzz and property gates:
 | AMP core data structures | Tagged | `v0.34.0`; no_std `aesynx-core` models core roles, heterogeneous capability metadata, `CoreLocal`, owner-scoped core registries, per-core local telemetry, boot barriers, and QEMU `[TEST] amp-core=ok` for the bootstrap core without enabling multicore execution. |
 | AP startup state table | Tagged | `v0.35.3`; xtask launches QEMU with `-smp 4`, manifests record `qemu_smp_cpus=4`, and `aesynx-core` now requires owner-issued `CoreStartupTicket` plus matching `CoreStartupArrival` evidence before a staged core can become hardware-online. AP launch resources are owner-scoped, staged-only, stack/watchdog checked, descriptor-table readiness is explicit, and topology mutation validates the joint hardware/assignment/local-state table before and after state changes. QEMU reports `state_table_ok=true`, `startup_evidence_ok=true`, `ap_preflight_ok=true`, and `ap_execution_blocked_ok=true` before `[TEST] multicore-topology=ok`. |
 | Multi-domain hardening blockers | Tagged | `v0.35.4`; x86_64 CPU hardening now models CPUID-gated IBRS/IBPB, STIBP, SSBD, and `ARCH_CAPABILITIES`, admits `IA32_SPEC_CTRL` plus `IA32_PRED_CMD`, requests supported SPEC_CTRL bits, issues IBPB when available, verifies read-back state, and reports only redacted booleans in QEMU evidence. Pentest fixes also made the IRQ proof linear and smoke-policy gated, removed equality from hash/signature-bearing AI manifests, restored non-online quarantine semantics, split heap accounting-overflow telemetry from free-list corruption telemetry, cached per-class slab-page bounds for free-list scans, and hardened manifest field validation. |
-| Core-to-core ping/pong | Active candidate | `v0.36.0`; no_std `aesynx-ipc` now models pairwise SPSC fabric links, kernel-stamped Ping/Pong messages, monotonic sequence numbers, route validation, Pong-to-Ping correlation, release/acquire ordering evidence, and fail-closed bidirectional backpressure. QEMU requires `ipc-pingpong ping_seq=`, `ipc_backpressure_ok=true`, `ipc_release_acquire_ok=true`, `ipc_pairwise_route_ok=true`, and `[TEST] ipc-pingpong=ok` after the multicore topology smoke. |
+| Core-to-core ping/pong | Tagged | `v0.36.0`; no_std `aesynx-ipc` models pairwise SPSC fabric links, kernel-stamped Ping/Pong messages, monotonic sequence numbers, route validation, Pong-to-Ping correlation, release/acquire ordering evidence, and fail-closed bidirectional backpressure. QEMU requires `ipc-pingpong ping_seq=`, `ipc_backpressure_ok=true`, `ipc_release_acquire_ok=true`, `ipc_pairwise_route_ok=true`, and `[TEST] ipc-pingpong=ok` after the multicore topology smoke. |
+| Capability grant over IPC | Active candidate | `v0.37.0`; sender tables can grant into receiver capability tables with audited receiver `CapId` allocation, the kernel smoke sends the receiver cap over a stamped `GrantCap` IPC message, rejects receiver WRITE and sender missing-GRANT escalation, sends a `RevokeCap` notification, and proves object-registry epoch revocation invalidates the receiver table before `[TEST] cap-ipc=ok`. |
 | Memory model | Model active | Page flags make writable+executable and user-global mappings unrepresentable; long-term memory should become object-native, purpose-tagged, capability-scoped, and snapshot-aware. |
 | OS world model | Planned | Kernel-stamped facts should feed a native world service so Aesynx can explain boot, memory, packages, drivers, capabilities, snapshots, and policy decisions without putting a database in ring 0. |
 | IPC model | Model active | Kernel-stamped message headers, caller requests, and bounded inline payloads. |
 | Bytecode model | Model active | Fuel limit and capability-typed permission checks. |
 | Logging model | Model active | Bounded single-record log messages. |
 | Build path | Active | x86_64 target metadata, linker script, Cargo config validation, stable freestanding kernel ELF build, and an optional nightly custom-target probe. |
-| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` launches QEMU with `-smp 4`; the smoke verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, v0.18.1 entropy policy evidence with `[TEST] entropy-policy=ok`, the v0.18 kernel heap smoke with `[TEST] heap=ok`, the v0.20 kernel capability-table smoke with `[TEST] cap=ok`, the v0.21 memory-capability mapping-descriptor gate with `[TEST] memory-cap=ok`, the v0.22 capability audit/telemetry gate with `[TEST] cap-audit=ok`, the v0.26 kernel service queue smoke with `[TEST] service-queue=ok`, the v0.27 task-model smoke with `[TEST] task-model=ok`, the v0.28 cooperative scheduler smoke with `[TEST] cooperative-sched=ok`, the v0.29 scheduler telemetry smoke with `[TEST] scheduler-telemetry=ok`, the v0.30 telemetry event schema smoke with `[TEST] telemetry-events=ok`, v0.31 decodable `trace-event` serial records, v0.33 AI policy heuristic/fallback evidence with `[TEST] ai-policy=ok`, v0.33.1 concurrency discipline evidence with `[TEST] concurrency=ok`, v0.34 AMP core evidence with `[TEST] amp-core=ok`, v0.35 four-core topology/AP-preflight evidence with `[TEST] multicore-topology=ok`, and v0.36 pairwise IPC fabric evidence with `[TEST] ipc-pingpong=ok` from Rust `_start`. |
+| QEMU first boot | Active | `cargo xtask image` creates a release-profile Limine ISO and `cargo xtask qemu` launches QEMU with `-smp 4`; the smoke verifies descriptor/IRQ setup, checked memory-map/frame-allocator/page-table markers, every v0.16 paging-policy-model `*_ok=true` marker, `[TEST] paging-policy-model=ok`, `[TEST] kernel-cr3=ok`, `[TEST] kernel-stack-guard=ok`, `[TEST] bootinfo=ok`, `[TEST] boot=ok`, post-CR3 CPU hardening, `[TEST] cpu-hardening=ok`, v0.18.1 entropy policy evidence with `[TEST] entropy-policy=ok`, the v0.18 kernel heap smoke with `[TEST] heap=ok`, the v0.20 kernel capability-table smoke with `[TEST] cap=ok`, the v0.21 memory-capability mapping-descriptor gate with `[TEST] memory-cap=ok`, the v0.22 capability audit/telemetry gate with `[TEST] cap-audit=ok`, the v0.26 kernel service queue smoke with `[TEST] service-queue=ok`, the v0.27 task-model smoke with `[TEST] task-model=ok`, the v0.28 cooperative scheduler smoke with `[TEST] cooperative-sched=ok`, the v0.29 scheduler telemetry smoke with `[TEST] scheduler-telemetry=ok`, the v0.30 telemetry event schema smoke with `[TEST] telemetry-events=ok`, v0.31 decodable `trace-event` serial records, v0.33 AI policy heuristic/fallback evidence with `[TEST] ai-policy=ok`, v0.33.1 concurrency discipline evidence with `[TEST] concurrency=ok`, v0.34 AMP core evidence with `[TEST] amp-core=ok`, v0.35 four-core topology/AP-preflight evidence with `[TEST] multicore-topology=ok`, v0.36 pairwise IPC fabric evidence with `[TEST] ipc-pingpong=ok`, and v0.37 capability grant/revoke-over-IPC evidence with `[TEST] cap-ipc=ok` from Rust `_start`. |
 | Fuzz/property smoke | Active candidate | `v0.16.1`; `cargo xtask fuzz-smoke` runs BootInfo fuzz seeds, deterministic BootInfo byte mutations, and mapper property sweeps before live CR3 activation. |
 | BootInfo normalization | Tagged | Limine memory map, executable address, HHDM, RSDP, and framebuffer metadata normalize into dependency-free `aesynx-boot` structures. |
 | Early diagnostics | Tagged | Boot phase tracking and `cargo xtask qemu --panic-smoke` verify readable panic output with `[TEST] panic=ok`. |
@@ -308,7 +314,7 @@ cargo xtask build-kernel --custom-target-probe
 After a pentest report is completed for a tag:
 
 ```bash
-cargo xtask release-ready v0.36.0
+cargo xtask release-ready v0.37.0
 ```
 
 ## Security Posture
@@ -344,6 +350,7 @@ pentest report in `security/pentest/<tag>.md`.
 - [Telemetry Event Schema](docs/telemetry-event-schema.md)
 - [v0.35.3 Release Candidate Notes](docs/releases/v0.35.3-rc.md)
 - [v0.35.4 Release Candidate Notes](docs/releases/v0.35.4-rc.md)
+- [v0.37.0 Release Candidate Notes](docs/releases/v0.37.0-rc.md)
 - [v0.36.0 Release Candidate Notes](docs/releases/v0.36.0-rc.md)
 - [Bootloader Roadmap](docs/bootloader-roadmap.md)
 - [Storage Roadmap](docs/storage-roadmap.md)

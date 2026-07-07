@@ -1,6 +1,7 @@
 use aesynx_abi::{CoreId, ObjectId};
 use aesynx_cap::{
     CapKind, CapPerms, Capability, LiveAuthorityError, LiveAuthorityState, LiveAuthorityView,
+    RevocationEpochStore, RevocationError,
 };
 
 use crate::{KernelObject, ObjectRecord, ObjectType};
@@ -223,6 +224,31 @@ impl<const CAPACITY: usize> LiveAuthorityView for ObjectRegistry<CAPACITY> {
         self.get(object_id)
             .map(|record| LiveAuthorityState::new(record.generation(), record.revocation_epoch()))
             .map_err(|_| LiveAuthorityError::ObjectNotFound)
+    }
+}
+
+impl<const CAPACITY: usize> RevocationEpochStore for ObjectRegistry<CAPACITY> {
+    fn increment_epoch(&mut self, object_id: ObjectId) -> Result<u64, RevocationError> {
+        let slot = self
+            .live_slot(object_id)
+            .map_err(|_| RevocationError::StoreUnavailable)?;
+        let ObjectSlot::Live(record) = self.slots[slot] else {
+            return Err(RevocationError::StoreUnavailable);
+        };
+        let next_epoch = record
+            .revocation_epoch()
+            .checked_add(1)
+            .ok_or(RevocationError::StoreUnavailable)?;
+
+        self.slots[slot] = ObjectSlot::Live(ObjectRecord::new(
+            record.object_id(),
+            record.object_type(),
+            record.owner_core(),
+            record.generation(),
+            next_epoch,
+        ));
+
+        Ok(next_epoch)
     }
 }
 

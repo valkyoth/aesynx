@@ -2,6 +2,11 @@
 pub mod ai_policy_smoke;
 #[path = "amp_core_smoke.rs"]
 pub mod amp_core_smoke;
+#[cfg(target_os = "none")]
+#[path = "capability_ipc_report.rs"]
+pub mod capability_ipc_report;
+#[path = "capability_ipc_smoke.rs"]
+pub mod capability_ipc_smoke;
 #[path = "capability_smoke.rs"]
 pub mod capability_smoke;
 #[path = "concurrency_smoke.rs"]

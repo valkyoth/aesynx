@@ -1,7 +1,7 @@
 use alloc::format;
 
 use aesynx_abi::{CoreId, ObjectId, PrincipalId};
-use aesynx_cap::{CapKind, CapPerms, CapabilityTable};
+use aesynx_cap::{CapKind, CapPerms, CapabilityTable, RevocationEpochStore, RevocationError};
 
 use crate::{KernelObject, ObjectCreate, ObjectRegistry, ObjectRegistryError};
 
@@ -212,6 +212,80 @@ fn object_capability_resolution_rejects_stale_revocation_epoch() -> Result<(), O
             CapPerms::READ
         ),
         Err(ObjectRegistryError::Revoked)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn registry_revocation_epoch_store_invalidates_stale_capabilities()
+-> Result<(), ObjectRegistryError> {
+    let mut registry = ObjectRegistry::<1>::new();
+    let endpoint = registry.create(ObjectCreate::endpoint(object_id(2), owner(0)))?;
+    let mut table = CapabilityTable::<1>::new();
+    let cap_id = table
+        .insert_root(
+            endpoint.object_id(),
+            CapKind::Endpoint,
+            PrincipalId::new(7),
+            CapPerms::READ.union(CapPerms::REVOKE),
+            endpoint.generation(),
+            endpoint.revocation_epoch(),
+        )
+        .map_err(|_| ObjectRegistryError::ObjectNotFound)?;
+    let cap = table
+        .get(cap_id)
+        .map_err(|_| ObjectRegistryError::ObjectNotFound)?;
+
+    assert_eq!(
+        registry.revoke_object_live(
+            cap,
+            endpoint.object_id(),
+            endpoint.generation(),
+            endpoint.revocation_epoch(),
+        ),
+        Ok(1)
+    );
+    assert_eq!(
+        registry.resolve_capability(cap, CapPerms::READ),
+        Err(ObjectRegistryError::Revoked)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn registry_revocation_epoch_overflow_fails_without_mutation() -> Result<(), ObjectRegistryError> {
+    let mut registry = ObjectRegistry::<1>::new();
+    let endpoint = registry
+        .create(ObjectCreate::endpoint(object_id(2), owner(0)).with_revocation_epoch(u64::MAX))?;
+    let mut table = CapabilityTable::<1>::new();
+    let cap_id = table
+        .insert_root(
+            endpoint.object_id(),
+            CapKind::Endpoint,
+            PrincipalId::new(7),
+            CapPerms::REVOKE,
+            endpoint.generation(),
+            endpoint.revocation_epoch(),
+        )
+        .map_err(|_| ObjectRegistryError::ObjectNotFound)?;
+    let cap = table
+        .get(cap_id)
+        .map_err(|_| ObjectRegistryError::ObjectNotFound)?;
+
+    assert_eq!(
+        registry.revoke_object_live(
+            cap,
+            endpoint.object_id(),
+            endpoint.generation(),
+            endpoint.revocation_epoch(),
+        ),
+        Err(RevocationError::StoreUnavailable)
+    );
+    assert_eq!(
+        registry.get(endpoint.object_id())?.revocation_epoch(),
+        u64::MAX
     );
 
     Ok(())

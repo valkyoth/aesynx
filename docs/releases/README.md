@@ -6,6 +6,7 @@ lands.
 
 ## Current Candidate
 
+- [v0.37.0 - Capability Grant Over IPC](v0.37.0-rc.md)
 - [v0.36.0 - Core-to-Core Ping/Pong](v0.36.0-rc.md)
 - [v0.35.5 - AP Startup Dispatch Token](v0.35.5-rc.md)
 - [v0.35.4 - Multi-Domain Hardening Blockers](v0.35.4-rc.md)

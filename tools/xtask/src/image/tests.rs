@@ -109,6 +109,11 @@ fn boot_smoke_requires_full_current_marker_set() {
         &missing_ap_dispatch_authority,
         SmokeKind::Boot
     ));
+    let missing_cap_ipc = valid.replacen("[TEST] cap-ipc=ok", "", 1);
+    assert!(!serial_log_contents_match(
+        &missing_cap_ipc,
+        SmokeKind::Boot
+    ));
 }
 
 #[test]
@@ -137,28 +142,28 @@ fn qemu_smoke_runs_four_virtual_cpus() {
 #[test]
 fn image_artifact_names_track_current_candidate_version() {
     let boot = image_names(SmokeKind::Boot);
-    assert_eq!(boot.image, "aesynx-v0.36.0.iso");
-    assert_eq!(boot.manifest, "aesynx-v0.36.0.manifest");
-    assert_eq!(boot.serial_log, "aesynx-v0.36.0.serial.log");
-    assert_eq!(boot.staging_dir, "aesynx-v0.36.0-iso");
+    assert_eq!(boot.image, "aesynx-v0.37.0.iso");
+    assert_eq!(boot.manifest, "aesynx-v0.37.0.manifest");
+    assert_eq!(boot.serial_log, "aesynx-v0.37.0.serial.log");
+    assert_eq!(boot.staging_dir, "aesynx-v0.37.0-iso");
 
     let panic = image_names(SmokeKind::Panic);
-    assert_eq!(panic.image, "aesynx-v0.36.0-panic.iso");
-    assert_eq!(panic.manifest, "aesynx-v0.36.0-panic.manifest");
-    assert_eq!(panic.serial_log, "aesynx-v0.36.0-panic.serial.log");
-    assert_eq!(panic.staging_dir, "aesynx-v0.36.0-panic-iso");
+    assert_eq!(panic.image, "aesynx-v0.37.0-panic.iso");
+    assert_eq!(panic.manifest, "aesynx-v0.37.0-panic.manifest");
+    assert_eq!(panic.serial_log, "aesynx-v0.37.0-panic.serial.log");
+    assert_eq!(panic.staging_dir, "aesynx-v0.37.0-panic-iso");
 
     let exception = image_names(SmokeKind::Exception);
-    assert_eq!(exception.image, "aesynx-v0.36.0-exception.iso");
-    assert_eq!(exception.manifest, "aesynx-v0.36.0-exception.manifest");
-    assert_eq!(exception.serial_log, "aesynx-v0.36.0-exception.serial.log");
-    assert_eq!(exception.staging_dir, "aesynx-v0.36.0-exception-iso");
+    assert_eq!(exception.image, "aesynx-v0.37.0-exception.iso");
+    assert_eq!(exception.manifest, "aesynx-v0.37.0-exception.manifest");
+    assert_eq!(exception.serial_log, "aesynx-v0.37.0-exception.serial.log");
+    assert_eq!(exception.staging_dir, "aesynx-v0.37.0-exception-iso");
 
     let timer = image_names(SmokeKind::Timer);
-    assert_eq!(timer.image, "aesynx-v0.36.0-timer.iso");
-    assert_eq!(timer.manifest, "aesynx-v0.36.0-timer.manifest");
-    assert_eq!(timer.serial_log, "aesynx-v0.36.0-timer.serial.log");
-    assert_eq!(timer.staging_dir, "aesynx-v0.36.0-timer-iso");
+    assert_eq!(timer.image, "aesynx-v0.37.0-timer.iso");
+    assert_eq!(timer.manifest, "aesynx-v0.37.0-timer.manifest");
+    assert_eq!(timer.serial_log, "aesynx-v0.37.0-timer.serial.log");
+    assert_eq!(timer.staging_dir, "aesynx-v0.37.0-timer-iso");
 }
 
 #[test]
@@ -198,7 +203,7 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
         .map_err(|error| format!("failed to read manifest test output: {error}"))?;
     let _ = fs::remove_file(&manifest);
 
-    assert!(contents.contains("name=Aesynx v0.36.0 core-to-core ping/pong candidate\n"));
+    assert!(contents.contains("name=Aesynx v0.37.0 capability grant over IPC candidate\n"));
     assert!(contents.contains("multicore_topology_state_table_marker=state_table_ok=true\n"));
     assert!(contents.contains("multicore_topology_ap_preflight_marker=ap_preflight_ok=true\n"));
     assert!(
@@ -214,6 +219,25 @@ fn image_manifest_records_required_smoke_markers() -> Result<(), String> {
     assert!(contents.contains("ipc_pingpong_release_acquire_marker=ipc_release_acquire_ok=true\n"));
     assert!(contents.contains("ipc_pingpong_pairwise_marker=ipc_pairwise_route_ok=true\n"));
     assert!(contents.contains("ipc_pingpong_marker=[TEST] ipc-pingpong=ok\n"));
+    assert!(contents.contains("cap_ipc_status_marker=cap-ipc grant_seq=\n"));
+    assert!(contents.contains("cap_ipc_grant_message_marker=cap_ipc_grant_message_ok=true\n"));
+    assert!(contents.contains("cap_ipc_receiver_read_marker=cap_ipc_receiver_read_ok=true\n"));
+    assert!(
+        contents
+            .contains("cap_ipc_receiver_write_denied_marker=cap_ipc_receiver_write_denied=true\n")
+    );
+    assert!(
+        contents.contains(
+            "cap_ipc_sender_grant_denied_marker=cap_ipc_sender_missing_grant_denied=true\n"
+        )
+    );
+    assert!(contents.contains("cap_ipc_revoke_message_marker=cap_ipc_revoke_message_ok=true\n"));
+    assert!(
+        contents.contains("cap_ipc_registry_epoch_marker=cap_ipc_registry_epoch_bumped=true\n")
+    );
+    assert!(contents.contains("cap_ipc_receiver_revoked_marker=cap_ipc_receiver_revoked=true\n"));
+    assert!(contents.contains("cap_ipc_audit_marker=cap_ipc_grant_audit_seen=true\n"));
+    assert!(contents.contains("cap_ipc_marker=[TEST] cap-ipc=ok\n"));
     assert!(contents.contains("cpu_hardening_ibpb_attempted_marker=ibpb_attempted=\n"));
     assert!(contents.contains("smoke=panic\n"));
     assert!(contents.contains("qemu_smp_cpus=4\n"));
