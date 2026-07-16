@@ -105,17 +105,33 @@ not report success to callers until required local and remote invalidation
 acknowledgements have completed or the operation has failed closed into a
 documented quarantine/degraded state.
 
-Backing-frame reclamation is a separate lifecycle from authority revocation.
-The memory-object lifecycle should be explicit:
+Backing-frame reclamation is a separate lifecycle from mutability sealing and
+authority revocation. The memory-object lifecycle should use independent axes:
 
 ```text
-Alive -> Frozen -> Revoking -> Unmapped -> Reclaimable -> Dead
+Mutability: Mutable | SealedReadOnly
+Authority:  Live | Revoking | Revoked
+Residency:  Mapped | Unmapping | Reclaimable | Dead
+Resources:  checked pin/reference counters plus pending invalidation records
 ```
+
+Sealing a shared buffer read-only must not imply revocation, and entering
+revocation must not imply that the object is a reusable immutable artifact.
+
+Pin acquisition is owner-core controlled: new pins are acquired only while
+authority is `Live`, acquisition is atomic relative to entering `Revoking`, and
+the normal pattern is pin, publish reference, revalidate epoch/state, otherwise
+roll back. Entering `Revoking` blocks new mappings, DMA bindings, leases, and
+cross-core references. Counters use checked non-wrapping arithmetic. Remote
+pins are explicit owner-recorded references, not globally modified shared
+refcounts.
 
 A backing frame remains pinned while referenced by any installed mapping,
 pending TLB invalidation, DMA/IOMMU mapping, checked operation or in-flight
 lease, shared queue, IPC transaction, page-table edit operation, executable
-transition, snapshot, or persistent object reference. A frame becomes
+transition, snapshot, or persistent object reference. Logical persistence is
+not the same as physical residency: a snapshot or persistent reference copies
+or seals content, or explicitly owns a bounded residency pin. A frame becomes
 reclaimable only after every reference class is drained, required remote
 acknowledgements complete, and the next owner cannot observe previous contents.
 Zeroing happens before reuse after stale observers are fenced; zeroing is not a

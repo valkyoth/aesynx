@@ -790,6 +790,8 @@ Shared memory policy:
 - Every writable-sharing protocol names permitted access widths, alignment,
   atomic orderings, ownership transitions, and recovery behavior. Non-atomic
   structured payloads require exclusive ownership transfer before access.
+- Volatile access is not synchronization; non-atomic conflicting writers remain
+  forbidden unless exclusive ownership has been transferred.
 - The page-table mapper must distinguish intentional shared-buffer aliasing
   from accidental duplicate physical-frame ownership.
 
@@ -898,7 +900,8 @@ SystemControlRights { typed operation IDs }
 
 The wire format validates both capability kind and typed-right representation.
 Invalid combinations such as endpoint execute, memory receive, or clock map are
-rejected at mint, derive, decode, and live resolution.
+rejected at mint, derive, decode, and live resolution. The typed-right wire
+format is versioned and rejects unknown mandatory rights.
 
 Kinds:
 

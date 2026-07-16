@@ -2110,6 +2110,8 @@ Deliverables:
   typed-right representation. Invalid examples such as `Endpoint|EXECUTE`,
   `Memory|RECV`, and `Clock|MAP` fail closed before an operation can ignore
   nonsense permissions.
+- Versioned typed-right wire representation. Decoding rejects rights that are
+  unknown, mandatory-but-unsupported, or not valid for the encoded object kind.
 - Capability-table, domain, endpoint, peer, and boot/session incarnations are
   part of every authority interpretation context. A table-local `CapId` is not
   meaningful after its table or domain is destroyed and recreated.
@@ -2140,7 +2142,13 @@ Deliverables:
 - Delegation attenuation rule:
 
 ```text
-delegated_rights <= requested_rights & live_sender_rights & delegable_rights
+delegated_common_rights <= requested_common_rights
+                         & live_sender_common_rights
+                         & delegable_common_rights
+
+delegated_kind_rights   <= requested_kind_rights
+                         & live_sender_kind_rights
+                         & delegable_kind_rights
 ```
 
   `ADMIN`, `REVOKE`, `GRANT`, executable/JIT, writable-sharing, and DMA rights
@@ -2161,6 +2169,16 @@ delegated_rights <= requested_rights & live_sender_rights & delegable_rights
   - commit makes authority usable;
   - abort/timeout expires pending authority;
   - retries are idempotent.
+- Bounded, preallocated authority transaction journal shared by grants,
+  move-grants, ownership transfer, strong revocation, and other
+  authority-moving operations. Each record stores transaction ID, participant
+  incarnations, source and destination capability identities, frozen source
+  generation, prepared/committed/aborted state, witness acknowledgements,
+  commit certificate or decision epoch, recovery owner, and timeout owner.
+- Coordinator restart recovers from the transaction journal. If no
+  authoritative coordinator record survives, the safe result is quarantine or
+  abort; recovery never reconstructs commit from sender-controlled or
+  receiver-controlled claims alone.
 - TLA+ or Quint transactional-grant model before implementation is considered
   complete. The model proves no usable receiver capability before commit, abort
   restores the original state, duplicate proposal/accept/commit/abort is
@@ -2186,6 +2204,8 @@ delegated_rights <= requested_rights & live_sender_rights & delegable_rights
 - Server death resolves outstanding reply capabilities through a typed
   cancellation result or retryable failure chosen by endpoint policy; authority
   cleanup is part of the server-restart transaction.
+- Reply cancellation is idempotent and keyed by endpoint incarnation plus
+  server incarnation so a restarted server cannot consume stale reply authority.
 - Bounded outstanding calls per principal and endpoint.
 - Per-principal quotas for kernel objects, page-table pages, pinned frames,
   lineage nodes, pending calls, and emergency audit capacity.
@@ -2215,8 +2235,14 @@ Verification:
   never loses the authority on abort.
 - Host tests prove invalid typed-right/kind combinations fail at mint, derive,
   decode, and live resolution.
+- Host tests prove unknown mandatory typed rights and rights invalid for the
+  encoded object kind fail during wire decode.
+- Host/model tests prove common-right and kind-specific attenuation are both
+  subsets of the sender's live authority.
 - Host tests prove receiver-supplied grant records cannot widen delegated
   rights.
+- Host/model tests prove coordinator restart uses only transaction-journal
+  evidence and cannot commit from participant-controlled claims.
 - Host tests prove old table/domain incarnations cannot interpret a recycled
   `CapId`.
 - Host tests prove replayed grant/revoke/map messages outside the accepted
@@ -2226,6 +2252,8 @@ Verification:
 - Host tests prove reply capabilities are one-shot, caller/transaction-bound,
   rejected after timeout/cancellation/server death, cleaned up during restart,
   and not redirectable to another caller.
+- Host tests prove reply cancellation is idempotent and stale reply authority
+  from a previous server incarnation cannot be consumed after restart.
 - Host tests prove map requests require both memory-object and address-space
   authority.
 - Host tests prove stale table entries are tombstoned or reclaimed within
@@ -2336,6 +2364,14 @@ Deliverables:
     the canonical wire encoding;
   - negotiated version and feature set are included in authority transaction
     and audit records.
+- Kernel-managed channel/session object stores negotiation results:
+  protocol ID, version, feature-set hash, peer/domain incarnations,
+  session generation, and negotiation transcript hash.
+- Every later message inherits protocol version and extension semantics from
+  the channel/session object instead of selecting its own version or extension
+  set.
+- Peer restart, service-owner transfer, or route replacement invalidates the
+  channel/session and requires renegotiation.
 - Per-peer queue, retry, and outstanding-request bounds.
 - Rejection/dead-letter message shape.
 - Redacted debug output for peer identities and authority-bearing fields.
@@ -2358,6 +2394,10 @@ Verification:
 - Host tests reject downgrade attempts where an intermediary removes supported
   versions or required extensions.
 - Host tests reject duplicate and noncanonical extension encodings.
+- Host tests prove post-negotiation messages cannot downgrade the channel by
+  selecting older versions or omitting negotiated required extensions.
+- Host tests prove peer restart, service-owner transfer, and route replacement
+  invalidate the channel/session.
 - Host tests prove sender-provided absolute timestamps are not accepted as
   cross-core authority deadlines without a synchronized-clock capability.
 
@@ -2397,6 +2437,14 @@ Deliverables:
   fail-safe, reserve emergency audit capacity, and set a sticky audit-loss
   digest or halt after authority is removed rather than preserving authority
   because the normal audit queue is full.
+- Emergency audit capacity is system-reserved and non-delegable, not a
+  principal-owned quota. It is preallocated per core or authority class, uses
+  allocation-free logging, can set a sticky `audit_lost` record without heap,
+  service locks, or ordinary queues, and is not directly writable by ordinary
+  principals.
+- Emergency audit records have explicit recovery and clearing semantics so an
+  operator or trusted recovery service can distinguish a handled audit-loss
+  condition from a silently reset one.
 - Explicit non-goal that full quorum/distributed consensus is later work unless
   Aesynx grows fault-tolerant peer groups.
 
@@ -2412,6 +2460,9 @@ Verification:
   IDs.
 - Negative model variants prove audit exhaustion cannot preserve revocable
   authority.
+- Host tests prove compromised principals cannot exhaust or write emergency
+  audit capacity directly, and revocation still proceeds when normal audit
+  delivery, heap allocation, and ordinary service queues fail.
 
 Exit criteria:
 
@@ -2691,12 +2742,33 @@ Deliverables:
   malicious holder.
 - Mapping teardown protocol that unmaps every affected address space before
   strong revoke commit.
-- Memory-object lifecycle states: `Alive -> Frozen -> Revoking -> Unmapped ->
-  Reclaimable -> Dead`.
+- Memory-object lifecycle uses independent axes rather than overloading
+  "frozen" for both immutable sharing and revocation:
+  - Mutability: `Mutable | SealedReadOnly`.
+  - Authority: `Live | Revoking | Revoked`.
+  - Residency: `Mapped | Unmapping | Reclaimable | Dead`.
+  - Resource state: checked pin/reference counters plus pending invalidation
+    records.
+- Sealing a shared buffer read-only does not imply revocation, and entering
+  revocation does not imply the object is a reusable immutable artifact.
+- Owner-core pin acquisition protocol:
+  - the object's owner core owns lifecycle transitions and pin accounting;
+  - new pins are acquired only while authority is `Live`;
+  - pin acquisition is atomic relative to entering `Revoking`;
+  - normal flow is pin, publish reference, revalidate epoch/state, otherwise
+    roll back;
+  - entering `Revoking` prevents every new mapping, DMA binding, lease, and
+    cross-core reference;
+  - counters use checked non-wrapping arithmetic;
+  - remote pins are explicit owner-recorded references, not globally modified
+    shared refcounts.
 - Backing frames remain pinned while referenced by any installed mapping,
   pending TLB invalidation, DMA/IOMMU mapping, checked operation or in-flight
   lease, shared queue, IPC transaction, page-table edit operation, executable
   transition, snapshot, or persistent object reference.
+- Logical persistence is distinct from physical pinning. A snapshot or
+  persistent reference copies/seals content or explicitly owns a bounded
+  residency pin; it does not silently keep frames resident forever.
 - Reclamation occurs only after every reference class is drained, all required
   remote acknowledgements complete, and the next owner cannot observe previous
   contents. Frame zeroing occurs before reuse after stale observers are fenced,
@@ -2740,6 +2812,9 @@ Verification:
 - Host model tests prove frames cannot enter `Reclaimable` while any mapping,
   TLB obligation, DMA mapping, lease, queue, transaction, page-table edit,
   executable transition, snapshot, or persistent reference is still live.
+- Host model tests prove pin acquisition races with `Revoking` fail closed,
+  rollback releases partial pins, checked counters never wrap, and remote pins
+  are visible to the owner-core lifecycle record.
 - Timeout tests prove dead participants cannot let stale authority remain
   silently usable.
 - Coordinator-death tests prove pending strong-revoke transactions recover,
@@ -2777,13 +2852,24 @@ Deliverables:
   validated before install.
 - Real TLB shootdown path for permission reduction and unmap, consuming the
   v0.37.9 acknowledgement contract.
+- Address-space residency barrier for permission reduction and unmap:
+  - track which cores have run each address space for the relevant mapping
+    generation;
+  - prevent new activation or migration into the address space;
+  - snapshot the resident-core set;
+  - apply page-table changes and shootdowns;
+  - wait for every required acknowledgement;
+  - only then permit activation again or release affected frames.
 - Initial x86_64 TLB mode before a PCID allocator exists:
   - PCID disabled;
   - PCID/ASID field fixed to zero in acknowledgement metadata;
   - CR3 switch performs the required full non-global flush;
   - permission reductions use `invlpg` or a full-context flush according to
     the affected range;
-  - global mappings and CR4.PGE have explicit invalidation rules;
+  - CR4.PGE stays disabled because reloading CR3 does not invalidate global
+    translations;
+  - global mappings are enabled only after a tested global-invalidation
+    protocol exists;
   - enabling PCID/INVPCID is blocked on a later tagged-TLB milestone with
     allocator, reuse generation, rollover, and invalidation tests.
 - Read-only shared mappings require a sealed or frozen backing object.
@@ -2816,8 +2902,11 @@ Verification:
 - QEMU smoke proves permission reduction or unmap requires real TLB invalidation
   completion before success is reported.
 - QEMU or host tests prove the initial no-PCID path records PCID zero, performs
-  a full non-global flush on CR3 switch, and handles global mappings through the
-  documented PGE invalidation rule.
+  a full non-global flush on CR3 switch, and keeps CR4.PGE/global mappings
+  disabled until the later global-invalidation protocol exists.
+- QEMU or host tests prove a core cannot newly activate or migrate into an
+  address space between shootdown target-set calculation and permission
+  reduction/unmap completion.
 - Host and QEMU tests reject writable/executable aliases across kernel/test
   address spaces.
 - Host tests reject conflicting cache attributes for aliases.
@@ -2909,6 +2998,12 @@ Deliverables:
   - range containment;
   - generation/epoch retirement and exhaustion behavior;
   - scheduler action validation and rejection.
+- Pin/freeze/reclaim race model covering pin acquisition versus `Revoking`,
+  remote owner-recorded pins, checked counter overflow, rollback, and
+  transition to `Reclaimable`.
+- Address-space activation during TLB shootdown model covering resident-core
+  snapshots, activation barriers, migration denial, acknowledgement loss, and
+  frame release after shootdown completion.
 - Loom model for the SPSC publication protocol, including producer cursor,
   consumer cursor, cached remote cursor observations, slot sequence reuse, and
   scrub-before-reuse ordering.
@@ -2947,6 +3042,9 @@ Verification:
   and big-endian host fixtures.
 - Fault-injection tests prove injected loss, replay, timeout, and exhaustion
   paths fail closed or enter documented quarantine.
+- Model checks prove pin/freeze/reclaim races and address-space activation
+  during TLB shootdown cannot produce stale mappings, premature frame reuse, or
+  missing acknowledgements.
 
 Exit criteria:
 
@@ -3440,6 +3538,16 @@ Deliverables:
 
 - Published userspace slots are treated as untrusted bytes, never as
   `&Request` or any other safe borrowed structured request.
+- User-controlled queue metadata is also untrusted: head, tail, slot index,
+  length, flags, generation, acknowledgements, and completion cursors are
+  observations only.
+- Kernel-owned shadow cursors define trusted queue progress. User cursors can
+  request work but cannot force reuse, rollback, skip ahead, or allocate.
+- Cursor rollback, replay, jumps larger than queue capacity, integer overflow,
+  and wraparound are rejected before mutation.
+- Length fields are bounded against the fixed slot size before any parse or
+  copy decision. The preferred path copies a fixed maximum-sized slot into
+  initialized kernel storage and parses only the validated prefix.
 - Exactly one fault-contained raw byte copy into kernel-owned or service-owned
   snapshot storage before parsing or authority validation.
 - The owned bytes are treated as arbitrary attacker-controlled input, even if
@@ -3457,6 +3565,9 @@ Deliverables:
 - Kernel stamps source identity, endpoint identity, traffic class, sequence,
   transaction ID, and receive deadline after copying.
 - No authority-bearing field is reread from the shared slot after validation.
+- Completions are built entirely in kernel-owned storage and copied out. A
+  malicious completion acknowledgement cannot make the kernel reuse an
+  out-of-range, stale, or unsafe slot.
 - Optional expensive path for later: page or slot write ownership transfer via
   page protection, used only when the cost is justified.
 - Runtime and ABI documentation distinguishes trusted internal fabric queues
@@ -3466,6 +3577,11 @@ Verification:
 
 - Host tests mutate a userspace slot during ingress copying and prove no mixed
   snapshot can bypass parsing, validation, authorization, or bounds checks.
+- Host tests fuzz queue control metadata with arbitrary cursor values, maximum
+  integers, wraparound, rollback, replay, out-of-capacity jumps, overlong
+  lengths, and faults midway through copying a slot.
+- Host tests prove malicious completion acknowledgements cannot cause unsafe
+  slot reuse or out-of-range completion processing.
 - Host tests prove generation changes before-copy, during-copy, and after-copy
   are reported as race diagnostics or retries, without being required for the
   security proof.
@@ -3528,6 +3644,8 @@ Deliverables:
 - Writable cross-domain memory is exposed only as atomic fields, volatile byte
   regions, or audited protocol-specific wrappers. No safe `&mut T` or aliased
   non-atomic `&T` is constructed over concurrently writable shared storage.
+- Volatile access is not synchronization. Non-atomic conflicting writers remain
+  forbidden unless exclusive ownership has been transferred.
 - Each writable-sharing protocol names permitted access widths, alignment,
   atomic orderings, ownership transitions, and recovery behavior.
 - Non-atomic structured payloads require exclusive ownership transfer before

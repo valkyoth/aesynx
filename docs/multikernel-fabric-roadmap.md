@@ -98,6 +98,12 @@ The fabric protocol is the internal network of Aesynx. It needs:
 - Canonical wire encoding that rejects duplicate, noncanonical, or malformed
   fields.
 - No silent downgrade after authenticated negotiation.
+- Negotiation results live in a kernel-managed channel/session object with
+  protocol ID, version, feature-set hash, peer/domain incarnations, session
+  generation, and negotiation transcript hash. Later messages inherit the
+  session instead of choosing their own version or extension set. Peer restart,
+  service-owner transfer, or route replacement invalidates the session and
+  requires renegotiation.
 
 No Rust-specific memory layout should cross the fabric boundary unless the
 sender and receiver are proven to use the same ABI and trust domain.
@@ -287,6 +293,14 @@ with a documented skew bound. Fabric messages should carry relative TTLs;
 receivers stamp local deadlines on authenticated receipt, coordinators decide
 timeouts using their local monotonic clock, and epoch/incarnation changes
 invalidate old deadlines.
+
+Authority-moving protocols use a bounded preallocated transaction journal. The
+journal records transaction ID, participant incarnations, source/destination
+capability identities, frozen source generation, prepared/committed/aborted
+state, witness acknowledgements, commit certificate or decision epoch, recovery
+owner, and timeout owner. Coordinator restart recovers from that journal; if no
+authoritative coordinator record survives, the safe result is quarantine or
+abort, never reconstruction from participant-controlled claims alone.
 
 Object identity is especially sensitive. A visible object name, package object
 ID, or content hash is not enough to authorize access. Capability targets need a
