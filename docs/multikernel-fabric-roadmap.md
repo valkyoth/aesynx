@@ -338,6 +338,25 @@ Priority proof targets:
 - Shared-buffer alias rules.
 - Owner-core mutation and quarantine transitions.
 - Topology route selection invariants.
+- TLA+ or Quint models for grant, revoke, coordinator failure, AP restart, and
+  strong-revocation linearization.
+- Kani, Verus, or equivalent bounded proofs for permission attenuation, range
+  containment, generation retirement, and scheduler action validation.
+- Loom models for SPSC publication, slot reuse, cursor caching, and
+  scrub-before-reuse ordering.
+- Architecture litmus tests for x86_64, aarch64, and RISC-V ordering
+  assumptions, especially where MMIO, IPI, DMA, TLB, or cache maintenance is
+  involved.
+- Cross-endian fabric golden vectors and decoder fuzzing for every stable wire
+  format.
+- Differential and metamorphic BootInfo normalization tests so parser behavior
+  is checked beyond fuzz-generated cases.
+- Test-only fault injection for dropped, duplicated, delayed, and reordered
+  messages; lost IPIs; coordinator death; AP late arrival; TLB-ack loss; full
+  queues; and epoch exhaustion.
+- Global W^X alias property tests across memory objects and address spaces.
+- Refinement tests showing executable Rust state machines agree with the
+  formal transition models they implement.
 
 Host model tests should come first; Kani, Verus, Prusti, Coq, or similar tools
 can then be applied where the code shape is stable enough.

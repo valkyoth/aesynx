@@ -2661,6 +2661,70 @@ Exit criteria:
 - AP startup and restart have incarnation/fencing semantics strong enough for
   live fabric queues and authority-bearing messages.
 
+### v0.37.12 - Formal Models And Fault-Injection Conformance
+
+Goal:
+
+Turn the multikernel proof targets into concrete executable artifacts before
+drivers and userspace services depend on the fabric, capability, and revocation
+protocols.
+
+Deliverables:
+
+- TLA+ or Quint models for:
+  - transactional grant;
+  - prospective revoke;
+  - strong revoke linearization;
+  - coordinator failure and recovery;
+  - AP restart and late-arrival quarantine.
+- Kani, Verus, or equivalent bounded proof targets for:
+  - permission attenuation;
+  - range containment;
+  - generation/epoch retirement and exhaustion behavior;
+  - scheduler action validation and rejection.
+- Loom model for the SPSC publication protocol, including producer cursor,
+  consumer cursor, cached remote cursor observations, slot sequence reuse, and
+  scrub-before-reuse ordering.
+- Architecture litmus tests for x86_64, aarch64, and RISC-V ordering
+  assumptions. Loom evidence is not enough for MMIO, IPI, DMA, TLB, or cache
+  maintenance ordering.
+- Executing lock-rank and IRQ/NMI-context checking in debug/QEMU builds, not
+  only documentation of the ranking policy.
+- Differential and metamorphic BootInfo normalization tests in addition to the
+  existing deterministic fuzz corpus.
+- Cross-endian fabric golden vectors and decoder fuzzing for the fixed-width
+  fabric ABI.
+- Test-only fault-injection harnesses for:
+  - dropped, duplicated, delayed, and reordered messages;
+  - lost, duplicated, delayed, and coalesced IPIs or doorbells;
+  - coordinator death;
+  - AP late arrival after timeout;
+  - TLB-ack loss;
+  - full queues and backpressure storms;
+  - epoch/generation exhaustion.
+- Global W^X alias property tests proving a memory object or physical frame is
+  never writable through one alias while executable through another.
+- Refinement tests showing the executable Rust state machines agree with the
+  formal transition models for grant, revoke, AP restart, queue publication,
+  and scheduler action validation.
+
+Verification:
+
+- `cargo xtask` or script targets run the selected model/proof/fault-injection
+  suites locally with bounded defaults suitable for CI.
+- Each formal model has at least one negative test or intentionally broken
+  variant proving the property would catch a relevant bug.
+- Golden-vector tests prove fabric messages decode identically on little-endian
+  and big-endian host fixtures.
+- Fault-injection tests prove injected loss, replay, timeout, and exhaustion
+  paths fail closed or enter documented quarantine.
+
+Exit criteria:
+
+- Aesynx has concrete model/proof/fault-injection evidence for the
+  authority-bearing fabric before driver services and userspace domains depend
+  on it.
+
 ## Phase 10: Driver Foundation
 
 ### v0.38.0 - Device Model
