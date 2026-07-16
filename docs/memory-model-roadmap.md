@@ -105,6 +105,22 @@ not report success to callers until required local and remote invalidation
 acknowledgements have completed or the operation has failed closed into a
 documented quarantine/degraded state.
 
+Backing-frame reclamation is a separate lifecycle from authority revocation.
+The memory-object lifecycle should be explicit:
+
+```text
+Alive -> Frozen -> Revoking -> Unmapped -> Reclaimable -> Dead
+```
+
+A backing frame remains pinned while referenced by any installed mapping,
+pending TLB invalidation, DMA/IOMMU mapping, checked operation or in-flight
+lease, shared queue, IPC transaction, page-table edit operation, executable
+transition, snapshot, or persistent object reference. A frame becomes
+reclaimable only after every reference class is drained, required remote
+acknowledgements complete, and the next owner cannot observe previous contents.
+Zeroing happens before reuse after stale observers are fenced; zeroing is not a
+substitute for revocation, TLB, DMA, or snapshot fencing.
+
 W^X is a memory-object invariant, not only a single-PTE invariant. A physical
 frame or memory object must not be writable in one address space while
 executable in another. Executable transition requires freezing writable

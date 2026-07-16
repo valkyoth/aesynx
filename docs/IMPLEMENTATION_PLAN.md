@@ -867,23 +867,38 @@ address-space state into a non-forgeable execution context or owner token.
 Permissions:
 
 ```text
+Common/meta:
+DERIVE
+GRANT
+REVOKE
+INTROSPECT
+ADMIN (kind-scoped only)
+
+Memory:
 READ
 WRITE
 EXECUTE
-GRANT
-DERIVE
 MAP
 SHARE_READ
 SHARE_WRITE
+
+Endpoint:
 SEND
 RECV
 CALL
 REPLY
 NOTIFY
-REVOKE
-INTROSPECT
-ADMIN
+
+Other kinds use typed rights, not arbitrary reuse of unrelated bits:
+AddressSpaceRights { map, unmap, protect, activate, inspect }
+IrqRights { bind, ack, mask, unmask }
+DmaRights { map, unmap, sync, invalidate }
+SystemControlRights { typed operation IDs }
 ```
+
+The wire format validates both capability kind and typed-right representation.
+Invalid combinations such as endpoint execute, memory receive, or clock map are
+rejected at mint, derive, decode, and live resolution.
 
 Kinds:
 
@@ -949,9 +964,12 @@ sender frozen, receiver pending
 -> sender active, receiver empty
 ```
 
-The invariant is `committed active copies <= 1`. Coordinator or receiver failure
-must recover without creating two active owners or permanently losing an
-irreplaceable resource.
+The escrow coordinator owns the frozen state and commit record; sender or
+receiver survival alone is not enough to recover the move. The commit
+linearization point is the coordinator's durable or epoch-stamped commit
+decision. The invariant is `committed active copies <= 1`. Coordinator or
+receiver failure must recover without creating two active owners or permanently
+losing an irreplaceable resource.
 
 Derivation invariant:
 

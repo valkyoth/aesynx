@@ -295,6 +295,8 @@ AMD GPU                         amd-gpu                   vendor/official
   PASID, and PRI, fences interrupt-remapping/MSI/MSI-X delivery, and assigns
   new device plus interrupt incarnations before restart. Devices that cannot be
   reliably quiesced, reset, or fenced fail closed instead of being rebound.
+  Device-memory ordering barriers are required around bus-master disable, reset,
+  IOTLB completion observation, interrupt-remap teardown, and queue teardown.
 
 ## Development Model
 

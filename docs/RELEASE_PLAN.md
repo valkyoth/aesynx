@@ -2096,18 +2096,20 @@ Deliverables:
   authorization must use kernel-stamped current execution identity.
 - Capability tables bound to an owning domain/principal incarnation, with quota
   and revocation-domain metadata.
-- Central capability-kind permission matrix. Mint, derive, decode, and live
-  resolution reject nonsensical permission/kind combinations before an
-  operation can accidentally ignore them. Examples:
-  - `Memory`: `READ`, `WRITE`, `EXECUTE`, `MAP`, `SHARE_READ`,
-    `SHARE_WRITE`.
-  - `Endpoint`: `SEND`, `RECV`, `CALL`, `REPLY`, `NOTIFY`.
-  - `AddressSpace`: mapping and protection-management rights.
-  - `Irq`: bind, acknowledge, mask, and unmask rights.
-  - `Dma`: map, unmap, and synchronize rights.
-  - `SystemControl`: narrowly typed administrative rights only.
-  - Invalid examples such as `Endpoint|EXECUTE`, `Memory|RECV`, and
-    `Clock|MAP` fail closed.
+- Central capability-kind permission matrix using common meta-rights plus
+  kind-specific typed rights instead of one ever-growing universal bitset:
+  - `CommonRights`: derive, grant, revoke, introspect, and narrowly scoped
+    admin where the kind permits it.
+  - `MemoryRights`: read, write, execute, map, share-read, share-write.
+  - `EndpointRights`: send, receive, call, reply, notify.
+  - `AddressSpaceRights`: map, unmap, protect, activate, and inspect.
+  - `IrqRights`: bind, acknowledge, mask, and unmask.
+  - `DmaRights`: map, unmap, synchronize, and invalidate.
+  - `SystemControlRights`: typed administrative operations only.
+  Mint, derive, decode, and live resolution validate both capability kind and
+  typed-right representation. Invalid examples such as `Endpoint|EXECUTE`,
+  `Memory|RECV`, and `Clock|MAP` fail closed before an operation can ignore
+  nonsense permissions.
 - Capability-table, domain, endpoint, peer, and boot/session incarnations are
   part of every authority interpretation context. A table-local `CapId` is not
   meaningful after its table or domain is destroyed and recreated.
@@ -2170,16 +2172,23 @@ delegated_rights <= requested_rights & live_sender_rights & delegable_rights
   - sender frozen and receiver pending;
   - receiver active and sender invalid on commit;
   - sender active and receiver empty on abort.
-  The formal invariant is `committed active copies <= 1`, with crash recovery
-  that prevents both duplicate owners and permanent loss of an irreplaceable
-  resource.
+  The escrow coordinator, not the sender or receiver alone, owns the frozen
+  state and commit record. The commit linearization point is the coordinator's
+  durable or epoch-stamped commit decision. The formal invariant is
+  `committed active copies <= 1`, with crash recovery that prevents both
+  duplicate owners and permanent loss of an irreplaceable resource.
 - Kernel-minted one-shot reply capabilities for `CALL`/`REPLY` endpoints.
   Reply caps are bound to caller, callee endpoint, transaction ID, boot/domain
   incarnation, and timeout/cancellation state.
 - Reply authority is exactly-once by default, cannot be redirected to an
   unrelated caller, cannot be delegated unless an endpoint type explicitly
   permits it, and is rejected after cancellation, timeout, or server restart.
+- Server death resolves outstanding reply capabilities through a typed
+  cancellation result or retryable failure chosen by endpoint policy; authority
+  cleanup is part of the server-restart transaction.
 - Bounded outstanding calls per principal and endpoint.
+- Per-principal quotas for kernel objects, page-table pages, pinned frames,
+  lineage nodes, pending calls, and emergency audit capacity.
 - Mapping-authority split between memory-object capability, destination
   address-space capability, and optional executable/JIT policy authority.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
@@ -2204,7 +2213,7 @@ Verification:
   phantom authority after abort, timeout, duplicate message, or sender revoke.
 - Host/model tests prove move-grant escrow never produces two active owners and
   never loses the authority on abort.
-- Host tests prove invalid permission/kind combinations fail at mint, derive,
+- Host tests prove invalid typed-right/kind combinations fail at mint, derive,
   decode, and live resolution.
 - Host tests prove receiver-supplied grant records cannot widen delegated
   rights.
@@ -2215,7 +2224,8 @@ Verification:
 - Host tests prove endpoint send/receive checks require endpoint rights and
   kernel-stamped source metadata.
 - Host tests prove reply capabilities are one-shot, caller/transaction-bound,
-  rejected after timeout/cancellation, and not redirectable to another caller.
+  rejected after timeout/cancellation/server death, cleaned up during restart,
+  and not redirectable to another caller.
 - Host tests prove map requests require both memory-object and address-space
   authority.
 - Host tests prove stale table entries are tombstoned or reclaimed within
@@ -2316,6 +2326,16 @@ Deliverables:
 - Endianness, alignment, and ABI rules so the protocol does not rely on
   Rust-specific layout or x86_64-only assumptions.
 - Bounded payload and extension-field policy.
+- Protocol downgrade and extension policy:
+  - each endpoint/service declares a minimum accepted protocol version;
+  - version negotiation is bound to peer/domain incarnations;
+  - no silent fallback after authenticated negotiation;
+  - extension fields are marked required or optional;
+  - unknown required extensions fail closed;
+  - duplicate, noncanonical, or out-of-order fields are rejected according to
+    the canonical wire encoding;
+  - negotiated version and feature set are included in authority transaction
+    and audit records.
 - Per-peer queue, retry, and outstanding-request bounds.
 - Rejection/dead-letter message shape.
 - Redacted debug output for peer identities and authority-bearing fields.
@@ -2335,6 +2355,9 @@ Verification:
 - Host tests encode/decode fabric headers without raw pointer layout.
 - Host tests reject unknown versions, oversized payloads, invalid peer roles,
   and non-monotonic sequence use where tracked.
+- Host tests reject downgrade attempts where an intermediary removes supported
+  versions or required extensions.
+- Host tests reject duplicate and noncanonical extension encodings.
 - Host tests prove sender-provided absolute timestamps are not accepted as
   cross-core authority deadlines without a synchronized-clock capability.
 
@@ -2638,6 +2661,22 @@ Deliverables:
   - revoke a revocation domain;
   - revoke the whole object.
 - Capability derivation/lineage identity for every delegated authority.
+- Lineage node identity contains object incarnation, lineage generation, parent
+  lineage reference, revocation-domain reference, and bounded child count.
+- Maximum derivation depth and maximum children per lineage node are explicit
+  release constants or policy values; exhaustion fails closed.
+- Ancestry checks are either O(1) through an index, or a bounded walk with a
+  documented maximum. Unbounded graph walks are not allowed in enforcement
+  paths.
+- Object-wide epochs and lineage-specific epochs are both part of live
+  validation. Object-wide revocation dominates lineage-specific liveness.
+- Mapping records, DMA records, leases, queued operations, and pending grants
+  are indexed by lineage so selective revocation can find every affected use.
+- Revoke-one either preserves descendants through an explicit promoted lineage
+  rule or rejects while descendants exist; the chosen policy is documented and
+  tested.
+- Retired lineage nodes are not reused until generation retirement proves stale
+  descendants cannot bind to the recycled node.
 - Rules for whether descendants may create independent revocation domains and
   which principals may choose each revocation scope.
 - Bounded lineage reclamation so selective revocation does not require
@@ -2652,6 +2691,16 @@ Deliverables:
   malicious holder.
 - Mapping teardown protocol that unmaps every affected address space before
   strong revoke commit.
+- Memory-object lifecycle states: `Alive -> Frozen -> Revoking -> Unmapped ->
+  Reclaimable -> Dead`.
+- Backing frames remain pinned while referenced by any installed mapping,
+  pending TLB invalidation, DMA/IOMMU mapping, checked operation or in-flight
+  lease, shared queue, IPC transaction, page-table edit operation, executable
+  transition, snapshot, or persistent object reference.
+- Reclamation occurs only after every reference class is drained, all required
+  remote acknowledgements complete, and the next owner cannot observe previous
+  contents. Frame zeroing occurs before reuse after stale observers are fenced,
+  not as a substitute for fencing stale observers.
 - Mandatory local and remote TLB invalidation acknowledgements before a
   permission reduction or unmap is reported complete.
 - TLB shootdown acknowledgements bind address-space incarnation, ASID/PCID and
@@ -2685,6 +2734,12 @@ Verification:
 - Host model tests prove revoke-one, revoke-subtree, revoke-domain, and
   revoke-object scopes invalidate exactly the intended descendants without
   leaving stale authority live.
+- Host model tests include lineage-node reuse, generation exhaustion, object
+  versus lineage epoch interaction, maximum-depth exhaustion, maximum-children
+  exhaustion, and revoke-one behavior when descendants exist.
+- Host model tests prove frames cannot enter `Reclaimable` while any mapping,
+  TLB obligation, DMA mapping, lease, queue, transaction, page-table edit,
+  executable transition, snapshot, or persistent reference is still live.
 - Timeout tests prove dead participants cannot let stale authority remain
   silently usable.
 - Coordinator-death tests prove pending strong-revoke transactions recover,
@@ -2722,6 +2777,15 @@ Deliverables:
   validated before install.
 - Real TLB shootdown path for permission reduction and unmap, consuming the
   v0.37.9 acknowledgement contract.
+- Initial x86_64 TLB mode before a PCID allocator exists:
+  - PCID disabled;
+  - PCID/ASID field fixed to zero in acknowledgement metadata;
+  - CR3 switch performs the required full non-global flush;
+  - permission reductions use `invlpg` or a full-context flush according to
+    the affected range;
+  - global mappings and CR4.PGE have explicit invalidation rules;
+  - enabling PCID/INVPCID is blocked on a later tagged-TLB milestone with
+    allocator, reuse generation, rollover, and invalidation tests.
 - Read-only shared mappings require a sealed or frozen backing object.
 - Writable shared mappings require `SHARE_WRITE`, a declared synchronization
   protocol, traffic-class policy, audit evidence, and strong-revocation support.
@@ -2751,6 +2815,9 @@ Verification:
   CR3 switches.
 - QEMU smoke proves permission reduction or unmap requires real TLB invalidation
   completion before success is reported.
+- QEMU or host tests prove the initial no-PCID path records PCID zero, performs
+  a full non-global flush on CR3 switch, and handles global mappings through the
+  documented PGE invalidation rule.
 - Host and QEMU tests reject writable/executable aliases across kernel/test
   address spaces.
 - Host tests reject conflicting cache attributes for aliases.
@@ -2797,11 +2864,17 @@ Verification:
   bootstrap-parameter seal/zero policy.
 - QEMU AP smoke proves timeout plus late-arrival model paths quarantine rather
   than accidentally marking a core online.
+- If this milestone claims actual AP restart or hotplug, QEMU must exercise a
+  real restart path and prove old queued messages, endpoint incarnations,
+  capability-table IDs, and topology snapshots are rejected after restart. If
+  QEMU or hardware cannot support that evidence yet, actual restart/hotplug
+  remains prohibited and the milestone is model/fencing-only.
 
 Exit criteria:
 
 - AP startup and restart have incarnation/fencing semantics strong enough for
-  live fabric queues and authority-bearing messages.
+  live fabric queues and authority-bearing messages. Actual AP restart/hotplug
+  is not enabled until real restart evidence exists.
 
 ### v0.37.12 - Formal Models And Fault-Injection Conformance
 
@@ -2880,6 +2953,45 @@ Exit criteria:
 - Aesynx has concrete model/proof/fault-injection evidence for the
   authority-bearing fabric before driver services and userspace domains depend
   on it.
+
+### v0.37.13 - Tagged TLB And Restart Live-Evidence Gate
+
+Goal:
+
+Keep advanced TLB tagging and actual AP restart/hotplug behind explicit live
+evidence instead of letting earlier model metadata become an implementation
+claim.
+
+Deliverables:
+
+- PCID/INVPCID enablement remains disabled by default until this milestone or a
+  later replacement provides:
+  - PCID allocator;
+  - per-address-space PCID reuse generation;
+  - rollover and retirement policy;
+  - INVPCID single-context and all-context invalidation plan;
+  - interaction with global mappings and CR4.PGE;
+  - host and QEMU tests for stale-PCID rejection.
+- Live AP restart/hotplug remains disabled until this milestone or a later
+  replacement provides:
+  - QEMU or hardware restart path;
+  - new core/domain incarnation after restart;
+  - rejection of old queued messages, endpoints, capability-table IDs, and
+    topology snapshots;
+  - cleanup of outstanding reply capabilities, grants, leases, and control
+    messages from the old incarnation.
+
+Verification:
+
+- PCID tests prove stale translations cannot survive PCID reuse, rollover, or
+  missed invalidation.
+- AP restart tests prove old authority-bearing messages from the previous
+  incarnation are rejected after a real restart path.
+
+Exit criteria:
+
+- Aesynx may enable tagged TLBs or actual AP restart/hotplug only after these
+  live-evidence gates pass.
 
 ## Phase 10: Driver Foundation
 
@@ -3328,11 +3440,18 @@ Deliverables:
 
 - Published userspace slots are treated as untrusted bytes, never as
   `&Request` or any other safe borrowed structured request.
-- Complete request copy into kernel-owned or service-owned snapshot storage
-  before authority validation.
-- Slot generation and publication state checked before and after copying.
-- Generation or publication-state change rejects the snapshot and retries or
-  reports a bounded race error.
+- Exactly one fault-contained raw byte copy into kernel-owned or service-owned
+  snapshot storage before parsing or authority validation.
+- The owned bytes are treated as arbitrary attacker-controlled input, even if
+  they were assembled while userspace was concurrently mutating the slot.
+- Slot generation and publication state checks are cooperative race diagnostics
+  only. They are useful for retry and telemetry, but they are not a security
+  proof against a malicious producer that can modify payload bytes without
+  changing the generation, restore the old generation, or create a torn but
+  structurally valid request.
+- If coherent publication is required for semantics rather than convenience,
+  the operation uses kernel-controlled ownership transfer, write protection, or
+  an authenticated immutable submission object.
 - Authority-bearing fields are validated and executed only from the owned
   snapshot.
 - Kernel stamps source identity, endpoint identity, traffic class, sequence,
@@ -3345,10 +3464,14 @@ Deliverables:
 
 Verification:
 
-- Host tests mutate a userspace slot during ingress copying and prove the
-  kernel rejects or retries instead of executing a mixed snapshot.
+- Host tests mutate a userspace slot during ingress copying and prove no mixed
+  snapshot can bypass parsing, validation, authorization, or bounds checks.
 - Host tests prove generation changes before-copy, during-copy, and after-copy
-  all fail closed.
+  are reported as race diagnostics or retries, without being required for the
+  security proof.
+- Host tests prove a structurally valid mixed snapshot is still treated as
+  attacker input and cannot gain authority through fields not present in the
+  owned snapshot.
 - Host tests prove traffic class and source identity come from kernel-stamped
   context, not from the user-provided payload.
 - Static tests or lint-like checks reject APIs that expose published userspace
@@ -3357,7 +3480,8 @@ Verification:
 Exit criteria:
 
 - Userspace queue ingress has a clear copy-validate-execute contract that avoids
-  double-fetch, torn-payload, and shared-reference hazards.
+  double-fetch, shared-reference hazards, and security dependence on
+  user-controlled generation counters.
 
 ### v0.46.0 - Enter Ring 3
 
@@ -4061,6 +4185,11 @@ Deliverables:
   - writer release-publishes an even/complete generation;
   - reader acquire-loads generation, copies payload, then reloads generation;
   - reader accepts only equal, even generations.
+- Seqlock generation wrap retires or reinitializes the ring before reuse can
+  make a stale even generation appear current.
+- If a writer dies while a record generation is odd/in-progress, readers reject
+  the slot, the collector records a torn-writer/lost-record event, and recovery
+  must either complete, retire, or reinitialize the slot before reuse.
 - Readers never form persistent references into overwriteable telemetry slots.
 - Periodic tamper-evident chunk checkpoints, optionally anchored by TPM or a
   trusted service, for detecting suffix truncation or collector omission. The
@@ -4083,6 +4212,8 @@ Verification:
   dispatch.
 - Host tests prove overwriteable telemetry snapshots reject odd generations,
   changed generations, and torn records.
+- Host tests prove seqlock generation wrap retirement and odd-generation writer
+  death recovery do not expose torn records as complete snapshots.
 - QEMU smoke proves the scheduler continues with AI disabled, model timeout,
   and telemetry loss counters.
 
@@ -4405,6 +4536,9 @@ commands:
   where Aesynx cannot invalidate those translations safely.
 - Interrupt-remapping, MSI, and MSI-X fencing so old interrupts cannot target a
   restarted or newly assigned domain.
+- Device-memory ordering barriers around bus-master disable, reset or
+  function-level reset, IOTLB completion observation, interrupt-remap teardown,
+  and queue teardown.
 - Device and interrupt-remapping incarnations included in driver restart and
   revoke transactions.
 - No driver restart until old DMA identities and interrupt identities are

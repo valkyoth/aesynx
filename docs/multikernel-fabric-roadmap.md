@@ -90,6 +90,14 @@ The fabric protocol is the internal network of Aesynx. It needs:
 - Dead-letter or rejection records.
 - Redacted diagnostics.
 - Endianness and alignment rules suitable for heterogeneous peers.
+- Minimum accepted protocol version per endpoint or service.
+- Negotiated version and feature set bound to peer/domain incarnations and
+  recorded in authority transactions/audit events.
+- Required versus optional extension fields; unknown required extensions fail
+  closed.
+- Canonical wire encoding that rejects duplicate, noncanonical, or malformed
+  fields.
+- No silent downgrade after authenticated negotiation.
 
 No Rust-specific memory layout should cross the fabric boundary unless the
 sender and receiver are proven to use the same ABI and trust domain.
@@ -111,11 +119,13 @@ production SPSC link needs:
 - Enqueue, dequeue completion, cancellation, acknowledgement, and slot reuse
   each need a named linearization point.
 - Hostile userspace queue producers are different from trusted kernel fabric
-  producers. Published userspace slots are untrusted bytes: the kernel copies a
-  complete request into owned storage, checks slot generation/publication state
-  before and after the copy, validates only the owned snapshot, stamps source
-  identity and traffic class itself, and never rereads authority-bearing fields
-  from the shared slot after validation.
+  producers. Published userspace slots are untrusted bytes: the kernel performs
+  one fault-contained raw byte copy into owned storage, treats that owned
+  snapshot as arbitrary attacker input even if userspace mutated it during the
+  copy, validates only the owned snapshot, stamps source identity and traffic
+  class itself, and never rereads authority-bearing fields from the shared slot
+  after validation. User-controlled generation counters are cooperative race
+  diagnostics only, not a security proof.
 - Slot generation/sequence numbers for wraparound and reuse.
 - Scrub-on-vacate before authority-bearing payload storage can be observed by a
   different trust domain.
@@ -187,8 +197,12 @@ replay rules, and timeout handling for failed peers.
 Selective revocation needs lineage semantics. A strong-revoke transaction names
 whether it revokes one entry, a delegation subtree, a revocation domain, or the
 whole object. Capability derivation carries lineage identity; descendants may
-create independent revocation domains only under explicit policy, and lineage
-metadata must be reclaimable without unbounded in-kernel graphs.
+create independent revocation domains only under explicit policy. Lineage nodes
+carry object incarnation, lineage generation, parent reference, revocation
+domain reference, bounded child count, maximum depth, and a retirement rule so
+stale descendants cannot bind to recycled nodes. Mappings, DMA records, leases,
+queued operations, and pending grants must be indexed by lineage for selective
+revocation.
 
 Normal audit-buffer exhaustion must not preserve stale authority. Authority
 creation, grant, executable mapping, DMA mapping, and policy expansion can fail
@@ -264,7 +278,9 @@ Endpoint RPC needs one-shot reply capabilities. A reply cap is minted by the
 kernel, bound to caller, callee endpoint, transaction, boot/domain incarnation,
 and timeout/cancellation state, and can complete exactly once. Servers cannot
 redirect it to an unrelated caller or delegate it unless an endpoint type
-explicitly permits that behavior.
+explicitly permits that behavior. Server death resolves outstanding reply caps
+through typed cancellation or retryable failure and cleans authority as part of
+the server-restart transaction.
 
 Cross-core deadlines are local decisions unless Aesynx has a synchronized clock
 with a documented skew bound. Fabric messages should carry relative TTLs;
