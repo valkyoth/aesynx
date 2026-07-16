@@ -2096,6 +2096,18 @@ Deliverables:
   authorization must use kernel-stamped current execution identity.
 - Capability tables bound to an owning domain/principal incarnation, with quota
   and revocation-domain metadata.
+- Central capability-kind permission matrix. Mint, derive, decode, and live
+  resolution reject nonsensical permission/kind combinations before an
+  operation can accidentally ignore them. Examples:
+  - `Memory`: `READ`, `WRITE`, `EXECUTE`, `MAP`, `SHARE_READ`,
+    `SHARE_WRITE`.
+  - `Endpoint`: `SEND`, `RECV`, `CALL`, `REPLY`, `NOTIFY`.
+  - `AddressSpace`: mapping and protection-management rights.
+  - `Irq`: bind, acknowledge, mask, and unmask rights.
+  - `Dma`: map, unmap, and synchronize rights.
+  - `SystemControl`: narrowly typed administrative rights only.
+  - Invalid examples such as `Endpoint|EXECUTE`, `Memory|RECV`, and
+    `Clock|MAP` fail closed.
 - Capability-table, domain, endpoint, peer, and boot/session incarnations are
   part of every authority interpretation context. A table-local `CapId` is not
   meaningful after its table or domain is destroyed and recreated.
@@ -2147,6 +2159,27 @@ delegated_rights <= requested_rights & live_sender_rights & delegable_rights
   - commit makes authority usable;
   - abort/timeout expires pending authority;
   - retries are idempotent.
+- TLA+ or Quint transactional-grant model before implementation is considered
+  complete. The model proves no usable receiver capability before commit, abort
+  restores the original state, duplicate proposal/accept/commit/abort is
+  idempotent, sender revocation before commit prevents receiver activation,
+  timeout never leaves phantom authority, rights cannot be amplified, and
+  exactly one final outcome exists.
+- Move-only grant escrow protocol:
+  - sender active;
+  - sender frozen and receiver pending;
+  - receiver active and sender invalid on commit;
+  - sender active and receiver empty on abort.
+  The formal invariant is `committed active copies <= 1`, with crash recovery
+  that prevents both duplicate owners and permanent loss of an irreplaceable
+  resource.
+- Kernel-minted one-shot reply capabilities for `CALL`/`REPLY` endpoints.
+  Reply caps are bound to caller, callee endpoint, transaction ID, boot/domain
+  incarnation, and timeout/cancellation state.
+- Reply authority is exactly-once by default, cannot be redirected to an
+  unrelated caller, cannot be delegated unless an endpoint type explicitly
+  permits it, and is rejected after cancellation, timeout, or server restart.
+- Bounded outstanding calls per principal and endpoint.
 - Mapping-authority split between memory-object capability, destination
   address-space capability, and optional executable/JIT policy authority.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
@@ -2167,6 +2200,12 @@ Verification:
   pending slots expired or reclaimable.
 - Host tests prove a sender revoke between grant proposal and grant commit
   aborts the grant without receiver authority becoming usable.
+- Model tests prove transactional grant has exactly one final outcome and no
+  phantom authority after abort, timeout, duplicate message, or sender revoke.
+- Host/model tests prove move-grant escrow never produces two active owners and
+  never loses the authority on abort.
+- Host tests prove invalid permission/kind combinations fail at mint, derive,
+  decode, and live resolution.
 - Host tests prove receiver-supplied grant records cannot widen delegated
   rights.
 - Host tests prove old table/domain incarnations cannot interpret a recycled
@@ -2175,6 +2214,8 @@ Verification:
   transaction window fail closed.
 - Host tests prove endpoint send/receive checks require endpoint rights and
   kernel-stamped source metadata.
+- Host tests prove reply capabilities are one-shot, caller/transaction-bound,
+  rejected after timeout/cancellation, and not redirectable to another caller.
 - Host tests prove map requests require both memory-object and address-space
   authority.
 - Host tests prove stale table entries are tombstoned or reclaimed within
@@ -2278,12 +2319,24 @@ Deliverables:
 - Per-peer queue, retry, and outstanding-request bounds.
 - Rejection/dead-letter message shape.
 - Redacted debug output for peer identities and authority-bearing fields.
+- Cross-core time semantics:
+  - protocols do not compare raw timestamps from different cores unless a
+    synchronized clock with a documented skew bound exists;
+  - messages prefer relative TTLs over sender-provided absolute deadlines;
+  - receivers stamp local deadlines on authenticated receipt;
+  - timeout decisions are made by the coordinator's local monotonic clock;
+  - epoch/incarnation changes invalidate old deadlines;
+  - suspend, migration, TSC instability, and counter rollover fail closed.
+- AI advice expiry uses receiver-local deadlines or scheduling epochs, not
+  untrusted sender-provided absolute timestamps.
 
 Verification:
 
 - Host tests encode/decode fabric headers without raw pointer layout.
 - Host tests reject unknown versions, oversized payloads, invalid peer roles,
   and non-monotonic sequence use where tracked.
+- Host tests prove sender-provided absolute timestamps are not accepted as
+  cross-core authority deadlines without a synchronized-clock capability.
 
 Exit criteria:
 
@@ -2579,6 +2632,16 @@ Deliverables:
     request, delegated entry, or in-flight endpoint operation can still commit.
 - Revocation messages carry object incarnation, previous epoch, new epoch,
   transaction ID, reason code, coordinator proof, and affected authority class.
+- Selective revocation scope carried by every strong-revoke transaction:
+  - revoke one table entry;
+  - revoke a delegation subtree;
+  - revoke a revocation domain;
+  - revoke the whole object.
+- Capability derivation/lineage identity for every delegated authority.
+- Rules for whether descendants may create independent revocation domains and
+  which principals may choose each revocation scope.
+- Bounded lineage reclamation so selective revocation does not require
+  unbounded in-kernel graphs.
 - Distributed prepare/freeze/ack/commit/abort model for strong revocation.
 - Bounded pending transaction counts per object, capability table, endpoint,
   principal, and coordinator.
@@ -2619,6 +2682,9 @@ Verification:
   after the linearization point.
 - Host model tests prove strong revoke cannot complete until modeled mappings,
   TLB acknowledgements, DMA ownership, and pending grants are resolved.
+- Host model tests prove revoke-one, revoke-subtree, revoke-domain, and
+  revoke-object scopes invalidate exactly the intended descendants without
+  leaving stale authority live.
 - Timeout tests prove dead participants cannot let stale authority remain
   silently usable.
 - Coordinator-death tests prove pending strong-revoke transactions recover,
@@ -3243,6 +3309,56 @@ Exit criteria:
 
 - User-mode entry can begin.
 
+### v0.45.1 - Hostile Userspace Queue Ingress Contract
+
+Goal:
+
+Define the safe ingress boundary for userspace submission queues before the
+kernel or service domains consume requests from hostile producers.
+
+Rationale:
+
+The internal kernel-to-kernel fabric can use a trusted-producer SPSC contract,
+but userspace producers remain writable owners of their queue slots after
+publication unless ownership is explicitly transferred. The kernel must not
+validate a shared slot and then execute data reread from the same mutable
+slot.
+
+Deliverables:
+
+- Published userspace slots are treated as untrusted bytes, never as
+  `&Request` or any other safe borrowed structured request.
+- Complete request copy into kernel-owned or service-owned snapshot storage
+  before authority validation.
+- Slot generation and publication state checked before and after copying.
+- Generation or publication-state change rejects the snapshot and retries or
+  reports a bounded race error.
+- Authority-bearing fields are validated and executed only from the owned
+  snapshot.
+- Kernel stamps source identity, endpoint identity, traffic class, sequence,
+  transaction ID, and receive deadline after copying.
+- No authority-bearing field is reread from the shared slot after validation.
+- Optional expensive path for later: page or slot write ownership transfer via
+  page protection, used only when the cost is justified.
+- Runtime and ABI documentation distinguishes trusted internal fabric queues
+  from hostile userspace ingress queues.
+
+Verification:
+
+- Host tests mutate a userspace slot during ingress copying and prove the
+  kernel rejects or retries instead of executing a mixed snapshot.
+- Host tests prove generation changes before-copy, during-copy, and after-copy
+  all fail closed.
+- Host tests prove traffic class and source identity come from kernel-stamped
+  context, not from the user-provided payload.
+- Static tests or lint-like checks reject APIs that expose published userspace
+  queue payloads as safe references.
+
+Exit criteria:
+
+- Userspace queue ingress has a clear copy-validate-execute contract that avoids
+  double-fetch, torn-payload, and shared-reference hazards.
+
 ### v0.46.0 - Enter Ring 3
 
 Goal:
@@ -3285,6 +3401,15 @@ Deliverables:
 - Read-only sealed shared-buffer mapping into both domains.
 - Writable shared-buffer mapping only with `SHARE_WRITE`, a named
   synchronization protocol, and audit evidence.
+- Writable cross-domain memory is exposed only as atomic fields, volatile byte
+  regions, or audited protocol-specific wrappers. No safe `&mut T` or aliased
+  non-atomic `&T` is constructed over concurrently writable shared storage.
+- Each writable-sharing protocol names permitted access widths, alignment,
+  atomic orderings, ownership transitions, and recovery behavior.
+- Non-atomic structured payloads require exclusive ownership transfer before
+  access.
+- `aesynx-rt` or the userspace SDK exposes safe shared-ring and shared-atomic
+  types rather than arbitrary mutable shared slices.
 - Strong-revocation teardown of user-domain shared mappings through the v0.37.9
   protocol.
 - TLB shootdown acknowledgements that bind user address-space incarnation,
@@ -3299,6 +3424,8 @@ Verification:
 - QEMU smoke maps a sealed read-only buffer into two actual ring-3 domains and
   proves both observe the same backing object.
 - QEMU smoke proves one domain cannot write through a read-only shared mapping.
+- Host tests prove shared writable regions cannot be wrapped in safe aliased
+  non-atomic references through the public runtime APIs.
 - QEMU smoke proves strong revoke tears down the mapping or quarantines the
   affected domain before success is reported.
 - Host and QEMU tests reject W+X and cache-attribute alias conflicts across
@@ -3308,6 +3435,8 @@ Exit criteria:
 
 - Aesynx can claim hostile cross-domain shared mappings only after actual
   isolated user domains, real page tables, and strong revocation all participate.
+  This milestone proves memory isolation and revocation safety only; scheduling
+  progress and denial-of-service containment require v0.46.2 preemption.
 
 ### v0.46.2 - Preemptive Timer And CPU-Budget Enforcement
 
@@ -3926,6 +4055,13 @@ Deliverables:
   overwrite and multi-reader behavior, sequence gaps, redaction at export,
   replay/reordering detection, and user-space hash chaining or Merkle
   aggregation.
+- Overwriteable telemetry records use a seqlock-style snapshot protocol:
+  - writer publishes an odd/in-progress generation;
+  - writer replaces the payload;
+  - writer release-publishes an even/complete generation;
+  - reader acquire-loads generation, copies payload, then reloads generation;
+  - reader accepts only equal, even generations.
+- Readers never form persistent references into overwriteable telemetry slots.
 - Periodic tamper-evident chunk checkpoints, optionally anchored by TPM or a
   trusted service, for detecting suffix truncation or collector omission. The
   roadmap must not claim impossible zero overhead; the target is bounded
@@ -3945,6 +4081,8 @@ Verification:
   while revoke, quarantine, and permission reduction proceed fail-safe with
   emergency audit-loss evidence; noncritical telemetry loss does not block
   dispatch.
+- Host tests prove overwriteable telemetry snapshots reject odd generations,
+  changed generations, and torn records.
 - QEMU smoke proves the scheduler continues with AI disabled, model timeout,
   and telemetry loss counters.
 
@@ -4259,6 +4397,20 @@ commands:
 - Revocation lifecycle.
 - Restart demo.
 - IOMMU plan implementation where QEMU/hardware allows.
+- Disable PCI bus mastering before revoking DMA-capable devices.
+- Device-specific reset or PCIe function-level reset where supported.
+- IOMMU unmap followed by completed IOTLB invalidation before DMA authority is
+  considered gone.
+- PCIe ATS, PASID, and PRI invalidation, or explicit prohibition for devices
+  where Aesynx cannot invalidate those translations safely.
+- Interrupt-remapping, MSI, and MSI-X fencing so old interrupts cannot target a
+  restarted or newly assigned domain.
+- Device and interrupt-remapping incarnations included in driver restart and
+  revoke transactions.
+- No driver restart until old DMA identities and interrupt identities are
+  unreachable.
+- Fail-closed policy for devices that cannot be reliably quiesced, reset, or
+  fenced from DMA/interrupt delivery.
 
 ### v1.3 - aarch64 QEMU Preview
 

@@ -783,6 +783,13 @@ Shared memory policy:
 - Read-only sealed buffers are the preferred zero-copy path for large assets.
 - Writable shared buffers require `SHARE_WRITE`, a declared synchronization
   protocol, audit events, and revocation/TLB-shootdown handling.
+- Writable cross-domain memory is never represented as ordinary shared Rust
+  references. It is exposed only through atomic fields, volatile byte regions,
+  or audited protocol-specific wrappers. No safe `&mut T` or aliased
+  non-atomic `&T` may be constructed over concurrently writable shared storage.
+- Every writable-sharing protocol names permitted access widths, alignment,
+  atomic orderings, ownership transitions, and recovery behavior. Non-atomic
+  structured payloads require exclusive ownership transfer before access.
 - The page-table mapper must distinguish intentional shared-buffer aliasing
   from accidental duplicate physical-frame ownership.
 
@@ -926,6 +933,25 @@ Production root minting should require a registry-issued mint ticket or a
 clearly marked bootstrap-only audited path. Normal code must not be able to
 construct authority by supplying arbitrary object ID, generation, and revocation
 epoch values.
+
+Move-only grants use escrow semantics:
+
+```text
+sender active
+-> sender frozen, receiver pending
+-> receiver active, sender invalid
+```
+
+On abort:
+
+```text
+sender frozen, receiver pending
+-> sender active, receiver empty
+```
+
+The invariant is `committed active copies <= 1`. Coordinator or receiver failure
+must recover without creating two active owners or permanently losing an
+irreplaceable resource.
 
 Derivation invariant:
 

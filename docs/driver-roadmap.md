@@ -199,7 +199,8 @@ driver publishes a new declarative generation:
    capabilities.
 
 Removing a driver publishes a new generation without that driver, drains active
-devices, revokes IRQ/MMIO/DMA caps, and rolls back if quiesce fails.
+devices, revokes IRQ/MMIO/DMA caps, fences interrupts and DMA, and rolls back
+if quiesce fails.
 
 ## Driver Manifest
 
@@ -288,6 +289,12 @@ AMD GPU                         amd-gpu                   vendor/official
 - Driver crashes must be contained to the driver service where possible.
 - Revocation must drain queues, stop DMA, disable IRQs, and revoke MMIO/DMA
   windows before unload.
+- Production DMA revocation also disables PCI bus mastering, performs
+  device-specific or function-level reset where available, unmaps IOMMU entries
+  and waits for completed IOTLB invalidation, invalidates or prohibits ATS,
+  PASID, and PRI, fences interrupt-remapping/MSI/MSI-X delivery, and assigns
+  new device plus interrupt incarnations before restart. Devices that cannot be
+  reliably quiesced, reset, or fenced fail closed instead of being rebound.
 
 ## Development Model
 

@@ -110,6 +110,12 @@ production SPSC link needs:
   slot.
 - Enqueue, dequeue completion, cancellation, acknowledgement, and slot reuse
   each need a named linearization point.
+- Hostile userspace queue producers are different from trusted kernel fabric
+  producers. Published userspace slots are untrusted bytes: the kernel copies a
+  complete request into owned storage, checks slot generation/publication state
+  before and after the copy, validates only the owned snapshot, stamps source
+  identity and traffic class itself, and never rereads authority-bearing fields
+  from the shared slot after validation.
 - Slot generation/sequence numbers for wraparound and reuse.
 - Scrub-on-vacate before authority-bearing payload storage can be observed by a
   different trust domain.
@@ -177,6 +183,12 @@ Strong revocation requires more than an epoch bump. It needs freeze/ack/commit
 or equivalent agreement, mapping teardown, local and remote TLB invalidation
 acknowledgements, DMA quiesce/cancel/drain, in-flight IPC cancellation or
 replay rules, and timeout handling for failed peers.
+
+Selective revocation needs lineage semantics. A strong-revoke transaction names
+whether it revokes one entry, a delegation subtree, a revocation domain, or the
+whole object. Capability derivation carries lineage identity; descendants may
+create independent revocation domains only under explicit policy, and lineage
+metadata must be reclaimable without unbounded in-kernel graphs.
 
 Normal audit-buffer exhaustion must not preserve stale authority. Authority
 creation, grant, executable mapping, DMA mapping, and policy expansion can fail
@@ -247,6 +259,18 @@ not by request payloads. A message may contain claimed peer, core, service,
 object, or endpoint IDs for logging and routing, but enforcement must use
 kernel-stamped execution context and registry-issued incarnations. This avoids
 turning public constructors for ID-shaped values into security boundaries.
+
+Endpoint RPC needs one-shot reply capabilities. A reply cap is minted by the
+kernel, bound to caller, callee endpoint, transaction, boot/domain incarnation,
+and timeout/cancellation state, and can complete exactly once. Servers cannot
+redirect it to an unrelated caller or delegate it unless an endpoint type
+explicitly permits that behavior.
+
+Cross-core deadlines are local decisions unless Aesynx has a synchronized clock
+with a documented skew bound. Fabric messages should carry relative TTLs;
+receivers stamp local deadlines on authenticated receipt, coordinators decide
+timeouts using their local monotonic clock, and epoch/incarnation changes
+invalidate old deadlines.
 
 Object identity is especially sensitive. A visible object name, package object
 ID, or content hash is not enough to authorize access. Capability targets need a
@@ -344,6 +368,13 @@ Zero-copy sharing is useful, but it must stay explicit:
 - Read-only sealed buffers are preferred for large assets.
 - Writable sharing requires `SHARE_WRITE`, a named synchronization protocol,
   audit, revocation, and TLB shootdown.
+- Writable cross-domain memory is represented only through atomic fields,
+  volatile byte regions, or audited protocol wrappers. Safe `&mut T` and
+  aliased non-atomic `&T` are not constructed over concurrently writable shared
+  storage.
+- Every writable-sharing protocol names permitted access widths, alignment,
+  atomic orderings, ownership transitions, and recovery behavior. Non-atomic
+  structured payloads require exclusive ownership transfer before access.
 - The mapper distinguishes declared shared-buffer aliasing from accidental
   physical double ownership.
 - Kernel-owned shared mapping infrastructure may be proven first using real
