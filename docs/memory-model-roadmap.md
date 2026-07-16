@@ -88,6 +88,23 @@ Separate capabilities should exist for:
 No service should gain executable, DMA, persistent, or cross-service sharing
 rights by accident.
 
+Production mapping is one reference-monitor operation. A caller should not
+separately authorize a `MemoryMapRequest`, extract raw addresses, and then call
+the mapper with ordinary physical/virtual addresses by convention. The live map
+path must consume a checked proof that composes:
+
+- memory-object authority over backing object offset and length;
+- address-space authority over the destination virtual range;
+- requested access rights and cache/device/confidential attributes;
+- executable/JIT policy authority where applicable;
+- current object generation and revocation epoch;
+- address-space incarnation and ASID/PCID context.
+
+Permission reduction and unmap also create TLB obligations. A live mapper must
+not report success to callers until required local and remote invalidation
+acknowledgements have completed or the operation has failed closed into a
+documented quarantine/degraded state.
+
 Low-level raw frame allocation is different from authority to use memory. The
 Barrelfish experience is a warning here: making every physical-memory operation
 a fine-grained, globally coordinated capability protocol adds complexity and

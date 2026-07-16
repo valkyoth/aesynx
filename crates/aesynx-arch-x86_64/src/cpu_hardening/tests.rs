@@ -124,6 +124,32 @@ fn capability_detection_keeps_intel_and_amd_ibrs_ibpb_paths_distinct() {
 }
 
 #[test]
+fn capability_detection_uses_amd_extended_ibrs_bit_14() {
+    let amd_ibrs_bit_14 = CpuidSnapshot::from_regs(0, 1 << 14, 0, 0);
+    let amd_unrelated_bit_9 = CpuidSnapshot::from_regs(0, 1 << 9, 0, 0);
+
+    let supported = capabilities_from_cpuid(
+        true,
+        false,
+        false,
+        false,
+        CpuidSnapshot::ZERO,
+        amd_ibrs_bit_14,
+    );
+    let unsupported = capabilities_from_cpuid(
+        true,
+        false,
+        false,
+        false,
+        CpuidSnapshot::ZERO,
+        amd_unrelated_bit_9,
+    );
+
+    assert!(supported.ibrs);
+    assert!(!unsupported.ibrs);
+}
+
+#[test]
 fn strict_hardening_policy_rejects_missing_optional_bits() {
     let no_smep = CpuHardeningCapabilities {
         nx: true,

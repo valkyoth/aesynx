@@ -2363,6 +2363,126 @@ Exit criteria:
 - Aesynx has a documented path to a small per-core kernel plus isolated
   monitor/services before distributed policy becomes live.
 
+### v0.37.8 - Cache-Aware Atomic Fabric Queues
+
+Goal:
+
+Replace model-only core-to-core queue evidence with the hardware-ordering shape
+required for live multicore endpoints.
+
+Rationale:
+
+The v0.36/v0.37 IPC smokes prove route validation, sequencing, and fail-closed
+backpressure, but the queue implementation remains sequential model code with
+plain indices. Live AP execution needs queues whose memory layout, ownership,
+cache behavior, and atomic publication protocol are correct on weakly ordered
+architectures as well as x86_64.
+
+Deliverables:
+
+- Hardware SPSC queue design that removes shared mutable `len` from producer
+  and consumer hot paths.
+- Monotonic producer and consumer cursors, each written by exactly one endpoint.
+- Cached remote-cursor observations that are explicitly advisory and refreshed
+  through acquire loads.
+- Producer and consumer metadata separated onto distinct cache lines, with an
+  option to place endpoint metadata on separate pages when permissions differ.
+- Slot publication protocol:
+  - producer writes payload;
+  - producer scrubs or initializes authority-bearing padding;
+  - producer performs a release store of slot sequence or tail;
+  - consumer performs an acquire load before reading payload.
+- Slot reuse protocol with generation or sequence numbers so wraparound cannot
+  expose stale payloads.
+- Mandatory zero/scrub-on-vacate policy before a slot can be observed by a
+  different trust domain.
+- Doorbell bitmap or equivalent pending-link summary so each core does not have
+  to poll every inbound link at high core counts.
+- IPI coalescing and batch receive/send policy.
+- Queue placement policy for NUMA-local allocation and traffic-class
+  separation.
+- Separate traffic classes for authority-critical revoke/topology messages,
+  best-effort telemetry, and ordinary service requests. Revocation and topology
+  control must not sit behind best-effort telemetry in the same FIFO.
+- Per-principal/service credits, deadlines, retry budgets, cancellation, and
+  dead-letter records for noisy or stalled peers.
+- Explicit memory-ordering tests and model checks for x86_64, aarch64, and
+  RISC-V assumptions. Release/acquire evidence must correspond to actual atomic
+  stores/loads, not metadata fields.
+
+Verification:
+
+- Host model tests prove full, empty, wraparound, stale-slot, and retry cases
+  fail closed without payload reuse.
+- Loom/Kani-style or equivalent bounded model tests prove the SPSC publication
+  protocol does not permit payload reads before release publication.
+- Cache-line layout tests prove producer and consumer hot metadata do not share
+  a cache line.
+- QEMU smoke reports direct-link evidence only after the atomic queue path is
+  used by the kernel smoke.
+
+Exit criteria:
+
+- Aesynx has a queue implementation shape that can be wired to live APs without
+  pretending model `Ordering` evidence is a hardware happens-before relation.
+
+### v0.37.9 - Strong Revocation And Mapping Invalidation Semantics
+
+Goal:
+
+Define and model the difference between prospective revocation and strong
+revocation before mappings, DMA, or in-flight endpoint operations can carry
+real authority across domains.
+
+Rationale:
+
+Incrementing a revocation epoch is enough for later live checks to fail, but it
+does not automatically remove receiver table entries, tear down mappings, flush
+remote TLBs, cancel DMA, cancel in-flight IPC, or prove every core has observed
+the new epoch. Aesynx needs an explicit revoke contract before shared memory,
+driver DMA, or cross-core delegation becomes live.
+
+Deliverables:
+
+- Two documented revoke classes:
+  - Prospective revoke: no operation beginning after the revoke linearization
+    point may succeed.
+  - Strong revoke: when revoke returns, no stale operation, mapping, DMA
+    request, delegated entry, or in-flight endpoint operation can still commit.
+- Revocation messages carry object incarnation, previous epoch, new epoch,
+  transaction ID, reason code, coordinator proof, and affected authority class.
+- Distributed prepare/freeze/ack/commit/abort model for strong revocation.
+- Mapping teardown protocol that unmaps every affected address space before
+  strong revoke commit.
+- Mandatory local and remote TLB invalidation acknowledgements before a
+  permission reduction or unmap is reported complete.
+- DMA quiesce/cancel/drain requirement before strong revocation of device-visible
+  memory.
+- In-flight IPC cancellation or replay policy for operations authorized before
+  the revoke linearization point.
+- Failure handling for dead cores or domains: timeout leads to quarantine,
+  degraded fail-closed state, or system halt depending on authority class.
+- Audit records linking proposal, freeze, acknowledgement, TLB/DMA cleanup,
+  commit, abort, and timeout.
+- Redacted diagnostics that expose counts, classes, and reason codes without
+  raw object IDs, physical frames, or table slots.
+
+Verification:
+
+- Host model tests prove prospective revoke rejects every operation starting
+  after the linearization point.
+- Host model tests prove strong revoke cannot complete until modeled mappings,
+  TLB acknowledgements, DMA ownership, and pending grants are resolved.
+- Timeout tests prove dead participants cannot let stale authority remain
+  silently usable.
+- Mapper tests prove permission reduction/unmap cannot be acknowledged until
+  the required flush obligation is consumed.
+
+Exit criteria:
+
+- Revocation semantics are precise enough for live shared memory, driver DMA,
+  and cross-core capability transfer to build on them.
+
 ## Phase 10: Driver Foundation
 
 ### v0.38.0 - Device Model
@@ -2701,6 +2821,58 @@ Exit criteria:
 
 - The kernel has one reviewed path for user memory access before userspace can
   pass pointers into kernel services.
+
+### v0.44.5 - Domain Transition And Speculation Hardening
+
+Goal:
+
+Define and smoke-test the CPU and address-space hardening required before ring
+3, mutually distrusting domains, or context switches can be treated as a real
+security boundary.
+
+Deliverables:
+
+- Correct x86_64 CPUID feature detection for Intel and AMD speculative controls,
+  including AMD extended-leaf IBRS bit 14, IBPB bit 12, STIBP bit 15, and SSBD
+  bit 24.
+- `IA32_ARCH_CAPABILITIES` field decoding plan for eIBRS/IBRS_ALL, RDCL_NO,
+  MDS_NO, TAA_NO, RSBA, and newer vendor-documented controls where available.
+- Context-transition mitigation policy for switching between mutually
+  distrusting domains:
+  - when IBPB is required;
+  - when STIBP is redundant or required;
+  - when RSB stuffing or BHB/BHI mitigation is required;
+  - when VERW-based MDS/RFDS buffer clearing is required;
+  - when L1D flush policy is required.
+- Explicit SMT-domain policy for high-assurance workloads.
+- KPTI or dual-root page-table plan for processors affected by rogue data-cache
+  load, with a documented QEMU/general-mode fallback.
+- L1TF hygiene policy: non-present PTEs are all-zero unless a reviewed
+  exception exists, and physical page zero must never contain secrets.
+- Hardened syscall/sysret or interrupt-return entry/exit plan with per-core
+  TSS/RSP0, swapgs fencing if used, contained user faults, and no reliance on
+  compiler-generated prologues for critical transition assembly.
+- Full architectural state-switch plan including SIMD/FPU ownership before
+  SSE/AVX is enabled in kernel or user contexts.
+- Trampoline or boot-order policy that enables compatible NX/WP/SMEP/SMAP/UMIP
+  protections before untrusted code or APs can execute with the final CR3.
+- Redacted serial markers for supported, requested, applied, and deferred
+  hardening controls.
+
+Verification:
+
+- Host tests cover Intel/AMD CPUID matrices, including the AMD IBRS bit-14
+  regression and unrelated-bit rejection.
+- Host tests cover `ARCH_CAPABILITIES` decode cases and strict/general policy
+  selection.
+- QEMU smoke reports boolean hardening evidence without raw MSR values.
+- Documentation states which mitigations are active, which are planned, and
+  which are not relevant on the current QEMU CPU model.
+
+Exit criteria:
+
+- The ring-3 path has an explicit security-transition hardening plan and tests
+  before user address spaces become a hostile input boundary.
 
 ## Phase 11: Native Userspace
 
@@ -3267,6 +3439,60 @@ Verification:
 Exit criteria:
 
 - AI assistance exists as a constrained shell helper, not an authority source.
+
+### v0.61.2 - Metered Asynchronous AI Policy Service
+
+Goal:
+
+Ensure AI advice can never block scheduler progress, bypass deterministic
+validation, or become a hidden reference monitor.
+
+Deliverables:
+
+- AI/model execution runs outside ring 0 in a capability-confined policy
+  service, not in the scheduler hot path.
+- Model evaluation has explicit fuel, deadline, memory, and output-size limits.
+- Manifest step and memory ceilings are consumed by the evaluator, not only
+  stored as metadata.
+- Kernel scheduling path never waits synchronously for model output. Advice is
+  accepted only if already available and still fresh.
+- Advice records carry topology epoch, task incarnation, model version, expiry,
+  and confidence bounded by the validated manifest.
+- Kernel-side validator is total and bounded:
+  - computes the finite admissible action set for the current scheduler state;
+  - rejects stale topology/task epochs;
+  - rejects invalid cores, ownership violations, affinity violations, and
+    migration-budget violations;
+  - executes deterministic fallback when advice is missing, stale, invalid, or
+    over budget.
+- Formal scheduler invariant statement: every admissible action preserves task
+  ownership, queue membership, budget accounting, and security-domain placement
+  constraints.
+- Task time budgets are decremented or explicitly documented as advisory until
+  preemption lands.
+- Telemetry buffer-full behavior cannot stop scheduling. Noncritical telemetry
+  drops or overwrites records with a loss counter; security audit events use a
+  separate reserved channel with an explicit fail-open/fail-closed policy.
+- OS-world trace emission targets zero allocation, zero locking, and zero copy
+  on the normal event path: per-core single-writer binary rings, read-only
+  collector mappings, sequence gaps, redaction at export, and user-space hash
+  chaining or Merkle aggregation for persistent tamper evidence.
+
+Verification:
+
+- Host tests prove invalid, stale, over-budget, or unavailable advice falls
+  back without blocking dispatch.
+- Host tests prove a full noncritical telemetry buffer increments loss and does
+  not prevent task dispatch.
+- Host tests prove advice cannot select an invalid core or migrate a task
+  outside allowed affinity/security-domain policy.
+- QEMU smoke proves the scheduler continues with AI disabled, model timeout,
+  and telemetry loss counters.
+
+Exit criteria:
+
+- AI is a bounded proposal source, and deterministic scheduler safety does not
+  depend on model liveness or correctness.
 
 ## Phase 15: Integration And 1.0 Hardening
 

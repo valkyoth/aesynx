@@ -94,6 +94,22 @@ The fabric protocol is the internal network of Aesynx. It needs:
 No Rust-specific memory layout should cross the fabric boundary unless the
 sender and receiver are proven to use the same ABI and trust domain.
 
+Live core-to-core queues are not the same as the current sequential model. A
+production SPSC link needs:
+
+- No shared hot-path `len` field written by both producer and consumer.
+- Monotonic cursors where each cursor has exactly one writer.
+- Cached remote cursor observations refreshed through acquire loads.
+- Producer and consumer metadata on separate cache lines, or separate pages
+  when endpoint permissions differ.
+- Payload write followed by release publication, and acquire observation before
+  payload read.
+- Slot generation/sequence numbers for wraparound and reuse.
+- Scrub-on-vacate before authority-bearing payload storage can be observed by a
+  different trust domain.
+- Doorbell bitmaps, IPI coalescing, batching, and traffic-class separation so a
+  noisy telemetry path cannot delay revocation or topology-control messages.
+
 ## Replicated Authority State
 
 A true multikernel cannot rely on one global lock for authority state.
@@ -118,6 +134,18 @@ The coordinator should usually be a monitor/service domain, not arbitrary kernel
 code on every core. The local kernel validates and applies the final local
 mechanism only after the authority protocol has produced a bounded, auditable
 decision.
+
+Revocation has two classes:
+
+- Prospective revocation: no operation beginning after the linearization point
+  may succeed.
+- Strong revocation: when revoke returns, no stale operation, mapping, DMA
+  request, delegated entry, or in-flight endpoint operation may still commit.
+
+Strong revocation requires more than an epoch bump. It needs freeze/ack/commit
+or equivalent agreement, mapping teardown, local and remote TLB invalidation
+acknowledgements, DMA quiesce/cancel/drain, in-flight IPC cancellation or
+replay rules, and timeout handling for failed peers.
 
 ## Topology And Routing
 

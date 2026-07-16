@@ -2,7 +2,7 @@ use super::CpuHardeningCapabilities;
 
 pub(super) const CPUID_LEAF_7_EDX_IBRS_IBPB: u32 = 1 << 26;
 pub(super) const CPUID_LEAF_7_EDX_ARCH_CAPABILITIES: u32 = 1 << 29;
-pub(super) const CPUID_AMD_EXTENDED_EBX_IBRS: u32 = 1 << 9;
+pub(super) const CPUID_AMD_EXTENDED_EBX_IBRS: u32 = 1 << 14;
 pub(super) const CPUID_AMD_EXTENDED_EBX_IBPB: u32 = 1 << 12;
 pub(super) const CPUID_AMD_EXTENDED_EBX_STIBP: u32 = 1 << 15;
 pub(super) const CPUID_AMD_EXTENDED_EBX_SSBD: u32 = 1 << 24;
