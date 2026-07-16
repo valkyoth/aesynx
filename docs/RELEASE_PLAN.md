@@ -2110,8 +2110,16 @@ Deliverables:
   typed-right representation. Invalid examples such as `Endpoint|EXECUTE`,
   `Memory|RECV`, and `Clock|MAP` fail closed before an operation can ignore
   nonsense permissions.
+- `ADMIN` is removed from generic enforcement paths or constrained so it never
+  implies another right. Every administrative operation has an exact typed
+  operation identifier, `ADMIN` is not an override for failed `READ`, `WRITE`,
+  `MAP`, `GRANT`, `REVOKE`, or similar checks, delegation is prohibited by
+  default, and every use is audited.
 - Versioned typed-right wire representation. Decoding rejects rights that are
   unknown, mandatory-but-unsupported, or not valid for the encoded object kind.
+- External `CapId` kind tags are non-authoritative routing hints. The registry
+  slot's live kind, incarnation, and typed-right representation control decode
+  and operation dispatch; a payload tag can never authorize an unsafe downcast.
 - Capability-table, domain, endpoint, peer, and boot/session incarnations are
   part of every authority interpretation context. A table-local `CapId` is not
   meaningful after its table or domain is destroyed and recreated.
@@ -2174,11 +2182,21 @@ delegated_kind_rights   <= requested_kind_rights
   authority-moving operations. Each record stores transaction ID, participant
   incarnations, source and destination capability identities, frozen source
   generation, prepared/committed/aborted state, witness acknowledgements,
-  commit certificate or decision epoch, recovery owner, and timeout owner.
+  commit certificate or decision epoch, recovery owner, timeout owner, journal
+  generation, torn-record integrity evidence, bounded replay window, and
+  terminal-record reclamation state.
+- One-writer journal ownership; the journal must not become a globally mutated
+  shared structure. Every transaction class states whether records survive
+  coordinator-domain restart, core reset, or machine reboot, and which
+  replication or witness acknowledgements are required before receiver
+  authority becomes active.
 - Coordinator restart recovers from the transaction journal. If no
-  authoritative coordinator record survives, the safe result is quarantine or
-  abort; recovery never reconstructs commit from sender-controlled or
-  receiver-controlled claims alone.
+  authoritative coordinator record or trusted commit witness survives, the
+  availability guarantee no longer applies. If commit might have been observed
+  but evidence is lost, the safe result is quarantine or explicit resource
+  loss; recovery never reconstructs commit from sender-controlled or
+  receiver-controlled claims and never blindly aborts by restoring sender
+  authority.
 - TLA+ or Quint transactional-grant model before implementation is considered
   complete. The model proves no usable receiver capability before commit, abort
   restores the original state, duplicate proposal/accept/commit/abort is
@@ -2208,7 +2226,8 @@ delegated_kind_rights   <= requested_kind_rights
   server incarnation so a restarted server cannot consume stale reply authority.
 - Bounded outstanding calls per principal and endpoint.
 - Per-principal quotas for kernel objects, page-table pages, pinned frames,
-  lineage nodes, pending calls, and emergency audit capacity.
+  lineage nodes, pending calls, and ordinary audit-rate usage. Emergency audit
+  capacity remains system-reserved and non-delegable.
 - Mapping-authority split between memory-object capability, destination
   address-space capability, and optional executable/JIT policy authority.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
@@ -2241,8 +2260,14 @@ Verification:
   subsets of the sender's live authority.
 - Host tests prove receiver-supplied grant records cannot widen delegated
   rights.
+- Host tests prove `ADMIN` never satisfies an unrelated typed-right check and
+  external `CapId` kind tags cannot override the registry slot's live kind.
 - Host/model tests prove coordinator restart uses only transaction-journal
   evidence and cannot commit from participant-controlled claims.
+- Host/model tests cover transaction-journal torn records, capacity
+  exhaustion, record reuse before replay-window retirement, coordinator
+  evidence loss after prepare, and coordinator evidence loss after possible
+  commit.
 - Host tests prove old table/domain incarnations cannot interpret a recycled
   `CapId`.
 - Host tests prove replayed grant/revoke/map messages outside the accepted
@@ -2755,13 +2780,29 @@ Deliverables:
   - the object's owner core owns lifecycle transitions and pin accounting;
   - new pins are acquired only while authority is `Live`;
   - pin acquisition is atomic relative to entering `Revoking`;
-  - normal flow is pin, publish reference, revalidate epoch/state, otherwise
-    roll back;
+  - usable reference implies owner-recorded live pin;
+  - the owner atomically validates `Live` plus epoch and installs a `PinLease`
+    before any reference becomes usable, or publishes only a
+    `PendingReference` that cannot be consumed until a final owner-authorized
+    commit converts it into an active reference;
+  - publishing a usable reference before revalidation is prohibited because
+    rollback cannot undo another core consuming that reference;
   - entering `Revoking` prevents every new mapping, DMA binding, lease, and
     cross-core reference;
   - counters use checked non-wrapping arithmetic;
   - remote pins are explicit owner-recorded references, not globally modified
     shared refcounts.
+- Legal memory-state table for the independent axes:
+  - `Authority::Live` cannot coexist with `Residency::Dead`;
+  - new mappings require `Authority::Live`;
+  - `Residency::Reclaimable` requires zero pins and no pending invalidation
+    records;
+  - `Residency::Dead` is terminal except through a newly minted object
+    incarnation;
+  - sealing is monotonic unless a separately authorized copy-on-write
+    operation creates a new object;
+  - physical reclamation must not implicitly change authority or mutability
+    state.
 - Backing frames remain pinned while referenced by any installed mapping,
   pending TLB invalidation, DMA/IOMMU mapping, checked operation or in-flight
   lease, shared queue, IPC transaction, page-table edit operation, executable
@@ -2801,6 +2842,9 @@ Verification:
 
 - Host model tests prove prospective revoke rejects every operation starting
   after the linearization point.
+- Host model tests prove stale local epoch-cache authorization fails during
+  prospective revoke unless backed by a current owner-issued lease or an
+  installed revocation fence.
 - Host model tests prove strong revoke cannot complete until modeled mappings,
   TLB acknowledgements, DMA ownership, and pending grants are resolved.
 - Host model tests prove revoke-one, revoke-subtree, revoke-domain, and
@@ -2812,9 +2856,15 @@ Verification:
 - Host model tests prove frames cannot enter `Reclaimable` while any mapping,
   TLB obligation, DMA mapping, lease, queue, transaction, page-table edit,
   executable transition, snapshot, or persistent reference is still live.
-- Host model tests prove pin acquisition races with `Revoking` fail closed,
-  rollback releases partial pins, checked counters never wrap, and remote pins
-  are visible to the owner-core lifecycle record.
+- Host model tests prove usable reference publication is impossible without an
+  owner-recorded live pin, pending references cannot be consumed before commit,
+  pin acquisition races with `Revoking` fail closed, rollback releases partial
+  pins, checked counters never wrap, and remote pins are visible to the
+  owner-core lifecycle record.
+- Host tests prove illegal lifecycle cross-products are rejected, including
+  `Live + Dead`, new mappings while not `Live`, `Reclaimable` with live pins or
+  invalidation records, reuse of `Dead` without a new incarnation, and
+  reclamation that changes authority or mutability state by side effect.
 - Timeout tests prove dead participants cannot let stale authority remain
   silently usable.
 - Coordinator-death tests prove pending strong-revoke transactions recover,
@@ -2860,6 +2910,14 @@ Deliverables:
   - apply page-table changes and shootdowns;
   - wait for every required acknowledgement;
   - only then permit activation again or release affected frames.
+- Non-forgeable address-space activation permit:
+  - contains address-space incarnation, mapping generation, and residency
+    epoch;
+  - context switching consumes or validates the permit;
+  - freezing the address space invalidates outstanding permits before the
+    shootdown target set is captured;
+  - scheduler and mapper code cannot bypass each other by consulting advisory
+    state directly.
 - Initial x86_64 TLB mode before a PCID allocator exists:
   - PCID disabled;
   - PCID/ASID field fixed to zero in acknowledgement metadata;
@@ -2872,7 +2930,9 @@ Deliverables:
     protocol exists;
   - enabling PCID/INVPCID is blocked on a later tagged-TLB milestone with
     allocator, reuse generation, rollover, and invalidation tests.
-- Read-only shared mappings require a sealed or frozen backing object.
+- Read-only shared mappings require `Mutability::SealedReadOnly` and
+  `Authority::Live`. A revocation-frozen object is not accepted as a normal
+  shared immutable object.
 - Writable shared mappings require `SHARE_WRITE`, a declared synchronization
   protocol, traffic-class policy, audit evidence, and strong-revocation support.
 - All aliases of the same memory object obey global W^X. A frame or memory
@@ -2907,6 +2967,9 @@ Verification:
 - QEMU or host tests prove a core cannot newly activate or migrate into an
   address space between shootdown target-set calculation and permission
   reduction/unmap completion.
+- Context-switch tests prove address-space activation requires a valid
+  activation permit and freezing an address space invalidates outstanding
+  permits before the shootdown target set is captured.
 - Host and QEMU tests reject writable/executable aliases across kernel/test
   address spaces.
 - Host tests reject conflicting cache attributes for aliases.
@@ -3410,6 +3473,20 @@ Deliverables:
 - SMAP `stac`/`clac` access-window design for x86_64 when SMAP is enabled.
 - TOCTOU guidance for shared service queues and memory objects.
 - Fault containment path for failed user copies.
+- All-or-nothing hostile user-copy semantics:
+  - destination snapshots are initialized before copying;
+  - a partial fault returns `CopyResult::Incomplete`;
+  - partial bytes are discarded and never parsed;
+  - kernel shadow cursors do not advance;
+  - no authority check, endpoint action, or completion is produced from an
+    incomplete snapshot.
+- Completion copy-out failure keeps a kernel-owned pending completion and
+  either retries or cancels according to endpoint policy. The user slot is not
+  acknowledged or reused until the completion is delivered or explicitly
+  cancelled.
+- Bounded ingress work budget per principal, endpoint, and doorbell so
+  repeated maximum-size copies or deliberate copy faults cannot become an
+  unbounded kernel CPU-denial path.
 - Redacted audit events for rejected user memory access.
 
 Expected serial:
@@ -3422,6 +3499,9 @@ Verification:
 
 - Host tests cover valid copy, invalid pointer, cross-page copy, noncanonical
   pointer, overflow, unmapped page, and permission mismatch cases.
+- Host tests cover partial copy-in faults, incomplete-snapshot discard, failed
+  completion copy-out, no shadow-cursor advance on failure, and bounded ingress
+  budget exhaustion from invalid submissions.
 - QEMU smoke exercises at least one rejected user-memory access without
   corrupting kernel state.
 

@@ -119,12 +119,25 @@ Sealing a shared buffer read-only must not imply revocation, and entering
 revocation must not imply that the object is a reusable immutable artifact.
 
 Pin acquisition is owner-core controlled: new pins are acquired only while
-authority is `Live`, acquisition is atomic relative to entering `Revoking`, and
-the normal pattern is pin, publish reference, revalidate epoch/state, otherwise
-roll back. Entering `Revoking` blocks new mappings, DMA bindings, leases, and
-cross-core references. Counters use checked non-wrapping arithmetic. Remote
+authority is `Live`, and acquisition is atomic relative to entering
+`Revoking`. A usable reference must imply an owner-recorded live pin. The
+normal protocol is owner validates `Live` plus epoch and installs a `PinLease`
+before the reference becomes usable, or publishes only a `PendingReference`
+that cannot be consumed until a final owner-authorized commit converts it into
+an active reference. A design that publishes a usable reference and then
+revalidates is not acceptable because another core could consume the reference
+before rollback. Entering `Revoking` blocks new mappings, DMA bindings, leases,
+and cross-core references. Counters use checked non-wrapping arithmetic. Remote
 pins are explicit owner-recorded references, not globally modified shared
 refcounts.
+
+Not every combination of memory lifecycle axes is valid. `Authority::Live`
+cannot coexist with `Residency::Dead`; new mappings require `Live`;
+`Reclaimable` requires zero pins and no pending invalidation records; `Dead` is
+terminal except through a newly minted object incarnation; sealing is
+monotonic unless an explicitly authorized copy-on-write operation creates a new
+object; and physical reclamation must not implicitly change authority or
+mutability state.
 
 A backing frame remains pinned while referenced by any installed mapping,
 pending TLB invalidation, DMA/IOMMU mapping, checked operation or in-flight

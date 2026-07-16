@@ -195,6 +195,15 @@ Revocation has two classes:
 - Strong revocation: when revoke returns, no stale operation, mapping, DMA
   request, delegated entry, or in-flight endpoint operation may still commit.
 
+The prospective-revoke linearization point is distributed. It is reached only
+after every core capable of local authorization has installed a deny/freeze
+fence for the new epoch, or that core has been fenced, quarantined, or reset.
+Every cached authorization proof must either be invalidated or represented by a
+registry-visible lease that revocation can drain, and new proof issuance is
+blocked during the transition. Local epoch caches are advisory; they do not
+establish liveness unless backed by a still-valid owner-issued lease or a
+locally installed revocation fence.
+
 Strong revocation requires more than an epoch bump. It needs freeze/ack/commit
 or equivalent agreement, mapping teardown, local and remote TLB invalidation
 acknowledgements, DMA quiesce/cancel/drain, in-flight IPC cancellation or
@@ -298,9 +307,18 @@ Authority-moving protocols use a bounded preallocated transaction journal. The
 journal records transaction ID, participant incarnations, source/destination
 capability identities, frozen source generation, prepared/committed/aborted
 state, witness acknowledgements, commit certificate or decision epoch, recovery
-owner, and timeout owner. Coordinator restart recovers from that journal; if no
-authoritative coordinator record survives, the safe result is quarantine or
-abort, never reconstruction from participant-controlled claims alone.
+owner, timeout owner, journal generation, torn-record integrity evidence, and
+bounded replay window. Journal ownership is one-writer; it must not become a
+globally mutated shared structure. Each protocol must specify whether records
+survive coordinator-domain restart, core reset, or machine reboot, and which
+replication or witness acknowledgements are required before receiver authority
+becomes active. Terminal records are reclaimed only after every participant has
+acknowledged the outcome and the replay window has retired. Coordinator
+restart recovers from the journal; if no authoritative coordinator record or
+trusted commit witness survives, availability is not guaranteed. If commit
+might have been observed but evidence is lost, the safe result is quarantine or
+explicit resource loss, never reconstruction from participant-controlled
+claims or blind abort that restores sender authority.
 
 Object identity is especially sensitive. A visible object name, package object
 ID, or content hash is not enough to authorize access. Capability targets need a

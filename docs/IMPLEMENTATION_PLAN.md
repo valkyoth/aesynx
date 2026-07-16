@@ -971,8 +971,11 @@ The escrow coordinator owns the frozen state and commit record; sender or
 receiver survival alone is not enough to recover the move. The commit
 linearization point is the coordinator's durable or epoch-stamped commit
 decision. The invariant is `committed active copies <= 1`. Coordinator or
-receiver failure must recover without creating two active owners or permanently
-losing an irreplaceable resource.
+receiver failure must recover without creating two active owners. Availability
+is conditional on at least one trusted commit witness surviving; if a commit
+might have been observed but all authoritative decision evidence is lost, the
+safety-preserving result is quarantine or explicit resource loss, not blindly
+aborting and restoring sender authority.
 
 Derivation invariant:
 
@@ -1021,7 +1024,15 @@ delegated_rights <= requested_rights & live_sender_rights & delegable_rights
 ```
 
 Powerful rights such as `ADMIN`, `REVOKE`, `GRANT`, executable/JIT,
-writable-sharing, and DMA rights never propagate implicitly.
+writable-sharing, and DMA rights never propagate implicitly. `ADMIN` is not an
+override bit: every administrative operation has an exact operation identifier,
+`ADMIN` never satisfies a failed `READ`, `WRITE`, `MAP`, `GRANT`, or similar
+typed-right check, delegation is prohibited unless the object kind explicitly
+allows it, and every use is audited.
+
+External `CapId` kind tags are routing hints only. The registry slot's live
+object kind and incarnation control decoding and dispatch; a payload tag can
+never authorize an unsafe downcast.
 
 ### 8.4 Revocation
 
