@@ -2054,7 +2054,90 @@ Exit criteria:
 
 - IPC and capabilities are integrated.
 
-### v0.37.1 - Capability-Based Shared Memory Windows
+### v0.37.1 - Authority Identity And Endpoint Hardening
+
+Goal:
+
+Close the remaining model-level authority gaps before Aesynx builds richer
+shared-memory, endpoint, and replicated-fabric behavior on top of capability
+IPC.
+
+Rationale:
+
+The v0.37.0 grant/revoke-over-IPC path proves useful integration, but future
+hostile-boundary work needs stronger identities than caller-selected object
+IDs and caller-supplied core IDs. This milestone makes authority identity,
+principal identity, endpoint rights, and live checks explicit before they
+become user or multicore enforcement APIs.
+
+Deliverables:
+
+- Registry-minted authority handles for kernel objects. Untrusted callers must
+  not be able to choose an authority-bearing object identity directly.
+- Stable logical object incarnation tracking that cannot resurrect stale
+  capabilities if an object ID is deleted and later recreated in a different
+  registry slot.
+- Separate user-visible/content object names from authority-bearing kernel
+  handles.
+- Multi-slot stale-capability resurrection regression tests covering delete,
+  slot reuse, object-ID recreation, generation wrap/retirement, and lookup
+  through live object resolution.
+- Non-forgeable execution context or owner-token model for enforcement paths.
+  Requests may carry claimed core/domain IDs for diagnostics, but
+  authorization must use kernel-stamped current execution identity.
+- Capability tables bound to an owning domain/principal incarnation, with quota
+  and revocation-domain metadata.
+- Root minting restricted to registry-issued mint tickets or bootstrap-only
+  audited paths; normal code must not supply arbitrary object ID, generation,
+  and epoch tuples as authority.
+- Enforcement APIs that return short-lived checked proof types, such as a live
+  capability lease, endpoint send permit, or address-space map permit, instead
+  of letting callers combine `check()` plus optional registry validation by
+  convention.
+- Rename or restrict table-only permission checks so they cannot be mistaken
+  for complete live authority validation.
+- Endpoint objects with typed `SEND`, `RECV`, call/reply, and notification
+  rights; queue objects remain transport mechanisms, not the authority
+  boundary.
+- Kernel-stamped endpoint metadata: source principal/domain incarnation,
+  protocol ID/version, sequence number, transaction ID, and bounded payload
+  schema.
+- Transactional capability grant protocol shape:
+  - reserve pending receiver slot;
+  - send grant proposal with transaction ID;
+  - receiver accepts or rejects;
+  - commit makes authority usable;
+  - abort/timeout expires pending authority;
+  - retries are idempotent.
+- Mapping-authority split between memory-object capability, destination
+  address-space capability, and optional executable/JIT policy authority.
+- Wire-format v1 notes for all authority-bearing IDs: fixed widths,
+  endianness, versioning, domain incarnation fields, and no Rust enum layout
+  crossing fabric or userspace boundaries.
+- Security-control update that marks the current caller-ID/object-ID model as
+  scaffolding until the new authority identity rules are implemented.
+
+Verification:
+
+- Host tests prove stale capabilities cannot become live again after object
+  deletion, slot reuse, and same visible object-name recreation.
+- Host tests prove enforcement paths cannot be authorized by passing a forged
+  `CoreId`, `PrincipalId`, `ObjectId`, or table owner value.
+- Host tests prove table-only checks are unavailable or clearly non-enforcing
+  outside internal/preflight contexts.
+- Host tests prove failed grant proposals leave receiver tables unchanged and
+  pending slots expired or reclaimable.
+- Host tests prove endpoint send/receive checks require endpoint rights and
+  kernel-stamped source metadata.
+- Host tests prove map requests require both memory-object and address-space
+  authority.
+
+Exit criteria:
+
+- Capability IPC has a hardened identity and endpoint foundation suitable for
+  the later shared-memory and multikernel fabric milestones.
+
+### v0.37.2 - Capability-Based Shared Memory Windows
 
 Goal:
 
@@ -2114,7 +2197,7 @@ Exit criteria:
 - Zero-copy shared assets are possible through explicit capabilities, while
   accidental physical aliasing still fails closed.
 
-### v0.37.2 - Fabric Protocol And Heterogeneous Peer Metadata
+### v0.37.3 - Fabric Protocol And Heterogeneous Peer Metadata
 
 Goal:
 
@@ -2150,7 +2233,7 @@ Exit criteria:
 - Aesynx has one documented internal fabric ABI before adding more cross-core
   protocols.
 
-### v0.37.3 - Replicated Authority State Protocol
+### v0.37.4 - Replicated Authority State Protocol
 
 Goal:
 
@@ -2181,7 +2264,7 @@ Exit criteria:
 - Cross-core revocation and system policy updates have a machine-local
   agreement protocol.
 
-### v0.37.4 - Topology-Aware Fabric Routing
+### v0.37.5 - Topology-Aware Fabric Routing
 
 Goal:
 
@@ -2210,7 +2293,7 @@ Exit criteria:
 - Aesynx can route fabric messages through policy rather than hardcoded
   core-to-core assumptions.
 
-### v0.37.5 - Component Fault Containment
+### v0.37.6 - Component Fault Containment
 
 Goal:
 
@@ -2241,7 +2324,7 @@ Exit criteria:
 - The roadmap has an explicit path from isolated drivers to restartable service
   domains.
 
-### v0.37.6 - Monitor Boundary And Minimal Ring-0 TCB
+### v0.37.7 - Monitor Boundary And Minimal Ring-0 TCB
 
 Goal:
 
@@ -3494,9 +3577,37 @@ commands:
 
 - QEMU `virt` boot.
 - PL011 serial.
+- EL1 kernel entry with EL0 reserved for future userspace.
+- Typed MAIR/TCR/SCTLR setup plan.
+- TTBR1_EL1 kernel mapping policy and TTBR0_EL1 user address-space plan.
+- ASID allocation and rollover policy.
 - GICv3.
 - Generic timer.
+- PSCI secondary-core startup plan.
 - Basic memory map.
+- PXN, UXN, WXN, PAN, BTI, PAC, and MTE support policy with hardware feature
+  gates and deterministic fallbacks.
+- Device versus normal memory attributes validated before MMIO or DMA access.
+- SMMUv3 DMA isolation roadmap for driver domains.
+- Barrier policy for mapping publication, queue publication, MMIO, and TLB
+  invalidation.
+
+### v1.3.1 - RISC-V 64 QEMU Preview
+
+- QEMU `virt` boot.
+- Minimal firmware/SBI handoff strategy, with a clear split between any M-mode
+  shim and the S-mode Aesynx kernel.
+- UART console for QEMU.
+- Sv39 address-space model.
+- Timer and IPI path through SBI or a reviewed local interrupt-controller path.
+- PLIC/AIA interrupt-controller roadmap.
+- PMP/Smepmp policy for protection boundaries where available.
+- Fixed-width, endian-defined fabric ABI conformance tests reused from x86_64
+  and aarch64.
+- Atomic-width and memory-ordering requirements documented before any shared
+  fabric queue is enabled on RISC-V.
+- Explicit note that RISC-V 32 is later work after the ABI and atomic
+  requirements are proven portable.
 
 ### v1.4 - Bytecode Driver Prototype
 

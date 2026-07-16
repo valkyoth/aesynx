@@ -156,6 +156,24 @@ A peer restart must not accidentally inherit stale authority from a previous
 generation. Service discovery must return capability-scoped handles, not ambient
 global pointers.
 
+Authority-bearing identities are minted by trusted registries or dispatchers,
+not by request payloads. A message may contain claimed peer, core, service,
+object, or endpoint IDs for logging and routing, but enforcement must use
+kernel-stamped execution context and registry-issued incarnations. This avoids
+turning public constructors for ID-shaped values into security boundaries.
+
+Object identity is especially sensitive. A visible object name, package object
+ID, or content hash is not enough to authorize access. Capability targets need a
+stable logical incarnation that cannot be recreated by deleting an object and
+later placing the same visible ID in another registry slot. Stale capability
+tests must cover slot reuse, migration between slots, deletion/recreation,
+generation exhaustion, and revocation-epoch changes.
+
+Capability tables and endpoints also need owners. A production table is bound
+to a domain or principal incarnation, and an endpoint send/receive operation is
+authorized through endpoint capabilities plus kernel-stamped source metadata.
+Raw queue access is never the authority boundary.
+
 ## Ordering, Timeouts, And Backpressure
 
 The fabric cannot assume one global clock or one global lock. Message protocols
@@ -169,6 +187,13 @@ need:
 - Explicit drop, retry, cancel, or dead-letter behavior.
 - Bounded memory use during retry storms.
 
+Authority-transfer protocols need transaction semantics. A grant proposal should
+reserve a pending receiver slot, carry a transaction ID, wait for acceptance,
+then commit or abort. Retried proposals must be idempotent, and timed-out grants
+must not leave usable receiver authority behind. Audit records should preserve
+proposal, acknowledgement, commit, abort, and revoke linkage without exposing
+raw authority identifiers.
+
 ## Admission Control And Quotas
 
 A malicious or broken peer must not exhaust the machine-local fabric:
@@ -181,6 +206,28 @@ A malicious or broken peer must not exhaust the machine-local fabric:
 - Telemetry for throttling and denial.
 
 These controls should become capability policy, not hardcoded hidden globals.
+
+## Side-Channel And Denial Boundaries
+
+The current threat model does not claim general side-channel resistance, but the
+fabric must not make future isolation impossible. Before mutually distrusting
+domains share cores or high-resolution telemetry, Aesynx needs explicit policy
+for:
+
+- Security-domain-aware placement and scheduling.
+- SMT disablement or partitioning for high-assurance workloads.
+- Speculation-control configuration where the architecture supports it.
+- Rate-limited and quantized telemetry exports.
+- Per-principal CPU, queue, memory, grant, and restart budgets.
+- Bounded lookup structures on syscall-hot or fabric-hot paths.
+- Cache-line separation for producer/consumer queue metadata.
+- Backpressure rules that prevent one endpoint from starving unrelated
+  channels.
+- Revocation epoch checks at the final enforcement boundary, so delayed
+  messages cannot preserve authority.
+
+These controls should be staged as measurable policy gates, not retrofitted
+after user domains start carrying hostile workloads.
 
 ## Fault Containment
 
