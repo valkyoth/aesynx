@@ -104,11 +104,21 @@ production SPSC link needs:
   when endpoint permissions differ.
 - Payload write followed by release publication, and acquire observation before
   payload read.
+- Consumer acknowledgement must have its own reverse release/acquire edge:
+  the consumer finishes reading, release-stores cursor/ack advancement, and the
+  producer acquire-loads that acknowledgement before scrubbing or reusing the
+  slot.
+- Enqueue, dequeue completion, cancellation, acknowledgement, and slot reuse
+  each need a named linearization point.
 - Slot generation/sequence numbers for wraparound and reuse.
 - Scrub-on-vacate before authority-bearing payload storage can be observed by a
   different trust domain.
 - Doorbell bitmaps, IPI coalescing, batching, and traffic-class separation so a
   noisy telemetry path cannot delay revocation or topology-control messages.
+- Traffic class is not an untrusted message field. It is derived from endpoint
+  or protocol capability, stamped by the local kernel/CPU driver, rate-limited,
+  and backed by reserved control capacity. Ordinary service traffic still needs
+  progress guarantees so control floods cannot starve it forever.
 
 Pairwise queues are isolation-friendly but scale quadratically. Aesynx should
 create links sparsely, keep dedicated direct links or reserved traffic classes
@@ -168,6 +178,21 @@ or equivalent agreement, mapping teardown, local and remote TLB invalidation
 acknowledgements, DMA quiesce/cancel/drain, in-flight IPC cancellation or
 replay rules, and timeout handling for failed peers.
 
+Normal audit-buffer exhaustion must not preserve stale authority. Authority
+creation, grant, executable mapping, DMA mapping, and policy expansion can fail
+closed before mutation when required evidence cannot be recorded. Revoke,
+quarantine, and permission reduction proceed fail-safe, reserve emergency audit
+capacity, and set a sticky audit-loss digest or halt after authority is removed
+if even emergency evidence cannot be retained.
+
+TLB shootdown acknowledgements bind address-space incarnation, ASID/PCID and
+reuse generation, mapping generation, virtual range, operation class, target
+core incarnation, and revocation transaction ID. An acknowledgement is valid
+only after the invalidation instruction and required architectural
+serialization have completed. A core that is unresponsive but still executing
+with possible stale TLB reachability prevents strong-revoke success unless it is
+hardware-reset, fenced from execution, or the system halts.
+
 ## Topology And Routing
 
 Early Aesynx can send direct core-to-core messages. A mature fabric should learn
@@ -195,6 +220,11 @@ satisfy a later generation. APIC-ID reuse, duplicate hardware IDs, topology
 snapshot epochs, boot-parameter publication/consumption barriers, and
 read-only/zeroed AP parameter pages after consumption are all part of the
 fabric safety model before live routing trusts a core.
+
+Until AP incarnation fencing exists, live AP-backed queues must prohibit restart
+and hotplug. A failed or timed-out AP stays quarantined until reboot rather than
+reusing a core identity that may still hold stale endpoint, routing, or
+capability-table messages.
 
 ## Naming And Discovery
 
@@ -316,6 +346,13 @@ Zero-copy sharing is useful, but it must stay explicit:
   audit, revocation, and TLB shootdown.
 - The mapper distinguishes declared shared-buffer aliasing from accidental
   physical double ownership.
+- Kernel-owned shared mapping infrastructure may be proven first using real
+  page-table roots, CR3 switching, and TLB shootdown in QEMU. Hostile
+  cross-domain user mappings are a later proof that requires actual isolated
+  ring-3 address spaces; model dispatchers are not evidence for that claim.
+- Page-table pages are protected after installation. Later updates require a
+  narrow owner-core edit window or dedicated temporary mapping protocol that
+  restores the protected state before returning.
 
 Raw physical frame allocation should remain local allocator work wherever
 possible. Capabilities authorize memory objects, mapping rights, sharing, DMA,
@@ -357,6 +394,15 @@ Priority proof targets:
 - Global W^X alias property tests across memory objects and address spaces.
 - Refinement tests showing executable Rust state machines agree with the
   formal transition models they implement.
+- Required safety properties: no authority amplification, authority
+  resurrection, split-brain commit, W+X alias, or stale-core acceptance.
+- Required bounded-liveness properties: healthy grant/revoke transactions
+  eventually commit or abort, revocation/control traffic is not starved by
+  telemetry floods, coordinator restart converges to one final result, and
+  queues progress under explicit producer/consumer scheduling assumptions.
+- TLA+/Quint models must state their fairness assumptions explicitly and have
+  negative variants or refinement tests that intentionally disagree with Rust
+  state-machine behavior.
 
 Host model tests should come first; Kani, Verus, Prusti, Coq, or similar tools
 can then be applied where the code shape is stable enough.

@@ -2298,6 +2298,9 @@ Handle global authority changes without a hidden global lock.
 
 Deliverables:
 
+- TLA+ or Quint model for grant, revoke, coordinator failure, participant
+  timeout, duplicate commit/abort, and recovery before the protocol is treated
+  as implementable.
 - Owner/coordinator rule for replicated authority records.
 - Monotonic epoch records for capability revocation, service ownership, routing
   table, and policy updates.
@@ -2312,6 +2315,12 @@ Deliverables:
 - Fail-closed stale-epoch handling.
 - Timeout and participant-dead handling.
 - Audit events linking proposal, acknowledgement, commit, abort, and revoke.
+- Emergency audit-loss rule: authority creation, grant, executable mapping,
+  DMA mapping, and policy expansion fail closed if required audit evidence
+  cannot be recorded; revoke, quarantine, and permission reduction proceed
+  fail-safe, reserve emergency audit capacity, and set a sticky audit-loss
+  digest or halt after authority is removed rather than preserving authority
+  because the normal audit queue is full.
 - Explicit non-goal that full quorum/distributed consensus is later work unless
   Aesynx grows fault-tolerant peer groups.
 
@@ -2325,6 +2334,8 @@ Verification:
 - Host model tests prove stale epochs cannot regain authority after commit.
 - Audit logs preserve proposal-to-commit linkage without exposing raw object
   IDs.
+- Negative model variants prove audit exhaustion cannot preserve revocable
+  authority.
 
 Exit criteria:
 
@@ -2447,6 +2458,7 @@ architectures as well as x86_64.
 
 Deliverables:
 
+- Loom or equivalent SPSC publication model before live AP-backed queue use.
 - Hardware SPSC queue design that removes shared mutable `len` from producer
   and consumer hot paths.
 - Monotonic producer and consumer cursors, each written by exactly one endpoint.
@@ -2459,6 +2471,13 @@ Deliverables:
   - producer scrubs or initializes authority-bearing padding;
   - producer performs a release store of slot sequence or tail;
   - consumer performs an acquire load before reading payload.
+- Reverse slot-reuse edge:
+  - consumer finishes reading payload;
+  - consumer release-stores acknowledgement or cursor advancement;
+  - producer acquire-loads that acknowledgement;
+  - producer may then scrub and reuse the slot.
+- Named linearization points for enqueue, dequeue completion, cancellation,
+  acknowledgement, and slot reuse.
 - Slot reuse protocol with generation or sequence numbers so wraparound cannot
   expose stale payloads.
 - Mandatory zero/scrub-on-vacate policy before a slot can be observed by a
@@ -2471,6 +2490,12 @@ Deliverables:
 - Separate traffic classes for authority-critical revoke/topology messages,
   best-effort telemetry, and ordinary service requests. Revocation and topology
   control must not sit behind best-effort telemetry in the same FIFO.
+- Traffic class is selected from endpoint/protocol capability and kernel-stamped
+  metadata, not from an untrusted message field. Reserved control capacity and
+  rate limits are required even for authority-critical endpoints.
+- Bounded scheduling rule that prevents telemetry floods from starving control
+  traffic and control floods from permanently starving ordinary service
+  traffic.
 - Per-principal/service credits, deadlines, retry budgets, cancellation, and
   dead-letter records for noisy or stalled peers.
 - Sparse link creation. Aesynx must not preallocate every pairwise queue at high
@@ -2496,13 +2521,18 @@ Deliverables:
 - Explicit memory-ordering tests and model checks for x86_64, aarch64, and
   RISC-V assumptions. Release/acquire evidence must correspond to actual atomic
   stores/loads, not metadata fields.
+- AP restart and hotplug are explicitly prohibited in this milestone. Any
+  timed-out or failed AP stays permanently quarantined until reboot; reusable
+  core identities and authority-bearing live messages remain blocked until
+  v0.37.11 incarnation fencing exists.
 
 Verification:
 
 - Host model tests prove full, empty, wraparound, stale-slot, and retry cases
   fail closed without payload reuse.
 - Loom/Kani-style or equivalent bounded model tests prove the SPSC publication
-  protocol does not permit payload reads before release publication.
+  protocol does not permit payload reads before release publication or payload
+  scrubbing before consumer acknowledgement is observed.
 - Cache-line layout tests prove producer and consumer hot metadata do not share
   a cache line.
 - QEMU live-AP smoke proves producer and consumer run concurrently on different
@@ -2511,9 +2541,10 @@ Verification:
   doorbells, delayed doorbells, coalesced doorbells, queue-full behavior while
   the receiver is descheduled, and AP quarantine/termination while messages are
   pending.
-- QEMU scaling smoke covers 2, 4, 8, 16, and preferably 32 virtual CPUs when
-  the host can provide them; lower-capacity hosts must run the largest safe
-  configured count and report the cap explicitly.
+- QEMU correctness smokes cover 2, 4, and 8 virtual CPUs. 16-core and 32-core
+  runs are scaling benchmarks when the host can provide them; lower-capacity
+  hosts must run the largest safe configured count and report the cap
+  explicitly.
 
 Exit criteria:
 
@@ -2538,6 +2569,9 @@ driver DMA, or cross-core delegation becomes live.
 
 Deliverables:
 
+- TLA+ or Quint model for prospective revoke, strong revoke linearization,
+  coordinator death, participant timeout, and recovery before strong revocation
+  can guard live shared mappings or DMA.
 - Two documented revoke classes:
   - Prospective revoke: no operation beginning after the revoke linearization
     point may succeed.
@@ -2546,10 +2580,22 @@ Deliverables:
 - Revocation messages carry object incarnation, previous epoch, new epoch,
   transaction ID, reason code, coordinator proof, and affected authority class.
 - Distributed prepare/freeze/ack/commit/abort model for strong revocation.
+- Bounded pending transaction counts per object, capability table, endpoint,
+  principal, and coordinator.
+- Sequence-number widths, retirement thresholds, and wraparound retirement
+  rules for revocation messages and acknowledgements.
+- Lease-freezing contract that states whether a freeze path is wait-free,
+  bounded-spin, or scheduler-assisted; strong revoke cannot wait forever for a
+  malicious holder.
 - Mapping teardown protocol that unmaps every affected address space before
   strong revoke commit.
 - Mandatory local and remote TLB invalidation acknowledgements before a
   permission reduction or unmap is reported complete.
+- TLB shootdown acknowledgements bind address-space incarnation, ASID/PCID and
+  reuse generation, mapping generation, virtual range, operation class,
+  target-core incarnation, and revocation transaction ID.
+- A TLB acknowledgement is emitted only after the invalidation instruction and
+  required architectural serialization have completed.
 - DMA quiesce/cancel/drain requirement before strong revocation of device-visible
   memory.
 - In-flight IPC cancellation or replay policy for operations authorized before
@@ -2558,6 +2604,12 @@ Deliverables:
   degraded fail-closed state, or system halt depending on authority class.
 - Audit records linking proposal, freeze, acknowledgement, TLB/DMA cleanup,
   commit, abort, and timeout.
+- Revocation, quarantine, and permission reduction must not be blocked solely
+  by normal audit-buffer exhaustion. These paths reserve emergency audit
+  capacity and, if even emergency evidence cannot be retained, set a sticky
+  audit-loss digest or halt after authority is removed.
+- NMI and machine-check behavior for page-table edit windows, TLB shootdown,
+  lease freezing, and lock-rank enforcement.
 - Redacted diagnostics that expose counts, classes, and reason codes without
   raw object IDs, physical frames, or table slots.
 
@@ -2574,6 +2626,9 @@ Verification:
 - Tests prove quarantine of a dead participant is sufficient to complete strong
   revocation only for authority classes whose mappings, DMA, and endpoint
   operations have been fenced or made unreachable.
+- Tests prove an unresponsive-but-still-running core holding a stale TLB entry
+  prevents strong-revoke success unless the core is demonstrably hardware-reset,
+  fenced from execution, or the system halts.
 - Mapper tests prove permission reduction/unmap cannot be acknowledged until
   the required flush obligation is consumed.
 
@@ -2582,17 +2637,25 @@ Exit criteria:
 - Revocation semantics are precise enough for live shared memory, driver DMA,
   and cross-core capability transfer to build on them.
 
-### v0.37.10 - Live Shared Mapping Integration
+### v0.37.10 - Kernel-Owned Shared Mapping Infrastructure
 
 Goal:
 
-Enable live shared-buffer mappings only after authority identity, atomic fabric
-queues, and strong revocation semantics exist.
+Enable live shared-buffer mapping infrastructure inside kernel-owned address
+spaces only after authority identity, atomic fabric queues, and strong
+revocation semantics exist. Hostile user-domain shared mappings are deliberately
+deferred until real isolated user address spaces and ring-3 execution exist.
 
 Deliverables:
 
 - Shared-buffer object descriptors from v0.37.2 are connected to the live
-  mapper through checked memory-object plus address-space authority proofs.
+  mapper through checked memory-object plus kernel-address-space authority
+  proofs.
+- At least two real hardware page-table roots for kernel/test domains.
+- Real CR3 switching between those roots in QEMU, with the selected root
+  validated before install.
+- Real TLB shootdown path for permission reduction and unmap, consuming the
+  v0.37.9 acknowledgement contract.
 - Read-only shared mappings require a sealed or frozen backing object.
 - Writable shared mappings require `SHARE_WRITE`, a declared synchronization
   protocol, traffic-class policy, audit evidence, and strong-revocation support.
@@ -2607,23 +2670,33 @@ Deliverables:
 - Cache-attribute consistency across every alias of the same memory object.
 - Page-table pages are protected from user mappings, DMA, and ordinary kernel
   writes after installation.
+- Protected page-table update mechanism after installation: either a narrow
+  owner-core edit window with hardening and audit evidence, or a dedicated
+  temporary mapping protocol that restores page-table pages to protected state
+  before returning.
 - Live unmap/revoke of a shared buffer consumes the v0.37.9 strong-revocation
   path and cannot return success until mapping teardown and required
   invalidation acknowledgements complete.
 
 Verification:
 
-- QEMU smoke maps a sealed read-only shared buffer into two dispatchers or
-  model dispatchers and proves reads observe the same backing object.
-- Host and QEMU tests reject writable/executable aliases across address spaces.
+- QEMU smoke maps a sealed read-only shared buffer into two real kernel/test
+  page-table roots and proves reads observe the same backing object after real
+  CR3 switches.
+- QEMU smoke proves permission reduction or unmap requires real TLB invalidation
+  completion before success is reported.
+- Host and QEMU tests reject writable/executable aliases across kernel/test
+  address spaces.
 - Host tests reject conflicting cache attributes for aliases.
 - Strong revoke tests prove live shared mappings are torn down or the affected
   domains are quarantined before success is reported.
 
 Exit criteria:
 
-- Zero-copy shared assets are live through explicit capabilities without
-  weakening global W^X, cache-attribute consistency, or revocation semantics.
+- Zero-copy shared assets are live through explicit capabilities between
+  kernel-owned address spaces without weakening global W^X, cache-attribute
+  consistency, or revocation semantics. No hostile user-domain shared mapping
+  claim is made until the later post-ring-3 milestone.
 
 ### v0.37.11 - AP Incarnation, Restart, And Parameter Fencing
 
@@ -2634,6 +2707,9 @@ parameters from confusing the live multicore topology.
 
 Deliverables:
 
+- TLA+ or Quint model for AP restart, late arrival, duplicate hardware IDs,
+  topology snapshot mismatch, and hotplug fencing before restart or hotplug can
+  interact with authority-bearing queues.
 - Startup-attempt generation or boot incarnation for every AP launch attempt.
 - Every AP arrival carries the exact startup attempt generation; late arrivals
   after timeout or restart are quarantined and cannot satisfy a later attempt.
@@ -2677,6 +2753,18 @@ Deliverables:
   - strong revoke linearization;
   - coordinator failure and recovery;
   - AP restart and late-arrival quarantine.
+- Required safety properties:
+  - no authority amplification;
+  - no authority resurrection;
+  - no split-brain commit;
+  - no W+X alias;
+  - no stale-core acceptance.
+- Required bounded-liveness properties:
+  - healthy grant and revoke transactions eventually commit or abort;
+  - revocation traffic is not starved under telemetry floods;
+  - coordinator restart converges to one final transaction result;
+  - queues progress under explicit producer/consumer scheduling assumptions.
+- Explicit fairness assumptions in every TLA+/Quint model.
 - Kani, Verus, or equivalent bounded proof targets for:
   - permission attenuation;
   - range containment;
@@ -2707,6 +2795,8 @@ Deliverables:
 - Refinement tests showing the executable Rust state machines agree with the
   formal transition models for grant, revoke, AP restart, queue publication,
   and scheduler action validation.
+- Negative refinement tests where a deliberately broken Rust transition and its
+  model disagree.
 
 Verification:
 
@@ -3179,6 +3269,83 @@ Verification:
 Exit criteria:
 
 - User mode works.
+
+### v0.46.1 - Hostile User-Domain Shared Mapping Proof
+
+Goal:
+
+Prove shared-buffer mappings between actual isolated user domains after ring-3
+execution exists. This is the hostile-domain counterpart to the kernel-owned
+v0.37.10 shared-mapping infrastructure.
+
+Deliverables:
+
+- Two isolated user address spaces with distinct task/domain incarnations.
+- Shared-buffer capability grant from an owning domain to a second domain.
+- Read-only sealed shared-buffer mapping into both domains.
+- Writable shared-buffer mapping only with `SHARE_WRITE`, a named
+  synchronization protocol, and audit evidence.
+- Strong-revocation teardown of user-domain shared mappings through the v0.37.9
+  protocol.
+- TLB shootdown acknowledgements that bind user address-space incarnation,
+  ASID/PCID reuse generation, mapping generation, virtual range, operation,
+  target-core incarnation, and revocation transaction ID.
+- User-domain W^X alias checks proving no memory object is writable in one
+  address space while executable in another.
+- Cache-attribute consistency checks across every user-domain alias.
+
+Verification:
+
+- QEMU smoke maps a sealed read-only buffer into two actual ring-3 domains and
+  proves both observe the same backing object.
+- QEMU smoke proves one domain cannot write through a read-only shared mapping.
+- QEMU smoke proves strong revoke tears down the mapping or quarantines the
+  affected domain before success is reported.
+- Host and QEMU tests reject W+X and cache-attribute alias conflicts across
+  user address spaces.
+
+Exit criteria:
+
+- Aesynx can claim hostile cross-domain shared mappings only after actual
+  isolated user domains, real page tables, and strong revocation all participate.
+
+### v0.46.2 - Preemptive Timer And CPU-Budget Enforcement
+
+Goal:
+
+Prevent ordinary hostile user domains from monopolizing a core before multiple
+untrusted processes and AI policy services depend on scheduler progress.
+
+Deliverables:
+
+- Timer-driven forced kernel entry from ring 3.
+- Full architectural context save and restore for preempted user domains.
+- Per-core scheduler ownership rule for preemption decisions.
+- Quantum and CPU-budget accounting with checked decrement and exhaustion
+  handling.
+- Preemption-disable nesting API for short kernel critical sections.
+- IRQ/preemption-safe run-queue mutation discipline.
+- Watchdog termination or reset path for non-yielding domains.
+- Redacted telemetry for preemption, budget exhaustion, watchdog reset, and
+  failed context restoration.
+- Kani, Verus, or equivalent proof target for `ValidatedScheduleAction` or its
+  successor when scheduler actions become externally advised.
+
+Verification:
+
+- QEMU smoke runs an infinite-loop user task while another user task continues
+  to receive CPU time.
+- Host tests prove run-queue mutation fails closed when attempted from the
+  wrong owner core or unsafe IRQ/preemption context.
+- Host tests prove CPU-budget underflow and quantum accounting overflow are
+  rejected without mutating scheduler state.
+- Fault-path tests prove preemption-disable nesting restores its previous state
+  on success and failure.
+
+Exit criteria:
+
+- Aesynx has a concrete preemption baseline before normal multi-process
+  userspace or AI policy services can claim progress isolation.
 
 ### v0.47.0 - aesynx-abi And aesynx-rt
 
@@ -3745,8 +3912,11 @@ Deliverables:
 - Telemetry buffer-full behavior cannot stop scheduling. Noncritical telemetry
   drops or overwrites records with a loss counter; security audit events use a
   separate reserved channel with a decision table:
-  - authority creation, grant, revoke, executable mapping, DMA mapping, and
-    policy changes fail closed if required audit evidence cannot be recorded;
+  - authority creation, grant, executable mapping, DMA mapping, and policy
+    expansion fail closed if required audit evidence cannot be recorded;
+  - revoke, quarantine, and permission reduction proceed fail-safe, reserve
+    emergency audit capacity, and record a sticky audit-loss digest or halt
+    after authority is removed if even emergency evidence is exhausted;
   - noncritical scheduling telemetry may be lossy and increments loss counters;
   - operator/debug telemetry never blocks scheduler dispatch.
 - OS-world trace emission targets zero allocation, zero locking, and zero copy
@@ -3771,8 +3941,10 @@ Verification:
   outside allowed affinity/security-domain policy.
 - Host tests prove raw advice cannot be executed without producing a
   `ValidatedScheduleAction`.
-- Host tests prove authority-critical audit-buffer failure blocks the operation
-  while noncritical telemetry loss does not block dispatch.
+- Host tests prove audit-buffer failure blocks authority creation/expansion
+  while revoke, quarantine, and permission reduction proceed fail-safe with
+  emergency audit-loss evidence; noncritical telemetry loss does not block
+  dispatch.
 - QEMU smoke proves the scheduler continues with AI disabled, model timeout,
   and telemetry loss counters.
 
