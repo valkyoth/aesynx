@@ -105,6 +105,18 @@ not report success to callers until required local and remote invalidation
 acknowledgements have completed or the operation has failed closed into a
 documented quarantine/degraded state.
 
+W^X is a memory-object invariant, not only a single-PTE invariant. A physical
+frame or memory object must not be writable in one address space while
+executable in another. Executable transition requires freezing writable
+mappings, completing TLB invalidation, performing any architecture-required
+instruction-cache synchronization, sealing the memory object, and then creating
+executable mappings.
+
+Aliases of the same memory object must also agree on cacheability/device memory
+attributes unless an architecture-specific reviewed exception exists. Page-table
+pages themselves are protected objects: once installed, they must not be mapped
+user-accessible, DMA-visible, or ordinary writable kernel data.
+
 Low-level raw frame allocation is different from authority to use memory. The
 Barrelfish experience is a warning here: making every physical-memory operation
 a fine-grained, globally coordinated capability protocol adds complexity and

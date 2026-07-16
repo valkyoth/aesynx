@@ -110,6 +110,27 @@ production SPSC link needs:
 - Doorbell bitmaps, IPI coalescing, batching, and traffic-class separation so a
   noisy telemetry path cannot delay revocation or topology-control messages.
 
+Pairwise queues are isolation-friendly but scale quadratically. Aesynx should
+create links sparsely, keep dedicated direct links or reserved traffic classes
+for revocation/control messages, define a core-count threshold for direct
+pairwise links, and use cluster-local or NUMA-local routers above that
+threshold. Doorbell state should be sharded or hierarchical; a single
+many-writer bitmap is treated as a cache-coherency hotspot until measurement
+proves otherwise.
+
+Shared queue pages preserve the shared-nothing rule only when write ownership is
+explicit:
+
+- Producer owns and writes payload and slot-publication pages.
+- Consumer maps producer pages read-only.
+- Consumer owns and writes acknowledgement/cursor pages.
+- Producer scrubs payload storage after observing consumption and before reuse.
+
+The implementation must choose either fixed-width wire frames encoded entirely
+through atomics or a tiny audited unsafe queue-storage island. If unsafe storage
+is used, it needs a local safety proof, Miri/model wrappers, and no general
+unsafe exposure from IPC callers.
+
 ## Replicated Authority State
 
 A true multikernel cannot rely on one global lock for authority state.
@@ -167,6 +188,13 @@ but a bounded non-AI policy must always exist.
 These facts are Aesynx's system-knowledge layer. They should be deterministic,
 bounded, and queryable by monitor/world services. The kernel emits and enforces
 facts; it must not become a general-purpose knowledge database.
+
+AP startup and restart need incarnations just like services. Every startup
+attempt carries a startup generation; late AP arrivals after timeout cannot
+satisfy a later generation. APIC-ID reuse, duplicate hardware IDs, topology
+snapshot epochs, boot-parameter publication/consumption barriers, and
+read-only/zeroed AP parameter pages after consumption are all part of the
+fabric safety model before live routing trusts a core.
 
 ## Naming And Discovery
 

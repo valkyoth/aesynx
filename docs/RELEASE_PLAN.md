@@ -1930,6 +1930,12 @@ Deliverables:
 - AP startup dispatch token. The APIC INIT/SIPI writer must accept only a
   consuming token produced from an execution-allowed `ApStartupPreflight`; raw
   advisory status checks are not enough for the hardware launch path.
+- Startup-attempt generation in every AP launch record. An AP arrival from an
+  old timed-out attempt must not satisfy a later startup attempt.
+- Publication barriers for per-core boot parameters before AP launch and
+  consumption barriers on AP entry.
+- Bootstrap-owned writable AP parameter pages are zeroed, revoked, or sealed
+  read-only after the AP consumes them.
 - Per-core GDT/IDT/TSS where needed.
 - The current single-core `static mut` descriptor, TSS, IDT, double-fault IST,
   activation-arena, and activation-stack storage is either migrated to
@@ -1979,9 +1985,11 @@ Exit criteria:
 
 Goal:
 
-Prove the first pairwise multikernel message-fabric contract. Until secondary
-cores execute Aesynx code, this is a model-backed QEMU smoke that the later live
-hardware path must preserve.
+Prove the first pairwise multikernel message-fabric contract. In the tagged
+v0.36.0 release this remains model-backed; if a later branch has already
+completed AP execution, this milestone still does not claim live hardware
+delivery until v0.37.8 replaces the queue with a cache-aware atomic AP-backed
+path.
 
 Deliverables:
 
@@ -2025,7 +2033,8 @@ Non-goals:
 
 - No APIC IPI delivery path.
 - No live cross-core atomics yet.
-- No secondary core executes Aesynx code yet.
+- No claim that ping/pong delivery is performed concurrently by two executing
+  APs; that belongs to v0.37.8.
 
 ### v0.37.0 - Capability Grant Over IPC
 
@@ -2087,6 +2096,16 @@ Deliverables:
   authorization must use kernel-stamped current execution identity.
 - Capability tables bound to an owning domain/principal incarnation, with quota
   and revocation-domain metadata.
+- Capability-table, domain, endpoint, peer, and boot/session incarnations are
+  part of every authority interpretation context. A table-local `CapId` is not
+  meaningful after its table or domain is destroyed and recreated.
+- Authority-bearing messages carry transaction IDs scoped by source domain,
+  target domain/table incarnation, endpoint incarnation, and boot/session
+  incarnation.
+- Sequence-wrap retirement and replay windows for grant, revoke, map, endpoint,
+  and routing messages.
+- Fail-closed generation/epoch exhaustion for objects, tables, peers,
+  endpoints, and transactions.
 - Root minting restricted to registry-issued mint tickets or bootstrap-only
   audited paths; normal code must not supply arbitrary object ID, generation,
   and epoch tuples as authority.
@@ -2094,6 +2113,25 @@ Deliverables:
   capability lease, endpoint send permit, or address-space map permit, instead
   of letting callers combine `check()` plus optional registry validation by
   convention.
+- Checked proof lifetime semantics. Every proof must be one of:
+  - an `AuthorizedOperation` consumed exactly once at the final mutation
+    boundary with commit-time generation/epoch revalidation;
+  - a registry-counted in-flight lease that revocation can freeze and drain;
+  - a read-side critical section whose lifetime is visible to the object
+    registry;
+  - an internal preflight token that cannot authorize mutation by itself.
+- Grant commit revalidates the sender's live capability, current revocation
+  epoch, and attenuated permissions. Revoking the sender between proposal and
+  commit aborts the grant.
+- Delegation attenuation rule:
+
+```text
+delegated_rights <= requested_rights & live_sender_rights & delegable_rights
+```
+
+  `ADMIN`, `REVOKE`, `GRANT`, executable/JIT, writable-sharing, and DMA rights
+  never propagate implicitly, and receiver-supplied grant records cannot select
+  or widen permissions.
 - Rename or restrict table-only permission checks so they cannot be mistaken
   for complete live authority validation.
 - Endpoint objects with typed `SEND`, `RECV`, call/reply, and notification
@@ -2127,22 +2165,33 @@ Verification:
   outside internal/preflight contexts.
 - Host tests prove failed grant proposals leave receiver tables unchanged and
   pending slots expired or reclaimable.
+- Host tests prove a sender revoke between grant proposal and grant commit
+  aborts the grant without receiver authority becoming usable.
+- Host tests prove receiver-supplied grant records cannot widen delegated
+  rights.
+- Host tests prove old table/domain incarnations cannot interpret a recycled
+  `CapId`.
+- Host tests prove replayed grant/revoke/map messages outside the accepted
+  transaction window fail closed.
 - Host tests prove endpoint send/receive checks require endpoint rights and
   kernel-stamped source metadata.
 - Host tests prove map requests require both memory-object and address-space
   authority.
+- Host tests prove stale table entries are tombstoned or reclaimed within
+  bounded quotas after revocation.
 
 Exit criteria:
 
 - Capability IPC has a hardened identity and endpoint foundation suitable for
   the later shared-memory and multikernel fabric milestones.
 
-### v0.37.2 - Capability-Based Shared Memory Windows
+### v0.37.2 - Shared Memory Object Model
 
 Goal:
 
-Allow explicit zero-copy sharing between dispatchers without weakening the
-AMP/multikernel rule that cores do not casually share kernel state.
+Model explicit zero-copy sharing between dispatchers without claiming live
+cross-address-space mappings before strong revocation, TLB shootdown, and
+atomic fabric queues exist.
 
 Design rule:
 
@@ -2151,6 +2200,11 @@ a typed shared-buffer object or derives authority from an existing memory
 object. The kernel decides the physical backing internally and returns
 capabilities with bounded range, permission, lifetime, and revocation metadata.
 
+This milestone is model-only. It may build descriptors, proofs, host tests, and
+QEMU markers for the object/capability shape, but it must not claim that live
+shared mappings are safe until the later strong-revocation and live mapping
+integration milestones land.
+
 Deliverables:
 
 - Shared-buffer object kind or typed memory-object mode.
@@ -2158,13 +2212,15 @@ Deliverables:
   - `SHARE_READ` for read-only shared mappings.
   - `SHARE_WRITE` only with an explicit synchronization protocol.
   - `MAP` still required before any address-space mapping is created.
-- Multi-address-space mapping request that maps the same backing object into
-  multiple dispatchers through separate capability grants.
+- Multi-address-space mapping descriptor that describes the same backing object
+  being mapped into multiple dispatchers through separate capability grants.
 - Read-only seal/freeze operation for large asset buffers, such as geometry,
   texture, model, or package-block data.
-- Revocation epoch integration so unmapping/revoking a shared buffer
-  invalidates every derived mapping capability.
-- TLB shootdown plan for every core/address space that observed the mapping.
+- Prospective revocation model showing that a later live validation rejects
+  stale derived mapping descriptors.
+- TLB shootdown requirement list for every core/address space that observed the
+  mapping; execution of the shootdown is explicitly deferred to v0.37.9 and the
+  live shared-mapping milestone.
 - Audit events for create, grant, map, seal, downgrade, revoke, and unmap.
 - Redacted diagnostics that expose sizes, permissions, and participant counts
   without exposing physical frames or raw object IDs.
@@ -2184,18 +2240,19 @@ map shared-buffer into render-core-2
 
 Verification:
 
-- Host tests prove read-only shared-buffer grants can be mapped by two
+- Host tests prove read-only shared-buffer descriptors can be produced for two
   dispatchers without copying.
 - Host tests reject writable sharing without `SHARE_WRITE` and a declared
   synchronization protocol.
-- Revocation invalidates every dispatcher mapping descriptor.
+- Prospective revocation invalidates every later descriptor validation.
 - Mapper tests distinguish allowed shared-frame aliasing from accidental
   physical-frame double ownership.
 
 Exit criteria:
 
-- Zero-copy shared assets are possible through explicit capabilities, while
-  accidental physical aliasing still fails closed.
+- The object/capability descriptor model for zero-copy shared assets exists,
+  while live shared mappings remain blocked on strong revocation and TLB
+  invalidation enforcement.
 
 ### v0.37.3 - Fabric Protocol And Heterogeneous Peer Metadata
 
@@ -2245,6 +2302,13 @@ Deliverables:
 - Monotonic epoch records for capability revocation, service ownership, routing
   table, and policy updates.
 - Prepare/commit/abort message types for critical authority changes.
+- Coordinator incarnation and fencing token for every critical transaction.
+- Precise participant-set rule: required participants are selected from an
+  epoch-stamped topology/service snapshot and cannot change silently
+  mid-transaction.
+- Coordinator-failure recovery rules for pending transactions, including
+  restart/resynchronization, idempotent duplicate commit/abort handling, and
+  bounded timeout escalation.
 - Fail-closed stale-epoch handling.
 - Timeout and participant-dead handling.
 - Audit events linking proposal, acknowledgement, commit, abort, and revoke.
@@ -2255,6 +2319,9 @@ Verification:
 
 - Host model tests prove a revoke proposal cannot commit if a required
   participant rejects or times out.
+- Host model tests prove coordinator death leaves participants in a recoverable
+  pending, abortable, or quarantined state rather than unbounded limbo.
+- Host model tests prove duplicate commit and abort messages are idempotent.
 - Host model tests prove stale epochs cannot regain authority after commit.
 - Audit logs preserve proposal-to-commit linkage without exposing raw object
   IDs.
@@ -2406,6 +2473,26 @@ Deliverables:
   control must not sit behind best-effort telemetry in the same FIFO.
 - Per-principal/service credits, deadlines, retry budgets, cancellation, and
   dead-letter records for noisy or stalled peers.
+- Sparse link creation. Aesynx must not preallocate every pairwise queue at high
+  core counts when a route is never used.
+- Direct-link threshold policy that names when pairwise links are preferred and
+  when cluster-local or NUMA-local routers are required.
+- Dedicated direct links or reserved traffic class for revocation and topology
+  control messages.
+- Sharded or hierarchical doorbell bitmaps. A single many-writer bitmap must be
+  treated as a cache-coherency hotspot unless measurement proves otherwise.
+- Quantitative targets for bytes per core pair, messages per second, p99
+  latency, IPIs per message, and cache-line invalidations per message.
+- Shared queue page ownership policy:
+  - producer owns and writes payload and slot-publication pages;
+  - consumer maps producer pages read-only;
+  - consumer owns and writes acknowledgement/cursor pages;
+  - producer scrubs payload storage only after observing consumption and before
+    reuse.
+- Implementation boundary decision: either fixed-width wire frames encoded
+  entirely through atomics, or a tiny audited queue-storage unsafe island with a
+  local safety proof, Miri/model wrappers, and no general unsafe exposure from
+  `aesynx-ipc`.
 - Explicit memory-ordering tests and model checks for x86_64, aarch64, and
   RISC-V assumptions. Release/acquire evidence must correspond to actual atomic
   stores/loads, not metadata fields.
@@ -2418,13 +2505,20 @@ Verification:
   protocol does not permit payload reads before release publication.
 - Cache-line layout tests prove producer and consumer hot metadata do not share
   a cache line.
-- QEMU smoke reports direct-link evidence only after the atomic queue path is
-  used by the kernel smoke.
+- QEMU live-AP smoke proves producer and consumer run concurrently on different
+  APs.
+- QEMU live-AP smoke exercises actual IPI or doorbell delivery, duplicate
+  doorbells, delayed doorbells, coalesced doorbells, queue-full behavior while
+  the receiver is descheduled, and AP quarantine/termination while messages are
+  pending.
+- QEMU scaling smoke covers 2, 4, 8, 16, and preferably 32 virtual CPUs when
+  the host can provide them; lower-capacity hosts must run the largest safe
+  configured count and report the cap explicitly.
 
 Exit criteria:
 
-- Aesynx has a queue implementation shape that can be wired to live APs without
-  pretending model `Ordering` evidence is a hardware happens-before relation.
+- Aesynx has a queue implementation proven by real concurrent AP execution and
+  actual doorbell/IPI delivery, not only by model `Ordering` evidence.
 
 ### v0.37.9 - Strong Revocation And Mapping Invalidation Semantics
 
@@ -2475,6 +2569,11 @@ Verification:
   TLB acknowledgements, DMA ownership, and pending grants are resolved.
 - Timeout tests prove dead participants cannot let stale authority remain
   silently usable.
+- Coordinator-death tests prove pending strong-revoke transactions recover,
+  abort, or quarantine according to a bounded rule.
+- Tests prove quarantine of a dead participant is sufficient to complete strong
+  revocation only for authority classes whose mappings, DMA, and endpoint
+  operations have been fenced or made unreachable.
 - Mapper tests prove permission reduction/unmap cannot be acknowledged until
   the required flush obligation is consumed.
 
@@ -2482,6 +2581,85 @@ Exit criteria:
 
 - Revocation semantics are precise enough for live shared memory, driver DMA,
   and cross-core capability transfer to build on them.
+
+### v0.37.10 - Live Shared Mapping Integration
+
+Goal:
+
+Enable live shared-buffer mappings only after authority identity, atomic fabric
+queues, and strong revocation semantics exist.
+
+Deliverables:
+
+- Shared-buffer object descriptors from v0.37.2 are connected to the live
+  mapper through checked memory-object plus address-space authority proofs.
+- Read-only shared mappings require a sealed or frozen backing object.
+- Writable shared mappings require `SHARE_WRITE`, a declared synchronization
+  protocol, traffic-class policy, audit evidence, and strong-revocation support.
+- All aliases of the same memory object obey global W^X. A frame or memory
+  object cannot be writable in one address space while executable in another.
+- Executable transition protocol:
+  - freeze writable mappings;
+  - complete local and remote TLB invalidation;
+  - perform architecture-required instruction-cache synchronization;
+  - seal the memory object;
+  - create executable mappings.
+- Cache-attribute consistency across every alias of the same memory object.
+- Page-table pages are protected from user mappings, DMA, and ordinary kernel
+  writes after installation.
+- Live unmap/revoke of a shared buffer consumes the v0.37.9 strong-revocation
+  path and cannot return success until mapping teardown and required
+  invalidation acknowledgements complete.
+
+Verification:
+
+- QEMU smoke maps a sealed read-only shared buffer into two dispatchers or
+  model dispatchers and proves reads observe the same backing object.
+- Host and QEMU tests reject writable/executable aliases across address spaces.
+- Host tests reject conflicting cache attributes for aliases.
+- Strong revoke tests prove live shared mappings are torn down or the affected
+  domains are quarantined before success is reported.
+
+Exit criteria:
+
+- Zero-copy shared assets are live through explicit capabilities without
+  weakening global W^X, cache-attribute consistency, or revocation semantics.
+
+### v0.37.11 - AP Incarnation, Restart, And Parameter Fencing
+
+Goal:
+
+Prevent stale AP arrivals, reused hardware IDs, or writable bootstrap
+parameters from confusing the live multicore topology.
+
+Deliverables:
+
+- Startup-attempt generation or boot incarnation for every AP launch attempt.
+- Every AP arrival carries the exact startup attempt generation; late arrivals
+  after timeout or restart are quarantined and cannot satisfy a later attempt.
+- APIC-ID reuse and duplicate detection across discovery, startup, restart, and
+  hotplug paths.
+- Offline, failed, quarantined, restarted, and hotplug transition table entries.
+- Topology snapshot epochs for routing, scheduler, and authority protocols.
+- Per-core boot-parameter publication barriers before SIPI/entry and
+  consumption barriers on AP entry.
+- Bootstrap-owned writable AP parameter pages are revoked, zeroed, or sealed
+  read-only after consumption.
+- Restarted cores receive a new core/domain incarnation so old endpoint,
+  capability-table, and routing messages cannot replay into the new instance.
+
+Verification:
+
+- Host tests cover stale late-arrival rejection, duplicate APIC ID rejection,
+  restart incarnation changes, topology snapshot mismatch rejection, and
+  bootstrap-parameter seal/zero policy.
+- QEMU AP smoke proves timeout plus late-arrival model paths quarantine rather
+  than accidentally marking a core online.
+
+Exit criteria:
+
+- AP startup and restart have incarnation/fencing semantics strong enough for
+  live fabric queues and authority-bearing messages.
 
 ## Phase 10: Driver Foundation
 
@@ -2826,38 +3004,47 @@ Exit criteria:
 
 Goal:
 
-Define and smoke-test the CPU and address-space hardening required before ring
-3, mutually distrusting domains, or context switches can be treated as a real
-security boundary.
+Implement or fail-closed gate the CPU and address-space hardening required
+before ring 3, mutually distrusting domains, or context switches can be treated
+as a real security boundary.
 
 Deliverables:
 
 - Correct x86_64 CPUID feature detection for Intel and AMD speculative controls,
   including AMD extended-leaf IBRS bit 14, IBPB bit 12, STIBP bit 15, and SSBD
   bit 24.
-- `IA32_ARCH_CAPABILITIES` field decoding plan for eIBRS/IBRS_ALL, RDCL_NO,
+- `IA32_ARCH_CAPABILITIES` field decoding for eIBRS/IBRS_ALL, RDCL_NO,
   MDS_NO, TAA_NO, RSBA, and newer vendor-documented controls where available.
-- Context-transition mitigation policy for switching between mutually
+- Implemented context-transition mitigation policy for switching between mutually
   distrusting domains:
   - when IBPB is required;
   - when STIBP is redundant or required;
   - when RSB stuffing or BHB/BHI mitigation is required;
   - when VERW-based MDS/RFDS buffer clearing is required;
   - when L1D flush policy is required.
-- Explicit SMT-domain policy for high-assurance workloads.
-- KPTI or dual-root page-table plan for processors affected by rogue data-cache
-  load, with a documented QEMU/general-mode fallback.
+- Explicit SMT-domain policy for high-assurance workloads, with a build or boot
+  selector that fails closed if the requested SMT isolation cannot be enforced.
+- KPTI or dual-root page-table implementation for processors affected by rogue
+  data-cache load, or fail-closed refusal to enter hostile userspace on affected
+  CPUs.
 - L1TF hygiene policy: non-present PTEs are all-zero unless a reviewed
   exception exists, and physical page zero must never contain secrets.
-- Hardened syscall/sysret or interrupt-return entry/exit plan with per-core
+- Hardened syscall/sysret or interrupt-return entry/exit assembly with per-core
   TSS/RSP0, swapgs fencing if used, contained user faults, and no reliance on
   compiler-generated prologues for critical transition assembly.
-- Full architectural state-switch plan including SIMD/FPU ownership before
+- Full architectural state-switch implementation including SIMD/FPU ownership
+  and XSAVE/XRSTOR state sanitization before
   SSE/AVX is enabled in kernel or user contexts.
 - Trampoline or boot-order policy that enables compatible NX/WP/SMEP/SMAP/UMIP
   protections before untrusted code or APs can execute with the final CR3.
 - Redacted serial markers for supported, requested, applied, and deferred
   hardening controls.
+- Per-core CR/MSR read-back for the bootstrap core and every executing AP.
+- SMAP usercopy windows with guaranteed `clac` restoration on every normal,
+  fault, and panic path that can exit the access window.
+- CET shadow-stack/IBT policy. If CET is deferred, this milestone must document
+  why the target CPU/QEMU profile can still enter userspace under the selected
+  threat model.
 
 Verification:
 
@@ -2866,13 +3053,17 @@ Verification:
 - Host tests cover `ARCH_CAPABILITIES` decode cases and strict/general policy
   selection.
 - QEMU smoke reports boolean hardening evidence without raw MSR values.
+- QEMU or host tests prove hostile userspace entry is blocked when a required
+  mitigation is selected but unavailable.
+- Fault-path tests prove SMAP access windows restore the access flag before
+  returning or halting.
 - Documentation states which mitigations are active, which are planned, and
   which are not relevant on the current QEMU CPU model.
 
 Exit criteria:
 
-- The ring-3 path has an explicit security-transition hardening plan and tests
-  before user address spaces become a hostile input boundary.
+- The ring-3 path either enforces the selected domain-transition hardening on
+  every executing core or refuses to enter hostile userspace.
 
 ## Phase 11: Native Userspace
 
@@ -3451,15 +3642,32 @@ Deliverables:
 
 - AI/model execution runs outside ring 0 in a capability-confined policy
   service, not in the scheduler hot path.
+- Preemptive timer enforcement is a hard dependency before Aesynx may claim an
+  AI policy service cannot lock a core. Until preemption exists, AI policy
+  services are cooperative/advisory only and must run on noncritical placement.
+- Scheduler-controlled CPU budgets, watchdog termination, and domain reset for
+  policy services.
+- Policy services cannot own scheduler-critical locks, queues, or dedicated
+  control cores.
 - Model evaluation has explicit fuel, deadline, memory, and output-size limits.
 - Manifest step and memory ceilings are consumed by the evaluator, not only
   stored as metadata.
+- Runtime model authenticity check: loaded model bytes must match the signed
+  manifest, model version, policy domain, and object identity. Safety must not
+  depend on authenticity, but substitution and stale-model replay must still be
+  rejected.
 - Kernel scheduling path never waits synchronously for model output. Advice is
   accepted only if already available and still fresh.
 - Advice records carry topology epoch, task incarnation, model version, expiry,
   and confidence bounded by the validated manifest.
+- Raw `PolicyDecision` or `ScheduleAdvice` values are never directly
+  executable. The scheduler accepts only a non-publicly-constructible
+  `ValidatedScheduleAction` produced by the kernel validator.
 - Kernel-side validator is total and bounded:
   - computes the finite admissible action set for the current scheduler state;
+  - stays within an explicit complexity bound such as `O(C)` over a capped core
+    count;
+  - uses checked arithmetic and deterministic tie-breaking;
   - rejects stale topology/task epochs;
   - rejects invalid cores, ownership violations, affinity violations, and
     migration-budget violations;
@@ -3472,11 +3680,22 @@ Deliverables:
   preemption lands.
 - Telemetry buffer-full behavior cannot stop scheduling. Noncritical telemetry
   drops or overwrites records with a loss counter; security audit events use a
-  separate reserved channel with an explicit fail-open/fail-closed policy.
+  separate reserved channel with a decision table:
+  - authority creation, grant, revoke, executable mapping, DMA mapping, and
+    policy changes fail closed if required audit evidence cannot be recorded;
+  - noncritical scheduling telemetry may be lossy and increments loss counters;
+  - operator/debug telemetry never blocks scheduler dispatch.
 - OS-world trace emission targets zero allocation, zero locking, and zero copy
   on the normal event path: per-core single-writer binary rings, read-only
-  collector mappings, sequence gaps, redaction at export, and user-space hash
-  chaining or Merkle aggregation for persistent tamper evidence.
+  collector mappings, release/acquire slot publication, slot generations,
+  boot/session nonce, schema epoch, source-domain incarnation, explicit
+  overwrite and multi-reader behavior, sequence gaps, redaction at export,
+  replay/reordering detection, and user-space hash chaining or Merkle
+  aggregation.
+- Periodic tamper-evident chunk checkpoints, optionally anchored by TPM or a
+  trusted service, for detecting suffix truncation or collector omission. The
+  roadmap must not claim impossible zero overhead; the target is bounded
+  constant overhead with zero allocation and zero locking on normal emission.
 
 Verification:
 
@@ -3486,13 +3705,19 @@ Verification:
   not prevent task dispatch.
 - Host tests prove advice cannot select an invalid core or migrate a task
   outside allowed affinity/security-domain policy.
+- Host tests prove raw advice cannot be executed without producing a
+  `ValidatedScheduleAction`.
+- Host tests prove authority-critical audit-buffer failure blocks the operation
+  while noncritical telemetry loss does not block dispatch.
 - QEMU smoke proves the scheduler continues with AI disabled, model timeout,
   and telemetry loss counters.
 
 Exit criteria:
 
 - AI is a bounded proposal source, and deterministic scheduler safety does not
-  depend on model liveness or correctness.
+  depend on model liveness or correctness. Claims about preventing a malicious
+  policy service from monopolizing a core require preemptive CPU enforcement to
+  be active.
 
 ## Phase 15: Integration And 1.0 Hardening
 

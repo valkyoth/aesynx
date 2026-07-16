@@ -828,11 +828,12 @@ bits 56..63  type tag
 pub struct CapId(u64);
 
 pub struct Capability {
-    object_id: ObjectId,
+    target: AuthorityHandle,
     base: Option<VirtAddr>,
     len: Option<u64>,
     perms: CapPerms,
-    owner: PrincipalId,
+    owner: PrincipalIncarnation,
+    table: CapTableIncarnation,
     generation: u32,
     revocation_epoch: u64,
     kind: CapKind,
@@ -905,11 +906,14 @@ Required operations:
 - `grant_shared_buffer`.
 - `map_shared_buffer`.
 - `derive_cap`.
-- `check`.
+- `resolve_live_authority`.
+- `prepare_authorized_operation`.
+- `commit_authorized_operation`.
 - `grant_copy`.
 - `grant_move`.
 - `borrow`.
-- `revoke`.
+- `revoke_prospective`.
+- `revoke_strong`.
 - `seal`.
 - `unseal`.
 - `describe_for_debug`, redacted by default.
@@ -935,10 +939,16 @@ requiring every caller to remember a sequence of table, registry, endpoint, and
 epoch checks. Examples:
 
 ```rust
-LiveCapLease<'registry, MemoryRights>
+AuthorizedOperation<'registry, MemoryRights>
 CheckedEndpointSend<'dispatch>
 MapPermit<'address_space>
 ```
+
+Checked proofs are not ambient long-lived tickets. A proof either performs
+commit-time generation/epoch revalidation, is registered as an in-flight lease
+that revocation can freeze and drain, or is a read-side critical-section token
+visible to the authority registry. Proofs that are only preflight evidence
+cannot authorize the final mutation.
 
 Low-level table permission checks may remain as internal preflight helpers, but
 they must not be named or documented as complete authorization checks unless
@@ -953,6 +963,14 @@ Grant over IPC is transactional. The sender reserves a pending receiver slot,
 sends a grant proposal with a transaction ID, waits for explicit acceptance,
 then commits the receiver slot. Abort, timeout, full queue, dead receiver, and
 retry paths must leave no usable phantom authority and must be idempotent.
+The final commit revalidates the sender's live authority and computes:
+
+```text
+delegated_rights <= requested_rights & live_sender_rights & delegable_rights
+```
+
+Powerful rights such as `ADMIN`, `REVOKE`, `GRANT`, executable/JIT,
+writable-sharing, and DMA rights never propagate implicitly.
 
 ### 8.4 Revocation
 
@@ -1028,11 +1046,16 @@ instead of wrapping.
 
 ```rust
 pub trait KernelObject {
-    fn object_id(&self) -> ObjectId;
+    fn authority_handle(&self) -> AuthorityHandle;
     fn object_type(&self) -> ObjectType;
-    fn owner_core(&self) -> CoreId;
+    fn owner_domain(&self) -> PrincipalIncarnation;
+    fn routing_owner_core(&self) -> CoreId;
 }
 ```
+
+`routing_owner_core()` is a locality and mutation-routing fact. It is not a
+security principal by itself. Authorization uses the owning domain/principal
+incarnation plus capability proofs minted by the dispatcher and registry.
 
 Object types:
 
