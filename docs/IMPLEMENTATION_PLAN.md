@@ -1076,11 +1076,13 @@ canonical reservation plan, every prepared reservation generation, and
 parent-local audit placeholder evidence. Child-owner placement is
 kernel-controlled, frozen into the reservation plan with placement-policy
 identity, topology epoch, selected owner incarnation, and capacity-configuration
-generation, and cannot be changed mid-transaction; caller locality preferences
-are hints, and destination-table ownership does not imply child ownership.
-Placement/topology/capacity changes before prepare require replanning under a
-new transaction ID, while retries of the same transaction return the original
-placement decision. Same-owner parent/child/destination
+identity, and cannot be changed mid-transaction; caller locality preferences are
+hints, and destination-table ownership does not imply child ownership. The
+capacity identity is a hash of the canonical owner-capacity manifest, while each
+prepared reservation records its resource owner's local capacity generation.
+Placement/topology/capacity-manifest changes before prepare require replanning
+under a new transaction ID, while retries of the same transaction return the
+original placement decision. Same-owner parent/child/destination
 transactions may elide IPC, but they keep the same logical manifest, states,
 reservations, audit placeholder, permit consumption, publication checks, and
 recovery semantics. The parent persists a
@@ -1091,8 +1093,9 @@ identity is versioned and domain-separated over canonical bytes, not Rust
 layout. Reservation acquisition follows a canonical order with a
 kernel-generated transaction-priority conflict rule, reserved abort/release
 capacity, explicit fixed-memory sizing constants, per-class terminal-progress
-reserve proofs, and bounded pending counts so persistent reservations cannot
-deadlock, livelock, or exhaust emergency capacity. Distributed parent/child
+reserve proofs with strongly typed capacity units, and bounded pending counts so
+persistent reservations cannot deadlock, livelock, or exhaust emergency
+capacity. Distributed parent/child
 owners track edge state, journal decision, terminal resolution, participant
 progress, and child publication separately: journal commit decides outcome, but
 no handle is returned until the child owner locally validates and publishes the

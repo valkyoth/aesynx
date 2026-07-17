@@ -2803,6 +2803,10 @@ new_root_rights <= requested_rights
     budget;
   - capacity is split into ordinary, recovery, abort/release, and revocation
     classes. Ordinary requests cannot consume emergency capacity;
+  - capacity amounts use strongly typed per-class units. Journal records,
+    message credits, audit slots, revocation work items, participant recovery
+    records, and TLB/DMA cleanup records cannot be added, compared, or
+    substituted as interchangeable scalar capacity;
   - capacity changes alter the relevant protocol/configuration identity, so old
     acknowledgements cannot silently carry into a differently sized protocol;
   - exhaustion returns typed errors without partial mutation;
@@ -2848,10 +2852,22 @@ RequiredReservationPlan {
     topology_epoch,
     participant_set_epoch,
     selected_child_owner_incarnation,
-    capacity_config_generation,
+    capacity_config_identity,
     canonical_entries_hash,
     mandatory_resource_class_bitmap,
 }
+```
+
+  - `capacity_config_identity` is the canonical identity of an immutable
+    capacity manifest:
+
+```text
+capacity_config_identity =
+    H(canonical_sorted(
+        owner_incarnation,
+        owner_capacity_generation,
+        per_class_limits
+    ))
 ```
 
   - plan identity is computed over a versioned canonical byte string:
@@ -2867,21 +2883,23 @@ plan_identity =
     enum or structure layout in the hashed bytes;
   - `canonical_plan_bytes` includes operation kind, relation-policy identity,
     placement-policy identity, topology epoch, participant-set epoch, selected
-    child-owner incarnation, capacity-configuration generation, resource
+    child-owner incarnation, capacity-configuration identity, resource
     owners, resource classes, bounded quantities/slots, terminal release
     policies, and the mandatory-class bitmap;
-  - `capacity_config_generation` is a recovery/configuration identity for
+  - `capacity_config_identity` is a recovery/configuration identity for
     fixed-memory sizing and reserve accounting. It is not automatically the
     fabric wire protocol version, and cores may have different fixed capacities
     without becoming wire-incompatible when the canonical plan names the
-    capacity generation used for that transaction;
+    immutable manifest identity used for that transaction;
   - owners validate the canonical fields they receive against their local
     resource state and relation-policy view, not merely equality of a
     caller-provided hash;
   - placement is recomputed or validated immediately before prepare. A topology
     epoch change, placement-policy change, selected-owner-incarnation change,
-    or capacity-configuration generation change before prepare requires
+    or capacity-configuration identity change before prepare requires
     replanning under a new transaction ID;
+  - an owner capacity change either changes the owner incarnation or invalidates
+    every outstanding reservation under the old owner capacity generation;
   - after prepare, the frozen participant set and selected child owner remain
     authoritative unless an owner incarnation becomes invalid. Invalid
     incarnations drive abort, recovery, or quarantine rather than transparent
@@ -2930,6 +2948,7 @@ PreparedReservation {
     transaction_id,
     resource_class,
     resource_owner_incarnation,
+    resource_owner_capacity_generation,
     reservation_generation,
     bounded_amount_or_slot,
     terminal_release_policy,
@@ -2944,8 +2963,11 @@ PreparedReservation {
   - the destination table owner reserves the destination capability-table slot;
   - each owner is the only writer for its own reservation and duplicate
     commit/abort/release messages are idempotent;
-  - prepared acknowledgements include reservation generations and are bound into
-    the commit certificate;
+  - prepared acknowledgements include reservation generations and owner-local
+    capacity generations and are bound into the commit certificate;
+  - an owner cannot acknowledge using capacity from one generation and commit
+    under another;
+  - unknown or mismatched capacity generations fail before commit;
   - timeout alone cannot release a reservation while commit may have been
     observed;
   - reservations from an obsolete owner incarnation cannot satisfy a new
@@ -3192,15 +3214,18 @@ Verification:
   incarnations, and replay-window retirement without producing usable orphan
   children.
 - Host/model tests prove prepared reservation manifests record transaction ID,
-  resource class, resource-owner incarnation, reservation generation,
-  bounded amount/slot, and terminal release policy for each resource; parent,
-  child, and destination owners write only their own reservations; prepared
-  acknowledgements bind reservation generations into the commit certificate; and
+  resource class, resource-owner incarnation, resource-owner capacity
+  generation, reservation generation, bounded amount/slot, and terminal release
+  policy for each resource; parent, child, and destination owners write only
+  their own reservations; prepared acknowledgements bind reservation
+  generations plus owner-local capacity generations into the commit certificate;
+  an owner cannot acknowledge under one capacity generation and commit under
+  another; unknown or mismatched capacity generations fail before commit; and
   obsolete owner-incarnation reservations cannot satisfy a new transaction.
 - Host/model tests prove the canonical `RequiredReservationPlan` is derived
   from operation kind, immutable relation-policy identity, placement-policy
   identity, topology epoch, participant-set epoch, selected child-owner
-  incarnation, capacity-configuration generation, object state, and destination
+  incarnation, capacity-configuration identity, object state, and destination
   identity; callers cannot choose resource classes, release policy,
   participants, placement outcome, or quantities; entries are canonical,
   ordered, and unique; missing, duplicated, conflicting, or unknown mandatory
@@ -3208,16 +3233,21 @@ Verification:
   prepared reservation generation; acknowledgements cannot substitute another
   slot/amount; same-transaction retries return the original placement decision;
   pre-prepare topology, placement-policy, owner-incarnation, or
-  capacity-generation changes force replanning with a new transaction ID; and
-  policy/placement/topology/capacity migration changes the plan identity.
+  capacity-manifest changes force replanning with a new transaction ID; owner
+  capacity changes either change owner incarnation or invalidate outstanding
+  reservations under the old owner capacity generation; asymmetric per-core
+  capacities remain wire-compatible; and policy/placement/topology/capacity
+  migration changes the plan identity.
 - Host/model tests prove plan identity uses the
   `aesynx-derived-reservation-plan-v1` domain-separation label, explicit hash
   algorithm/version, fixed-width little-endian canonical encoding, explicit list
   lengths, no Rust enum/layout bytes, and includes operation, policy identity,
   placement policy, topology epoch, participant epoch, selected child owner,
-  capacity-configuration generation, resource owners/classes/quantities,
-  release policies, and mandatory-class bitmap. Owners validate canonical
-  fields rather than trusting a supplied hash, and hash migration rejects old
+  capacity-configuration identity, resource owners/classes/quantities, release
+  policies, and mandatory-class bitmap. The capacity identity is the hash of a
+  canonical sorted manifest of owner incarnation, owner-local capacity
+  generation, and typed per-class limits. Owners validate canonical fields
+  rather than trusting a supplied hash, and hash migration rejects old
   acknowledgements.
 - Host/model crash tests prove parent-local bootstrap order: no remote prepare
   is sent before parent journal slot plus abort/recovery capacity are reserved,
@@ -3245,7 +3275,9 @@ Verification:
   preparing transactions, recovering edges, and concurrent strong revokes.
   Tests saturate combinations, not only each limit independently, and prove
   admission into `Preparing` consumes the required terminal-progress credits
-  before any remote side effect.
+  before any remote side effect. Tests also cover asymmetric per-core capacity
+  manifests and capacity-generation changes during planning, prepare, recovery,
+  and commit.
 - Host/model tests cover two-or-more-coordinator reservation contention with
   opposite acquisition orders, full capacity, delayed release messages,
   repeated retries, coordinator failure, and eventual progress under stated

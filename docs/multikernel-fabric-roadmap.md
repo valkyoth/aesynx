@@ -506,14 +506,16 @@ Priority proof targets:
   same-owner fast-path equivalence, parent-owner coordinator locality,
   owner-local reservation manifests, canonical required-reservation plans with
   versioned domain-separated identities that include placement-policy identity,
-  topology epoch, selected child-owner incarnation, and capacity-configuration
-  generation, parent-local preparing-record persistence before remote side
-  effects, transaction-bound reservation consumption/release, per-class
-  fixed-memory terminal-progress capacity accounting, deadlock/livelock-free
-  reservation acquisition, deterministic priority conflict resolution, permit
-  consumption at the parent-owned journal commit transition, parent-local audit
-  placeholder finalization, recoverable quarantine, `ResourceLost` terminal
-  tombstones, provenance recording, and cascading revocation. Future
+  topology epoch, selected child-owner incarnation, capacity-configuration
+  manifest identity, and owner-local capacity generations in prepared
+  reservations, parent-local preparing-record persistence before remote side
+  effects, transaction-bound reservation consumption/release, strongly typed
+  per-class fixed-memory terminal-progress capacity accounting,
+  deadlock/livelock-free reservation acquisition, deterministic priority
+  conflict resolution, permit consumption at the parent-owned journal commit
+  transition, parent-local audit placeholder finalization, recoverable
+  quarantine, `ResourceLost` terminal tombstones, provenance recording, and
+  cascading revocation. Future
   multi-parent support requires its own
   `ParentSetManifest` model before any implementation accepts more than one
   parent.
@@ -545,9 +547,10 @@ Priority proof targets:
   reservation deadlock/livelock, remote reservation before recoverable
   parent-local prepare state, inconsistent transaction-priority conflict
   handling, caller-controlled child-owner selection, local-path authorization
-  bypass, same-transaction placement drift, emergency-capacity consumption by
-  ordinary requests, insufficient per-class terminal-progress reserve, or cycle
-  under concurrent edge transactions.
+  bypass, same-transaction placement drift, capacity-generation mismatch at
+  commit, scalar mixing of typed capacity classes, emergency-capacity
+  consumption by ordinary requests, insufficient per-class terminal-progress
+  reserve, or cycle under concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and
