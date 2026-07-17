@@ -1040,6 +1040,11 @@ as domain kill, task kill, task exception-endpoint mutation, debug memory write,
 fault-frame modification/resume, and scheduling-ceiling changes are
 non-delegable by default. Domain possession, address-space possession, and
 executable possession do not imply authority to create tasks.
+Task join/result rights are not a single lifetime: `WAIT` is repeatable until
+completion, `READ_RESULT` is bounded and either repeatable or policy-marked
+one-shot, and `CONSUME_RESULT` is the one-shot operation with an explicit
+linearization point. Exit results do not carry raw capability handles; returned
+capabilities move through a separate audited grant transaction.
 
 External `CapId` kind tags are routing hints only. The registry slot's live
 object kind and incarnation control decoding and dispatch; a payload tag can
@@ -1779,6 +1784,11 @@ synchronization, image-instance seal, then final RX mapping. A physical frame
 must never be writable in one address space while executable in another, shared
 text is allowed only when placement-independent and identical, and failed
 validation tears down and sanitizes staging frames before reuse.
+Each image instance records source object incarnation, source execution
+authority lineage, load-manifest identity, image-instance incarnation, load
+generation, mapping lineage, and owning domain incarnation. Source, lineage
+subtree, image-instance, and object-wide revocation scopes use the same
+selective-revocation machinery as other capability-derived objects.
 
 ## 15. Device and Driver Model
 

@@ -2309,11 +2309,24 @@ Deliverables:
   `TaskFactory::CREATE_TASK`; creating a task requires task quota, stack/TLS
   memory, scheduling-context authority, and target-domain authority. A task
   capability cannot be reinterpreted as a domain capability or vice versa.
-- Join/result capabilities are one-shot and task-incarnation-bound. Reading a
-  task result does not imply task control, task-local exit cannot revoke the
-  whole domain unless it is the last task under configured policy, and domain
-  teardown dominates every task-local capability by consuming or retiring
-  outstanding join/result objects.
+- Task join/result capabilities are task-incarnation-bound but have distinct
+  consumption semantics:
+  - `WAIT` may be called repeatedly until completion and does not consume the
+    capability;
+  - `READ_RESULT` returns a bounded immutable result and is either repeatable
+    for observer capabilities or explicitly marked one-shot by object policy;
+  - `CONSUME_RESULT` is always one-shot and transitions the result object to
+    consumed for that holder at a named consume linearization point;
+  - move-only join capabilities have exactly one consumer;
+  - copyable observer capabilities may wait/read but cannot consume or control
+    the task;
+  - consuming one observer capability does not destroy the result for other
+    authorized observers unless object policy explicitly selects
+    single-consumer semantics.
+  Reading a task result does not imply task control, task-local exit cannot
+  revoke the whole domain unless it is the last task under configured policy,
+  and domain teardown dominates every task-local capability by consuming or
+  retiring outstanding join/result objects.
 - `ADMIN` is removed from generic enforcement paths or constrained so it never
   implies another right. Every administrative operation has an exact typed
   operation identifier, `ADMIN` is not an override for failed `READ`, `WRITE`,
@@ -5175,6 +5188,26 @@ Deliverables:
     object-wide policy explicitly selects broader scope;
   - source deletion cannot reclaim backing pages while image instances or
     shared-text mappings remain pinned;
+  - executable image instances participate in the normal capability derivation
+    and selective-revocation lineage graph rather than a loader-only side
+    graph;
+  - every image instance records source object incarnation, source
+    execution-authority lineage, load-manifest identity, image-instance
+    incarnation, load generation, mapping lineage, and owning domain
+    incarnation;
+  - revoking a loader/execute capability prevents that principal from creating
+    new instances but does not affect instances created through unrelated
+    authority unless object-wide scope is selected;
+  - revoking a source-lineage subtree finds and revokes every image derived
+    through that lineage;
+  - strong source-object revocation freezes new loads and tears down every
+    derived image instance and shared-text mapping before it can report
+    completion;
+  - deleting a source object is allowed only after every image instance,
+    shared-text mapping, load transaction, and executable pin is drained;
+  - shared text cannot outlive the backing source incarnation unless it has
+    been promoted into a separately owned immutable code object with its own
+    authority lineage;
   - executable image revocation, downgrade, or replacement uses the same TLB
     and residency protocol as ordinary mapping revocation;
   - x86_64 cannot define the portable instruction-cache rule as a no-op for
@@ -5225,6 +5258,18 @@ Verification:
 - Host tests prove source revocation blocks new image creation.
 - Host tests prove image-instance revocation does not accidentally revoke
   unrelated instances unless object-wide scope was selected.
+- Host tests prove revoking one principal's load authority does not affect
+  instances created through unrelated authority unless object-wide scope was
+  selected.
+- Host tests prove source-lineage subtree revocation discovers every derived
+  image instance and shared-text mapping.
+- Host tests prove strong source-object revocation cannot complete while any
+  derived image remains executable.
+- Host tests prove an image instance cannot be rebound to a recreated source
+  object with the same user-visible name.
+- Host tests prove shared text cannot outlive the backing source incarnation
+  unless it was promoted into a separately owned immutable code object with its
+  own authority lineage.
 - Host tests prove source backing cannot be reclaimed while any image instance
   or shared-text mapping remains live.
 - Host tests prove executable downgrade/revocation follows the same TLB,
@@ -5591,7 +5636,20 @@ Deliverables:
     empty supervisor domain alive.
 - Join/result capabilities are explicit one-shot objects bound to task
   incarnation, domain incarnation, and exit-generation state.
+- Join/result operation semantics:
+  - `WAIT` is repeatable until completion and does not consume the join/result
+    capability;
+  - `READ_RESULT` returns a bounded immutable result and is repeatable only for
+    observer policies that explicitly allow repeated reads;
+  - `CONSUME_RESULT` is one-shot, has a named linearization point, and
+    transitions the result to consumed for that holder;
+  - cancellation and timeout never consume a result that completed
+    concurrently unless the consume linearization point was reached.
+- Result storage has a bounded retention deadline or quota and is reclaimed by
+  policy after every authorized holder has consumed, expired, or been revoked.
 - Reading a task result does not imply task control.
+- Exit results cannot contain raw capability handles. Any capability returned
+  by a task must transfer through a separate audited grant transaction.
 - Fault containment rules define which faults terminate only the task, which
   terminate the domain, and which may be delivered to an authorized external
   pager/debug service.
@@ -5616,6 +5674,14 @@ Verification:
   derived from only domain, address-space, or executable possession.
 - Tests prove task IDs, join capabilities, and result capabilities reject stale
   incarnations after task reuse.
+- Model tests cover completion racing with wait timeout, cancellation,
+  `READ_RESULT`, `CONSUME_RESULT`, domain teardown, result retention expiry,
+  and task-incarnation reuse.
+- Tests prove consuming one observer result does not destroy availability for
+  other authorized observers unless single-consumer policy was explicitly
+  selected.
+- Tests prove exit results cannot carry raw capability handles and capability
+  return uses a separate audited grant transaction.
 - Tests prove `KILL` and exception-endpoint mutation rights are nondelegable by
   default and generic `ADMIN` does not satisfy task lifecycle rights.
 - Address-space mutation tests prove no runnable task can execute with a stale
