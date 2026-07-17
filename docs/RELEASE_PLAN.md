@@ -3302,6 +3302,12 @@ Verification:
   O(number of transaction participants), not O(system cores). Owners validate
   canonical fields rather than trusting a supplied hash, and hash migration
   rejects old acknowledgements.
+- Checked-in cross-endian golden byte vectors cover reservation-plan canonical
+  encoding, participant-capacity bindings, class-limit digest input, final
+  plan identity, and final capacity identity. The vector corpus includes
+  empty, minimum, and maximum lists; unknown mandatory capacity classes;
+  asymmetric owners; and hash/schema-version changes. Encoders and decoders
+  must reproduce these vectors before the format is treated as stable.
 - Host/model crash tests prove parent-local bootstrap order: no remote prepare
   is sent before parent journal slot plus abort/recovery capacity are reserved,
   the torn-record-protected `Preparing` record is persisted, and the

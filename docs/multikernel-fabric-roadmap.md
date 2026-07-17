@@ -530,7 +530,10 @@ Priority proof targets:
   assumptions, especially where MMIO, IPI, DMA, TLB, or cache maintenance is
   involved.
 - Cross-endian fabric golden vectors and decoder fuzzing for every stable wire
-  format.
+  format. Derived-edge vectors include reservation-plan canonical encoding,
+  participant-capacity bindings, class-limit digest input, final plan identity,
+  and final capacity identity, with empty/minimum/maximum lists, unknown
+  mandatory classes, asymmetric owners, and hash/schema-version changes.
 - Differential and metamorphic BootInfo normalization tests so parser behavior
   is checked beyond fuzz-generated cases.
 - Test-only fault injection for dropped, duplicated, delayed, and reordered
