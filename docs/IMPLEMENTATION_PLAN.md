@@ -1071,8 +1071,12 @@ journal/replay, audit placeholder, revocation-progress, and backing resources,
 inherited provenance, and rights bounded by requested rights, live child rights,
 and policy promotable rights; it cannot launder an object out from under pending
 parent revocation. Child and destination owners send generation-stamped prepared
-acknowledgements; the parent-owned commit certificate binds the complete
-reservation manifest and audit placeholder evidence. Distributed parent/child
+acknowledgements; the parent-owned commit certificate binds a kernel-generated
+canonical reservation plan, every prepared reservation generation, and
+parent-local audit placeholder evidence. Reservation acquisition follows a
+canonical order with deterministic transaction priority, reserved abort/release
+capacity, and bounded pending counts so persistent reservations cannot deadlock
+capacity. Distributed parent/child
 owners track edge state, journal decision, terminal resolution, participant
 progress, and child publication separately: journal commit decides outcome, but
 no handle is returned until the child owner locally validates and publishes the

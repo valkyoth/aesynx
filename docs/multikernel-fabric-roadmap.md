@@ -503,12 +503,14 @@ Priority proof targets:
   strong-revocation linearization.
 - TLA+ or Quint models for derived-edge creation, promotion/detachment, v1
   single-parent publication, parent-owner coordinator locality, owner-local
-  reservation manifests, transaction-bound reservation consumption/release,
-  permit consumption at the parent-owned journal commit transition, audit
-  placeholder finalization, recoverable quarantine, `ResourceLost` terminal
-  tombstones, provenance recording, and cascading revocation. Future
-  multi-parent support requires its own `ParentSetManifest` model before any
-  implementation accepts more than one parent.
+  reservation manifests, canonical required-reservation plans,
+  transaction-bound reservation consumption/release, deadlock/livelock-free
+  reservation acquisition, permit consumption at the parent-owned journal commit
+  transition, parent-local audit placeholder finalization, recoverable
+  quarantine, `ResourceLost` terminal tombstones, provenance recording, and
+  cascading revocation. Future multi-parent support requires its own
+  `ParentSetManifest` model before any implementation accepts more than one
+  parent.
 - Kani, Verus, or equivalent bounded proofs for permission attenuation, range
   containment, generation retirement, and scheduler action validation.
 - Loom models for SPSC publication, slot reuse, cursor caching, and
@@ -533,7 +535,8 @@ Priority proof targets:
   cross-core transmission of an internal derivation permit, ordinary allocation
   required after derived-edge commit, stale permit replay, delayed commit/abort
   resurrection after `ResourceLost`, missing audit evidence for an
-  authority-creating commit, or cycle under concurrent edge transactions.
+  authority-creating commit, reservation-plan substitution, persistent
+  reservation deadlock/livelock, or cycle under concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and

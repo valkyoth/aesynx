@@ -2769,6 +2769,33 @@ new_root_rights <= requested_rights
     edge records;
   - messages involving obsolete owner incarnations fail closed.
 - Edge publication reserves revocation progress resources:
+  - before prepare, the parent-owned coordinator derives a canonical
+    kernel-generated reservation plan from the immutable relation policy and
+    operation:
+
+```text
+RequiredReservationPlan {
+    operation_kind,
+    relation_policy_identity,
+    participant_set_epoch,
+    canonical_entries_hash,
+    mandatory_resource_class_bitmap,
+}
+```
+
+  - callers cannot select `resource_class`, `terminal_release_policy`,
+    participant set, or required quantities;
+  - required resource classes are determined only by operation kind,
+    relation-policy identity, object state, destination identity, and the
+    current participant-set epoch;
+  - reservation entries are canonically ordered and unique. Missing, duplicated,
+    conflicting, or unknown mandatory entries reject commit;
+  - the commit certificate binds the required-plan hash and every prepared
+    reservation generation;
+  - an owner acknowledgement cannot substitute a different slot or amount from
+    the one requested by the canonical plan;
+  - policy migration changes the plan identity and cannot reuse old prepared
+    reservations;
   - every distributed reservation is represented by a fixed manifest entry:
 
 ```text
@@ -2796,6 +2823,19 @@ PreparedReservation {
     observed;
   - reservations from an obsolete owner incarnation cannot satisfy a new
     transaction;
+  - reservations are acquired in canonical order by protocol rank, owner
+    incarnation, and resource class;
+  - no owner synchronously waits for another owner while holding an owner-state
+    guard;
+  - if the next reservation is unavailable, the coordinator records abort and
+    releases already prepared reservations through reserved control capacity;
+  - deterministic transaction priority based on transaction epoch/ID prevents
+    contenders from repeatedly forcing each other to retry;
+  - before a commit decision, coordinator timeout may record abort and initiate
+    release; after commit may have been observed, timeout cannot independently
+    release anything;
+  - pending reservations and retries are bounded per principal, object, and
+    owner to prevent reservation-based denial of service;
   - prepare holds transaction-bound reservations for child registry slots, edge
     slots, destination capability-table slots, object/lineage/principal quota
     credits, journal records, replay records, revocation-progress credit,
@@ -2815,14 +2855,18 @@ PreparedReservation {
     capacity, or best-effort journal space;
   - credits are returned only after edge retirement and replay-window closure.
 - Edge publication couples audit evidence to the commit decision:
+  - v1 audit placeholders are parent-owner-local and do not introduce a separate
+    audit owner participant;
   - prepare installs a security-audit placeholder bound to transaction ID,
     operation, pinned policy identity, principal, and reserved audit generation;
   - the journal commit references the audit reservation generation;
-  - commit either finalizes the record atomically on the audit owner or leaves
+  - commit either finalizes the record atomically on the parent owner or leaves
     enough prepared evidence for deterministic recovery to finalize it without
     ordinary allocation;
   - abort finalizes or retires the placeholder as aborted;
   - torn or missing prepared audit evidence prevents commit;
+  - audit finalization cannot synchronously reenter the parent transaction or
+    capability table;
   - audit payloads remain redacted and cannot contain reusable authority
     identifiers.
 - Strong revocation with bounded traversal cannot report partial success:
@@ -3002,10 +3046,25 @@ Verification:
   child, and destination owners write only their own reservations; prepared
   acknowledgements bind reservation generations into the commit certificate; and
   obsolete owner-incarnation reservations cannot satisfy a new transaction.
+- Host/model tests prove the canonical `RequiredReservationPlan` is derived
+  from operation kind, immutable relation-policy identity, participant-set
+  epoch, object state, and destination identity; callers cannot choose resource
+  classes, release policy, participants, or quantities; entries are canonical,
+  ordered, and unique; missing, duplicated, conflicting, or unknown mandatory
+  entries reject commit; commit certificates bind the plan hash plus every
+  prepared reservation generation; acknowledgements cannot substitute another
+  slot/amount; and policy migration changes the plan identity.
 - Host/model tests prove commit is impossible until the complete reservation
   manifest is acknowledged, timeout alone cannot release a reservation while
   commit may have been observed, and duplicate commit/abort/release messages are
   idempotent.
+- Host/model tests cover two-or-more-coordinator reservation contention with
+  opposite acquisition orders, full capacity, delayed release messages,
+  repeated retries, coordinator failure, and eventual progress under stated
+  fairness assumptions. The model proves canonical acquisition order,
+  no-wait-while-guarded discipline, deterministic transaction priority,
+  reserved abort/release capacity, and per-principal/object/owner pending
+  bounds prevent reservation deadlock, livelock, and denial-of-service.
 - Host/model tests prove edge state, transaction decision, and participant
   progress are interpreted separately; received `edge_state` is not
   authoritative by itself, aborted pending edges remain replay-detectable until
@@ -3052,8 +3111,10 @@ Verification:
   reservation generation, torn or missing prepared audit evidence prevents
   commit, committed-but-unfinalized audit records are finalized deterministically
   during recovery without ordinary allocation, abort retires or finalizes the
-  placeholder as aborted, and audit payloads remain redacted without reusable
-  authority identifiers.
+  placeholder as aborted, v1 audit placeholders are parent-owner-local rather
+  than a separate participant, audit finalization cannot synchronously reenter
+  the parent transaction or capability table, and audit payloads remain redacted
+  without reusable authority identifiers.
 - Host/model tests prove strong parent revocation freezes new child creation,
   processes descendants through generation-stamped continuation cursors, leaves
   affected descendants unusable while `Revoking`, and reports success only when
