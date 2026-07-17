@@ -1073,15 +1073,22 @@ and policy promotable rights; it cannot launder an object out from under pending
 parent revocation. Child and destination owners send generation-stamped prepared
 acknowledgements; the parent-owned commit certificate binds a kernel-generated
 canonical reservation plan, every prepared reservation generation, and
-parent-local audit placeholder evidence. The parent persists a
+parent-local audit placeholder evidence. Child-owner placement is
+kernel-controlled, frozen into the reservation plan, and cannot be changed
+mid-transaction; caller locality preferences are hints, and destination-table
+ownership does not imply child ownership. Same-owner parent/child/destination
+transactions may elide IPC, but they keep the same logical manifest, states,
+reservations, audit placeholder, permit consumption, publication checks, and
+recovery semantics. The parent persists a
 torn-record-protected `Preparing` record, parent-local audit placeholder, and
 abort/recovery capacity before the first remote prepare request, so recovery can
 query or release every named participant after restart. Reservation-plan
 identity is versioned and domain-separated over canonical bytes, not Rust
 layout. Reservation acquisition follows a canonical order with a
 kernel-generated transaction-priority conflict rule, reserved abort/release
-capacity, and bounded pending counts so persistent reservations cannot deadlock
-or livelock capacity. Distributed parent/child
+capacity, explicit fixed-memory sizing constants, and bounded pending counts so
+persistent reservations cannot deadlock, livelock, or exhaust emergency
+capacity. Distributed parent/child
 owners track edge state, journal decision, terminal resolution, participant
 progress, and child publication separately: journal commit decides outcome, but
 no handle is returned until the child owner locally validates and publishes the

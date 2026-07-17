@@ -2586,6 +2586,19 @@ DerivedObjectEdge {
   - edges are bounded by per-object and per-principal quotas;
   - v1 child publication is single-parent-only: it uses a newly minted,
     unpublished child with exactly one immutable incoming dependency edge;
+  - child-owner selection is kernel-controlled. Caller-supplied core IDs,
+    owner IDs, and locality preferences are hints only and never authority;
+  - placement considers current owner incarnation, topology epoch, NUMA
+    locality where known, available escrowed quota, registry capacity, and
+    quarantine/restart/drain state;
+  - the selected child owner and placement-policy identity are frozen into the
+    canonical reservation plan before prepare;
+  - owner selection cannot change mid-transaction. Any placement change requires
+    abort plus a new transaction ID;
+  - quarantined, draining, restarting, or stale-incarnation cores cannot be
+    selected as child owner;
+  - destination-table ownership does not automatically imply child-object
+    ownership;
   - only a `Live`, published, unfrozen parent may authorize child creation;
     `Pending`, `Revoking`, `Recovering`, `QuarantinedAwaitingEvidence`,
     `Retired`, or unpublished objects cannot act as parents;
@@ -2708,6 +2721,14 @@ new_root_rights <= requested_rights
     transaction ID;
   - commit is impossible until the complete required reservation manifest and
     audit placeholder evidence have been acknowledged;
+  - if parent, child, and destination table are owned by the same live owner
+    incarnation, the implementation may elide IPC and remote acknowledgements,
+    but it must still use the same transaction states, reservation manifest,
+    parent-local audit placeholder, permit-consumption point, commit
+    certificate shape, and publication checks;
+  - local participant acknowledgements are represented in the same logical
+    manifest as remote acknowledgements, so recovery semantics do not diverge;
+  - there is no separate trusted-local authorization path;
   - transaction commit decision and child publication are separate points: the
     journal commit determines the irreversible transaction outcome; child
     publication occurs later when the child owner locally changes
@@ -2769,6 +2790,31 @@ new_root_rights <= requested_rights
     edge records;
   - messages involving obsolete owner incarnations fail closed.
 - Edge publication reserves revocation progress resources:
+  - implementation must define explicit fixed-memory sizing constants:
+    `MAX_PENDING_DERIVED_TX_PER_CORE`,
+    `MAX_PENDING_DERIVED_TX_PER_PRINCIPAL`,
+    `MAX_RESERVATIONS_PER_TX`, `MAX_CHILDREN_PER_PARENT`,
+    `MAX_DERIVATION_DEPTH`, `MAX_REPLAY_TOMBSTONES`,
+    `MAX_RECOVERING_EDGES`, `MAX_AUDIT_PLACEHOLDERS`,
+    `RESERVED_ABORT_RELEASE_RECORDS`, and
+    `RESERVED_REVOCATION_PROGRESS`;
+  - compile-time or boot-time checked multiplication/addition computes total
+    storage for those constants, with a documented per-core and system-wide byte
+    budget;
+  - capacity is split into ordinary, recovery, abort/release, and revocation
+    classes. Ordinary requests cannot consume emergency capacity;
+  - capacity changes alter the relevant protocol/configuration identity, so old
+    acknowledgements cannot silently carry into a differently sized protocol;
+  - exhaustion returns typed errors without partial mutation;
+  - quarantined and `ResourceLost` records remain charged until their documented
+    retirement points;
+  - required terminal-progress reserves satisfy:
+
+```text
+reserved_terminal_progress_capacity
+    >= maximum_transactions_that_can_reach Preparing
+```
+
   - before prepare, the parent-owned coordinator derives a canonical
     kernel-generated reservation plan from the immutable relation policy and
     operation:
@@ -3047,6 +3093,20 @@ Verification:
   pending/revoking/recovering/quarantined/unpublished parents, computes
   `child_depth = checked(parent_depth + 1)` under a fixed maximum, and cascades
   revocation from the committed parent when policy requires it.
+- Host/model tests prove child-owner selection is kernel-controlled:
+  caller-supplied core/owner IDs and locality preferences are hints only,
+  placement uses owner incarnation, topology epoch, NUMA locality where known,
+  escrowed quota, registry capacity, and quarantine/drain/restart state, the
+  selected child owner and placement-policy identity are frozen into the
+  reservation plan, mid-transaction placement changes require abort plus a new
+  transaction ID, stale/quarantined/draining/restarting owners are rejected, and
+  destination-table ownership does not imply child-object ownership.
+- Differential host/model tests prove same-owner local transactions and
+  distributed transactions produce equivalent decisions, rights, audit records,
+  revocation behavior, and failure outcomes. The local path may elide IPC but
+  must retain the same logical manifest, transaction states, reservations,
+  permit consumption, audit placeholder, commit certificate, publication checks,
+  and recovery semantics.
 - Host/model tests prove any attempted multi-parent child is rejected until a
   future `ParentSetManifest` milestone defines canonical parent-set identity,
   all-parent approvals, complete-set commit, rights intersection, concurrent
@@ -3125,6 +3185,15 @@ Verification:
   manifest is acknowledged, timeout alone cannot release a reservation while
   commit may have been observed, and duplicate commit/abort/release messages are
   idempotent.
+- Host/model tests exercise every derived-edge sizing constant at zero, one,
+  maximum, and exhaustion, including simultaneous per-principal and global
+  limits. Tests prove checked total-storage arithmetic, documented per-core and
+  system-wide byte budgets, separate ordinary/recovery/abort-release/revocation
+  capacity classes, no ordinary request consuming emergency capacity, typed
+  exhaustion errors without partial mutation, capacity changes updating
+  protocol/configuration identity, charged quarantine/`ResourceLost` records
+  until retirement, and
+  `reserved_terminal_progress_capacity >= maximum_transactions_that_can_reach Preparing`.
 - Host/model tests cover two-or-more-coordinator reservation contention with
   opposite acquisition orders, full capacity, delayed release messages,
   repeated retries, coordinator failure, and eventual progress under stated

@@ -502,15 +502,17 @@ Priority proof targets:
 - TLA+ or Quint models for grant, revoke, coordinator failure, AP restart, and
   strong-revocation linearization.
 - TLA+ or Quint models for derived-edge creation, promotion/detachment, v1
-  single-parent publication, parent-owner coordinator locality, owner-local
-  reservation manifests, canonical required-reservation plans with versioned
-  domain-separated identities, parent-local preparing-record persistence before
-  remote side effects, transaction-bound reservation consumption/release,
-  deadlock/livelock-free reservation acquisition, deterministic priority
-  conflict resolution, permit consumption at the parent-owned journal commit
-  transition, parent-local audit placeholder finalization, recoverable
-  quarantine, `ResourceLost` terminal tombstones, provenance recording, and
-  cascading revocation. Future multi-parent support requires its own
+  single-parent publication, kernel-controlled child-owner placement,
+  same-owner fast-path equivalence, parent-owner coordinator locality,
+  owner-local reservation manifests, canonical required-reservation plans with
+  versioned domain-separated identities, parent-local preparing-record
+  persistence before remote side effects, transaction-bound reservation
+  consumption/release, fixed-memory capacity accounting, deadlock/livelock-free
+  reservation acquisition, deterministic priority conflict resolution, permit
+  consumption at the parent-owned journal commit transition, parent-local audit
+  placeholder finalization, recoverable quarantine, `ResourceLost` terminal
+  tombstones, provenance recording, and cascading revocation. Future
+  multi-parent support requires its own
   `ParentSetManifest` model before any implementation accepts more than one
   parent.
 - Kani, Verus, or equivalent bounded proofs for permission attenuation, range
@@ -540,7 +542,9 @@ Priority proof targets:
   authority-creating commit, reservation-plan substitution, persistent
   reservation deadlock/livelock, remote reservation before recoverable
   parent-local prepare state, inconsistent transaction-priority conflict
-  handling, or cycle under concurrent edge transactions.
+  handling, caller-controlled child-owner selection, local-path authorization
+  bypass, emergency-capacity consumption by ordinary requests, or cycle under
+  concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and
