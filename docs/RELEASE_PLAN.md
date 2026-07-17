@@ -4697,6 +4697,14 @@ Deliverables:
 
 - Exact x86_64 register calling convention for syscall entry, return, and
   faulted return.
+- Architecture-neutral ABI semantics are separated from architecture-specific
+  entry mechanics:
+  - syscall numbers, endpoint operation IDs, wire structures, error codes,
+    capability handles, transaction states, and semantic behavior are identical
+    fixed-width encodings on every supported architecture;
+  - x86_64, future aarch64, and future RISC-V define their own trap
+    instruction, argument registers, return registers, preserved-register set,
+    stack rules, and red-zone or no-red-zone policy.
 - Stack alignment contract at entry and return.
 - ABI version, feature bitmap, and mandatory/optional feature negotiation.
 - Fixed-width syscall numbers, endpoint operation codes, flags, capability
@@ -4755,6 +4763,9 @@ Verification:
 - Host tests fuzz every register field, ABI version, syscall number, flag
   combination, handle generation, pointer/length pair, timeout encoding, and
   reserved field.
+- Cross-architecture golden vectors prove x86_64 and future aarch64/RISC-V
+  decoders interpret the same architecture-neutral request, response, handle,
+  flag, timeout, and error structures identically.
 - Host tests inject interruption at every blocking transaction state and prove
   retry cannot duplicate committed work.
 - Host tests inject copy-in and copy-out faults and prove partial snapshots
@@ -4789,8 +4800,29 @@ Deliverables:
 - Kernel-stamped fault messages contain only redacted virtual-address class,
   fault type, access type, task/domain incarnation class, instruction-pointer
   class, and bounded register summary.
+- Two fault outputs:
+  - telemetry/audit fault records are always redacted and safe for unrelated
+    observers;
+  - capability-authorized same-domain exception messages may contain exact
+    user-space fault addresses, user instruction pointers, and a defined
+    register subset required for recovery, but never kernel addresses,
+    physical addresses, page-table values, or unrelated-domain state.
 - No raw kernel addresses, physical addresses, CR3 values, page-table roots, or
   raw page-table entries in user fault messages.
+- Recoverable exception-delivery contract:
+  - one-shot exception-resume capability;
+  - resume token bound to fault transaction, task incarnation, domain
+    incarnation, and saved-frame generation;
+  - exact set of registers the handler may inspect or modify;
+  - separate rights for inspect, modify, map, and resume;
+  - resume rejected if the task was killed, migrated, restarted, or faulted
+    again;
+  - pager endpoint requires explicit address-space mapping authority;
+  - handler cannot convert a protection fault into a mapping without the
+    relevant memory-object and address-space capabilities;
+  - timeout, recursive fault, or handler death consumes the resume token and
+    enters teardown;
+  - at most one live resume token per stopped fault frame.
 - Recursive exception-delivery depth limit.
 - Separate or guard-protected handler stack policy.
 - Full or faulting exception endpoint falls back to deterministic termination
@@ -4809,6 +4841,12 @@ Verification:
   fatal or endpoint-delivery path.
 - Host tests prove fault messages redact addresses and reject stale
   task/domain incarnations.
+- Tests prove authorized exception messages expose exact user-space recovery
+  data only to holders of the correct endpoint/debug/pager capabilities.
+- Tests prove resume tokens are one-shot, frame-generation-bound, and rejected
+  after kill, migration, restart, repeated fault, timeout, or handler death.
+- Tests prove a pager cannot install mappings without the relevant memory and
+  address-space capabilities.
 - Tests prove recursive endpoint faults hit the depth limit and terminate
   deterministically.
 - Tests prove debugger caps cannot inspect or resume unrelated domains.
@@ -4854,6 +4892,19 @@ Deliverables:
     space.
 - Startup information block with ABI version, runtime feature bits, initial
   capability bundle, stack/TLS layout, endpoint handles, and redaction policy.
+- Startup block immutability:
+  - kernel constructs it in owned memory;
+  - it is mapped read-only into the new domain;
+  - variable-length data is bounded and offset-based, not pointer-linked;
+  - every offset and count is validated against the block size;
+  - capability handles are table-local and invalid outside the new domain;
+  - unused padding is zero;
+  - no kernel pointers, physical addresses, raw object IDs, KASLR data, or
+    other domains' handles are present;
+  - the child may copy it but cannot treat it as live mutable kernel state;
+  - later capability changes arrive through endpoints, not startup-block
+    mutation;
+  - restart produces a new startup-block generation.
 - Runtime panic and exit reporting through explicit endpoint/capability
   authority, not ambient process-parent assumptions.
 
@@ -4864,6 +4915,8 @@ Verification:
   rejection, and no Rust-only enum layout in public ABI values.
 - Host/QEMU tests cover TLS unsupported-mode rejection or TLS base validation,
   save/restore, migration handoff, teardown reset, and FSGSBASE policy.
+- Host tests fuzz startup-block offsets, counts, padding, table-local handles,
+  generation reuse, and forbidden pointer/address fields.
 - Runtime tests prove debug output redacts capability handles and raw object
   identifiers.
 
@@ -4917,19 +4970,43 @@ ELF policy engine.
 Architecture:
 
 - Full ELF parsing should live in a confined loader service where possible.
-- The kernel consumes a bounded canonical load plan bound to a sealed
-  executable-object hash.
+- Preferred trust model is a canonical signed load manifest: the executable
+  object contains a canonical segment/load manifest covered by the object
+  signature or boot-capsule signature, and the kernel checks the proposed load
+  plan exactly matches it.
+- The kernel consumes a bounded canonical load plan bound to the sealed
+  executable-object hash and canonical load-manifest identity.
 - The kernel independently validates every security-relevant mapping invariant
   before installing mappings.
 - Initial `aesynx-init` may use a boot-capsule-provided, hash-bound load plan
-  to avoid a circular dependency on `loaderd`.
+  to avoid a circular dependency on `loaderd`, but that plan is covered by the
+  verified boot capsule, not merely placed next to it.
 
 Deliverables:
 
 - Sealed executable object identity: exact bytes, content hash, architecture,
   ABI version, entry point, requested capability set, and manifest provenance.
+- Content hash and sealed identity are mandatory for loader correctness.
+  Signature authenticity is mandatory only for trust policies that claim
+  publisher provenance. An unsigned executable may still be sandboxed if policy
+  allows it, but a signature never grants capabilities automatically, and
+  signed/unsigned artifacts cannot collide under one executable identity.
+- Plan version, executable ABI, canonical load-manifest hash, executable object
+  hash, and capability request manifest are part of the signed/hash-bound
+  identity.
+- Two distinct valid interpretations of the same executable bytes are not
+  permitted unless they have distinct manifest identities.
 - Bounded canonical load-plan format with fixed-width fields and no Rust layout
   dependency.
+- Kernel load-plan checks:
+  - every mapped byte range corresponds to a declared manifest segment;
+  - file offsets, virtual ranges, access flags, entry point, and relocation
+    records match the canonical load manifest;
+  - no executable mapping can be manufactured from arbitrary data inside the
+    same sealed object;
+  - capability requests are bound to the same executable identity and load
+    manifest;
+  - boot-provided init load plans are covered by the verified boot capsule.
 - ELF validation policy for the loader service:
   - supported class, endianness, machine, ABI, and file type;
   - static ELF only initially;
@@ -4950,7 +5027,8 @@ Deliverables:
   - no text relocations;
   - RELRO or equivalent sealing where applicable.
 - Executable backing cannot change between validation and mapping. The load
-  plan is bound to the sealed executable hash and manifest.
+  plan is bound to the sealed executable hash, canonical load manifest, and
+  capability request manifest.
 - Transactional mapping creation: any failure removes every partially installed
   segment, stack, heap, TLS, queue, and startup-block mapping.
 - User ASLR:
@@ -4978,8 +5056,14 @@ Verification:
   dynamic fields, entry-point confusion, and wraparound arithmetic.
 - Differential tests against an independent host parser fixture for accepted
   and rejected ELF/load-plan cases.
-- Host tests prove load-plan hash mismatch, manifest mismatch, backing-object
-  mutation, and unsupported relocation fail before mapping.
+- Host tests prove load-plan hash mismatch, canonical load-manifest mismatch,
+  capability request manifest mismatch, backing-object mutation, and
+  unsupported relocation fail before mapping.
+- Host tests prove loaderd cannot select arbitrary object ranges, mark data as
+  executable, choose a different entry point, omit security-relevant ELF
+  metadata, or reinterpret the same executable object under a second identity.
+- Boot-capsule tests prove init's load plan is covered by the verified capsule
+  signature/manifest.
 - Host tests prove transactional failure removes every partially installed
   segment and returns quotas/capability reservations.
 - QEMU smoke loads init from a sealed boot-capsule load plan, then loads a
@@ -5004,6 +5088,17 @@ Deliverables:
 
 - Spawn transaction state machine for staging, validation, commit, abort, and
   recovery.
+- Typed domain-lifecycle capabilities:
+  - `DomainFactoryRights::SPAWN`;
+  - `DomainControlRights::{STOP, KILL, RESTART, INSPECT_STATUS,
+    SET_EXCEPTION_ENDPOINT}`;
+  - `DebugRights::{READ_REGISTERS, WRITE_REGISTERS, READ_MEMORY, WRITE_MEMORY,
+    SUSPEND, RESUME}`.
+- Executable-object possession alone does not authorize spawning a domain.
+  `SPAWN` requires explicit quota, scheduling-context, address-space, and
+  executable-object authority.
+- Initial init authority comes from a boot-policy-issued capability bundle, not
+  a hidden kernel exception.
 - Staged resources:
   - new domain and task incarnations;
   - capability table and quota escrow;
@@ -5022,6 +5117,17 @@ Deliverables:
   creator's entire capability table, namespace, current directory, or ambient
   authority.
 - Parent/creator identity does not imply authority over the child after launch.
+  A creator controls a child only if it retains an explicit attenuated
+  `DomainControl` capability.
+- Self-exit is permitted through the caller's current execution context and
+  does not imply control over another task or domain.
+- `STOP` does not imply `KILL`, `INSPECT_STATUS`, debug authority, or
+  `RESTART`. `INSPECT_STATUS` returns redacted lifecycle state only and does
+  not imply memory/register inspection.
+- `RESTART` creates a new domain incarnation and cannot silently reuse old
+  endpoint, capability-table, scheduling-context, exception, or debug authority.
+- Generic `ADMIN` does not satisfy domain factory, domain control, exception,
+  or debug rights.
 - Duplicate spawn commit cannot create two children from one transaction.
 - Stale launch results cannot bind to recycled domain or task IDs.
 - Spawn journal capacity is reserved separately from ordinary endpoint traffic.
@@ -5038,6 +5144,10 @@ Verification:
   endpoint state are reclaimed or retired according to policy.
 - Host tests prove initial capability bundles are exact and no ambient creator
   authority leaks into the child.
+- Host tests prove executable possession alone cannot spawn, `SPAWN` requires
+  quota/scheduling/address-space authority, `ADMIN` does not satisfy typed
+  lifecycle rights, and child control after launch requires an explicit
+  attenuated `DomainControl` capability.
 - Host tests prove stale launch results are rejected after domain/task
   incarnation reuse.
 
@@ -5080,8 +5190,25 @@ Running
 - Quiesce DMA and IRQ authority where present.
 - Drain remote frees and allocator ownership.
 - Remove World Service query leases, projections, and result-stream state.
-- Zero sensitive stack, register-save, TLS, startup block, private heap, and
-  private memory before cross-domain reuse where policy requires zeroing.
+- Cross-domain private-memory sanitization is unconditional for plaintext
+  private memory. A private physical frame is never mapped into a different
+  protection domain until all stale CPU/DMA observers are fenced and the frame
+  has been zeroed or cryptographically erased under a proven memory-encryption
+  key lifecycle.
+- Narrow exceptions:
+  - deliberately shared immutable content;
+  - public executable/package content;
+  - hardware-backed cryptographic erase where retiring the key demonstrably
+    removes access;
+  - same-domain reuse under the same surviving memory-confidentiality
+    incarnation, if explicitly allowed.
+- Sanitization coverage includes kernel stack pages, user stack and TLS pages,
+  register/XSAVE save areas, secret-bearing capability-table slots, IPC and
+  syscall snapshot buffers, page-table pages before reuse as ordinary data,
+  allocator metadata that may contain prior object identities, and crash/fault
+  emergency buffers.
+- Zeroing happens after stale observers are fenced. It is not a substitute for
+  TLB, IOMMU, DMA, or core-execution fencing.
 - Publish exit result through an explicit capability rather than an ambient
   parent relationship.
 - Bound retained exit records so dead or zombie domains cannot exhaust kernel
@@ -5098,6 +5225,10 @@ Verification:
 - Failure-injection tests cover task running during kill, pending reply,
   donated budget, timer wake, in-flight grant, shared mapping, TLB ack loss,
   remote-free backlog, world query lease, and stale exit-result delivery.
+- Tests prove private frames, stack/TLS/register-save areas, IPC/syscall
+  snapshots, page-table pages, allocator metadata, and emergency buffers are
+  fenced then zeroed or cryptographically erased before cross-domain reuse.
+- Tests prove zeroing before fencing is not accepted as teardown completion.
 - Host tests prove duplicate kill/exit/fault events are idempotent.
 - Host tests prove bounded exit records and zombie cleanup cannot exhaust
   kernel memory.

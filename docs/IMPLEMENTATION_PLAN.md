@@ -1719,7 +1719,7 @@ manifest
 ELF image
 required capability declarations
 hash
-signature optional before secure-update phase
+signature/provenance envelope when policy requires publisher trust
 ```
 
 Loader checks:
@@ -1731,6 +1731,21 @@ Loader checks:
 - Text is RX.
 - Data is RW NX.
 - Stack has guard page.
+
+Executable identity rules:
+
+- Content hash and sealed executable identity are mandatory for loader
+  correctness.
+- A canonical load manifest records segment ranges, access flags, entry point,
+  relocation policy, executable ABI, and capability request manifest identity.
+- The kernel load plan must match the canonical load manifest; a loader service
+  cannot manufacture executable mappings from arbitrary bytes inside the same
+  sealed object.
+- Signature authenticity is mandatory only for trust policies that claim
+  publisher provenance. An unsigned executable can still be sandboxed if policy
+  allows it.
+- A signature never grants capabilities automatically.
+- Signed and unsigned artifacts cannot collide under one executable identity.
 
 ## 15. Device and Driver Model
 
