@@ -2501,6 +2501,11 @@ DerivedObjectEdge {
     child_object_incarnation,
     relation_kind,
     edge_generation,
+    edge_state,
+    transaction_id,
+    relation_policy_version,
+    parent_owner_incarnation,
+    child_owner_incarnation,
     revocation_policy,
 }
 ```
@@ -2530,6 +2535,59 @@ DerivedObjectEdge {
     reverse dependency requires it;
   - promoting shared text into an independent code object consumes the original
     dependency and establishes a new explicit authority root.
+- Derived-object promotion and detachment are security-sensitive operations,
+  not mere child control:
+  - promotion requires explicit `PROMOTE` or `DETACH_DERIVATION` authority from
+    the parent authority path;
+  - each relation kind has a kernel-owned relation-policy entry that states
+    whether detachment is permitted;
+  - the caller cannot directly select `revocation_policy`; it comes from the
+    kernel-owned relation-policy table and policy version;
+  - promotion revalidates the parent capability, parent lineage, and edge
+    generation at the promotion linearization point;
+  - promotion fails if parent revocation is pending or already linearized;
+  - promotion is atomic: either the old dependency remains intact, or the new
+    root exists and the old edge is retired;
+  - promotion creates a new object incarnation and records inherited
+    provenance;
+  - promoted shared executable text follows these rules before it can become an
+    independent immutable code object.
+- Distributed edge ownership and recovery for shared-nothing cores:
+  - edge state is `Pending -> Live -> Revoking -> Retired`;
+  - the parent owner holds the authoritative outgoing edge;
+  - the child owner holds an inbound dependency record;
+  - the child is published only after both records reach the committed
+    generation;
+  - every edge message is bound to transaction ID, relation-policy version,
+    parent owner incarnation, child owner incarnation, parent object
+    incarnation, child object incarnation, and edge generation;
+  - recovery handles crash or restart after reservation, after one-sided
+    installation, and after commit before acknowledgement;
+  - edge retirement is not garbage-collected until both owners acknowledge it
+    and its replay window has closed;
+  - messages involving obsolete owner incarnations fail closed.
+- Strong revocation with bounded traversal cannot report partial success:
+  - root revocation first freezes new delegation, derivation, mapping, and
+    promotion at the root;
+  - a bounded revocation worklist is persisted or preallocated before work
+    begins;
+  - descendants are processed incrementally with generation-stamped
+    continuation cursors;
+  - affected objects remain `Revoking` and unusable while traversal continues;
+  - success is reported only after every required owner has fenced or
+    invalidated its descendants;
+  - queue exhaustion, owner timeout, or traversal-budget exhaustion leaves the
+    operation in quarantined/revoking state, never partial success.
+- Concurrent edge insertion must make cycle prevention race-resistant:
+  - incoming edge commits are serialized at the child owner and combined with
+    ordered owner-to-owner transactions, or the validation snapshot carries a
+    topology/edge epoch that must remain unchanged through commit;
+  - parent and child object generations are revalidated at commit;
+  - the transaction is rejected if the validation snapshot changed;
+  - intrinsically hierarchical relation kinds carry checked derivation depth or
+    rank;
+  - unknown relation kinds or relation-policy versions received over IPC are
+    rejected rather than interpreted through defaults.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
   endianness, versioning, domain incarnation fields, and no Rust enum layout
   crossing fabric or userspace boundaries.
@@ -2607,6 +2665,28 @@ Verification:
   crash between child creation and edge publication aborts or quarantines the
   child, cyclic dependency attempts fail before mutation, and edge retirement
   plus source/object ID reuse cannot resurrect a stale child relationship.
+- Host/model tests prove promotion requires parent-side `PROMOTE` or
+  `DETACH_DERIVATION` authority, revalidates the parent and edge generation at
+  the linearization point, fails during parent revocation, and cannot
+  caller-select a weaker revocation policy.
+- Host/model tests prove promotion is atomic: the old dependency remains live
+  on failure, or the new root exists with inherited provenance and the old edge
+  is retired.
+- Host/model tests prove distributed edge recovery handles reservation,
+  one-sided installation, commit-before-acknowledgement, obsolete owner
+  incarnations, and replay-window retirement without producing usable orphan
+  children.
+- Host/model tests prove strong parent revocation freezes new child creation,
+  processes descendants through generation-stamped continuation cursors, leaves
+  affected descendants unusable while `Revoking`, and reports success only when
+  all required owners have fenced or invalidated descendants.
+- Host/model tests prove traversal-budget exhaustion, queue exhaustion, and
+  owner timeout leave the operation quarantined/revoking instead of partially
+  successful.
+- Host/model tests prove concurrent opposite-edge insertion cannot create a
+  cycle, stale validation snapshots are rejected at commit, hierarchical
+  relation depth/rank is enforced, and unknown relation kinds or policy
+  versions from IPC fail closed.
 - Host tests prove stale table entries are tombstoned or reclaimed within
   bounded quotas after revocation.
 - Model tests prove quota-credit accounting preserves the configured ceiling
