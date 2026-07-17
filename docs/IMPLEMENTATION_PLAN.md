@@ -1043,8 +1043,17 @@ executable possession do not imply authority to create tasks.
 Task join/result rights are not a single lifetime: `WAIT` is repeatable until
 completion, `READ_RESULT` is bounded and either repeatable or policy-marked
 one-shot, and `CONSUME_RESULT` is the one-shot operation with an explicit
-linearization point. Exit results do not carry raw capability handles; returned
-capabilities move through a separate audited grant transaction.
+linearization point. Independently granted observer capabilities may wait/read
+without consuming or controlling the task. Exit results do not carry raw
+capability handles; returned capabilities move through a separate audited grant
+transaction.
+
+Cross-object derivation uses explicit dependency edges, not implicit same-object
+capability attenuation. A child object such as an executable image, snapshot,
+copy-on-write child, sealed transform, promoted shared-code object, or derived
+index must have a transactionally committed parent/child edge before it becomes
+usable. Edge traversal, quotas, generation retirement, promotion, and cascading
+revocation are part of the authority model.
 
 External `CapId` kind tags are routing hints only. The registry slot's live
 object kind and incarnation control decoding and dispatch; a payload tag can
@@ -1788,7 +1797,7 @@ Each image instance records source object incarnation, source execution
 authority lineage, load-manifest identity, image-instance incarnation, load
 generation, mapping lineage, and owning domain incarnation. Source, lineage
 subtree, image-instance, and object-wide revocation scopes use the same
-selective-revocation machinery as other capability-derived objects.
+cross-object edge and selective-revocation machinery as other derived objects.
 
 ## 15. Device and Driver Model
 

@@ -2318,8 +2318,10 @@ Deliverables:
   - `CONSUME_RESULT` is always one-shot and transitions the result object to
     consumed for that holder at a named consume linearization point;
   - move-only join capabilities have exactly one consumer;
-  - copyable observer capabilities may wait/read but cannot consume or control
-    the task;
+  - independently granted observer capabilities may wait/read but cannot
+    consume or control the task; each observer has its own capability-table
+    slot and generation, authority lineage, revocation state,
+    result-read policy, and expiry/retention accounting;
   - consuming one observer capability does not destroy the result for other
     authorized observers unless object policy explicitly selects
     single-consumer semantics.
@@ -2487,6 +2489,47 @@ delegated_kind_rights   <= requested_kind_rights
     `allocated + prepared + local_free + quarantined == configured_ceiling`.
 - Mapping-authority split between memory-object capability, destination
   address-space capability, and optional executable/JIT policy authority.
+- Generic cross-object dependency edges for derived objects whose child object
+  has a different object incarnation than the parent. Ordinary same-object
+  capability derivation remains attenuation over one object; cross-object
+  derivation records an explicit `DerivedObjectEdge`:
+
+```text
+DerivedObjectEdge {
+    parent_object_incarnation,
+    parent_capability_lineage,
+    child_object_incarnation,
+    relation_kind,
+    edge_generation,
+    revocation_policy,
+}
+```
+
+  Initial relation kinds include `ExecutableImage`, `Snapshot`,
+  `CopyOnWriteChild`, `SealedTransform`, `PromotedSharedCode`, and
+  `DerivedIndex`.
+- Cross-object dependency rules:
+  - the parent owner records the edge transactionally before the child object
+    becomes usable;
+  - child publication and edge publication share one commit decision;
+  - failure cannot produce a usable orphan child that parent/source revocation
+    cannot discover;
+  - parent and child IDs are registry-minted incarnations;
+  - edges are bounded by per-object and per-principal quotas;
+  - cycles are prohibited or rejected through a bounded DAG rule;
+  - edge traversal has strict maximum depth and work budgets;
+  - deleting or recycling an edge requires the child to be dead or
+    independently promoted under an explicit policy;
+  - edge generation cannot wrap or silently migrate between registry slots;
+  - revoking a parent capability follows its configured prospective policy;
+  - revoking a parent lineage subtree traverses only edges derived through that
+    lineage;
+  - strong object-wide parent revocation traverses every dependent edge whose
+    policy requires cascading revoke;
+  - revoking a child does not revoke the parent unless a separately defined
+    reverse dependency requires it;
+  - promoting shared text into an independent code object consumes the original
+    dependency and establishes a new explicit authority root.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
   endianness, versioning, domain incarnation fields, and no Rust enum layout
   crossing fabric or userspace boundaries.
@@ -2554,6 +2597,16 @@ Verification:
   from a previous server incarnation cannot be consumed after restart.
 - Host tests prove map requests require both memory-object and address-space
   authority.
+- Host/model tests prove no cross-object child becomes usable before its
+  dependency edge commits.
+- Host/model tests prove source-wide or object-wide revocation finds all
+  cascade-bound children, lineage-local revocation does not affect children
+  created through unrelated lineages, and child revocation does not
+  accidentally revoke the parent.
+- Host/model tests prove edge capacity exhaustion leaves no usable orphan,
+  crash between child creation and edge publication aborts or quarantines the
+  child, cyclic dependency attempts fail before mutation, and edge retirement
+  plus source/object ID reuse cannot resurrect a stale child relationship.
 - Host tests prove stale table entries are tombstoned or reclaimed within
   bounded quotas after revocation.
 - Model tests prove quota-credit accounting preserves the configured ceiling
@@ -5188,9 +5241,10 @@ Deliverables:
     object-wide policy explicitly selects broader scope;
   - source deletion cannot reclaim backing pages while image instances or
     shared-text mappings remain pinned;
-  - executable image instances participate in the normal capability derivation
-    and selective-revocation lineage graph rather than a loader-only side
-    graph;
+  - executable image instances are cross-object children linked from the source
+    object through the generic `DerivedObjectEdge` and selective-revocation
+    machinery rather than a loader-only side graph or an implicit same-object
+    capability derivation;
   - every image instance records source object incarnation, source
     execution-authority lineage, load-manifest identity, image-instance
     incarnation, load generation, mapping lineage, and owning domain
@@ -5634,8 +5688,9 @@ Deliverables:
   - domain exit tears down every task;
   - last-task exit terminates the domain unless policy explicitly keeps an
     empty supervisor domain alive.
-- Join/result capabilities are explicit one-shot objects bound to task
-  incarnation, domain incarnation, and exit-generation state.
+- Join/result capabilities are task-incarnation-bound objects with
+  operation-specific consumption semantics. `WAIT` is repeatable,
+  `READ_RESULT` follows observer policy, and `CONSUME_RESULT` is one-shot.
 - Join/result operation semantics:
   - `WAIT` is repeatable until completion and does not consume the join/result
     capability;
