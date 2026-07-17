@@ -127,6 +127,15 @@ Kernel responsibilities:
 The kernel must continue working if `worldd`, projections, or AI helpers are
 disabled, corrupted, or rolled back.
 
+Kernel telemetry is not zero overhead. The production target is bounded,
+allocation-free, constant overhead on normal emission: per-core single-writer
+binary rings, fixed-width or length-delimited versioned events,
+release/acquire publication, loss counters for advisory facts, and reserved
+non-overwritable lanes for security audit transitions. Fact indexing, joins,
+history, query processing, tamper-evident hash chaining, Merkle checkpoints,
+TPM/remote anchoring, and field-level redaction belong in isolated userspace
+services.
+
 ## Userspace Responsibilities
 
 Native userspace owns the rich OS brain:

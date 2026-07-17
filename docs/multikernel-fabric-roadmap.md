@@ -262,6 +262,14 @@ snapshot epochs, boot-parameter publication/consumption barriers, and
 read-only/zeroed AP parameter pages after consumption are all part of the
 fabric safety model before live routing trusts a core.
 
+Live endpoint messages also need stamped identity before payload parsing:
+machine boot/session nonce, topology epoch, sender and receiver logical core
+IDs, sender and receiver core incarnations, endpoint incarnation, link
+generation, protocol version, and negotiated extension set. A validated core ID
+without the topology epoch and core incarnation is only advisory; it must not
+authorize a future message after the topology snapshot that validated it has
+expired.
+
 Until AP incarnation fencing exists, live AP-backed queues must prohibit restart
 and hotplug. A failed or timed-out AP stays quarantined until reboot rather than
 reusing a core identity that may still hold stale endpoint, routing, or

@@ -877,6 +877,9 @@ Deliverables:
 - Keep null page, guard page, and reserved heap windows unmapped.
 - Re-run the kernel mapping policy verifier against the hardware-shaped table
   image before loading CR3.
+- Hardware-table export is admitted only from a sealed validated address-space
+  proof. Raw mapper arenas, partially checked roots, and advisory status
+  reports must not be accepted by the CR3 installation path.
 - Switch CR3 to the Aesynx-owned root table.
 - Read back CR3 in redacted form and verify that execution continues under the
   Aesynx-owned address space.
@@ -894,6 +897,8 @@ Verification:
 - QEMU normal boot survives the CR3 switch and still emits all prior boot
   markers.
 - Fault smoke proves that the page-fault path still works after the switch.
+- Host tests prove raw mapper values cannot bypass the sealed validated
+  address-space proof required for hardware export.
 - Release notes clearly distinguish "Aesynx-owned CR3 active" from full
   process isolation or userspace enforcement.
 
@@ -2658,6 +2663,15 @@ Deliverables:
   control messages.
 - Sharded or hierarchical doorbell bitmaps. A single many-writer bitmap must be
   treated as a cache-coherency hotspot unless measurement proves otherwise.
+- Stamped endpoint/link identity on every live AP-backed message:
+  - boot or machine-session nonce;
+  - topology epoch;
+  - sender and receiver logical core IDs;
+  - sender and receiver core incarnations;
+  - endpoint incarnation;
+  - link generation;
+  - protocol version and required extension set.
+  Mismatches are rejected before payload parsing or capability interpretation.
 - Quantitative targets for bytes per core pair, messages per second, p99
   latency, IPIs per message, and cache-line invalidations per message.
 - Shared queue page ownership policy:
@@ -2682,6 +2696,9 @@ Verification:
 
 - Host model tests prove full, empty, wraparound, stale-slot, and retry cases
   fail closed without payload reuse.
+- Host tests prove stale topology epochs, core incarnations, endpoint
+  incarnations, link generations, boot/session nonces, and protocol versions
+  are rejected before payload parsing.
 - Loom/Kani-style or equivalent bounded model tests prove the SPSC publication
   protocol does not permit payload reads before release publication or payload
   scrubbing before consumer acknowledgement is observed.
@@ -3000,6 +3017,10 @@ Deliverables:
   after timeout or restart are quarantined and cannot satisfy a later attempt.
 - APIC-ID reuse and duplicate detection across discovery, startup, restart, and
   hotplug paths.
+- Startup preflight binds the startup ticket, AP incarnation, expected CR3 or
+  page-table root, trampoline page, boot-parameter page, guarded stack
+  allocation, INIT/SIPI generation, APIC identity, arrival doorbell, and
+  timer/calibration contract into one checked startup descriptor.
 - Offline, failed, quarantined, restarted, and hotplug transition table entries.
 - Topology snapshot epochs for routing, scheduler, and authority protocols.
 - Per-core boot-parameter publication barriers before SIPI/entry and
@@ -3014,6 +3035,9 @@ Verification:
 - Host tests cover stale late-arrival rejection, duplicate APIC ID rejection,
   restart incarnation changes, topology snapshot mismatch rejection, and
   bootstrap-parameter seal/zero policy.
+- Host tests prove startup evidence cannot be reused with a different CR3,
+  trampoline, parameter page, stack, INIT/SIPI generation, APIC identity,
+  arrival doorbell, or timer/calibration contract.
 - QEMU AP smoke proves timeout plus late-arrival model paths quarantine rather
   than accidentally marking a core online.
 - If this milestone claims actual AP restart or hotplug, QEMU must exercise a
@@ -3094,6 +3118,27 @@ Deliverables:
   and scheduler action validation.
 - Negative refinement tests where a deliberately broken Rust transition and its
   model disagree.
+- Release-gate checklist for the authority-bearing sequence:
+  - real concurrency gate with Rust executing on APs at 2, 4, 8, and configured
+    higher core counts, randomized delay/saturation, cache-miss/IPI/fairness
+    measurements, and reserved-lane latency evidence;
+  - memory-model gate with Loom queue wrap/reuse/cancel models, architecture
+    litmus tests, and Miri over any audited unsafe queue-storage island;
+  - capability gate with grant/revoke/restart/replay models proving no
+    authority amplification, revocation closure, and no strong-revoke success
+    before TLB/IOMMU/in-flight-operation acknowledgement;
+  - lock gate with real path rank checks and injected audit-full, lock-poison,
+    allocation-failure, and peer-timeout faults;
+  - boot gate with coverage-guided differential fuzzing plus permutation,
+    split/merge, overlap, truncation, alignment, and maximum-count metamorphic
+    BootInfo properties;
+  - paging gate with differential PTE walks, random map/unmap/protect, global
+    W^X alias tests, and TLB-shootdown tests;
+  - AI gate with finite-action validation, arbitrary advice fuzzing, evaluator
+    fuel exhaustion, service hangs, stale responses, and epoch changes during
+    commit;
+  - telemetry gate proving permanently full advisory rings cannot change
+    scheduling, IPC, revocation, or fault-handling progress.
 
 Verification:
 
@@ -3547,6 +3592,16 @@ Deliverables:
   SSE/AVX is enabled in kernel or user contexts.
 - Trampoline or boot-order policy that enables compatible NX/WP/SMEP/SMAP/UMIP
   protections before untrusted code or APs can execute with the final CR3.
+- Explicit boot hardening state machine:
+  - validate CPUID and selected deployment baseline;
+  - enable EFER.NXE and CR0.WP before switching to tables that rely on NX or
+    supervisor write-protection;
+  - activate the verified CR3 through an identity/current-stack-safe
+    transition;
+  - enable SMEP, SMAP, and UMIP after all required supervisor accesses are
+    routed through controlled helpers;
+  - assert final EFER/CR0/CR3/CR4/MSR state before accepting interrupts,
+    starting AP Rust execution, or entering userspace.
 - Redacted serial markers for supported, requested, applied, and deferred
   hardening controls.
 - Per-core CR/MSR read-back for the bootstrap core and every executing AP.
@@ -3565,6 +3620,9 @@ Verification:
 - QEMU smoke reports boolean hardening evidence without raw MSR values.
 - QEMU or host tests prove hostile userspace entry is blocked when a required
   mitigation is selected but unavailable.
+- Boot-state-machine tests prove NXE/WP precede NX-bearing table activation
+  when required and SMEP/SMAP/UMIP are not enabled until their access-window
+  and supervisor-access contracts exist.
 - Fault-path tests prove SMAP access windows restore the access flag before
   returning or halting.
 - Documentation states which mitigations are active, which are planned, and
@@ -4331,6 +4389,10 @@ Deliverables:
   policy services.
 - Policy services cannot own scheduler-critical locks, queues, or dedicated
   control cores.
+- Model output is treated as hostile bytes. Public advice constructors are not
+  authority: the scheduler computes a bounded validator over authoritative
+  kernel state, including queues, running tasks, topology, task incarnations,
+  affinity/security rules, budgets, and topology epoch.
 - Model evaluation has explicit fuel, deadline, memory, and output-size limits.
 - Manifest step and memory ceilings are consumed by the evaluator, not only
   stored as metadata.
@@ -4358,6 +4420,8 @@ Deliverables:
 - Formal scheduler invariant statement: every admissible action preserves task
   ownership, queue membership, budget accounting, and security-domain placement
   constraints.
+- Commit rechecks the scheduler/topology epoch after validation; stale advice
+  falls back deterministically rather than mutating scheduler state.
 - Task time budgets are decremented or explicitly documented as advisory until
   preemption lands.
 - Telemetry buffer-full behavior cannot stop scheduling. Noncritical telemetry
@@ -4404,6 +4468,10 @@ Verification:
   outside allowed affinity/security-domain policy.
 - Host tests prove raw advice cannot be executed without producing a
   `ValidatedScheduleAction`.
+- Property tests prove arbitrary model bytes can only produce a valid sealed
+  action or the exact deterministic fallback, and accepted actions preserve
+  unique task ownership, current task/core incarnation, affinity,
+  security-domain, manifest, priority, and budget ceilings.
 - Host tests prove audit-buffer failure blocks authority creation/expansion
   while revoke, quarantine, and permission reduction proceed fail-safe with
   emergency audit-loss evidence; noncritical telemetry loss does not block
