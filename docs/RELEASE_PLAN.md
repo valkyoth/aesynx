@@ -2783,6 +2783,26 @@ RequiredReservationPlan {
 }
 ```
 
+  - plan identity is computed over a versioned canonical byte string:
+
+```text
+plan_identity =
+    H("aesynx-derived-reservation-plan-v1" || canonical_plan_bytes)
+```
+
+  - the hash algorithm and algorithm version are explicit fields in the plan
+    identity. The v1 encoding uses fixed-width fields, little-endian integers,
+    canonical ordering, explicit length prefixes for variable lists, and no Rust
+    enum or structure layout in the hashed bytes;
+  - `canonical_plan_bytes` includes operation kind, relation-policy identity,
+    participant-set epoch, resource owners, resource classes, bounded
+    quantities/slots, terminal release policies, and the mandatory-class
+    bitmap;
+  - owners validate the canonical fields they receive against their local
+    resource state and relation-policy view, not merely equality of a
+    caller-provided hash;
+  - hash-algorithm migration creates a new plan identity and cannot reuse old
+    prepared acknowledgements or reservations;
   - callers cannot select `resource_class`, `terminal_release_policy`,
     participant set, or required quantities;
   - required resource classes are determined only by operation kind,
@@ -2796,6 +2816,25 @@ RequiredReservationPlan {
     the one requested by the canonical plan;
   - policy migration changes the plan identity and cannot reuse old prepared
     reservations;
+  - before the first remote prepare request, the parent owner reserves a
+    parent-local journal slot plus abort/recovery capacity, persists a
+    torn-record-protected `Preparing` record, and installs the parent-local audit
+    placeholder;
+  - the `Preparing` record contains transaction ID, coordinator incarnation,
+    required reservation-plan identity, canonical plan entries, complete
+    participant set, policy/object/edge/destination incarnations,
+    timeout/recovery owner, and the initial audit placeholder generation;
+  - if parent-local bootstrap reservation or `Preparing` persistence fails, the
+    operation aborts before producing any remote side effect;
+  - remote prepare requests are sent only after the `Preparing` record and audit
+    placeholder are recoverable;
+  - acknowledgement progress is persisted as generation-stamped participant
+    records or a participant bitmap before it can count toward commit;
+  - commit is allowed only after all required acknowledgements are recoverably
+    represented in the parent-owned journal;
+  - after coordinator restart, recovery queries or releases every participant
+    named in the persisted plan even if the crash happened after a remote owner
+    reserved resources but before its acknowledgement was recorded;
   - every distributed reservation is represented by a fixed manifest entry:
 
 ```text
@@ -2829,8 +2868,18 @@ PreparedReservation {
     guard;
   - if the next reservation is unavailable, the coordinator records abort and
     releases already prepared reservations through reserved control capacity;
-  - deterministic transaction priority based on transaction epoch/ID prevents
-    contenders from repeatedly forcing each other to retry;
+  - transaction priority is a kernel-generated total order over coordinator
+    epoch and transaction sequence; callers cannot influence priority;
+  - each resource owner grants a conflicting reservation to the highest-priority
+    eligible transaction according to the same comparison rule;
+  - a losing transaction receives a deterministic conflict response and must
+    abort rather than retain partial reservations and retry in place;
+  - prepared or committed transactions cannot be displaced by a later
+    transaction;
+  - bounded owner-local admission queues or aging rules prevent indefinite
+    starvation of lower-priority principals;
+  - priority comparisons involving obsolete coordinator incarnations fail
+    closed;
   - before a commit decision, coordinator timeout may record abort and initiate
     release; after commit may have been observed, timeout cannot independently
     release anything;
@@ -3054,6 +3103,24 @@ Verification:
   entries reject commit; commit certificates bind the plan hash plus every
   prepared reservation generation; acknowledgements cannot substitute another
   slot/amount; and policy migration changes the plan identity.
+- Host/model tests prove plan identity uses the
+  `aesynx-derived-reservation-plan-v1` domain-separation label, explicit hash
+  algorithm/version, fixed-width little-endian canonical encoding, explicit list
+  lengths, no Rust enum/layout bytes, and includes operation, policy identity,
+  participant epoch, resource owners/classes/quantities, release policies, and
+  mandatory-class bitmap. Owners validate canonical fields rather than trusting
+  a supplied hash, and hash migration rejects old acknowledgements.
+- Host/model crash tests prove parent-local bootstrap order: no remote prepare
+  is sent before parent journal slot plus abort/recovery capacity are reserved,
+  the torn-record-protected `Preparing` record is persisted, and the
+  parent-local audit placeholder is installed. Crash points cover before the
+  preparing record, after the record before first message, after each prepare
+  request, after remote reservation before acknowledgement, and after
+  acknowledgement arrival before local journal update.
+- Host/model recovery tests prove coordinator restart queries or releases every
+  participant named in the persisted plan even when acknowledgement progress was
+  not locally recorded, and commit is impossible until every required
+  acknowledgement is recoverably represented in the parent-owned journal.
 - Host/model tests prove commit is impossible until the complete reservation
   manifest is acknowledged, timeout alone cannot release a reservation while
   commit may have been observed, and duplicate commit/abort/release messages are
@@ -3065,6 +3132,13 @@ Verification:
   no-wait-while-guarded discipline, deterministic transaction priority,
   reserved abort/release capacity, and per-principal/object/owner pending
   bounds prevent reservation deadlock, livelock, and denial-of-service.
+- Host/model tests prove every resource owner applies the same
+  kernel-generated priority rule over coordinator epoch and transaction
+  sequence, callers cannot influence priority, conflicts go to the
+  highest-priority eligible transaction, losing transactions abort instead of
+  retaining partial reservations, prepared/committed transactions are not
+  displaced by later requests, owner-local admission/aging prevents starvation,
+  and obsolete coordinator incarnations fail closed.
 - Host/model tests prove edge state, transaction decision, and participant
   progress are interpreted separately; received `edge_state` is not
   authoritative by itself, aborted pending edges remain replay-detectable until

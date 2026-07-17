@@ -503,9 +503,11 @@ Priority proof targets:
   strong-revocation linearization.
 - TLA+ or Quint models for derived-edge creation, promotion/detachment, v1
   single-parent publication, parent-owner coordinator locality, owner-local
-  reservation manifests, canonical required-reservation plans,
-  transaction-bound reservation consumption/release, deadlock/livelock-free
-  reservation acquisition, permit consumption at the parent-owned journal commit
+  reservation manifests, canonical required-reservation plans with versioned
+  domain-separated identities, parent-local preparing-record persistence before
+  remote side effects, transaction-bound reservation consumption/release,
+  deadlock/livelock-free reservation acquisition, deterministic priority
+  conflict resolution, permit consumption at the parent-owned journal commit
   transition, parent-local audit placeholder finalization, recoverable
   quarantine, `ResourceLost` terminal tombstones, provenance recording, and
   cascading revocation. Future multi-parent support requires its own
@@ -536,7 +538,9 @@ Priority proof targets:
   required after derived-edge commit, stale permit replay, delayed commit/abort
   resurrection after `ResourceLost`, missing audit evidence for an
   authority-creating commit, reservation-plan substitution, persistent
-  reservation deadlock/livelock, or cycle under concurrent edge transactions.
+  reservation deadlock/livelock, remote reservation before recoverable
+  parent-local prepare state, inconsistent transaction-priority conflict
+  handling, or cycle under concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and
