@@ -2550,17 +2550,24 @@ DerivedObjectEdge {
   that child-side right is consumed, retained, or merely revalidated.
   `PROMOTE` and `DETACH_DERIVATION` are nondelegable by default unless a
   relation policy explicitly admits constrained delegation.
-  The relation policy, execution identity, parent lineage, child incarnation,
-  quotas, audit capacity, destination principal/table incarnation, and
-  transaction identity are validated before the kernel mints an internal
-  `DerivationControlPermit`. That permit is an internal proof type only: it is
-  not table-storable, serializable, delegable, or wire-decodable; it is bound
-  to one transaction and consumed once at the final mutation boundary after
-  revalidating both parent-side and child-side authority sources. Cross-core
-  messages carry only journal decisions or owner-issued commit certificates, not
-  the permit. If a future design needs a permit to cross IPC, it must be
-  redesigned as a full authority-bearing capability with incarnation, replay,
-  delegation, and revocation semantics.
+  The parent owner mints an internal `DerivationControlPermit` after resolving
+  the caller's authority. The relation policy, execution identity, parent
+  lineage, child incarnation, quotas, audit capacity, destination
+  principal/table incarnation, and transaction identity are validated before the
+  permit exists. That permit is an internal proof type only: it is not
+  table-storable, serializable, delegable, wire-decodable, persisted in the
+  journal, or reproduced during recovery. It authorizes exactly the
+  coordinator/journal transition from `Undecided` to `Committed`; parent-side
+  authority, child-side authority, pinned policy, generations, and
+  transaction-bound reservations are revalidated immediately before that
+  transition. Commit consumes the permit. Abort, timeout, or failed prepare
+  destroys it without permitting reuse. Local child publication is authorized by
+  the replay-protected commit certificate plus publication-time parent-state
+  validation, not by the permit. Cross-core messages carry only journal
+  decisions or owner-issued commit certificates, not the permit. If a future
+  design needs a permit to cross IPC, it must be redesigned as a full
+  authority-bearing capability with incarnation, replay, delegation, and
+  revocation semantics.
 - Cross-object dependency rules:
   - the parent owner records the edge transactionally before the child object
     becomes usable;
@@ -2665,8 +2672,8 @@ new_root_rights <= requested_rights
     live-child authority and the relation policy;
   - promotion is bound to exact parent lineage, child incarnation, edge
     generation, destination principal, and destination table incarnation;
-  - destination table capacity and audit capacity are preflighted before
-    commit;
+  - destination capability-table slot and required audit capacity are reserved
+    during prepare, not merely preflighted;
   - the destination principal cannot be redirected after prepare;
   - promotion is atomic: either the old dependency remains intact, or the new
     root exists and the old edge is retired;
@@ -2678,6 +2685,9 @@ new_root_rights <= requested_rights
   - edge state is `Pending | Live | Revoking | Recovering |
     QuarantinedAwaitingEvidence | Retired`;
   - transaction decision is `Undecided | Committed | Aborted`;
+  - terminal resolution is separate from the transaction decision:
+    `None | ResourceLost`. `ResourceLost` never reinterprets the journal as a
+    normal commit or abort;
   - participant state is `Absent | Prepared | Applied | Acknowledged`;
   - a received `edge_state` value is never authoritative by itself;
   - state transitions require the journal decision or commit certificate plus
@@ -2710,6 +2720,16 @@ new_root_rights <= requested_rights
   - recovery can transition to a terminal outcome only from trusted
     journal/witness evidence, and capacity remains charged until the terminal
     decision plus replay-window retirement;
+  - `ResourceLost` can become terminal only after every participant capable of
+    publishing commit or abort evidence is incarnation-fenced, reset, or
+    permanently denied execution; candidate capabilities, child handles, and
+    commit certificates are retired; a replay-resistant terminal tombstone is
+    installed; no delayed commit or abort can reactivate authority; and resource
+    pins, mappings, DMA records, and TLB obligations are drained before physical
+    reclamation;
+  - if those conditions cannot be proved, the state remains
+    `QuarantinedAwaitingEvidence` or the system halts. It cannot report
+    terminal resource loss and recycle identifiers;
   - idempotent means no duplicate side effect: a client cannot treat "no handle
     returned" after a committed-but-revoked, recovering, quarantined, or
     resource-lost transaction as an ordinary abort and accidentally create a
@@ -2736,6 +2756,16 @@ new_root_rights <= requested_rights
     edge records;
   - messages involving obsolete owner incarnations fail closed.
 - Edge publication reserves revocation progress resources:
+  - prepare holds transaction-bound reservations for child registry slots, edge
+    slots, destination capability-table slots, object/lineage/principal quota
+    credits, journal records, replay records, revocation-progress credit,
+    required backing pins or pending resources, and required security-audit
+    record capacity;
+  - commit consumes those reservations, abort releases them idempotently, and
+    recovery or quarantine keeps them charged until terminal resolution and
+    replay retirement;
+  - the invariant is: `Committed => reaching a safe terminal state requires no
+    ordinary allocation`;
   - every live edge either consumes reserved revocation-progress credit at
     creation or stores progress directly in edge records using revocation
     generations and restartable cursors that need only constant reserved
@@ -2846,9 +2876,17 @@ Verification:
   name the exact child-side right and consume/retain/revalidate behavior, and
   `PROMOTE`/`DETACH_DERIVATION` are nondelegable by default.
 - Host tests prove `DerivationControlPermit` values are internal proof objects:
-  nondelegable, one-shot, exact-operation-bound, consumed at the final mutation
-  boundary, unavailable for capability-table storage, and rejected by stable
-  wire decoders or cross-core IPC schemas.
+  nondelegable, one-shot, exact-operation-bound, unavailable for
+  capability-table storage, and rejected by stable wire decoders or cross-core
+  IPC schemas.
+- Host/model tests prove the parent owner mints a permit only after resolving
+  caller authority, the permit authorizes only the `Undecided -> Committed`
+  journal transition, commit consumes it, abort/timeout destroys it without
+  reuse, local publication uses the commit certificate rather than the permit,
+  and coordinator restart or recovery never persists or recreates a permit.
+- Host/model tests prove duplicate commit attempts, coordinator restart,
+  delayed requests, and replay cannot consume the same permit twice or mint a
+  replacement from stale authority.
 - Host/model tests prove source-wide or object-wide revocation finds all
   cascade-bound children, lineage-local revocation does not affect children
   created through unrelated lineages, and child revocation does not
@@ -2888,8 +2926,8 @@ Verification:
   implicitly.
 - Host/model tests prove promotion is bound to exact parent lineage, child
   incarnation, edge generation, destination principal, and destination table
-  incarnation, preflights destination/audit capacity, and rejects destination
-  principal redirection after prepare.
+  incarnation, reserves destination table/audit capacity during prepare, and
+  rejects destination principal redirection after prepare.
 - Host/model tests prove promotion is atomic: the old dependency remains live
   on failure, or the new root exists with inherited provenance and the old edge
   is retired.
@@ -2920,12 +2958,28 @@ Verification:
   trusted journal/witness evidence, retries never create a second child, and no
   handle absence is treated as permission to duplicate a committed child under
   the same transaction.
+- Host/model tests prove `ResourceLost` is represented as terminal resolution,
+  not a normal journal decision, and can be installed only after all
+  potentially publishing participants are incarnation-fenced, reset, or denied
+  execution; candidate capabilities, handles, and commit certificates are
+  retired; a terminal tombstone blocks replay; delayed commit/abort evidence is
+  rejected; and pins, mappings, DMA, and TLB obligations are drained before
+  reclamation.
+- Host/model fault tests inject a delayed valid-looking commit after
+  `ResourceLost` and prove the terminal tombstone plus incarnation fence rejects
+  it without resurrecting authority.
 - Host/model tests inject every interleaving between commit decision, parent
   revoke, participant apply, acknowledgement, and child publication.
 - Host/model tests exhaust ordinary allocation, IPC, and best-effort journal
   capacity while proving root freeze and derived-edge revocation can still
   begin and make bounded progress through reserved revocation credit or
   restartable in-edge progress cursors.
+- Host/model tests exhaust child registry slots, edge slots, destination table
+  slots, quota credits, journal/replay records, audit records,
+  revocation-progress credit, backing pins, and pending resources after initial
+  validation but before prepare. The transaction must either hold a reservation
+  through commit/recovery/quarantine or abort before commit; no committed
+  transaction may require ordinary allocation to reach a safe terminal state.
 - Host/model tests prove strong parent revocation freezes new child creation,
   processes descendants through generation-stamped continuation cursors, leaves
   affected descendants unusable while `Revoking`, and reports success only when

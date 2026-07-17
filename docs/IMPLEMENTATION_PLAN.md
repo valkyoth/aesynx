@@ -1060,14 +1060,22 @@ resolved parent-object capability whose single kind-specific rights
 representation contains the exact create/promote/detach relation operation,
 plus required child-side authority; `CommonRights::DERIVE` remains same-object
 attenuation only. Only after both sources are revalidated does the kernel mint a
-transaction-local internal permit. Promotion or detachment requires
-relation-policy approval, pinned immutable policy identity, preflighted
-destination/audit capacity, inherited provenance, and rights bounded by
-requested rights, live child rights, and policy promotable rights; it cannot
-launder an object out from under pending parent revocation. Distributed
-parent/child owners track edge state, journal decision, participant progress,
-and child publication separately: journal commit decides outcome, but no handle
-is returned until the child owner locally validates and publishes the child. V1
+transaction-local internal permit. That permit authorizes only the
+`Undecided -> Committed` journal transition, is consumed by commit, is destroyed
+by abort or timeout, is never persisted, and does not authorize later local
+publication. Promotion or detachment requires relation-policy approval, pinned
+immutable policy identity, transaction-bound reservations for destination,
+quota, journal/replay, audit, revocation-progress, and backing resources,
+inherited provenance, and rights bounded by requested rights, live child rights,
+and policy promotable rights; it cannot launder an object out from under pending
+parent revocation. Distributed parent/child owners track edge state, journal
+decision, terminal resolution, participant progress, and child publication
+separately: journal commit decides outcome, but no handle is returned until the
+child owner locally validates and publishes the child. `ResourceLost` is a
+terminal resolution only after publisher-capable participants are fenced or
+reset, candidate authority is retired, replay tombstones are installed, and
+pins/mappings/DMA/TLB obligations are drained; otherwise the edge remains
+recovering/quarantined or the system halts. V1
 is deliberately single-parent-only: a newly minted unpublished child has exactly
 one incoming dependency edge, only a live published unfrozen parent may create
 it, and child depth is checked as `parent_depth + 1` under a fixed maximum so
@@ -1079,8 +1087,9 @@ records, which are kernel-stamped, integrity-protected, origin-classified, bound
 to incarnations and hashes, grant no authority, and retain no resources.
 Promoted shared code is recorded as provenance after the old dependency is
 retired, not as a remaining cascade-capable authority edge. Edge publication
-reserves future revocation progress so ordinary allocator, IPC, or best-effort
-journal exhaustion cannot prevent root freeze or bounded revoke progress. Strong
+reserves all resources needed to reach a safe terminal state so ordinary
+allocator, IPC, or best-effort journal exhaustion cannot prevent root freeze,
+bounded revoke progress, recovery, or quarantine. Strong
 revocation freezes new derivation and uses bounded continuation worklists;
 budget exhaustion cannot report partial success while descendants remain usable.
 Concurrent edge insertion revalidates generations and edge/topology epochs so
