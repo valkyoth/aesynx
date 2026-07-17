@@ -1030,14 +1030,16 @@ override bit: every administrative operation has an exact operation identifier,
 typed-right check, delegation is prohibited unless the object kind explicitly
 allows it, and every use is audited.
 
-The central kind-to-right matrix must also cover domain lifecycle, debug,
-exception, pager, scheduling-context, and clock rights. For each kind it records
-wire encoding, mint authority, derivation/attenuation, delegation policy,
-one-shot or transaction binding, incarnation binding, revocation behavior,
-audit event class, cross-domain behavior, and how `ADMIN`, `GRANT`, and
-`REVOKE` coexist. High-risk rights such as domain kill, debug memory write,
+The central kind-to-right matrix must also cover domain lifecycle, task
+lifecycle, task join/result, debug, exception, pager, scheduling-context, and
+clock rights. For each kind it records wire encoding, mint authority,
+derivation/attenuation, delegation policy, one-shot or transaction binding,
+incarnation binding, revocation behavior, audit event class, cross-domain
+behavior, and how `ADMIN`, `GRANT`, and `REVOKE` coexist. High-risk rights such
+as domain kill, task kill, task exception-endpoint mutation, debug memory write,
 fault-frame modification/resume, and scheduling-ceiling changes are
-non-delegable by default.
+non-delegable by default. Domain possession, address-space possession, and
+executable possession do not imply authority to create tasks.
 
 External `CapId` kind tags are routing hints only. The registry slot's live
 object kind and incarnation control decoding and dispatch; a payload tag can
@@ -1766,11 +1768,16 @@ Executable identity rules:
 - A signature never grants capabilities automatically.
 - Signed and unsigned artifacts cannot collide under one executable identity.
 
-Executable mapping follows an explicit transition: private writable/NX staging,
-copy plus BSS zeroing, permitted relocations only, final-byte validation,
+Executable mapping distinguishes the immutable executable source from the
+per-domain executable image instance. Publisher identity covers the canonical
+source bytes and load manifest; ASLR-dependent relocated bytes are an instance
+measurement, not a replacement source signature. Loading follows an explicit
+transition: sealed source, private image instance, writable/NX staging, copy
+plus BSS zeroing, permitted relocations only, instantiated-byte validation,
 writable-alias freeze, required TLB invalidation, architecture instruction-cache
-synchronization, seal, then final RX mapping. A physical frame must never be
-writable in one address space while executable in another, and failed
+synchronization, image-instance seal, then final RX mapping. A physical frame
+must never be writable in one address space while executable in another, shared
+text is allowed only when placement-independent and identical, and failed
 validation tears down and sanitizes staging frames before reuse.
 
 ## 15. Device and Driver Model

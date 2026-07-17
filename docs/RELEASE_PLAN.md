@@ -2276,6 +2276,10 @@ Deliverables:
   - `DomainFactoryRights`: spawn.
   - `DomainControlRights`: stop, kill, restart, inspect-status, and
     set-exception-endpoint.
+  - `TaskFactoryRights`: create-task.
+  - `TaskControlRights`: stop, kill, inspect-status, and
+    set-exception-endpoint.
+  - `TaskJoinRights`: wait, read-result, and consume-result.
   - `DebugRights`: read-registers, write-registers, read-memory,
     write-memory, suspend, and resume.
   - `ExceptionRights`: receive-fault, inspect-frame, modify-frame, and
@@ -2298,7 +2302,18 @@ Deliverables:
   policy explicitly proves why delegation is safe. Initial non-delegable
   examples include `DomainControl::KILL`, `Debug::WRITE_MEMORY`,
   `Exception::MODIFY_FRAME`, `Exception::RESUME_FRAME`, and
-  `SchedulingContext::SET_CEILING`.
+  `SchedulingContext::SET_CEILING`, `TaskControl::KILL`, and
+  `TaskControl::SET_EXCEPTION_ENDPOINT`.
+- Task lifecycle rights are distinct from domain lifecycle rights. Domain
+  possession, address-space possession, and executable possession do not imply
+  `TaskFactory::CREATE_TASK`; creating a task requires task quota, stack/TLS
+  memory, scheduling-context authority, and target-domain authority. A task
+  capability cannot be reinterpreted as a domain capability or vice versa.
+- Join/result capabilities are one-shot and task-incarnation-bound. Reading a
+  task result does not imply task control, task-local exit cannot revoke the
+  whole domain unless it is the last task under configured policy, and domain
+  teardown dominates every task-local capability by consuming or retiring
+  outstanding join/result objects.
 - `ADMIN` is removed from generic enforcement paths or constrained so it never
   implies another right. Every administrative operation has an exact typed
   operation identifier, `ADMIN` is not an override for failed `READ`, `WRITE`,
@@ -2487,6 +2502,11 @@ Verification:
   proposal, grant commit, and checked live proof creation.
 - Host tests prove high-risk rights are stripped or rejected when delegation is
   not explicitly allowed by the central kind-to-right matrix.
+- Host tests prove task factory/control/join rights participate in mint,
+  derive, grant, decode, live-resolution, audit, and revocation checks; generic
+  `ADMIN` does not satisfy task lifecycle rights.
+- Host tests prove task capabilities and domain capabilities cannot be decoded,
+  granted, or resolved as each other.
 - Host tests prove unknown mandatory typed rights and rights invalid for the
   encoded object kind fail during wire decode.
 - Host/model tests prove common-right and kind-specific attenuation are both
@@ -5112,28 +5132,51 @@ Deliverables:
   plan is bound to the sealed executable hash, canonical load manifest, and
   capability request manifest.
 - Executable transition protocol:
-  - create private writable/non-executable staging mappings;
+  - start from a sealed executable source object containing immutable
+    canonical ELF/package bytes, load manifest, publisher provenance, and
+    capability request identity;
+  - create a private executable image instance for the target domain and load
+    generation;
+  - create private writable/non-executable staging mappings for that image
+    instance;
   - copy file-backed bytes and zero BSS;
   - apply only declared and supported relocations;
-  - validate final bytes and manifest identity;
+  - validate instantiated bytes and manifest identity;
   - freeze every writable alias to executable content;
   - complete required local and remote TLB invalidation;
   - perform required architecture instruction-cache synchronization;
-  - seal the executable object and load generation;
-  - install final read/execute mappings.
+  - seal the executable image instance;
+  - install final read/execute mappings for executable portions.
 - Loader transition rules:
+  - the immutable executable source object never becomes writable during
+    loading;
+  - relocated data belongs to the image instance, not the source identity;
+  - publisher signatures cover the canonical source and load manifest, not
+    ASLR-dependent relocated bytes;
+  - post-relocation hashes are image-instance measurements, not replacement
+    publisher identities;
+  - two image instances from the same source may have different instance hashes
+    and mapping generations;
   - relocation targets inside executable segments are rejected initially;
   - supported relocations may modify only declared writable relocation targets;
   - no physical frame may be writable in one address space while executable in
     another;
-  - shared executable text is fully relocated before sharing or is PIE with no
-    writable text fixups;
-  - sealed executable content is immutable;
+  - shared executable text is allowed only when its bytes are
+    placement-independent and identical;
+  - domain-private relocated text remains unsupported initially;
+  - shared text and private relocated data are separate memory objects or
+    separately tracked frame classes;
+  - sealed source content and sealed image-instance content are immutable;
   - failed relocation, validation, sealing, or final mapping tears down staging
     and sanitizes staged frames before reuse;
   - final executable mappings use a generation distinct from writable staging;
-  - executable revocation, downgrade, or replacement uses the same TLB and
-    residency protocol as ordinary mapping revocation;
+  - revoking source execution authority prevents new image creation;
+  - revoking one image instance tears down only that instance unless
+    object-wide policy explicitly selects broader scope;
+  - source deletion cannot reclaim backing pages while image instances or
+    shared-text mappings remain pinned;
+  - executable image revocation, downgrade, or replacement uses the same TLB
+    and residency protocol as ordinary mapping revocation;
   - x86_64 cannot define the portable instruction-cache rule as a no-op for
     all architectures; aarch64 and RISC-V loaders must perform their explicit
     instruction-cache maintenance before claiming executable readiness.
@@ -5157,8 +5200,8 @@ Deliverables:
   - address randomization never substitutes for capability checks, W^X, SMAP,
     or usercopy discipline.
 - Redacted loader diagnostics and World Service facts expose object hash class,
-  segment counts, policy result, and entropy class without leaking raw user
-  layout.
+  source identity class, image-instance generation, mapping generation, segment
+  counts, policy result, and entropy class without leaking raw user layout.
 
 Verification:
 
@@ -5175,6 +5218,15 @@ Verification:
   space.
 - Host tests prove failed relocation or post-relocation validation sanitizes
   staging frames and consumes/retires the staging generation.
+- Host tests prove two ASLR placements can share immutable PIC text while
+  retaining distinct private data image instances.
+- Host tests prove image-instance hashes are not accepted as executable source
+  signatures or publisher identities.
+- Host tests prove source revocation blocks new image creation.
+- Host tests prove image-instance revocation does not accidentally revoke
+  unrelated instances unless object-wide scope was selected.
+- Host tests prove source backing cannot be reclaimed while any image instance
+  or shared-text mapping remains live.
 - Host tests prove executable downgrade/revocation follows the same TLB,
   residency, and generation rules as ordinary mapping revocation.
 - Architecture tests prove aarch64 and RISC-V executable installs issue the
@@ -5362,61 +5414,6 @@ Exit criteria:
 - Aesynx has an auditable domain teardown path before normal process restart or
   hostile-domain lifecycle management.
 
-### v0.47.5 - Multi-Task Domain Model
-
-Goal:
-
-Add shared-address-space tasks only after the initial one-task domain model,
-spawn, fault delivery, and teardown rules are already deterministic.
-
-Deliverables:
-
-- Explicit `TaskFactory` or `ThreadCreate` authority. Possessing a domain,
-  address-space, or executable capability does not imply authority to create a
-  second task inside that domain.
-- Per-task incarnation, stack, guard page, TLS base, scheduling context, fault
-  frame state, exit state, and accounting.
-- Domain-wide task table with thread-count quotas and fail-closed generation
-  retirement on task-ID reuse.
-- Address-space mutation synchronization across every task in the domain:
-  freeze or rendezvous runnable tasks, invalidate stale activation permits,
-  complete TLB shootdown/residency acknowledgements, then publish the new
-  mapping generation.
-- Clear task-local versus domain-wide exit semantics:
-  - task exit produces a task result capability if requested;
-  - domain exit tears down every task;
-  - last-task exit terminates the domain unless policy explicitly keeps an
-    empty supervisor domain alive.
-- Join/result capabilities are explicit one-shot objects bound to task
-  incarnation, domain incarnation, and exit-generation state.
-- Fault containment rules define which faults terminate only the task, which
-  terminate the domain, and which may be delivered to an authorized external
-  pager/debug service.
-- Cross-core teardown stops, fences, and drains every task before the domain can
-  report `Dead`.
-- Scheduler and budget accounting distinguish per-task budgets from domain
-  aggregate ceilings.
-
-Verification:
-
-- Host/model tests prove task creation requires explicit `TaskFactory` or
-  `ThreadCreate` authority and respects task-count quotas.
-- Tests prove task IDs, join capabilities, and result capabilities reject stale
-  incarnations after task reuse.
-- Address-space mutation tests prove no runnable task can execute with a stale
-  mapping generation after mutation commits.
-- Fault tests prove configured task-local faults do not leak authority or leave
-  stale resume tokens, while domain-fatal faults enter the domain teardown
-  protocol.
-- Cross-core teardown tests prove a domain cannot report `Dead` until every
-  task is fenced, every scheduling context is drained, and every join/result
-  capability is resolved or retired.
-
-Exit criteria:
-
-- Shared-address-space tasks become an explicit authority-bearing feature
-  instead of an accidental extension of the initial process model.
-
 ### v0.48.0 - aesynx-init
 
 Goal:
@@ -5546,6 +5543,95 @@ Verification:
 Exit criteria:
 
 - Aesynx pipelines are no longer text-only by design.
+
+### v0.51.2 - Multi-Task Domain Model
+
+Goal:
+
+Add shared-address-space tasks only after the one-task native profile has real
+end-to-end evidence through init boot, shell separation/restart, external
+native command execution, single-task spawn/fault/exit/kill/restart stress,
+single-task migration, and single-task teardown tests.
+
+Until this milestone lands:
+
+- Task-create, thread-create, task-join, and thread-join syscall numbers remain
+  absent or rejected.
+- The ABI feature bitmap reports no multi-task support.
+- Domain manifests cannot request multiple initial tasks.
+- Exception handlers remain external services.
+- Scheduler and address-space internals may be multi-task-ready, but the public
+  execution profile remains one task per domain.
+
+Deliverables:
+
+- Explicit ABI/runtime feature negotiation for multi-task domains. Enabling the
+  feature cannot silently change existing exit, fault, TLS, or address-space
+  semantics.
+- Explicit `TaskFactory` or `ThreadCreate` authority. Possessing a domain,
+  address-space, or executable capability does not imply authority to create a
+  second task inside that domain.
+- Creating a task requires task quota, stack/TLS memory, scheduling-context
+  authority, and target-domain authority; `CREATE_TASK` cannot create a task in
+  an unrelated domain.
+- Per-task incarnation, stack, guard page, TLS base, scheduling context, fault
+  frame state, exit state, and accounting.
+- Domain-wide task table with thread-count quotas and fail-closed generation
+  retirement on task-ID reuse.
+- Address-space mutation synchronization across every task in the domain:
+  freeze or rendezvous runnable tasks, invalidate stale activation permits,
+  complete TLB shootdown/residency acknowledgements, then publish the new
+  mapping generation.
+- Clear task-local versus domain-wide exit semantics:
+  - task exit produces a task result capability if requested;
+  - task-local exit does not revoke the whole domain unless it is the last task
+    under the configured policy;
+  - domain exit tears down every task;
+  - last-task exit terminates the domain unless policy explicitly keeps an
+    empty supervisor domain alive.
+- Join/result capabilities are explicit one-shot objects bound to task
+  incarnation, domain incarnation, and exit-generation state.
+- Reading a task result does not imply task control.
+- Fault containment rules define which faults terminate only the task, which
+  terminate the domain, and which may be delivered to an authorized external
+  pager/debug service.
+- Domain teardown dominates every task-local capability and consumes or retires
+  outstanding join/result objects.
+- Cross-core teardown stops, fences, and drains every task before the domain can
+  report `Dead`.
+- Scheduler and budget accounting distinguish per-task budgets from domain
+  aggregate ceilings.
+
+Verification:
+
+- One-task profile tests prove multi-task ABI feature bits are disabled before
+  this milestone and task/thread creation or join requests are rejected.
+- Manifest tests prove multiple initial tasks cannot be requested until the
+  negotiated multi-task feature is active.
+- Stress tests prove one-task spawn, fault, exit, kill, restart, migration, and
+  teardown behavior remains unchanged before and after this feature is disabled.
+- Host/model tests prove task creation requires explicit `TaskFactory` or
+  `ThreadCreate` authority and respects task-count quotas.
+- Tests prove `CREATE_TASK` cannot target an unrelated domain and cannot be
+  derived from only domain, address-space, or executable possession.
+- Tests prove task IDs, join capabilities, and result capabilities reject stale
+  incarnations after task reuse.
+- Tests prove `KILL` and exception-endpoint mutation rights are nondelegable by
+  default and generic `ADMIN` does not satisfy task lifecycle rights.
+- Address-space mutation tests prove no runnable task can execute with a stale
+  mapping generation after mutation commits.
+- Fault tests prove configured task-local faults do not leak authority or leave
+  stale resume tokens, while domain-fatal faults enter the domain teardown
+  protocol.
+- Cross-core teardown tests prove a domain cannot report `Dead` until every
+  task is fenced, every scheduling context is drained, and every join/result
+  capability is resolved or retired.
+
+Exit criteria:
+
+- Shared-address-space tasks become an explicitly negotiated
+  authority-bearing feature after the single-task userspace profile has proven
+  itself end to end.
 
 ## Phase 12: Object Graph And Boot Bundle
 
