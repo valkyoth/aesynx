@@ -501,9 +501,10 @@ Priority proof targets:
 - Topology route selection invariants.
 - TLA+ or Quint models for grant, revoke, coordinator failure, AP restart, and
   strong-revocation linearization.
-- TLA+ or Quint models for derived-edge creation, promotion/detachment,
-  complete parent-set publication, provenance recording, and cascading
-  revocation.
+- TLA+ or Quint models for derived-edge creation, promotion/detachment, v1
+  single-parent publication, provenance recording, and cascading revocation.
+  Future multi-parent support requires its own `ParentSetManifest` model before
+  any implementation accepts more than one parent.
 - Kani, Verus, or equivalent bounded proofs for permission attenuation, range
   containment, generation retirement, and scheduler action validation.
 - Loom models for SPSC publication, slot reuse, cursor caching, and
@@ -523,9 +524,9 @@ Priority proof targets:
   formal transition models they implement.
 - Required safety properties: no authority amplification, authority
   resurrection, split-brain commit, W+X alias, stale-core acceptance, usable
-  orphan derived child, promotion-based revocation escape, partial
-  multi-parent publication, provenance-as-authority, or cycle under concurrent
-  edge transactions.
+  orphan derived child, promotion-based revocation escape, multi-parent derived
+  child use before the `ParentSetManifest` feature gate, provenance-as-authority,
+  or cycle under concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and
