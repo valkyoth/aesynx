@@ -1054,15 +1054,20 @@ copy-on-write child, sealed transform, promoted shared-code object, or derived
 index must have a transactionally committed parent/child edge before it becomes
 usable. Edge traversal, quotas, generation retirement, promotion, and cascading
 revocation are part of the authority model. Promotion or detachment requires
-parent-side authority and relation-policy approval, records inherited
-provenance, and cannot launder an object out from under pending parent
-revocation. Distributed parent/child owners use pending/live/revoking/retired
-edge states, owner incarnations, transaction IDs, replay-window retirement, and
-quarantine on uncertain recovery. Strong revocation freezes new derivation and
-uses bounded continuation worklists; budget exhaustion cannot report partial
-success while descendants remain usable. Concurrent edge insertion revalidates
-generations and edge/topology epochs so cycle prevention is not a time-of-check
-to time-of-use race.
+typed parent-side `PROMOTE`/`DETACH_DERIVATION` authority, child-side authority,
+relation-policy approval, pinned immutable policy identity, preflighted
+destination/audit capacity, inherited provenance, and rights bounded by
+requested rights, live child rights, and policy promotable rights; it cannot
+launder an object out from under pending parent revocation. Distributed
+parent/child owners track edge state, journal decision, and participant progress
+separately, using owner incarnations, transaction IDs, replay-window
+retirement, and quarantine on uncertain recovery. Edge publication reserves
+future revocation progress so ordinary allocator, IPC, or best-effort journal
+exhaustion cannot prevent root freeze or bounded revoke progress. Strong
+revocation freezes new derivation and uses bounded continuation worklists;
+budget exhaustion cannot report partial success while descendants remain usable.
+Concurrent edge insertion revalidates generations and edge/topology epochs so
+cycle prevention is not a time-of-check to time-of-use race.
 
 External `CapId` kind tags are routing hints only. The registry slot's live
 object kind and incarnation control decoding and dispatch; a payload tag can
