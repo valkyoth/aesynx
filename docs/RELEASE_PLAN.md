@@ -2551,23 +2551,31 @@ DerivedObjectEdge {
   `PROMOTE` and `DETACH_DERIVATION` are nondelegable by default unless a
   relation policy explicitly admits constrained delegation.
   The parent owner mints an internal `DerivationControlPermit` after resolving
-  the caller's authority. The relation policy, execution identity, parent
-  lineage, child incarnation, quotas, audit capacity, destination
-  principal/table incarnation, and transaction identity are validated before the
-  permit exists. That permit is an internal proof type only: it is not
-  table-storable, serializable, delegable, wire-decodable, persisted in the
-  journal, or reproduced during recovery. It authorizes exactly the
-  coordinator/journal transition from `Undecided` to `Committed`; parent-side
-  authority, child-side authority, pinned policy, generations, and
-  transaction-bound reservations are revalidated immediately before that
-  transition. Commit consumes the permit. Abort, timeout, or failed prepare
-  destroys it without permitting reuse. Local child publication is authorized by
-  the replay-protected commit certificate plus publication-time parent-state
+  the caller's authority. For v1 single-parent derivation, the parent owner is
+  also the derived-edge transaction coordinator and journal-shard owner, and the
+  transaction ID embeds that journal shard plus parent-owner incarnation. The
+  relation policy, execution identity, parent lineage, child incarnation,
+  quotas, audit capacity, destination principal/table incarnation, and
+  transaction identity are validated before the permit exists. That permit is
+  an internal proof type only: it is not table-storable, serializable,
+  delegable, wire-decodable, persisted in the journal, or reproduced during
+  recovery. It authorizes exactly the local parent-owner coordinator/journal
+  transition from `Undecided` to `Committed`; parent-side authority, child-side
+  authority, pinned policy, generations, prepared acknowledgements, audit
+  placeholder evidence, and transaction-bound reservations are revalidated
+  immediately before that transition. Commit consumes the permit. Abort,
+  timeout, or failed prepare destroys it without permitting reuse. Child and
+  destination owners send generation-stamped prepared acknowledgements and
+  never receive the permit. Local child publication is authorized by the
+  replay-protected commit certificate plus publication-time parent-state
   validation, not by the permit. Cross-core messages carry only journal
-  decisions or owner-issued commit certificates, not the permit. If a future
-  design needs a permit to cross IPC, it must be redesigned as a full
-  authority-bearing capability with incarnation, replay, delegation, and
-  revocation semantics.
+  decisions, prepared acknowledgements, or owner-issued commit certificates, not
+  the permit. If the parent owner fails before commit, recovery may only abort
+  or quarantine based on durable journal evidence. Recovery may reproduce an
+  existing commit certificate but can never create a new commit decision by
+  reconstructing the permit. If a future design needs a permit to cross IPC, it
+  must be redesigned as a full authority-bearing capability with incarnation,
+  replay, delegation, and revocation semantics.
 - Cross-object dependency rules:
   - the parent owner records the edge transactionally before the child object
     becomes usable;
@@ -2695,6 +2703,11 @@ new_root_rights <= requested_rights
   - aborted pending edges remain replay-detectable until journal retirement;
   - the parent owner holds the authoritative outgoing edge;
   - the child owner holds an inbound dependency record;
+  - child and destination owners send prepared acknowledgements bound to owner
+    incarnation, reservation generation, policy identity, edge generation, and
+    transaction ID;
+  - commit is impossible until the complete required reservation manifest and
+    audit placeholder evidence have been acknowledged;
   - transaction commit decision and child publication are separate points: the
     journal commit determines the irreversible transaction outcome; child
     publication occurs later when the child owner locally changes
@@ -2756,6 +2769,33 @@ new_root_rights <= requested_rights
     edge records;
   - messages involving obsolete owner incarnations fail closed.
 - Edge publication reserves revocation progress resources:
+  - every distributed reservation is represented by a fixed manifest entry:
+
+```text
+PreparedReservation {
+    transaction_id,
+    resource_class,
+    resource_owner_incarnation,
+    reservation_generation,
+    bounded_amount_or_slot,
+    terminal_release_policy,
+}
+```
+
+  - the parent owner reserves outgoing edge slots, journal records, audit
+    placeholders it owns, object/lineage/principal quota credits it owns, and
+    revocation-progress resources;
+  - the child owner reserves the child registry slot, inbound edge record, and
+    required backing resources it owns;
+  - the destination table owner reserves the destination capability-table slot;
+  - each owner is the only writer for its own reservation and duplicate
+    commit/abort/release messages are idempotent;
+  - prepared acknowledgements include reservation generations and are bound into
+    the commit certificate;
+  - timeout alone cannot release a reservation while commit may have been
+    observed;
+  - reservations from an obsolete owner incarnation cannot satisfy a new
+    transaction;
   - prepare holds transaction-bound reservations for child registry slots, edge
     slots, destination capability-table slots, object/lineage/principal quota
     credits, journal records, replay records, revocation-progress credit,
@@ -2774,6 +2814,17 @@ new_root_rights <= requested_rights
   - revocation does not depend on the ordinary allocator, ordinary IPC
     capacity, or best-effort journal space;
   - credits are returned only after edge retirement and replay-window closure.
+- Edge publication couples audit evidence to the commit decision:
+  - prepare installs a security-audit placeholder bound to transaction ID,
+    operation, pinned policy identity, principal, and reserved audit generation;
+  - the journal commit references the audit reservation generation;
+  - commit either finalizes the record atomically on the audit owner or leaves
+    enough prepared evidence for deterministic recovery to finalize it without
+    ordinary allocation;
+  - abort finalizes or retires the placeholder as aborted;
+  - torn or missing prepared audit evidence prevents commit;
+  - audit payloads remain redacted and cannot contain reusable authority
+    identifiers.
 - Strong revocation with bounded traversal cannot report partial success:
   - root revocation first freezes new delegation, derivation, mapping, and
     promotion at the root;
@@ -2881,9 +2932,15 @@ Verification:
   IPC schemas.
 - Host/model tests prove the parent owner mints a permit only after resolving
   caller authority, the permit authorizes only the `Undecided -> Committed`
-  journal transition, commit consumes it, abort/timeout destroys it without
-  reuse, local publication uses the commit certificate rather than the permit,
-  and coordinator restart or recovery never persists or recreates a permit.
+  journal transition on the parent-owned coordinator/journal shard, commit
+  consumes it, abort/timeout destroys it without reuse, local publication uses
+  the commit certificate rather than the permit, and coordinator restart or
+  recovery never persists or recreates a permit.
+- Host/model tests prove v1 derived-edge transaction IDs bind the parent-owner
+  journal shard and owner incarnation, child/destination owners never receive a
+  permit, parent-owner failure before commit cannot be recovered as a new commit
+  decision, and recovery may only reproduce an existing commit certificate from
+  durable journal evidence.
 - Host/model tests prove duplicate commit attempts, coordinator restart,
   delayed requests, and replay cannot consume the same permit twice or mint a
   replacement from stale authority.
@@ -2939,6 +2996,16 @@ Verification:
   one-sided installation, commit-before-acknowledgement, obsolete owner
   incarnations, and replay-window retirement without producing usable orphan
   children.
+- Host/model tests prove prepared reservation manifests record transaction ID,
+  resource class, resource-owner incarnation, reservation generation,
+  bounded amount/slot, and terminal release policy for each resource; parent,
+  child, and destination owners write only their own reservations; prepared
+  acknowledgements bind reservation generations into the commit certificate; and
+  obsolete owner-incarnation reservations cannot satisfy a new transaction.
+- Host/model tests prove commit is impossible until the complete reservation
+  manifest is acknowledged, timeout alone cannot release a reservation while
+  commit may have been observed, and duplicate commit/abort/release messages are
+  idempotent.
 - Host/model tests prove edge state, transaction decision, and participant
   progress are interpreted separately; received `edge_state` is not
   authoritative by itself, aborted pending edges remain replay-detectable until
@@ -2980,6 +3047,13 @@ Verification:
   validation but before prepare. The transaction must either hold a reservation
   through commit/recovery/quarantine or abort before commit; no committed
   transaction may require ordinary allocation to reach a safe terminal state.
+- Host/model crash tests cover audit placeholder reservation, journal commit,
+  and audit finalization. Authority-creating commits must reference the audit
+  reservation generation, torn or missing prepared audit evidence prevents
+  commit, committed-but-unfinalized audit records are finalized deterministically
+  during recovery without ordinary allocation, abort retires or finalizes the
+  placeholder as aborted, and audit payloads remain redacted without reusable
+  authority identifiers.
 - Host/model tests prove strong parent revocation freezes new child creation,
   processes descendants through generation-stamped continuation cursors, leaves
   affected descendants unusable while `Revoking`, and reports success only when

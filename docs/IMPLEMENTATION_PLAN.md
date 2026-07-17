@@ -1060,18 +1060,23 @@ resolved parent-object capability whose single kind-specific rights
 representation contains the exact create/promote/detach relation operation,
 plus required child-side authority; `CommonRights::DERIVE` remains same-object
 attenuation only. Only after both sources are revalidated does the kernel mint a
-transaction-local internal permit. That permit authorizes only the
-`Undecided -> Committed` journal transition, is consumed by commit, is destroyed
-by abort or timeout, is never persisted, and does not authorize later local
-publication. Promotion or detachment requires relation-policy approval, pinned
-immutable policy identity, transaction-bound reservations for destination,
-quota, journal/replay, audit, revocation-progress, and backing resources,
+transaction-local internal permit. For v1, the parent owner is also the
+derived-edge coordinator and journal-shard owner, so that permit authorizes only
+the local parent-owned `Undecided -> Committed` journal transition, is consumed
+by commit, is destroyed by abort or timeout, is never persisted or reproduced
+during recovery, and does not authorize later local publication. Promotion or
+detachment requires relation-policy approval, pinned immutable policy identity,
+transaction-bound owner-local reservations for destination, quota,
+journal/replay, audit placeholder, revocation-progress, and backing resources,
 inherited provenance, and rights bounded by requested rights, live child rights,
 and policy promotable rights; it cannot launder an object out from under pending
-parent revocation. Distributed parent/child owners track edge state, journal
-decision, terminal resolution, participant progress, and child publication
-separately: journal commit decides outcome, but no handle is returned until the
-child owner locally validates and publishes the child. `ResourceLost` is a
+parent revocation. Child and destination owners send generation-stamped prepared
+acknowledgements; the parent-owned commit certificate binds the complete
+reservation manifest and audit placeholder evidence. Distributed parent/child
+owners track edge state, journal decision, terminal resolution, participant
+progress, and child publication separately: journal commit decides outcome, but
+no handle is returned until the child owner locally validates and publishes the
+child. `ResourceLost` is a
 terminal resolution only after publisher-capable participants are fenced or
 reset, candidate authority is retired, replay tombstones are installed, and
 pins/mappings/DMA/TLB obligations are drained; otherwise the edge remains

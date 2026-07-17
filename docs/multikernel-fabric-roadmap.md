@@ -502,11 +502,13 @@ Priority proof targets:
 - TLA+ or Quint models for grant, revoke, coordinator failure, AP restart, and
   strong-revocation linearization.
 - TLA+ or Quint models for derived-edge creation, promotion/detachment, v1
-  single-parent publication, transaction-bound reservation consumption/release,
-  permit consumption at the journal commit transition, recoverable quarantine,
-  `ResourceLost` terminal tombstones, provenance recording, and cascading
-  revocation. Future multi-parent support requires its own `ParentSetManifest`
-  model before any implementation accepts more than one parent.
+  single-parent publication, parent-owner coordinator locality, owner-local
+  reservation manifests, transaction-bound reservation consumption/release,
+  permit consumption at the parent-owned journal commit transition, audit
+  placeholder finalization, recoverable quarantine, `ResourceLost` terminal
+  tombstones, provenance recording, and cascading revocation. Future
+  multi-parent support requires its own `ParentSetManifest` model before any
+  implementation accepts more than one parent.
 - Kani, Verus, or equivalent bounded proofs for permission attenuation, range
   containment, generation retirement, and scheduler action validation.
 - Loom models for SPSC publication, slot reuse, cursor caching, and
@@ -528,9 +530,10 @@ Priority proof targets:
   resurrection, split-brain commit, W+X alias, stale-core acceptance, usable
   orphan derived child, promotion-based revocation escape, multi-parent derived
   child use before the `ParentSetManifest` feature gate, provenance-as-authority,
-  ordinary allocation required after derived-edge commit, stale permit replay,
-  delayed commit/abort resurrection after `ResourceLost`, or cycle under
-  concurrent edge transactions.
+  cross-core transmission of an internal derivation permit, ordinary allocation
+  required after derived-edge commit, stale permit replay, delayed commit/abort
+  resurrection after `ResourceLost`, missing audit evidence for an
+  authority-creating commit, or cycle under concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and
