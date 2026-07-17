@@ -1030,6 +1030,15 @@ override bit: every administrative operation has an exact operation identifier,
 typed-right check, delegation is prohibited unless the object kind explicitly
 allows it, and every use is audited.
 
+The central kind-to-right matrix must also cover domain lifecycle, debug,
+exception, pager, scheduling-context, and clock rights. For each kind it records
+wire encoding, mint authority, derivation/attenuation, delegation policy,
+one-shot or transaction binding, incarnation binding, revocation behavior,
+audit event class, cross-domain behavior, and how `ADMIN`, `GRANT`, and
+`REVOKE` coexist. High-risk rights such as domain kill, debug memory write,
+fault-frame modification/resume, and scheduling-ceiling changes are
+non-delegable by default.
+
 External `CapId` kind tags are routing hints only. The registry slot's live
 object kind and incarnation control decoding and dispatch; a payload tag can
 never authorize an unsafe downcast.
@@ -1602,6 +1611,16 @@ Initial capabilities:
 - Clock.
 - System control.
 
+Initial execution model:
+
+- One task per domain until the later multi-task-domain milestone.
+- `exit` terminates the domain.
+- Fatal task faults enter domain teardown.
+- Exception and pager handlers normally run in separate service domains with
+  attenuated authority over the target address space.
+- No task-create/thread-create or join syscall exists in the first ABI.
+- TLS is per task, but there is exactly one TLS instance in the initial domain.
+
 ### 14.2 User ABI
 
 `aesynx-abi` contains all cross-boundary structs.
@@ -1746,6 +1765,13 @@ Executable identity rules:
   allows it.
 - A signature never grants capabilities automatically.
 - Signed and unsigned artifacts cannot collide under one executable identity.
+
+Executable mapping follows an explicit transition: private writable/NX staging,
+copy plus BSS zeroing, permitted relocations only, final-byte validation,
+writable-alias freeze, required TLB invalidation, architecture instruction-cache
+synchronization, seal, then final RX mapping. A physical frame must never be
+writable in one address space while executable in another, and failed
+validation tears down and sanitizes staging frames before reuse.
 
 ## 15. Device and Driver Model
 

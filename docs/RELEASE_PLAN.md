@@ -2273,10 +2273,32 @@ Deliverables:
   - `IrqRights`: bind, acknowledge, mask, and unmask.
   - `DmaRights`: map, unmap, synchronize, and invalidate.
   - `SystemControlRights`: typed administrative operations only.
+  - `DomainFactoryRights`: spawn.
+  - `DomainControlRights`: stop, kill, restart, inspect-status, and
+    set-exception-endpoint.
+  - `DebugRights`: read-registers, write-registers, read-memory,
+    write-memory, suspend, and resume.
+  - `ExceptionRights`: receive-fault, inspect-frame, modify-frame, and
+    resume-frame.
+  - `PagerRights`: receive-page-fault, supply-page, and reject-fault.
+  - `SchedulingContextRights`: donate, set-ceiling, cancel-donation, and
+    inspect-budget.
+  - `ClockRights`: read-coarse, read-precise, create-deadline, and
+    synchronized-compare.
   Mint, derive, decode, and live resolution validate both capability kind and
   typed-right representation. Invalid examples such as `Endpoint|EXECUTE`,
   `Memory|RECV`, and `Clock|MAP` fail closed before an operation can ignore
   nonsense permissions.
+- The central matrix records, for every object kind, the wire encoding, mint
+  authority, derivation/attenuation rule, whether delegation is allowed,
+  one-shot/transaction/incarnation binding, revocation behavior, audit event
+  class, cross-domain behavior, and exact coexistence rules for `ADMIN`,
+  `GRANT`, and `REVOKE`.
+- High-risk rights are non-delegable by default unless a later object-specific
+  policy explicitly proves why delegation is safe. Initial non-delegable
+  examples include `DomainControl::KILL`, `Debug::WRITE_MEMORY`,
+  `Exception::MODIFY_FRAME`, `Exception::RESUME_FRAME`, and
+  `SchedulingContext::SET_CEILING`.
 - `ADMIN` is removed from generic enforcement paths or constrained so it never
   implies another right. Every administrative operation has an exact typed
   operation identifier, `ADMIN` is not an override for failed `READ`, `WRITE`,
@@ -2461,6 +2483,10 @@ Verification:
   never loses the authority on abort.
 - Host tests prove invalid typed-right/kind combinations fail at mint, derive,
   decode, and live resolution.
+- Host tests prove invalid kind/right combinations also fail during grant
+  proposal, grant commit, and checked live proof creation.
+- Host tests prove high-risk rights are stripped or rejected when delegation is
+  not explicitly allowed by the central kind-to-right matrix.
 - Host tests prove unknown mandatory typed rights and rights invalid for the
   encoded object kind fail during wire decode.
 - Host/model tests prove common-right and kind-specific attenuation are both
@@ -4588,6 +4614,11 @@ Deliverables:
 
 - Scheduling-context object bound to principal/domain incarnation, task
   incarnation, priority ceiling, and CPU-budget accounting.
+- Scheduling-context authority uses the central typed-right matrix:
+  `DONATE`, `SET_CEILING`, `CANCEL_DONATION`, and `INSPECT_BUDGET`.
+  `SET_CEILING` is non-delegable by default, `INSPECT_BUDGET` exposes only
+  redacted accounting state unless a richer debug right is also present, and
+  budget donation never implies authority donation.
 - Synchronous `CALL` may transfer a bounded CPU budget to the callee for that
   transaction.
 - Donation carries caller, callee endpoint, transaction ID, priority ceiling,
@@ -4834,6 +4865,12 @@ Deliverables:
   scheduling/request budget.
 - User fault handling integrates with domain termination and cannot leave a task
   executable on an unfenced core after fatal classification.
+- "Same-domain exception message" means the handler has explicit authority over
+  the target address space and fault frame. It does not mean the initial
+  one-task domain runs its own handler task. In the first userspace profile,
+  recoverable exception and pager endpoints normally target a separate service
+  domain holding attenuated exception, pager, debug, memory, and address-space
+  capabilities.
 
 Verification:
 
@@ -4857,6 +4894,51 @@ Exit criteria:
 
 - User exceptions have a deterministic policy before native services can expose
   exception handlers or debugger capabilities.
+
+### v0.46.6 - Initial Task And Domain Model
+
+Goal:
+
+Define the first native userspace execution model before ABI/runtime work can
+accidentally grow shared-address-space thread semantics.
+
+Deliverables:
+
+- One task per domain through the first native userspace milestones.
+- `exit` terminates the current domain, not only a task.
+- Fatal task faults enter the domain teardown protocol.
+- Exception and pager endpoints target a separate service domain unless a later
+  multi-task-domain milestone explicitly authorizes same-address-space handler
+  tasks.
+- No shared-address-space threads in the initial profile.
+- No task-create, thread-create, task-join, or thread-join syscall numbers in
+  the initial ABI.
+- TLS is per task, but there is exactly one TLS instance per initial domain.
+- Domain address-space mutation while the sole task can execute requires the
+  same fencing and activation-generation checks as later multi-task mutation;
+  there is no implicit "safe because one task exists" bypass.
+- Task migration either migrates the whole domain in the initial profile or is
+  rejected if future metadata says a domain has more than one task.
+- Domain teardown revokes the capability table, stops the sole task, fences
+  execution, and sanitizes private memory before cross-domain reuse.
+
+Verification:
+
+- Host ABI tests prove task-create, thread-create, task-join, and thread-join
+  requests are undefined or rejected before mutation.
+- Spawn tests prove a new initial domain contains exactly one runnable task.
+- Exit and fatal-fault tests prove the domain teardown state machine is entered.
+- Fault-delivery tests prove an exception handler task inside the same initial
+  domain is rejected; an external pager/debug service with attenuated authority
+  is accepted.
+- TLS tests prove exactly one initial TLS instance and reset it during teardown.
+- Address-space mutation tests prove the sole task is fenced before mappings
+  change.
+
+Exit criteria:
+
+- Native userspace starts from a small domain model that cannot be confused
+  with POSIX-style multithreaded processes.
 
 ### v0.47.0 - aesynx-abi And aesynx-rt
 
@@ -5029,6 +5111,35 @@ Deliverables:
 - Executable backing cannot change between validation and mapping. The load
   plan is bound to the sealed executable hash, canonical load manifest, and
   capability request manifest.
+- Executable transition protocol:
+  - create private writable/non-executable staging mappings;
+  - copy file-backed bytes and zero BSS;
+  - apply only declared and supported relocations;
+  - validate final bytes and manifest identity;
+  - freeze every writable alias to executable content;
+  - complete required local and remote TLB invalidation;
+  - perform required architecture instruction-cache synchronization;
+  - seal the executable object and load generation;
+  - install final read/execute mappings.
+- Loader transition rules:
+  - relocation targets inside executable segments are rejected initially;
+  - supported relocations may modify only declared writable relocation targets;
+  - no physical frame may be writable in one address space while executable in
+    another;
+  - shared executable text is fully relocated before sharing or is PIE with no
+    writable text fixups;
+  - sealed executable content is immutable;
+  - failed relocation, validation, sealing, or final mapping tears down staging
+    and sanitizes staged frames before reuse;
+  - final executable mappings use a generation distinct from writable staging;
+  - executable revocation, downgrade, or replacement uses the same TLB and
+    residency protocol as ordinary mapping revocation;
+  - x86_64 cannot define the portable instruction-cache rule as a no-op for
+    all architectures; aarch64 and RISC-V loaders must perform their explicit
+    instruction-cache maintenance before claiming executable readiness.
+- The canonical load manifest binds supported relocation types, relocation
+  target ranges, post-relocation segment hashes where feasible, executable
+  transition generation, and text shareability policy.
 - Transactional mapping creation: any failure removes every partially installed
   segment, stack, heap, TLS, queue, and startup-block mapping.
 - User ASLR:
@@ -5059,6 +5170,16 @@ Verification:
 - Host tests prove load-plan hash mismatch, canonical load-manifest mismatch,
   capability request manifest mismatch, backing-object mutation, and
   unsupported relocation fail before mapping.
+- Host tests prove relocation targets inside executable segments are rejected
+  initially and no final executable frame remains writable in another address
+  space.
+- Host tests prove failed relocation or post-relocation validation sanitizes
+  staging frames and consumes/retires the staging generation.
+- Host tests prove executable downgrade/revocation follows the same TLB,
+  residency, and generation rules as ordinary mapping revocation.
+- Architecture tests prove aarch64 and RISC-V executable installs issue the
+  required instruction-cache synchronization before the mapping is reported
+  runnable.
 - Host tests prove loaderd cannot select arbitrary object ranges, mark data as
   executable, choose a different entry point, omit security-relevant ELF
   metadata, or reinterpret the same executable object under a second identity.
@@ -5088,7 +5209,8 @@ Deliverables:
 
 - Spawn transaction state machine for staging, validation, commit, abort, and
   recovery.
-- Typed domain-lifecycle capabilities:
+- Typed domain-lifecycle capabilities are entries in the central kind-to-right
+  matrix, not local ad hoc enums:
   - `DomainFactoryRights::SPAWN`;
   - `DomainControlRights::{STOP, KILL, RESTART, INSPECT_STATUS,
     SET_EXCEPTION_ENDPOINT}`;
@@ -5239,6 +5361,61 @@ Exit criteria:
 
 - Aesynx has an auditable domain teardown path before normal process restart or
   hostile-domain lifecycle management.
+
+### v0.47.5 - Multi-Task Domain Model
+
+Goal:
+
+Add shared-address-space tasks only after the initial one-task domain model,
+spawn, fault delivery, and teardown rules are already deterministic.
+
+Deliverables:
+
+- Explicit `TaskFactory` or `ThreadCreate` authority. Possessing a domain,
+  address-space, or executable capability does not imply authority to create a
+  second task inside that domain.
+- Per-task incarnation, stack, guard page, TLS base, scheduling context, fault
+  frame state, exit state, and accounting.
+- Domain-wide task table with thread-count quotas and fail-closed generation
+  retirement on task-ID reuse.
+- Address-space mutation synchronization across every task in the domain:
+  freeze or rendezvous runnable tasks, invalidate stale activation permits,
+  complete TLB shootdown/residency acknowledgements, then publish the new
+  mapping generation.
+- Clear task-local versus domain-wide exit semantics:
+  - task exit produces a task result capability if requested;
+  - domain exit tears down every task;
+  - last-task exit terminates the domain unless policy explicitly keeps an
+    empty supervisor domain alive.
+- Join/result capabilities are explicit one-shot objects bound to task
+  incarnation, domain incarnation, and exit-generation state.
+- Fault containment rules define which faults terminate only the task, which
+  terminate the domain, and which may be delivered to an authorized external
+  pager/debug service.
+- Cross-core teardown stops, fences, and drains every task before the domain can
+  report `Dead`.
+- Scheduler and budget accounting distinguish per-task budgets from domain
+  aggregate ceilings.
+
+Verification:
+
+- Host/model tests prove task creation requires explicit `TaskFactory` or
+  `ThreadCreate` authority and respects task-count quotas.
+- Tests prove task IDs, join capabilities, and result capabilities reject stale
+  incarnations after task reuse.
+- Address-space mutation tests prove no runnable task can execute with a stale
+  mapping generation after mutation commits.
+- Fault tests prove configured task-local faults do not leak authority or leave
+  stale resume tokens, while domain-fatal faults enter the domain teardown
+  protocol.
+- Cross-core teardown tests prove a domain cannot report `Dead` until every
+  task is fenced, every scheduling context is drained, and every join/result
+  capability is resolved or retired.
+
+Exit criteria:
+
+- Shared-address-space tasks become an explicit authority-bearing feature
+  instead of an accidental extension of the initial process model.
 
 ### v0.48.0 - aesynx-init
 
