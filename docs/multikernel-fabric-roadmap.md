@@ -501,6 +501,9 @@ Priority proof targets:
 - Topology route selection invariants.
 - TLA+ or Quint models for grant, revoke, coordinator failure, AP restart, and
   strong-revocation linearization.
+- TLA+ or Quint models for derived-edge creation, promotion/detachment,
+  complete parent-set publication, provenance recording, and cascading
+  revocation.
 - Kani, Verus, or equivalent bounded proofs for permission attenuation, range
   containment, generation retirement, and scheduler action validation.
 - Loom models for SPSC publication, slot reuse, cursor caching, and
@@ -519,7 +522,10 @@ Priority proof targets:
 - Refinement tests showing executable Rust state machines agree with the
   formal transition models they implement.
 - Required safety properties: no authority amplification, authority
-  resurrection, split-brain commit, W+X alias, or stale-core acceptance.
+  resurrection, split-brain commit, W+X alias, stale-core acceptance, usable
+  orphan derived child, promotion-based revocation escape, partial
+  multi-parent publication, provenance-as-authority, or cycle under concurrent
+  edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and

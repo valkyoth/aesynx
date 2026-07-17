@@ -2193,6 +2193,9 @@ Deliverables:
 - TLA+ or Quint model for prospective revoke, strong revoke, coordinator
   failure, participant timeout, and recovery before v0.37.9 can guard live
   shared mappings or DMA.
+- TLA+ or Quint model for derived-object edge creation, promotion/detachment,
+  parent-set publication, and cascading revocation before v0.37.1 derived-edge
+  implementation is considered complete.
 - TLA+ or Quint model for AP startup, late arrival, permanent quarantine, and
   restart/hotplug fencing before v0.37.11 can relax the no-restart rule.
 - Model interfaces name the Rust state machines and event fields they refine
@@ -2288,7 +2291,6 @@ Deliverables:
   - `TaskControlRights`: stop, kill, inspect-status, and
     set-exception-endpoint.
   - `TaskJoinRights`: wait, read-result, and consume-result.
-  - `DerivedObjectEdgeRights`: promote and detach-derivation.
   - `DebugRights`: read-registers, write-registers, read-memory,
     write-memory, suspend, and resume.
   - `ExceptionRights`: receive-fault, inspect-frame, modify-frame, and
@@ -2298,6 +2300,7 @@ Deliverables:
     inspect-budget.
   - `ClockRights`: read-coarse, read-precise, create-deadline, and
     synchronized-compare.
+  - `DerivationControlPermitRights`: promote and detach-derivation.
   Mint, derive, decode, and live resolution validate both capability kind and
   typed-right representation. Invalid examples such as `Endpoint|EXECUTE`,
   `Memory|RECV`, and `Clock|MAP` fail closed before an operation can ignore
@@ -2507,6 +2510,7 @@ delegated_kind_rights   <= requested_kind_rights
 DerivedObjectEdge {
     parent_object_incarnation,
     parent_capability_lineage,
+    parent_set_identity,
     child_object_incarnation,
     relation_kind,
     edge_generation,
@@ -2525,6 +2529,14 @@ DerivedObjectEdge {
   Initial relation kinds include `ExecutableImage`, `Snapshot`,
   `CopyOnWriteChild`, `SealedTransform`, `PromotedSharedCode`, and
   `DerivedIndex`.
+- `DerivedObjectEdge` records are internal authority metadata, not
+  caller-addressable capability objects. Boundary code must never accept a
+  caller-supplied parent/child/edge tuple as authority. Parent-authorized edge
+  operations mint a nondelegable, one-shot `DerivationControlPermit` bound to
+  exact parent lineage, child incarnation, edge generation, operation kind,
+  destination principal, destination table incarnation, and transaction ID.
+  The permit is consumed at the final mutation boundary after live parent,
+  child, policy, quota, and audit revalidation.
 - Cross-object dependency rules:
   - the parent owner records the edge transactionally before the child object
     becomes usable;
@@ -2533,6 +2545,19 @@ DerivedObjectEdge {
     cannot discover;
   - parent and child IDs are registry-minted incarnations;
   - edges are bounded by per-object and per-principal quotas;
+  - v1 child publication uses a newly minted, unpublished child and immutable
+    incoming dependency set;
+  - v1 supports either exactly one parent or a bounded complete parent set
+    committed atomically before publication; no incoming edge may be added to
+    an already `Live` child;
+  - every dependency carries a checked creation rank or depth, and
+    `parent_rank < child_rank` is required for hierarchical relation kinds;
+  - if a relation policy permits multi-parent children, every parent edge is
+    prepared before the single child-publication decision, cascade-bound
+    revocation by any parent affects the child, promotion detaches every
+    required incoming authority dependency, promoted rights satisfy every
+    applicable parent policy, and failure cannot publish a child with only a
+    subset of declared dependencies;
   - cycles are prohibited or rejected through a bounded DAG rule;
   - edge traversal has strict maximum depth and work budgets;
   - deleting or recycling an edge requires the child to be dead or
@@ -2547,6 +2572,16 @@ DerivedObjectEdge {
     reverse dependency requires it;
   - promoting shared text into an independent code object consumes the original
     dependency and establishes a new explicit authority root.
+- Authority dependencies and provenance are separate records:
+  - authority dependency edges participate in cascading revocation, pinning,
+    promotion, and lifecycle/resource retention;
+  - immutable provenance records record origin and inherited provenance but
+    grant no authority, cause no cascade, and do not retain resources by
+    themselves;
+  - successful promotion retires the authority dependency and appends a
+    provenance link, so independent objects do not remain accidentally
+    revocation-linked and provenance does not disappear when the dependency
+    edge is reclaimed.
 - Relation policies are immutable and downgrade-resistant:
   - an edge pins a policy identity or semantic hash, not a mutable version
     number alone;
@@ -2563,8 +2598,9 @@ DerivedObjectEdge {
   not mere child control:
   - promotion requires explicit `PROMOTE` or `DETACH_DERIVATION` authority from
     the parent authority path;
-  - `PROMOTE` and `DETACH_DERIVATION` are typed edge/derivation rights in the
-    central kind-to-right matrix, not universal permission bits;
+  - `PROMOTE` and `DETACH_DERIVATION` are typed
+    `DerivationControlPermitRights` in the central kind-to-right matrix, not
+    universal permission bits;
   - appropriate child-side authority is also required; parent-side detachment
     approval alone cannot spend child authority;
   - each relation kind has a kernel-owned relation-policy entry that states
@@ -2606,10 +2642,27 @@ new_root_rights <= requested_rights
   - aborted pending edges remain replay-detectable until journal retirement;
   - the parent owner holds the authoritative outgoing edge;
   - the child owner holds an inbound dependency record;
-  - the child-publication linearization point is the commit decision that makes
-    both the parent outgoing edge and child inbound dependency discoverable;
-  - the child is published only after both records reach the committed
-    generation;
+  - transaction commit decision and child publication are separate points: the
+    journal commit determines the irreversible transaction outcome; child
+    publication occurs later when the child owner locally changes
+    `Pending -> Live`;
+  - before local publication, the child owner verifies the commit certificate,
+    parent-edge discoverability, owner incarnations, pinned policy identity,
+    edge generation, complete parent set, and current parent revocation/freeze
+    state;
+  - if parent revocation linearizes between transaction commit and local child
+    publication, the child enters `Revoking` or `Quarantined` and never becomes
+    briefly usable;
+  - parent revocation traverses both `Live` edges and committed but not yet
+    published edges;
+  - no capability or user-visible handle is returned until local child
+    publication completes;
+  - the journal owner is authoritative for transaction decision, the parent
+    owner for outgoing edge state, and the child owner for inbound dependency
+    record plus local publication state; remote participant state is
+    generation-stamped observation only;
+  - the child is published only after required parent/child records reach the
+    committed generation and local publication validation succeeds;
   - a committed edge is discoverable by parent revocation before the child can
     become usable;
   - every edge message is bound to transaction ID, relation-policy identity,
@@ -2654,7 +2707,7 @@ new_root_rights <= requested_rights
   - the transaction is rejected if the validation snapshot changed;
   - intrinsically hierarchical relation kinds carry checked derivation depth or
     rank;
-  - unknown relation kinds or relation-policy versions received over IPC are
+  - unknown relation kinds or relation-policy identities received over IPC are
     rejected rather than interpreted through defaults.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
   endianness, versioning, domain incarnation fields, and no Rust enum layout
@@ -2724,15 +2777,30 @@ Verification:
 - Host tests prove map requests require both memory-object and address-space
   authority.
 - Host/model tests prove no cross-object child becomes usable before its
-  dependency edge commits.
+  dependency edge commits and local child publication validation completes.
+- Host tests prove boundary code cannot authorize edge operations from
+  caller-supplied parent/child/edge tuples; `DerivationControlPermit` values
+  are nondelegable, one-shot, exact-operation-bound, and consumed at the final
+  mutation boundary.
 - Host/model tests prove source-wide or object-wide revocation finds all
   cascade-bound children, lineage-local revocation does not affect children
   created through unrelated lineages, and child revocation does not
   accidentally revoke the parent.
+- Host/model tests prove v1 child publication rejects adding an incoming edge
+  to an already `Live` child, rejects partial publication of a multi-parent
+  child, enforces `parent_rank < child_rank` for hierarchical relations, and
+  cascades revocation from any cascade-bound parent in the committed parent
+  set.
+- Host/model tests prove promotion of a multi-parent child detaches every
+  required incoming authority dependency and promoted rights satisfy every
+  applicable parent policy.
 - Host/model tests prove edge capacity exhaustion leaves no usable orphan,
   crash between child creation and edge publication aborts or quarantines the
   child, cyclic dependency attempts fail before mutation, and edge retirement
   plus source/object ID reuse cannot resurrect a stale child relationship.
+- Host/model tests prove successful promotion retires authority dependencies
+  while appending immutable provenance records, and provenance records do not
+  grant authority, retain resources, or trigger cascading revocation.
 - Host/model tests prove promotion requires parent-side `PROMOTE` or
   `DETACH_DERIVATION` authority, revalidates the parent and edge generation at
   the linearization point, fails during parent revocation, and cannot
@@ -2761,9 +2829,14 @@ Verification:
   authoritative by itself, aborted pending edges remain replay-detectable until
   journal retirement, uncertain commit never becomes inferred abort, and
   quarantine records are incarnation-bound.
-- Host/model tests prove child publication linearizes only when the common
-  transaction journal commits both parent outgoing and child inbound records,
-  and parent revocation can discover the edge before the child is usable.
+- Host/model tests prove journal commit decision and local child publication
+  are separate: no user-visible handle returns before local publication,
+  publication verifies commit certificate, policy identity, owner
+  incarnations, complete parent set, parent-edge discoverability, and parent
+  freeze/revocation state, and parent revocation between commit and publication
+  sends the child to `Revoking` or `Quarantined` without becoming usable.
+- Host/model tests inject every interleaving between commit decision, parent
+  revoke, participant apply, acknowledgement, and child publication.
 - Host/model tests exhaust ordinary allocation, IPC, and best-effort journal
   capacity while proving root freeze and derived-edge revocation can still
   begin and make bounded progress through reserved revocation credit or
@@ -2778,7 +2851,7 @@ Verification:
 - Host/model tests prove concurrent opposite-edge insertion cannot create a
   cycle, stale validation snapshots are rejected at commit, hierarchical
   relation depth/rank is enforced, and unknown relation kinds or policy
-  versions from IPC fail closed.
+  identities from IPC fail closed.
 - Host tests prove stale table entries are tombstoned or reclaimed within
   bounded quotas after revocation.
 - Model tests prove quota-credit accounting preserves the configured ceiling
@@ -3861,6 +3934,11 @@ Deliverables:
   - no promotion-based authority amplification or revocation escape;
   - no cycle under concurrent edge transactions;
   - exactly one promotion/create outcome after failure recovery;
+  - no child publication before local owner validation after transaction
+    commit;
+  - no partial publication of a multi-parent child with only a subset of its
+    declared dependencies;
+  - no authority retained by immutable provenance records;
   - no strong-revoke success while a cascade-bound child remains usable.
 - Required bounded-liveness properties:
   - healthy grant and revoke transactions eventually commit or abort;
@@ -3906,7 +3984,7 @@ Deliverables:
 - Refinement tests showing the executable Rust state machines agree with the
   formal transition models for grant, revoke, AP restart, queue publication,
   scheduler action validation, derived-object edge creation, edge promotion,
-  and edge revocation traversal.
+  parent-set publication, provenance recording, and edge revocation traversal.
 - Negative refinement tests where a deliberately broken Rust transition and its
   model disagree.
 - Release-gate checklist for the authority-bearing sequence:
