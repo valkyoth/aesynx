@@ -875,6 +875,12 @@ Deliverables:
 - Map kernel text as RX/write-protected, rodata as read-only/NX, data/BSS as
   RW/NX, and required boot/diagnostic mappings with explicit flags.
 - Keep null page, guard page, and reserved heap windows unmapped.
+- Minimum hardening before CR3 activation:
+  - detect NX support;
+  - enable EFER.NXE before installing tables that use NX bits;
+  - enable CR0.WP before relying on supervisor read-only page protection;
+  - fail closed if the selected boot profile requires either bit and read-back
+    verification fails.
 - Re-run the kernel mapping policy verifier against the hardware-shaped table
   image before loading CR3.
 - Hardware-table export is admitted only from a sealed validated address-space
@@ -883,6 +889,8 @@ Deliverables:
 - Switch CR3 to the Aesynx-owned root table.
 - Read back CR3 in redacted form and verify that execution continues under the
   Aesynx-owned address space.
+- Read back EFER.NXE, CR0.WP, and CR3 after activation; AP Rust execution stays
+  blocked until the minimum bootstrap hardening state is verified.
 - Keep Limine's active mappings as an input to the transition, not as the final
   security claim.
 
@@ -899,6 +907,8 @@ Verification:
 - Fault smoke proves that the page-fault path still works after the switch.
 - Host tests prove raw mapper values cannot bypass the sealed validated
   address-space proof required for hardware export.
+- QEMU or host tests prove CR3 activation does not proceed when required
+  NXE/WP read-back fails.
 - Release notes clearly distinguish "Aesynx-owned CR3 active" from full
   process isolation or userspace enforcement.
 
@@ -2068,6 +2078,42 @@ Exit criteria:
 
 - IPC and capabilities are integrated.
 
+### v0.37.0.1 - Protocol Specification Gate
+
+Goal:
+
+Require executable protocol specifications before implementing the live
+mechanisms that depend on them.
+
+Deliverables:
+
+- TLA+ or Quint model for transactional grants before v0.37.1 grant
+  implementation is considered complete.
+- TLA+ or Quint model for live queue publication, reuse, cancellation, and
+  wraparound before v0.37.8 atomic fabric queues can claim AP-backed safety.
+- TLA+ or Quint model for prospective revoke, strong revoke, coordinator
+  failure, participant timeout, and recovery before v0.37.9 can guard live
+  shared mappings or DMA.
+- TLA+ or Quint model for AP startup, late arrival, permanent quarantine, and
+  restart/hotplug fencing before v0.37.11 can relax the no-restart rule.
+- Model interfaces name the Rust state machines and event fields they refine
+  later in v0.37.12.
+- Explicit split between this early specification gate and the later v0.37.12
+  conformance gate. Implementation must not rely on "the model comes later"
+  for authority-bearing behavior.
+
+Verification:
+
+- Each model has at least one positive path and one intentionally broken
+  negative variant proving the property catches a relevant bug.
+- Documentation gate rejects v0.37.1, v0.37.8, v0.37.9, or v0.37.11 release
+  notes that claim completion while the matching model is absent.
+
+Exit criteria:
+
+- Live authority, queue, revocation, and AP-fencing work has a formal
+  executable contract before implementation detail dominates the design.
+
 ### v0.37.1 - Authority Identity And Endpoint Hardening
 
 Goal:
@@ -2083,6 +2129,23 @@ hostile-boundary work needs stronger identities than caller-selected object
 IDs and caller-supplied core IDs. This milestone makes authority identity,
 principal identity, endpoint rights, and live checks explicit before they
 become user or multicore enforcement APIs.
+
+Implementation slicing:
+
+This milestone is security-critical and must not land as one giant change.
+Implementation must be split into reviewable units with their own tests:
+
+1. Registry-minted authority handles, table/domain incarnations, table
+   ownership, and root-minting restrictions.
+2. Typed rights, kind-to-right matrix, canonical wire representation, and
+   non-authoritative `CapId` tags.
+3. Live authorization proof APIs that replace boundary use of table-only
+   `check()` plus optional registry resolution.
+4. Transaction journal plus copy grants.
+5. Move-only grant escrow.
+6. Endpoint call/reply authority, one-shot replies, cancellation, and
+   server-death cleanup.
+7. Distributed quota accounting foundations.
 
 Deliverables:
 
@@ -2182,19 +2245,20 @@ delegated_kind_rights   <= requested_kind_rights
   - commit makes authority usable;
   - abort/timeout expires pending authority;
   - retries are idempotent.
-- Bounded, preallocated authority transaction journal shared by grants,
+- Common bounded transaction journal record format shared by grants,
   move-grants, ownership transfer, strong revocation, and other
-  authority-moving operations. Each record stores transaction ID, participant
+  authority-moving operations. "Shared" means common protocol and schema, not a
+  single system-wide journal. Each record stores transaction ID, participant
   incarnations, source and destination capability identities, frozen source
   generation, prepared/committed/aborted state, witness acknowledgements,
   commit certificate or decision epoch, recovery owner, timeout owner, journal
-  generation, torn-record integrity evidence, bounded replay window, and
-  terminal-record reclamation state.
-- One-writer journal ownership; the journal must not become a globally mutated
-  shared structure. Every transaction class states whether records survive
-  coordinator-domain restart, core reset, or machine reboot, and which
-  replication or witness acknowledgements are required before receiver
-  authority becomes active.
+  generation, torn-record integrity evidence, bounded replay window, reserved
+  capacity class, and terminal-record reclamation state.
+- Owner-local or sharded one-writer journal ownership. A transaction ID names
+  the owning shard and shard incarnation; cross-shard transactions name
+  explicit participants and witnesses. No journal may become a global
+  cache-coherency or availability bottleneck, and each transaction class has
+  reserved journal capacity.
 - Coordinator restart recovers from the transaction journal. If no
   authoritative coordinator record or trusted commit witness survives, the
   availability guarantee no longer applies. If commit might have been observed
@@ -2233,6 +2297,14 @@ delegated_kind_rights   <= requested_kind_rights
 - Per-principal quotas for kernel objects, page-table pages, pinned frames,
   lineage nodes, pending calls, and ordinary audit-rate usage. Emergency audit
   capacity remains system-reserved and non-delegable.
+- Distributed quota accounting uses escrowed credits rather than one global
+  shared counter:
+  - a quota coordinator grants bounded credits to owner cores;
+  - a core allocates only from local credit;
+  - credit transfer is transactional;
+  - dead-incarnation recovery retires or reclaims outstanding credits;
+  - the invariant is
+    `allocated + reserved + free_distributed_credits == configured_ceiling`.
 - Mapping-authority split between memory-object capability, destination
   address-space capability, and optional executable/JIT policy authority.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
@@ -2598,6 +2670,78 @@ Exit criteria:
 - Aesynx has a documented path to a small per-core kernel plus isolated
   monitor/services before distributed policy becomes live.
 
+### v0.37.7.1 - Minimum Core Incarnation Contract
+
+Goal:
+
+Provide the minimum authoritative identity contract that live AP-backed queues
+consume before the richer restart/hotplug model arrives.
+
+Deliverables:
+
+- Machine boot nonce or machine-session nonce available to fabric identity.
+- Immutable core incarnation minted only after successful AP startup.
+- Startup-attempt generation distinct from reusable logical core ID.
+- Late-arrival rejection before the AP can publish, consume, or acknowledge
+  live fabric messages.
+- Endpoint and link identities bound to boot nonce, topology epoch, logical
+  core, core incarnation, endpoint incarnation, and link generation.
+- Permanent quarantine until reboot for failed/timed-out APs; no identity reuse
+  and no restart/hotplug in this milestone.
+- Explicit statement that v0.37.11 owns restart/hotplug recovery, but v0.37.8
+  may not consume core-incarnation fields until these minimum semantics exist.
+
+Verification:
+
+- Host tests prove a stale startup attempt cannot mint a current core
+  incarnation.
+- Host tests prove endpoint/link identity validation rejects mismatched boot
+  nonce, topology epoch, core incarnation, endpoint incarnation, and link
+  generation before payload parsing.
+- QEMU model smoke proves a quarantined AP identity is not reused.
+
+Exit criteria:
+
+- Live atomic IPC has authoritative core-incarnation fields to consume, while
+  restart and hotplug remain explicitly disabled until v0.37.11.
+
+### v0.37.7.2 - Per-Core Memory Ownership Contract
+
+Goal:
+
+Define allocator and frame ownership before AP-backed services can mutate
+kernel memory from multiple cores.
+
+Deliverables:
+
+- Per-core heap arena or slab-cache ownership model.
+- Owner-stamped physical-frame allocation records.
+- Remote-free queues for memory freed on a non-owner core.
+- Explicit frame-ownership transfer protocol with prepare/accept/commit/abort.
+- NUMA-aware refill requests and policy hooks where topology information is
+  available.
+- Bounded emergency allocation reserves for faults, quarantine, revocation, and
+  audit-loss handling.
+- Rule that a core never directly mutates another core allocator's metadata.
+- Recovery policy for frames, heap slabs, and remote-free queues owned by a
+  quarantined core.
+- No frame reuse while remote references, pending frees, DMA mappings, TLB
+  obligations, or owner-transfer transactions are live.
+
+Verification:
+
+- Host/model tests prove a frame cannot simultaneously belong to two
+  allocators.
+- Host/model tests prove remote-free delivery, duplicate remote-free, owner
+  quarantine, and refill failure do not leak or double-own frames.
+- Host tests prove emergency reserves cannot be consumed by ordinary allocation
+  paths.
+
+Exit criteria:
+
+- Shared-nothing memory ownership has a concrete allocator boundary before
+  live AP queues and services rely on per-core state.
+
 ### v0.37.8 - Cache-Aware Atomic Fabric Queues
 
 Goal:
@@ -2720,6 +2864,60 @@ Exit criteria:
 - Aesynx has a queue implementation proven by real concurrent AP execution and
   actual doorbell/IPI delivery, not only by model `Ordering` evidence.
 
+### v0.37.8.1 - Fabric Link Lifecycle And Deadlock Rules
+
+Goal:
+
+Make sparse link creation safe to tear down and reuse, and prevent distributed
+protocol waits from becoming hidden lock cycles.
+
+Deliverables:
+
+- Fabric link lifecycle state machine:
+  - `Absent`;
+  - `Creating`;
+  - `Active`;
+  - `Draining`;
+  - `Retired`;
+  - `Reclaimable`.
+- Link teardown protocol:
+  - stop new publication;
+  - drain or cancel outstanding messages;
+  - retire doorbell/vector identity;
+  - invalidate endpoint and link generations;
+  - wait for producer and consumer acknowledgement;
+  - unmap shared queue pages and complete required TLB invalidation;
+  - scrub payload pages;
+  - return pages only after stale endpoints are fenced.
+- Delayed IPI, acknowledgement, or completion messages cannot bind to a reused
+  link generation.
+- Logical quarantine is not hardware fencing. A still-running AP is not treated
+  as harmless merely because routing tables label it quarantined; protocols
+  must either prove it cannot execute stale authority, fence/reset it, or halt.
+- Distributed no-deadlock rules:
+  - never wait synchronously on another core while holding a kernel lock or
+    mutable owner-state guard;
+  - no nested authority transaction unless protocol ranks explicitly allow it;
+  - every blocking protocol names its rank or acyclic dependency edge;
+  - callbacks cannot synchronously reenter the waiting coordinator;
+  - cancellation and revocation traffic cannot require resources held by the
+    operation being cancelled.
+
+Verification:
+
+- Host/model tests cover each link lifecycle transition and reject invalid
+  skip transitions.
+- Fault-injection tests cover delayed IPI/acknowledgement after link retirement
+  and prove the old message cannot affect a reused link.
+- Model tests cover cyclic waits among grant, mapping, scheduler, allocator,
+  and revocation protocols and prove they fail closed or follow an acyclic
+  rank.
+
+Exit criteria:
+
+- Fabric links can be retired, reclaimed, and recreated without stale messages
+  or distributed wait cycles resurrecting authority.
+
 ### v0.37.9 - Strong Revocation And Mapping Invalidation Semantics
 
 Goal:
@@ -2735,6 +2933,18 @@ does not automatically remove receiver table entries, tear down mappings, flush
 remote TLBs, cancel DMA, cancel in-flight IPC, or prove every core has observed
 the new epoch. Aesynx needs an explicit revoke contract before shared memory,
 driver DMA, or cross-core delegation becomes live.
+
+Implementation slicing:
+
+This milestone is too large to implement as one security change. It is split
+into reviewable units:
+
+1. Prospective revoke and operation fences.
+2. Lineage and selective revocation.
+3. Memory-object pin/freeze/reclaim lifecycle.
+4. TLB invalidation, residency barriers, and address-space activation permits.
+5. DMA/device revoke integration.
+6. Failure recovery and strong-revoke completion semantics.
 
 Deliverables:
 
@@ -2842,6 +3052,18 @@ Deliverables:
   memory.
 - In-flight IPC cancellation or replay policy for operations authorized before
   the revoke linearization point.
+- Operation-class side-effect table. For every revocable operation class,
+  define:
+  - authorization linearization point;
+  - side-effect commit point;
+  - whether cancellation is possible;
+  - drain or completion evidence;
+  - what strong revoke promises about effects already committed;
+  - whether rollback is meaningful;
+  - whether the only safe response is device reset, quarantine, or halt.
+- Explicit non-claim: strong revoke prevents future effects and drains or
+  fences previously accepted work, but it cannot undo an already observed
+  external side effect such as a transmitted packet or completed device write.
 - Failure handling for dead cores or domains: timeout leads to quarantine,
   degraded fail-closed state, or system halt depending on authority class.
 - Audit records linking proposal, freeze, acknowledgement, TLB/DMA cleanup,
@@ -2864,6 +3086,8 @@ Verification:
   installed revocation fence.
 - Host model tests prove strong revoke cannot complete until modeled mappings,
   TLB acknowledgements, DMA ownership, and pending grants are resolved.
+- Host/model tests prove each operation class follows its side-effect table and
+  never reports rollback for an already externally observed effect.
 - Host model tests prove revoke-one, revoke-subtree, revoke-domain, and
   revoke-object scopes invalidate exactly the intended descendants without
   leaving stale authority live.
@@ -3199,6 +3423,44 @@ Exit criteria:
 - Aesynx may enable tagged TLBs or actual AP restart/hotplug only after these
   live-evidence gates pass.
 
+### v0.37.14 - Bare-Metal Multicore Evidence Gate
+
+Goal:
+
+Separate deterministic QEMU/KVM evidence from production multicore coherence
+claims.
+
+Deliverables:
+
+- Bare-metal x86_64 SMP queue stress with actual AP execution.
+- Bare-metal TLB-shootdown stress covering permission reduction, unmap, and
+  address-space activation denial.
+- KVM and TCG QEMU runs with distinct documented expectations.
+- Hardware performance-counter collection for cache-line bouncing, IPI cost,
+  queue saturation, and reserved-lane latency where the platform exposes it.
+- Multi-socket or NUMA testing when available; otherwise the test report states
+  the topology limit.
+- Physical AArch64 weak-memory testing before the aarch64 backend claims live
+  AP-backed fabric correctness.
+- Long-duration wraparound, saturation, and core-offline/quarantine stress.
+- Clear non-claim that QEMU 16/32-core scaling is useful evidence, but not the
+  final cache-coherence, NUMA, SMT-interference, or weak-memory proof.
+
+Verification:
+
+- Bare-metal report records CPU model, core/thread count, memory topology,
+  firmware mode, AP count, test duration, wrap counters, IPI counts, and
+  failure/quarantine events.
+- Stress tests prove control/revocation lanes keep bounded latency while
+  best-effort traffic saturates queues.
+- Any platform that cannot expose performance counters or NUMA data reports
+  that limitation rather than silently claiming coverage.
+
+Exit criteria:
+
+- Aesynx has real-hardware multicore evidence before making production
+  multikernel concurrency claims.
+
 ## Phase 10: Driver Foundation
 
 ### v0.38.0 - Device Model
@@ -3301,6 +3563,46 @@ Verification:
 Exit criteria:
 
 - Drivers are capability-limited.
+
+### v0.41.1 - Directed IRQ Ownership And Transfer
+
+Goal:
+
+Make interrupt ownership explicit before real driver services depend on
+directed IRQ routing.
+
+Deliverables:
+
+- Vector and interrupt-source incarnations.
+- Exactly one owner core/domain for each routable interrupt source.
+- IRQ transfer protocol:
+  - mask source;
+  - drain in-service state;
+  - clear or acknowledge device-level interrupt state in documented order;
+  - reroute or remap vector/MSI/MSI-X/interrupt-remapping entry;
+  - publish new owner incarnation;
+  - unmask only after ownership and routing evidence is visible.
+- Correct EOI ordering for edge-triggered and level-triggered interrupts.
+- Handling for level-triggered lines that remain asserted.
+- Stale interrupt rejection after driver, core, or source incarnation restart.
+- MSI/MSI-X and interrupt-remapping teardown rules before device/domain
+  revocation.
+- Storm rate limiting, quarantine, and escalation policy.
+- Explicit special-case policy for NMI, machine-check, timer, and non-routable
+  interrupts.
+
+Verification:
+
+- Host model tests prove an interrupt cannot be owned by two domains.
+- Host tests prove stale vector/source incarnations are rejected after transfer
+  or restart.
+- QEMU smoke or model test proves mask/drain/remap/unmask ordering is enforced
+  before a fake driver receives IRQ authority.
+
+Exit criteria:
+
+- IRQ delivery is an owned, transferable capability path rather than ambient
+  hardware state.
 
 ### v0.42.0 - Virtio RNG
 
@@ -3764,13 +4066,15 @@ Exit criteria:
 
 - User mode works.
 
-### v0.46.1 - Hostile User-Domain Shared Mapping Proof
+### v0.46.1 - Cooperative User-Domain Shared Mapping Proof
 
 Goal:
 
-Prove shared-buffer mappings between actual isolated user domains after ring-3
-execution exists. This is the hostile-domain counterpart to the kernel-owned
-v0.37.10 shared-mapping infrastructure.
+Prove shared-buffer mapping mechanics between actual isolated user domains
+after ring-3 execution exists. This is the user-domain counterpart to the
+kernel-owned v0.37.10 shared-mapping infrastructure, but it is still a
+cooperative isolation proof until v0.46.2 preemption and CPU-budget enforcement
+exist.
 
 Deliverables:
 
@@ -3813,10 +4117,9 @@ Verification:
 
 Exit criteria:
 
-- Aesynx can claim hostile cross-domain shared mappings only after actual
-  isolated user domains, real page tables, and strong revocation all participate.
-  This milestone proves memory isolation and revocation safety only; scheduling
-  progress and denial-of-service containment require v0.46.2 preemption.
+- Aesynx proves user-domain shared mapping mechanics, memory isolation, and
+  revocation safety. It must not claim hostile-domain scheduling progress or
+  denial-of-service containment until v0.46.2 preemption is active.
 
 ### v0.46.2 - Preemptive Timer And CPU-Budget Enforcement
 
@@ -3855,6 +4158,52 @@ Exit criteria:
 
 - Aesynx has a concrete preemption baseline before normal multi-process
   userspace or AI policy services can claim progress isolation.
+
+### v0.46.3 - Transactional Task Migration
+
+Goal:
+
+Move runnable or waiting tasks between owner cores without duplicating
+execution authority or losing scheduler state.
+
+Deliverables:
+
+- Transactional migration state machine:
+  - source running/owned;
+  - source frozen and destination pending;
+  - destination accepted;
+  - ownership commit;
+  - destination runnable and source empty;
+  - abort restores source ownership.
+- Migration transaction identity bound to task incarnation, domain
+  incarnation, source core incarnation, destination core incarnation,
+  scheduler epoch, and topology epoch.
+- Transferred state includes CPU registers, SIMD/FPU state, address-space
+  activation or residency permit, pending timers and wakeups, IPC reply/wait
+  state, CPU budget, scheduler accounting, affinity/security-domain
+  constraints, and outstanding per-core references.
+- Destination queue-full, destination death, stale epoch, affinity violation,
+  budget violation, or failed address-space activation aborts without losing or
+  duplicating the task.
+- Pinned IRQ, device, control-plane, and explicitly non-migratable tasks cannot
+  migrate.
+- Migration does not hold kernel locks or mutable owner-state guards while
+  waiting for a remote core.
+
+Verification:
+
+- Model tests prove at most one core can execute a task.
+- Model tests prove a committed runnable task is owned by exactly one core.
+- Model tests prove abort restores source ownership without duplicating the
+  task.
+- Host tests prove stale migration messages cannot revive an earlier task
+  incarnation.
+- Host tests prove pinned/control tasks reject migration before mutation.
+
+Exit criteria:
+
+- Scheduler and AI policy work has a concrete task-ownership transfer protocol
+  instead of treating migration as a local queue operation.
 
 ### v0.47.0 - aesynx-abi And aesynx-rt
 
@@ -4264,13 +4613,27 @@ Deliverables:
 - Model object manifest.
 - Schema version check.
 - Hash check.
-- Signature placeholder or real signature if crypto exists.
+- Real signature verification before loaded model bytes can influence advisory
+  runtime policy. A placeholder is allowed only for offline fixtures that cannot
+  affect scheduler, shell, or policy-service decisions.
+- Supported signature scheme and canonical manifest encoding.
+- Trust-root storage and update policy.
+- Key rotation and signer revocation.
+- Model-version anti-rollback.
+- Policy-domain binding.
+- Hash covers the exact bytes consumed by the evaluator, not a different
+  packaging representation.
+- Parser and manifest-version downgrade rejection.
+- Failure behavior when clock, revocation status, or trust-root availability is
+  unavailable.
 - Safety limits.
 
 Verification:
 
 - Bad schema rejected.
 - Bad hash rejected.
+- Bad signature, revoked signer, stale model version, wrong policy domain, and
+  parser downgrade are rejected before runtime policy use.
 - Safe dummy model loaded.
 
 Exit criteria:
@@ -4322,6 +4685,49 @@ Verification:
 Exit criteria:
 
 - Aesynx has a concrete bridge from telemetry to the future world service.
+
+### v0.60.2 - Live OS World Service
+
+Goal:
+
+Move from host-side trace conversion to a capability-scoped native `worldd`
+service that can answer bounded questions without becoming a kernel authority
+source.
+
+Deliverables:
+
+- Capability-scoped fact ingestion from kernel/service telemetry streams.
+- Capability-scoped query API for native userspace.
+- Canonical fact types versus derived/projection fact types.
+- Source identity, boot/session nonce, core/domain incarnation, schema version,
+  and provenance validation for every accepted fact.
+- Query CPU, memory, result-size, and wall-clock budgets.
+- Retention, compaction, and restart-reconstruction policy.
+- Redaction before joins and projections, not only at final serialization.
+- Projection invalidation rules when source facts are revoked, corrected, or
+  superseded.
+- Advisory-fact rule: no authority decision is made solely from advisory,
+  incomplete, stale, or lossy facts.
+- Per-core completeness frontiers:
+  - complete through boot/session nonce, core incarnation, and sequence;
+  - gap/loss after sequence `N`;
+  - topology snapshot epoch `E`.
+- Absence of an event is non-authoritative unless backed by a completeness
+  certificate for the relevant source and epoch.
+
+Verification:
+
+- Host and userspace tests prove queries are filtered by caller capability.
+- Tests prove redaction happens before joins can correlate restricted fields.
+- Tests prove restart reconstruction preserves provenance and completeness
+  frontier semantics.
+- Tests prove missing telemetry, loss counters, and incomplete frontiers cannot
+  be interpreted as "no event happened" for authority decisions.
+
+Exit criteria:
+
+- Aesynx has a real userspace world service path that can support diagnostics
+  and AI context packs without moving rich query logic into ring 0.
 
 ### v0.61.0 - Advisory Scheduler Policy
 
