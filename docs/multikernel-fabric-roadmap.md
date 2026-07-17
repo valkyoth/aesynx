@@ -137,6 +137,20 @@ production SPSC link needs:
   different trust domain.
 - Doorbell bitmaps, IPI coalescing, batching, and traffic-class separation so a
   noisy telemetry path cannot delay revocation or topology-control messages.
+- Doorbells/IPIs are hints; the queue state is authoritative. Safety and
+  liveness are separate obligations:
+  - safety: duplicated, stale, coalesced, or early notifications never duplicate
+    message consumption or authorize stale payload reuse;
+  - liveness: under documented scheduler and hardware fairness assumptions, a
+    published message is eventually observed even if the first notification is
+    lost.
+- A live endpoint needs one reliable progress mechanism: a persistent pending
+  bit acknowledged only after observed work, producer retransmission after a
+  bounded local timeout, receiver watchdog/periodic polling of inbound
+  summaries, a level-triggered notification source, or a rule that deep idle is
+  unavailable while no reliable wake source exists. Acknowledgements are bound
+  to doorbell generation, link incarnation, receiver incarnation, and observed
+  cursor so old acknowledgements cannot clear newer work.
 - Traffic class is not an untrusted message field. It is derived from endpoint
   or protocol capability, stamped by the local kernel/CPU driver, rate-limited,
   and backed by reserved control capacity. Ordinary service traffic still needs
@@ -352,6 +366,14 @@ need:
 - Backpressure before queues overflow.
 - Explicit drop, retry, cancel, or dead-letter behavior.
 - Bounded memory use during retry storms.
+- Security-grade timebase rules before timeouts become enforcement inputs:
+  per-core clock-source selection, invariant/nonstop TSC detection where
+  relevant, checked calibration, core-to-core skew measurement, rollover and
+  suspend/resume/AP-restart behavior, clock generations attached to deadlines,
+  fail-closed backward-jump handling, independent watchdog sources where
+  coordinator failure matters, and an authenticated synchronized-clock
+  capability before comparing absolute times across cores. Timeouts can abort,
+  retry, cancel, or quarantine, but cannot manufacture a commit.
 
 Authority-transfer protocols need transaction semantics. A grant proposal should
 reserve a pending receiver slot, carry a transaction ID, wait for acceptance,
@@ -359,6 +381,13 @@ then commit or abort. Retried proposals must be idempotent, and timed-out grants
 must not leave usable receiver authority behind. Audit records should preserve
 proposal, acknowledgement, commit, abort, and revoke linkage without exposing
 raw authority identifiers.
+
+Service/RPC protocols also need a confused-deputy contract. Caller identity is
+context and audit evidence, not authorization. Each request schema declares the
+capability arguments that authorize the operation, nested service calls carry
+only explicitly delegated authority, scheduling-budget donation is not authority
+donation, reply capabilities only authorize the matching result path, and
+service-local caches preserve caller authority and classification context.
 
 ## Admission Control And Quotas
 
@@ -383,7 +412,15 @@ for:
 - Security-domain-aware placement and scheduling.
 - SMT disablement or partitioning for high-assurance workloads.
 - Speculation-control configuration where the architecture supports it.
+- Microcode-revision and mixed-core mitigation policy before speculative
+  controls are treated as valid evidence.
 - Rate-limited and quantized telemetry exports.
+- Capability-gated high-resolution clocks and performance counters.
+- Cache/LLC partitioning through CAT/MPAM or equivalent where available.
+- Memory-bandwidth allocation or rate limiting where supported.
+- Page coloring only when measured and included in allocator policy.
+- Shared-buffer, shared-cache, shared-core, SMT-sibling, and shared-device
+  relationships recorded as deliberate covert-channel edges.
 - Per-principal CPU, queue, memory, grant, and restart budgets.
 - Bounded lookup structures on syscall-hot or fabric-hot paths.
 - Cache-line separation for producer/consumer queue metadata.

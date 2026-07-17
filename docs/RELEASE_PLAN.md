@@ -1947,8 +1947,8 @@ Deliverables:
 - `IA32_SPEC_CTRL` admitted MSR handling and redacted read-back evidence when
   supported.
 - KASLR/PIE boot plan: kernel build flags, Limine config, executable-address
-  response use, relocation assumptions, and QEMU evidence. If full KASLR is not
-  implemented in this milestone, it remains a tagged blocker before ring 3.
+  response use, relocation assumptions, and QEMU evidence. Full KASLR
+  implementation is tracked as the v0.44.6 blocker before hostile userspace.
 - x86_64 `RDRAND`/`RDSEED` instruction path with bounded retries and runtime
   stuck-sample self-test. Raw hardware output must seed only a DRBG, never be
   exposed directly as a random token.
@@ -2337,6 +2337,24 @@ delegated_kind_rights   <= requested_kind_rights
 - Kernel-stamped endpoint metadata: source principal/domain incarnation,
   protocol ID/version, sequence number, transaction ID, and bounded payload
   schema.
+- Confused-deputy prevention contract for every RPC/service operation:
+  - the request schema declares which capability arguments authorize which
+    operation;
+  - caller identity is context and audit evidence, not a substitute for an
+    object, endpoint, memory, package, or policy capability;
+  - a service does not automatically spend its administrative, indexing,
+    storage, world, or package capabilities on behalf of an untrusted caller;
+  - delegated capability arguments are attenuated, transaction-bound, and
+    consumed or revalidated at the final mutation boundary;
+  - nested service calls propagate only explicitly delegated authority, never
+    ambient server authority;
+  - scheduling-context or CPU-budget donation never implies authority donation;
+  - reply capabilities authorize returning a result for the original call, not
+    performing unrelated operations;
+  - service-local caches are keyed by caller authority, classification context,
+    domain incarnation, and relevant capability generation/epoch;
+  - a request cannot substitute another caller's capability-table handle,
+    principal ID, object name, or namespace path as authority.
 - Transactional capability grant protocol shape:
   - reserve pending receiver slot;
   - send grant proposal with transaction ID;
@@ -2401,9 +2419,22 @@ delegated_kind_rights   <= requested_kind_rights
   - a quota coordinator grants bounded credits to owner cores;
   - a core allocates only from local credit;
   - credit transfer is transactional;
-  - dead-incarnation recovery retires or reclaims outstanding credits;
+  - dead-incarnation recovery retires or reclaims outstanding credits only
+    after the old incarnation is fenced from committing further allocations;
+  - every allocation consumes credit under the current coordinator and owner
+    incarnation;
+  - credit spends prepared before an epoch change either commit through an
+    accepted certificate or abort;
+  - an expired lease alone does not make credits reusable while the old core
+    could still publish a valid-looking spend;
+  - coordinator restart changes the credit epoch and fences old spend/refund
+    messages;
+  - duplicate spend and refund messages are idempotent;
+  - local offline operation cannot exceed previously escrowed credit;
+  - if a credit holder cannot be fenced, its remaining credits stay unavailable
+    as quarantined credit;
   - the invariant is
-    `allocated + reserved + free_distributed_credits == configured_ceiling`.
+    `allocated + prepared + local_free + quarantined == configured_ceiling`.
 - Mapping-authority split between memory-object capability, destination
   address-space capability, and optional executable/JIT policy authority.
 - Wire-format v1 notes for all authority-bearing IDs: fixed widths,
@@ -2450,6 +2481,13 @@ Verification:
   transaction window fail closed.
 - Host tests prove endpoint send/receive checks require endpoint rights and
   kernel-stamped source metadata.
+- Confused-deputy adversarial tests prove a privileged storage, index, world,
+  or package service cannot be induced by an unprivileged client to read or
+  mutate an arbitrary object by supplying only a name, path, principal ID, or
+  another caller's capability-table handle.
+- Host tests prove scheduling-context donation changes CPU budget only and
+  never authorizes a service operation without the declared capability
+  arguments.
 - Host tests prove reply capabilities are one-shot, caller/transaction-bound,
   rejected after timeout/cancellation/server death, cleaned up during restart,
   and not redirectable to another caller.
@@ -2459,6 +2497,9 @@ Verification:
   authority.
 - Host tests prove stale table entries are tombstoned or reclaimed within
   bounded quotas after revocation.
+- Model tests prove quota-credit accounting preserves the configured ceiling
+  through spend, prepare, commit, abort, duplicate refund, coordinator restart,
+  dead owner, quarantined-but-not-fenced owner, and offline local-spend cases.
 
 Exit criteria:
 
@@ -2606,6 +2647,54 @@ Exit criteria:
 
 - Aesynx has one documented internal fabric ABI before adding more cross-core
   protocols.
+
+### v0.37.3.1 - Security-Grade Monotonic Timebase
+
+Goal:
+
+Provide the monotonic-clock contract required by leases, deadlines, retries,
+watchdogs, coordinator timeouts, AI advice expiry, and fabric progress without
+assuming one global clock or letting timeouts manufacture authority.
+
+Deliverables:
+
+- Per-core monotonic clock-source selection and capability classification.
+- x86_64 invariant/nonstop TSC detection with fallback policy.
+- Frequency calibration with checked conversion into kernel time units.
+- Core-to-core offset and skew measurement where cross-core comparison is
+  required.
+- Counter rollover handling and tested conversion boundaries.
+- VM migration, frequency-change, suspend/resume, and AP-restart behavior.
+- Clock generation/incarnation attached to deadlines, leases, watchdog
+  decisions, and retry timers.
+- Fail-closed behavior after detected backward jumps, unstable calibration,
+  inconsistent per-core clocks, or unsupported timebase changes.
+- Independent watchdog-source requirement where coordinator failure must be
+  detected despite scheduler or fabric stalls.
+- Rule that timeouts may drive abort, retry, cancellation, quarantine, or
+  escalation, but never manufacture a commit, grant, mapping success, revoke
+  success, or ownership transfer.
+- Authenticated synchronized-clock capability required before comparing
+  absolute times from different cores or peers.
+- Redacted diagnostics for clock source, stability, generation, and skew class
+  without exposing raw high-resolution timestamps to untrusted consumers.
+
+Verification:
+
+- Host/model tests inject backward jumps, forward jumps, skew, counter
+  rollover, calibration failure, AP restart, suspend/resume discontinuity, and
+  VM-migration-like discontinuity.
+- Tests prove stale clock generations invalidate deadlines instead of reusing
+  them after restart or resume.
+- Tests prove timeout-triggered recovery can abort/quarantine but cannot commit
+  a transaction without the required authority evidence.
+- QEMU smoke records stable clock-source evidence before any live fabric
+  timeout, lease, or watchdog claim depends on it.
+
+Exit criteria:
+
+- Fabric and authority protocols have a concrete monotonic-time foundation
+  before live transactional timeouts or watchdogs become enforcement inputs.
 
 ### v0.37.4 - Replicated Authority State Protocol
 
@@ -2928,6 +3017,23 @@ Deliverables:
     a wakeup when required.
 - Doorbells are hints; queue state is authoritative. Lost, duplicated,
   coalesced, or early doorbells must not lose messages.
+- Reliable notification progress contract:
+  - either a persistent pending bit remains set until the receiver acknowledges
+    the observed work;
+  - or the producer retransmits after a bounded local timeout;
+  - or a receiver watchdog/periodic timer polls pending inbound summaries;
+  - or a platform level-triggered notification source is used;
+  - or deep idle is unavailable for that endpoint/core while no reliable wake
+    source exists.
+- Notification acknowledgement is bound to doorbell generation, link
+  incarnation, receiver core incarnation, and the observed producer cursor, so
+  an acknowledgement for old work cannot clear newer pending work.
+- Notification properties are documented separately:
+  - safety: duplicated, stale, coalesced, or early notifications never duplicate
+    message consumption or authorize stale payload reuse;
+  - liveness: under stated scheduler and hardware fairness assumptions, a
+    published message is eventually observed even if the first doorbell/IPI is
+    lost.
 - An IPI is not acknowledged before the consumer has made the corresponding
   queue work observable to its dispatcher.
 - MMIO/APIC doorbell ordering uses architecture-specific barriers; Rust
@@ -3018,6 +3124,9 @@ Verification:
   doorbells, delayed doorbells, coalesced doorbells, queue-full behavior while
   the receiver is descheduled, and AP quarantine/termination while messages are
   pending.
+- QEMU/model tests cover lost first doorbell, stale acknowledgement, pending-bit
+  persistence, retransmission/watchdog wakeup, deep-idle denial when no reliable
+  wake source exists, and fairness assumptions for eventual observation.
 - QEMU correctness smokes cover 2, 4, and 8 virtual CPUs. 16-core and 32-core
   runs are scaling benchmarks when the host can provide them; lower-capacity
   hosts must run the largest safe configured count and report the cap
@@ -4036,6 +4145,21 @@ Deliverables:
   bit 24.
 - `IA32_ARCH_CAPABILITIES` field decoding for eIBRS/IBRS_ALL, RDCL_NO,
   MDS_NO, TAA_NO, RSBA, and newer vendor-documented controls where available.
+- Redacted CPU family, model, stepping, vendor, and microcode-revision evidence
+  for the BSP and every AP that will execute hostile-domain code.
+- Minimum-revision or vulnerability-policy table for supported production
+  profiles, with a QEMU/general profile that remains honest about missing
+  evidence.
+- Consistent acceptable mitigation state across every active core before
+  hostile userspace is entered. A late AP with weaker or unverifiable mitigation
+  state is quarantined before it can run hostile-domain work.
+- Mixed-vendor, mixed-stepping, or mixed-mitigation topology policy.
+- Re-evaluation of CPUID and relevant MSRs after any accepted microcode update.
+- Explicit ownership of microcode updates: firmware/bootloader-owned,
+  Aesynx-owned through an audited boot path, or unsupported. Raw microcode blobs
+  from untrusted userspace services are never accepted.
+- Fail-closed hostile-userspace policy when a selected mitigation depends on
+  unavailable, inconsistent, or unverified microcode behavior.
 - Implemented context-transition mitigation policy for switching between mutually
   distrusting domains:
   - when IBPB is required;
@@ -4053,6 +4177,17 @@ Deliverables:
 - Hardened syscall/sysret or interrupt-return entry/exit assembly with per-core
   TSS/RSP0, swapgs fencing if used, contained user faults, and no reliance on
   compiler-generated prologues for critical transition assembly.
+- Instruction-level verification for critical entry/exit assembly:
+  - disassembly checks for required instructions and forbidden compiler-generated
+    prologues on hand-written transition paths;
+  - stack-alignment and frame-layout assertions shared between Rust `repr(C)`
+    frame definitions and assembly offsets;
+  - checked correspondence between assembly constants and Rust frame fields;
+  - no accidental `SYSRET` path bypassing validation;
+  - all return paths pass through the same final RFLAGS/address validation;
+  - emulator/QEMU fault injection after each critical entry/exit phase;
+  - NMI, double-fault, and machine-check injection at sensitive transition
+    points where the architecture allows meaningful testing.
 - Syscall/user-return invariants:
   - validate user RIP and RSP canonicality before return;
   - never execute unsafe `SYSRET`; use a validated fast path or fall back to
@@ -4098,6 +4233,9 @@ Verification:
   regression and unrelated-bit rejection.
 - Host tests cover `ARCH_CAPABILITIES` decode cases and strict/general policy
   selection.
+- Host tests cover microcode-revision policy, mixed-core mitigation policy,
+  post-update CPUID/MSR reevaluation, and late-AP quarantine for weaker
+  mitigation evidence.
 - QEMU smoke reports boolean hardening evidence without raw MSR values.
 - QEMU or host tests prove hostile userspace entry is blocked when a required
   mitigation is selected but unavailable.
@@ -4106,6 +4244,9 @@ Verification:
   and supervisor-access contracts exist.
 - Hostile-register tests cover noncanonical user RIP/RSP, unusual RFLAGS,
   nested NMI around `SWAPGS`, usercopy fault, and return-path fault injection.
+- Disassembly and frame-layout tests prove critical transition assembly uses
+  the expected instructions, offsets, stack alignment, validation funnel, and no
+  compiler-generated prologue/epilogue where prohibited.
 - Fault-path tests prove SMAP access windows restore the access flag before
   returning or halting.
 - Documentation states which mitigations are active, which are planned, and
@@ -4115,6 +4256,101 @@ Exit criteria:
 
 - The ring-3 path either enforces the selected domain-transition hardening on
   every executing core or refuses to enter hostile userspace.
+
+### v0.44.6 - Kernel PIE And KASLR Activation
+
+Goal:
+
+Turn the earlier KASLR/PIE planning work into a concrete implementation gate
+before hostile userspace can rely on address-space randomization as
+defense-in-depth.
+
+Deliverables:
+
+- PIE-capable kernel code-generation path for the selected x86_64 boot profile.
+- Audited supported relocation-type list. Unknown, malformed, unsupported, or
+  overflowing relocations fail closed before execution continues.
+- Random virtual load bias selected from the approved DRBG path once v0.18.2
+  has made `random_tokens_available=true`.
+- Slide alignment and canonical-address constraints.
+- Collision checks against direct map, framebuffer, boot modules, heap,
+  activation/per-core stacks, page-table arenas, MMIO windows, ACPI/firmware
+  windows, and reserved guard/null regions.
+- BSP/AP agreement on the selected slide before APs can execute relocated
+  kernel code.
+- Exception, unwind, panic, symbol, and diagnostic handling under relocation.
+- No raw slide leakage through serial telemetry, panic output, capability
+  debug, page-table diagnostics, trace export, or World Service public facts.
+- High-assurance failure policy when adequate entropy, relocation support, or
+  collision-free address space is unavailable.
+- Measured effective entropy after alignment, canonical-address, direct-map,
+  framebuffer, module, MMIO, and reserved-window constraints.
+- Clear statement that KASLR remains defense-in-depth and never substitutes for
+  W^X, KPTI, SMEP/SMAP, usercopy discipline, or speculative mitigations.
+
+Verification:
+
+- Host tests reject unsupported relocation records, malformed relocation
+  sections, relocation overflow, noncanonical slides, and collisions with every
+  reserved region class.
+- Tests prove slide selection fails closed when approved random tokens are
+  unavailable under the selected deployment profile.
+- QEMU smoke boots at multiple deterministic test slides and at least one
+  entropy-derived slide when the DRBG gate is available.
+- Diagnostic tests prove public output exposes only redacted slide-class
+  evidence and effective entropy, not the raw slide.
+- AP startup tests prove AP-visible bootstrap parameters and per-core metadata
+  agree with the BSP-selected slide.
+
+Exit criteria:
+
+- Aesynx either boots from a PIE/KASLR kernel image with redacted evidence or
+  refuses the deployment profile that requires KASLR.
+
+### v0.44.7 - High-Assurance Side-Channel Isolation Profile
+
+Goal:
+
+Define an optional deployment profile for high-assurance workloads where
+side-channel isolation has concrete hardware, scheduler, telemetry, and memory
+placement rules instead of broad non-claims.
+
+Deliverables:
+
+- Same-security-domain SMT sibling policy, or SMT disabled for the profile.
+- Security-domain-aware core placement and migration restrictions.
+- Capability-gated high-resolution clocks and performance counters.
+- Quantized and rate-limited telemetry for untrusted consumers.
+- Cache/LLC partitioning through Intel CAT, ARM MPAM, or equivalent where
+  available.
+- Memory-bandwidth allocation or rate limiting where supported.
+- Page coloring only if measured on the target hardware and included in the
+  allocator policy, proof obligations, and documentation.
+- Branch-predictor, TLB, and buffer-clearing mitigation policy tied to domain
+  transitions.
+- Shared-buffer, shared-cache, shared-core, SMT-sibling, and shared-device
+  relationships recorded as deliberate covert-channel edges in diagnostics and
+  world facts.
+- Explicit noninterference claims limited to named hardware profiles, measured
+  cache/topology evidence, and selected mitigations.
+- Fail-closed behavior when the requested profile cannot enforce required
+  isolation controls on the current CPU, firmware, or topology.
+
+Verification:
+
+- Host tests prove profile selection rejects incompatible SMT, clock,
+  telemetry, placement, and partitioning configurations.
+- QEMU/general profile documents non-claims instead of pretending to enforce
+  unavailable hardware partitioning.
+- Real-hardware tests, when available, record redacted CPU/topology evidence,
+  selected partition controls, and denied profile reasons.
+- Documentation names which covert-channel edges remain accepted risks for each
+  profile.
+
+Exit criteria:
+
+- Aesynx has a named high-assurance side-channel profile with explicit
+  enforcement requirements, fallback behavior, and non-claims.
 
 ## Phase 11: Native Userspace
 
