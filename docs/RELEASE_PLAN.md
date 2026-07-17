@@ -21,12 +21,22 @@ The project can add more patch tags whenever needed. The list below is not a max
 Every release must have:
 
 - A clear definition of done.
+- An explicit `Goal`, `Deliverables`, `Verification`, and `Exit criteria`
+  block in its release section.
 - A QEMU or host-test verification command.
 - A completed pentest report for the exact commit being tagged.
 - Serial-output markers where applicable.
 - No hidden dependency on the developer's machine.
 - Documentation of known limitations.
 - No accidental Unix compatibility promise.
+- Exit criteria that explicitly require the pentest handoff/tag-readiness gate:
+  no local root `PENTEST.md`, passing CI/CodeQL, a recorded passing pentest
+  report for the exact commit, and `cargo xtask release-ready <tag>` passing
+  before tag creation.
+
+This pentest/tag-readiness requirement is incorporated into every
+`Exit criteria` block below, even where the section keeps its local exit bullets
+focused on the release-specific outcome.
 
 Every release should prefer:
 
@@ -7292,7 +7302,9 @@ Goal:
 
 Release the first complete QEMU version of Aesynx.
 
-Required deliverables:
+Deliverables:
+
+Required:
 
 - Reproducible documented build.
 - QEMU x86_64 boot.
@@ -7322,7 +7334,7 @@ Required deliverables:
 - QEMU smoke suite.
 - Documentation set.
 
-Preferred deliverables:
+Preferred:
 
 - QEMU multicore boot through SMP/APIC hardware mechanisms.
 - Core-to-core ping/pong.
@@ -7352,7 +7364,13 @@ Explicit non-goals:
 - Online AI learning.
 - Formal proof of the kernel.
 
-1.0 demo script:
+Verification:
+
+- A clean checkout can build and boot the QEMU image.
+- Full smoke suite passes.
+- `cargo xtask image` creates the release image.
+- `cargo xtask qemu` boots into the native userspace shell.
+- The 1.0 demo script works:
 
 ```text
 cargo xtask image
@@ -7377,14 +7395,24 @@ commands:
   reboot
 ```
 
-1.0 acceptance:
+Exit criteria:
 
-- A clean checkout can build and boot the QEMU image.
-- Smoke tests pass.
-- The shell demo works.
+- Required deliverables are implemented and documented.
+- Preferred deliverables are either implemented or explicitly documented as
+  deferred without weakening the 1.0 QEMU target.
+- The shell demo works from a clean checkout.
 - Documentation clearly says what works and what does not.
+- The pentest handoff has completed for `v1.0.0`, the passing report names the
+  exact commit, GitHub CI/CodeQL are green, no root `PENTEST.md` remains, and
+  `cargo xtask release-ready v1.0.0` passes before the tag is created.
 
 ## Post-1.0 Direction
+
+The entries below are roadmap direction, not tag-ready release sections. Before
+any post-1.0 item becomes an actual release target, it must be expanded into the
+same `Goal`, `Deliverables`, `Verification`, and `Exit criteria` structure used
+above, and its exit criteria must include the pentest handoff/tag-readiness
+gate for the exact tag.
 
 ### v1.1 - Storage Persistence
 
