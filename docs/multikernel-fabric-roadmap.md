@@ -508,10 +508,12 @@ Priority proof targets:
   versioned domain-separated identities that include placement-policy identity,
   topology epoch, selected child-owner incarnation, participant-scoped
   capacity-configuration manifest identity, owner-local capacity generations,
-  and relevant class-limit digests in prepared reservations, parent-local
-  preparing-record persistence before remote side effects, transaction-bound
-  reservation consumption/release, strongly typed per-class fixed-memory
-  terminal-progress capacity accounting,
+  and domain-separated relevant class-limit digests in prepared reservations.
+  Class-limit digests are recomputed from stable resource-class IDs and
+  strongly typed canonical limits, not Rust layout or opaque coordinator input.
+  The model also covers parent-local preparing-record persistence before remote
+  side effects, transaction-bound reservation consumption/release, strongly
+  typed per-class fixed-memory terminal-progress capacity accounting,
   deadlock/livelock-free reservation acquisition, deterministic priority
   conflict resolution, permit consumption at the parent-owned journal commit
   transition, parent-local audit placeholder finalization, recoverable
@@ -550,9 +552,10 @@ Priority proof targets:
   handling, caller-controlled child-owner selection, local-path authorization
   bypass, same-transaction placement drift, unrelated-core capacity changes
   invalidating a transaction, required-participant capacity-generation mismatch
-  at commit, scalar mixing of typed capacity classes, emergency-capacity
-  consumption by ordinary requests, insufficient per-class terminal-progress
-  reserve, or cycle under concurrent edge transactions.
+  at commit, opaque class-limit digest acceptance, scalar mixing of typed
+  capacity classes, emergency-capacity consumption by ordinary requests,
+  insufficient per-class terminal-progress reserve, or cycle under concurrent
+  edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and

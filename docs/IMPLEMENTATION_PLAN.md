@@ -1080,7 +1080,10 @@ identity, and cannot be changed mid-transaction; caller locality preferences are
 hints, and destination-table ownership does not imply child ownership. The
 capacity identity is a hash of the required participant-capacity bindings, not
 a system-wide hash of every core, while each prepared reservation records its
-resource owner's local capacity generation and relevant class-limit digest.
+resource owner's local capacity generation and relevant class-limit digest. The
+class-limit digest is domain-separated, built from stable resource-class IDs and
+strongly typed canonical limits rather than Rust layout, and recomputed by the
+owning participant from actual limits.
 Placement/topology/required-capacity-manifest changes before prepare require
 replanning under a new transaction ID, while unrelated owner-capacity changes do
 not invalidate the transaction and retries of the same transaction return the

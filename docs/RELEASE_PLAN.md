@@ -2807,8 +2807,9 @@ new_root_rights <= requested_rights
     message credits, audit slots, revocation work items, participant recovery
     records, and TLB/DMA cleanup records cannot be added, compared, or
     substituted as interchangeable scalar capacity;
-  - capacity changes alter the relevant protocol/configuration identity, so old
-    acknowledgements cannot silently carry into a differently sized protocol;
+  - capacity changes alter the relevant capacity-manifest/configuration
+    identity, so old acknowledgements cannot silently carry into a differently
+    sized reserve configuration;
   - exhaustion returns typed errors without partial mutation;
   - quarantined and `ResourceLost` records remain charged until their documented
     retirement points;
@@ -2869,6 +2870,30 @@ ParticipantCapacityBinding {
     relevant_class_limits_digest,
 }
 ```
+
+  - `relevant_class_limits_digest` is a nested domain-separated digest over the
+    exact typed limits used by that participant binding:
+
+```text
+relevant_class_limits_digest =
+    H(
+        "aesynx-capacity-class-limits-v1"
+        || owner_capacity_generation
+        || canonical_typed_class_limits
+    )
+```
+
+  - `canonical_typed_class_limits` uses stable resource-class IDs, strongly
+    typed units, ordinary/emergency capacity class, configured limit, reserved
+    amount where relevant, fixed-width little-endian fields, canonical ordering,
+    explicit schema version, and no Rust enum or memory layout bytes;
+  - unknown mandatory capacity classes reject the binding before prepare or
+    commit;
+  - class-limit hash algorithm or schema migration creates a new digest and
+    cannot reuse old prepared acknowledgements;
+  - owners validate the actual canonical typed limits and recompute
+    `relevant_class_limits_digest`; they never accept an opaque caller- or
+    coordinator-supplied digest as authority;
 
 ```text
 capacity_config_identity =
@@ -3265,7 +3290,15 @@ Verification:
   policies, and mandatory-class bitmap. The capacity identity is the hash of a
   canonical sorted manifest of required participant-capacity bindings, each
   carrying owner incarnation, owner-local capacity generation, and a digest of
-  the relevant typed per-class limits. The manifest is
+  the relevant typed per-class limits. The class-limit digest uses the
+  `aesynx-capacity-class-limits-v1` domain-separation label, owner capacity
+  generation, stable resource-class IDs, strongly typed units,
+  ordinary/emergency capacity class, configured limit, reserved amount where
+  relevant, fixed-width little-endian fields, canonical ordering, explicit
+  schema version, no Rust enum/layout bytes, unknown mandatory-class rejection,
+  and hash/schema migration rules. Owners recompute the digest from actual
+  canonical typed limits rather than accepting an opaque caller- or
+  coordinator-supplied digest. The manifest is
   O(number of transaction participants), not O(system cores). Owners validate
   canonical fields rather than trusting a supplied hash, and hash migration
   rejects old acknowledgements.
