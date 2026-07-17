@@ -1119,6 +1119,64 @@ Exit criteria:
 - Later capability and object milestones can state whether an identifier is
   anti-confusion, anti-replay, or attacker-unpredictable.
 
+### v0.18.2 - DRBG Implementation And Token Readiness
+
+Goal:
+
+Provide the approved attacker-unpredictable randomness path before any
+security-sensitive nonce, secret handle, KASLR seed, update/model token, or
+cross-boot authoritative identity consumes randomness.
+
+Deliverables:
+
+- Chosen no_std CSPRNG/DRBG construction and security rationale.
+- Entropy-source combination policy for hardware seed inputs and deterministic
+  fallback classification.
+- Known-answer tests and startup self-tests for the DRBG implementation.
+- Runtime health tests on hardware seed inputs before they are accepted as seed
+  material.
+- Initial seeding and reseeding thresholds.
+- Per-core streams derived through domain-separated labels.
+- Backtracking-resistance policy after state compromise where feasible.
+- Core-restart and suspend/resume behavior.
+- DRBG state zeroization on teardown or failed initialization.
+- Checked generation and reseed counters that fail closed instead of wrapping.
+- Fail-closed behavior when reseeding is required but seed material is
+  unavailable.
+- Explicit prohibition on copying DRBG state during task migration, core
+  migration, AP restart, suspend/resume, or snapshot creation.
+- Identity classification:
+  - boot-local anti-confusion identity may use monotonic generation;
+  - cross-boot authoritative session identity requires a nonrepeating
+    persistent generation, verified random nonce, or both;
+  - unpredictable secret/token generation requires the approved DRBG.
+- World Service and package/update identity rules must not use a deterministic
+  boot-local counter as the sole cross-boot identity.
+
+Expected serial:
+
+```text
+drbg self_test=true reseed_counter_ok=true random_tokens_available=true
+[TEST] drbg=ok
+```
+
+Verification:
+
+- Known-answer and startup self-tests pass.
+- Host tests reject reseed-counter overflow and unavailable-required-reseed
+  paths without producing a token.
+- Tests prove per-core stream labels produce distinct streams from the same
+  seed.
+- Tests prove DRBG state is not `Copy`/`Clone` and is not accepted by migration
+  or snapshot paths.
+- QEMU smoke reports `random_tokens_available=true` only after DRBG self-test
+  and seed policy succeed.
+
+Exit criteria:
+
+- Aesynx has one approved random-token path and keeps anti-confusion
+  generation counters distinct from attacker-unpredictable secrets.
+
 ## Phase 5: Capabilities
 
 ### v0.19.0 - Capability Model Crate
@@ -1930,6 +1988,47 @@ Exit criteria:
   address randomization, and attacker-unpredictable token generation before any
   multi-domain deployment claim.
 
+### v0.35.4.1 - Firmware Topology Normalization
+
+Goal:
+
+Treat ACPI/MADT and related firmware topology data as hostile-shaped input
+before it can influence AP startup, routing, IRQ policy, or NUMA placement.
+
+Deliverables:
+
+- RSDP, XSDT, and RSDT pointer provenance checks and mapping bounds.
+- ACPI table length, checksum, revision, alignment, and integer-overflow
+  validation before parsing.
+- Bounded MADT subtable walking with malformed-length rejection.
+- Unknown MADT entry skip rules that cannot desynchronize the walker.
+- Duplicate or conflicting local APIC/x2APIC ID rejection.
+- Disabled versus enabled CPU entry policy.
+- BSP duplication and nonexistent BSP handling.
+- Local NMI and interrupt-source-override record normalization.
+- APIC base and x2APIC mode consistency checks.
+- SRAT/SLIT NUMA consistency rules before NUMA data is used for allocation or
+  routing decisions.
+- Normalized topology copied into kernel-owned storage before AP launch.
+- No later reread of mutable firmware memory for security decisions.
+
+Verification:
+
+- Coverage-guided and deterministic host fuzzing over ACPI/MADT-shaped byte
+  inputs.
+- Truncation tests at every byte boundary in the table header and subtable
+  walker.
+- Mutation tests for duplicate entries, conflicting APIC IDs, disabled CPUs,
+  malformed subtable lengths, checksum failures, and integer-overflow lengths.
+- Differential normalization tests against an independent host parser fixture.
+- QEMU smoke proves AP startup consumes the normalized kernel-owned topology,
+  not raw firmware table pointers.
+
+Exit criteria:
+
+- AP startup receives a bounded, normalized, kernel-owned topology description
+  with explicit non-claims for any firmware topology feature not yet parsed.
+
 ### v0.35.5 - x86_64 QEMU AP Startup
 
 Goal:
@@ -2653,6 +2752,15 @@ Deliverables:
 - Explicit rule that raw physical frame allocation stays owner-local/per-core
   where possible; capabilities govern memory objects, mappings, sharing, DMA,
   transfer, executable authority, and revocation.
+- Privileged per-core kernel crate dependency allowlist.
+- Maximum privileged protocol-decoder surface for local traps, endpoint
+  delivery, and authority checks.
+- Static-memory budgets for topology, capability, journal, and lineage state.
+- Explicit inventory of heap-using ring-0 paths.
+- Unsafe-island count, ownership, and extraction/non-growth policy.
+- Every in-kernel policy scaffold names a userspace extraction target.
+- Rich routing, graph traversal, world queries, model loading, signature
+  verification, and package policy remain outside the per-core fast path.
 - Formal-verification target list for local capability checks, fabric message
   decoding, shared-buffer alias rules, and replicated authority protocols.
 - Updated security controls that distinguish current QEMU scaffolding from
@@ -2664,6 +2772,11 @@ Verification:
   privileged local mechanism and its monitor/service policy owner.
 - Host model tests or static checks reject new fabric protocol definitions that
   lack an owner, timeout, stale-epoch behavior, and redaction rule.
+- Static checks enforce the privileged dependency allowlist and require a
+  reviewed exception for new ring-0 heap use, unsafe islands, or protocol
+  decoder growth.
+- Monitor failure tests prove the local kernel continues enforcing existing
+  authority without accepting new global policy.
 
 Exit criteria:
 
@@ -2718,6 +2831,15 @@ Deliverables:
 - Owner-stamped physical-frame allocation records.
 - Remote-free queues for memory freed on a non-owner core.
 - Explicit frame-ownership transfer protocol with prepare/accept/commit/abort.
+- Remote free remains pending ownership until acknowledged by the owning
+  allocator. The freeing core cannot reuse a frame merely because it enqueued
+  or attempted to enqueue a free.
+- Full remote-free queues use bounded quarantine storage, retry, or explicit
+  backpressure; they never silently drop a free.
+- Every remote free carries frame incarnation, allocation generation, allocator
+  owner incarnation, and transaction ID.
+- Duplicate remote frees are rejected idempotently.
+- Ordinary callers cannot consume emergency remote-free capacity.
 - NUMA-aware refill requests and policy hooks where topology information is
   available.
 - Bounded emergency allocation reserves for faults, quarantine, revocation, and
@@ -2725,6 +2847,10 @@ Deliverables:
 - Rule that a core never directly mutates another core allocator's metadata.
 - Recovery policy for frames, heap slabs, and remote-free queues owned by a
   quarantined core.
+- Allocator metadata owned by a quarantined-but-still-running core cannot be
+  recovered until that core is hardware fenced/reset or the system halts.
+- A dead owner's frames remain unavailable rather than guessed reclaimable from
+  another core's observations.
 - No frame reuse while remote references, pending frees, DMA mappings, TLB
   obligations, or owner-transfer transactions are live.
 
@@ -2734,6 +2860,8 @@ Verification:
   allocators.
 - Host/model tests prove remote-free delivery, duplicate remote-free, owner
   quarantine, and refill failure do not leak or double-own frames.
+- Host/model tests prove full remote-free queues retain pending ownership and
+  do not silently drop frees or allow the freeing core to reuse the frame.
 - Host tests prove emergency reserves cannot be consumed by ordinary allocation
   paths.
 
@@ -2763,6 +2891,20 @@ Deliverables:
 - Hardware SPSC queue design that removes shared mutable `len` from producer
   and consumer hot paths.
 - Monotonic producer and consumer cursors, each written by exactly one endpoint.
+- Every queue endpoint names its exact writer execution context: task context,
+  IRQ level, softirq/deferred worker, or NMI. "One core" is not enough to prove
+  single-writer safety when task, IRQ, NMI, and panic paths can reenter one
+  another.
+- Ordinary task and IRQ producers cannot share a producer cursor without local
+  serialization. Preferred design is per-context local staging feeding one
+  canonical producer.
+- NMI and machine-check paths never use ordinary fabric queues; they use fixed
+  emergency records or a separately proven wait-free channel.
+- Queue operations state whether interrupts and preemption are disabled, and
+  for the maximum bounded duration.
+- Reentrant enqueue/dequeue is detected before slot mutation.
+- Panic paths cannot recursively enter a queue already owned by the interrupted
+  context.
 - Cached remote-cursor observations that are explicitly advisory and refreshed
   through acquire loads.
 - Producer and consumer metadata separated onto distinct cache lines, with an
@@ -2772,6 +2914,24 @@ Deliverables:
   - producer scrubs or initializes authority-bearing padding;
   - producer performs a release store of slot sequence or tail;
   - consumer performs an acquire load before reading payload.
+- Publication-to-doorbell ordering:
+  - producer initializes payload;
+  - producer release-publishes the slot;
+  - producer executes the architecture-required barrier for APIC/MMIO/doorbell
+    ordering;
+  - producer rings the doorbell or sends the IPI.
+- Consumer no-lost-wakeup handshake:
+  - consumer marks the endpoint armed/sleeping;
+  - consumer rechecks the queue with acquire semantics;
+  - consumer sleeps only if the queue is still empty;
+  - producer publishes first, then observes or clears the armed state and sends
+    a wakeup when required.
+- Doorbells are hints; queue state is authoritative. Lost, duplicated,
+  coalesced, or early doorbells must not lose messages.
+- An IPI is not acknowledged before the consumer has made the corresponding
+  queue work observable to its dispatcher.
+- MMIO/APIC doorbell ordering uses architecture-specific barriers; Rust
+  atomic ordering alone does not order device writes.
 - Reverse slot-reuse edge:
   - consumer finishes reading payload;
   - consumer release-stores acknowledgement or cursor advancement;
@@ -2843,6 +3003,10 @@ Verification:
 - Host tests prove stale topology epochs, core incarnations, endpoint
   incarnations, link generations, boot/session nonces, and protocol versions
   are rejected before payload parsing.
+- Host/model tests cover task-to-IRQ, IRQ-to-NMI, and panic-during-enqueue
+  interleavings and prove the single-writer invariant still holds.
+- Host/model tests cover publication while a consumer arms sleep and consumer
+  drain while a producer decides whether to send an IPI.
 - Loom/Kani-style or equivalent bounded model tests prove the SPSC publication
   protocol does not permit payload reads before release publication or payload
   scrubbing before consumer acknowledgement is observed.
@@ -3889,6 +4053,21 @@ Deliverables:
 - Hardened syscall/sysret or interrupt-return entry/exit assembly with per-core
   TSS/RSP0, swapgs fencing if used, contained user faults, and no reliance on
   compiler-generated prologues for critical transition assembly.
+- Syscall/user-return invariants:
+  - validate user RIP and RSP canonicality before return;
+  - never execute unsafe `SYSRET`; use a validated fast path or fall back to
+    `IRETQ`;
+  - mask user-controlled RFLAGS including IOPL, NT, TF, AC, DF, RF, and
+    reserved bits according to policy;
+  - execute `CLD` on entry;
+  - guarantee `CLAC` on every exit from usercopy;
+  - apply the selected `SWAPGS` fencing strategy;
+  - normalize exception frames with and without hardware error codes;
+  - scrub kernel-sensitive scratch registers before user return;
+  - prevent user-selected segment or compatibility-mode state unless
+    explicitly supported;
+  - handle faults during entry/exit through a dedicated tested failure path;
+  - ensure NMI around `SWAPGS` cannot select the wrong per-core state.
 - Full architectural state-switch implementation including SIMD/FPU ownership
   and XSAVE/XRSTOR state sanitization before
   SSE/AVX is enabled in kernel or user contexts.
@@ -3925,6 +4104,8 @@ Verification:
 - Boot-state-machine tests prove NXE/WP precede NX-bearing table activation
   when required and SMEP/SMAP/UMIP are not enabled until their access-window
   and supervisor-access contracts exist.
+- Hostile-register tests cover noncanonical user RIP/RSP, unusual RFLAGS,
+  nested NMI around `SWAPGS`, usercopy fault, and return-path fault injection.
 - Fault-path tests prove SMAP access windows restore the access flag before
   returning or halting.
 - Documentation states which mitigations are active, which are planned, and
@@ -4159,6 +4340,50 @@ Exit criteria:
 - Aesynx has a concrete preemption baseline before normal multi-process
   userspace or AI policy services can claim progress isolation.
 
+### v0.46.2.1 - Scheduling Contexts And Budget Donation
+
+Goal:
+
+Define who pays for synchronous service work, kernel parsing, faults, and
+cross-core request execution before untrusted domains can use CALL/REPLY as a
+resource-amplification path.
+
+Deliverables:
+
+- Scheduling-context object bound to principal/domain incarnation, task
+  incarnation, priority ceiling, and CPU-budget accounting.
+- Synchronous `CALL` may transfer a bounded CPU budget to the callee for that
+  transaction.
+- Donation carries caller, callee endpoint, transaction ID, priority ceiling,
+  donation depth, and expiry.
+- Server spends donated budget only on work for that transaction.
+- Unused budget returns on reply, cancellation, timeout, or server death.
+- Donation chains have a strict maximum depth.
+- Effective priority cannot exceed the endpoint manifest ceiling.
+- Asynchronous messages consume receiver-owned service budgets and
+  per-principal request credits.
+- Kernel work performed on behalf of a request, including copying, parsing,
+  page faults, capability lookup, and validation, is charged or strictly
+  bounded.
+- IRQ work is charged to the device or service domain where meaningful; any
+  uncharged interrupt work must have a fixed bound and storm policy.
+- Cross-core priority inheritance and donation cannot create cyclic waits.
+
+Verification:
+
+- Model tests prove conservation of scheduling budget across call, reply,
+  cancellation, timeout, and server death.
+- Model tests prove donation depth and endpoint priority ceilings are enforced.
+- Host tests prove expensive usercopy, parser rejection, page-fault handling,
+  and capability lookup paths are charged or bounded before mutation.
+- Model tests prove cyclic donation across endpoints is rejected or broken by a
+  documented rule.
+
+Exit criteria:
+
+- CALL/REPLY and service execution have explicit budget ownership instead of
+  letting clients amplify work through privileged services.
+
 ### v0.46.3 - Transactional Task Migration
 
 Goal:
@@ -4172,6 +4397,7 @@ Deliverables:
   - source running/owned;
   - source frozen and destination pending;
   - destination accepted;
+  - owner-issued commit certificate or journal decision;
   - ownership commit;
   - destination runnable and source empty;
   - abort restores source ownership.
@@ -4185,6 +4411,21 @@ Deliverables:
 - Destination queue-full, destination death, stale epoch, affinity violation,
   budget violation, or failed address-space activation aborts without losing or
   duplicating the task.
+- Destination cannot execute the task merely because it accepted prepare.
+- Source death after destination prepare cannot let the destination infer
+  commit without the owner-issued commit certificate or journal decision.
+- Destination death after commit is handled through domain/core recovery, not
+  by blindly restoring the source copy.
+- If the final decision is ambiguous and no trusted witness survives, the safe
+  result is quarantine or explicit task loss, not running two copies.
+- Duplicate prepare, accept, commit, abort, and acknowledgement messages are
+  idempotent.
+- Timer wakeups and reply completions are incarnation-stamped so they cannot
+  awaken both source and destination.
+- Migration journal capacity is reserved separately from ordinary scheduling
+  traffic.
+- Migration of a currently running task occurs only after a verified
+  architectural quiescence point.
 - Pinned IRQ, device, control-plane, and explicitly non-migratable tasks cannot
   migrate.
 - Migration does not hold kernel locks or mutable owner-state guards while
@@ -4198,6 +4439,9 @@ Verification:
   task.
 - Host tests prove stale migration messages cannot revive an earlier task
   incarnation.
+- Failure-injection tests cover source death before and after commit,
+  destination death before and after commit, commit-ack loss, timer expiry
+  during prepare, and topology change during recovery.
 - Host tests prove pinned/control tasks reject migration before mutation.
 
 Exit criteria:
@@ -4708,6 +4952,19 @@ Deliverables:
   superseded.
 - Advisory-fact rule: no authority decision is made solely from advisory,
   incomplete, stale, or lossy facts.
+- Query authorization creates a bounded live read lease or snapshot
+  authorization.
+- Long-running queries periodically observe cancellation/freeze state.
+- Result publication revalidates query authority and classification.
+- Revocation before result release prevents releasing newly unauthorized rows.
+- Partial streaming results have explicit revocation semantics.
+- Derived facts inherit the most restrictive source classification unless a
+  deterministic declassification capability authorizes otherwise.
+- Query and projection caches are partitioned by authorization and
+  classification context.
+- A result computed under one principal's authority cannot be replayed to
+  another principal.
+- Cancellation does not leave unbounded query memory or projection state.
 - Per-core completeness frontiers:
   - complete through boot/session nonce, core incarnation, and sequence;
   - gap/loss after sequence `N`;
@@ -4723,6 +4980,8 @@ Verification:
   frontier semantics.
 - Tests prove missing telemetry, loss counters, and incomplete frontiers cannot
   be interpreted as "no event happened" for authority decisions.
+- Tests prove revocation during a long-running query prevents release of newly
+  unauthorized rows and frees bounded query/projection resources.
 
 Exit criteria:
 
