@@ -534,6 +534,11 @@ Priority proof targets:
   participant-capacity bindings, class-limit digest input, final plan identity,
   and final capacity identity, with empty/minimum/maximum lists, unknown
   mandatory classes, asymmetric owners, and hash/schema-version changes.
+  Negative vectors cover noncanonical ordering, duplicate/conflicting entries,
+  truncated/trailing bytes, incorrect list counts, integer overflow,
+  maximum-length-plus-one, wrong endianness, unknown mandatory versus optional
+  classes, incorrect digests over otherwise-correct fields, and old
+  schema/hash versions paired with new acknowledgements.
 - Differential and metamorphic BootInfo normalization tests so parser behavior
   is checked beyond fuzz-generated cases.
 - Test-only fault injection for dropped, duplicated, delayed, and reordered

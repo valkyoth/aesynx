@@ -3308,6 +3308,12 @@ Verification:
   empty, minimum, and maximum lists; unknown mandatory capacity classes;
   asymmetric owners; and hash/schema-version changes. Encoders and decoders
   must reproduce these vectors before the format is treated as stable.
+- Fixed negative golden vectors prove decoders reject noncanonical ordering,
+  duplicate or conflicting entries, truncated input, trailing bytes, incorrect
+  list counts, integer overflow, maximum-length-plus-one encodings, wrong
+  endianness, unknown mandatory classes while tolerating documented unknown
+  optional classes, correct fields paired with an incorrect digest, and old
+  schema/hash versions paired with new acknowledgements.
 - Host/model crash tests prove parent-local bootstrap order: no remote prepare
   is sent before parent journal slot plus abort/recovery capacity are reserved,
   the torn-record-protected `Preparing` record is persisted, and the
