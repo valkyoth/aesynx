@@ -1056,24 +1056,29 @@ usable. Edge traversal, quotas, generation retirement, promotion, and cascading
 revocation are part of the authority model. Edge operations use internal,
 nondelegable, one-shot derivation-control permits rather than caller-held edge
 capabilities or caller-supplied edge tuples. The original caller authority is a
-resolved parent-object capability carrying typed create/promote/detach
-derivation rights for the exact operation, plus required child-side authority;
-only after that validation does the kernel mint a transaction-local internal
-permit. Promotion or detachment requires relation-policy approval, pinned
-immutable policy identity, preflighted destination/audit capacity, inherited
-provenance, and rights bounded by requested rights, live child rights, and
-policy promotable rights; it cannot launder an object out from under pending
-parent revocation. Distributed parent/child owners track edge state, journal
-decision, participant progress, and child publication separately: journal commit
-decides outcome, but no handle is returned until the child owner locally
-validates and publishes the child. V1 is deliberately single-parent-only: a
-newly minted unpublished child has exactly one incoming dependency edge, and
-multi-parent children stay rejected until a future `ParentSetManifest` milestone
-defines canonical parent-set identity, all-parent approvals, rights
-intersection, concurrent revocation, promotion, and recovery. Authority
-dependency edges are separate from immutable provenance records, which are
-kernel-stamped, integrity-protected, origin-classified, bound to incarnations
-and hashes, grant no authority, and retain no resources. Edge publication
+resolved parent-object capability whose single kind-specific rights
+representation contains the exact create/promote/detach relation operation,
+plus required child-side authority; `CommonRights::DERIVE` remains same-object
+attenuation only. Only after both sources are revalidated does the kernel mint a
+transaction-local internal permit. Promotion or detachment requires
+relation-policy approval, pinned immutable policy identity, preflighted
+destination/audit capacity, inherited provenance, and rights bounded by
+requested rights, live child rights, and policy promotable rights; it cannot
+launder an object out from under pending parent revocation. Distributed
+parent/child owners track edge state, journal decision, participant progress,
+and child publication separately: journal commit decides outcome, but no handle
+is returned until the child owner locally validates and publishes the child. V1
+is deliberately single-parent-only: a newly minted unpublished child has exactly
+one incoming dependency edge, only a live published unfrozen parent may create
+it, and child depth is checked as `parent_depth + 1` under a fixed maximum so
+cycles are structurally impossible. Multi-parent children stay rejected until a
+future `ParentSetManifest` milestone defines canonical parent-set identity,
+all-parent approvals, rights intersection, concurrent revocation, promotion, and
+recovery. Authority dependency edges are separate from immutable provenance
+records, which are kernel-stamped, integrity-protected, origin-classified, bound
+to incarnations and hashes, grant no authority, and retain no resources.
+Promoted shared code is recorded as provenance after the old dependency is
+retired, not as a remaining cascade-capable authority edge. Edge publication
 reserves future revocation progress so ordinary allocator, IPC, or best-effort
 journal exhaustion cannot prevent root freeze or bounded revoke progress. Strong
 revocation freezes new derivation and uses bounded continuation worklists;

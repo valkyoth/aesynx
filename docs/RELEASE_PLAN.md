@@ -2302,9 +2302,12 @@ Deliverables:
     inspect-budget.
   - `ClockRights`: read-coarse, read-precise, create-deadline, and
     synchronized-compare.
-  - `ParentObjectDerivationRights`: create-derived, promote, and
-    detach-derivation, valid only for parent object kinds and relation
-    policies that explicitly admit cross-object derivation.
+  - parent-object derivation operations: create-derived, promote, and
+    detach-derivation. These are not a second cross-cutting capability-rights
+    bitset in the wire format; each applicable parent object kind embeds the
+    admitted relation operations in its single kind-specific rights
+    representation, and the central matrix records them as a documentation and
+    validation family.
   Mint, derive, decode, and live resolution validate both capability kind and
   typed-right representation. Invalid examples such as `Endpoint|EXECUTE`,
   `Memory|RECV`, and `Clock|MAP` fail closed before an operation can ignore
@@ -2529,21 +2532,31 @@ DerivedObjectEdge {
 }
 ```
 
-  Initial relation kinds include `ExecutableImage`, `Snapshot`,
-  `CopyOnWriteChild`, `SealedTransform`, `PromotedSharedCode`, and
-  `DerivedIndex`.
+  Initial authority-dependency relation kinds include `ExecutableImage`,
+  `Snapshot`, `CopyOnWriteChild`, `SealedTransform`, and `DerivedIndex`.
+  `PromotedSharedCode` is a provenance relation kind recorded after successful
+  promotion, not a live authority-dependency edge that can cascade-revoke the
+  newly independent root.
 - `DerivedObjectEdge` records are internal authority metadata, not
   caller-addressable capability objects. Boundary code must never accept a
   caller-supplied parent/child/edge tuple as authority. The original caller
   authority for create, promote, and detach operations comes from a resolved
-  parent-object capability carrying `ParentObjectDerivationRights` for the
-  exact operation, plus whatever child-side authority the operation requires.
+  parent-object capability whose kind-specific rights include the exact
+  relation operation, plus whatever child-side authority the operation
+  requires. `CommonRights::DERIVE` only attenuates authority over the same live
+  object; `CREATE_DERIVED` creates a new object incarnation and therefore
+  always uses the transactional edge protocol. Relation policies define the
+  exact child-side right required for each relation and operation and whether
+  that child-side right is consumed, retained, or merely revalidated.
+  `PROMOTE` and `DETACH_DERIVATION` are nondelegable by default unless a
+  relation policy explicitly admits constrained delegation.
   The relation policy, execution identity, parent lineage, child incarnation,
   quotas, audit capacity, destination principal/table incarnation, and
   transaction identity are validated before the kernel mints an internal
   `DerivationControlPermit`. That permit is an internal proof type only: it is
   not table-storable, serializable, delegable, or wire-decodable; it is bound
-  to one transaction and consumed once at the final mutation boundary. Cross-core
+  to one transaction and consumed once at the final mutation boundary after
+  revalidating both parent-side and child-side authority sources. Cross-core
   messages carry only journal decisions or owner-issued commit certificates, not
   the permit. If a future design needs a permit to cross IPC, it must be
   redesigned as a full authority-bearing capability with incarnation, replay,
@@ -2558,10 +2571,15 @@ DerivedObjectEdge {
   - edges are bounded by per-object and per-principal quotas;
   - v1 child publication is single-parent-only: it uses a newly minted,
     unpublished child with exactly one immutable incoming dependency edge;
+  - only a `Live`, published, unfrozen parent may authorize child creation;
+    `Pending`, `Revoking`, `Recovering`, `QuarantinedAwaitingEvidence`,
+    `Retired`, or unpublished objects cannot act as parents;
   - no incoming edge may be added to an already `Live` child, and a v1 child
     with more than one incoming parent is rejected before mutation;
-  - every dependency carries a checked creation rank or depth, and
-    `parent_rank < child_rank` is required for hierarchical relation kinds;
+  - every dependency carries a checked creation depth. For v1,
+    `child_depth = checked(parent_depth + 1)` with a fixed maximum makes cycles
+    structurally impossible; general DAG search and distributed topology epochs
+    are reserved for the future `ParentSetManifest` feature gate;
   - `DerivedIndex` and similar v1 derived views derive from one collection or
     one snapshot, not a parent set;
   - multi-parent children are a future feature gate, not v1 behavior. They must
@@ -2622,8 +2640,9 @@ DerivedObjectEdge {
   - promotion requires explicit `PROMOTE` or `DETACH_DERIVATION` authority from
     the parent authority path;
   - `PROMOTE` and `DETACH_DERIVATION` are typed
-    `ParentObjectDerivationRights` on the parent object capability, not
-    universal permission bits and not caller-held edge capabilities;
+    relation operations inside the parent object's kind-specific rights, not
+    universal permission bits, caller-held edge capabilities, or a second
+    composed rights family;
   - appropriate child-side authority is also required; parent-side detachment
     approval alone cannot spend child authority;
   - each relation kind has a kernel-owned relation-policy entry that states
@@ -2656,7 +2675,8 @@ new_root_rights <= requested_rights
   - promoted shared executable text follows these rules before it can become an
     independent immutable code object.
 - Distributed edge ownership and recovery for shared-nothing cores:
-  - edge state is `Pending | Live | Revoking | Retired | Quarantined`;
+  - edge state is `Pending | Live | Revoking | Recovering |
+    QuarantinedAwaitingEvidence | Retired`;
   - transaction decision is `Undecided | Committed | Aborted`;
   - participant state is `Absent | Prepared | Applied | Acknowledged`;
   - a received `edge_state` value is never authoritative by itself;
@@ -2674,17 +2694,25 @@ new_root_rights <= requested_rights
     edge generation, the single v1 parent edge, and current parent
     revocation/freeze state;
   - if parent revocation linearizes between transaction commit and local child
-    publication, the child enters `Revoking` or `Quarantined` and never becomes
-    briefly usable;
+    publication, the child enters `Revoking`,
+    `QuarantinedAwaitingEvidence`, or a terminal resource-loss outcome and
+    never becomes briefly usable;
   - parent revocation traverses both `Live` edges and committed but not yet
     published edges;
   - no capability or user-visible handle is returned until local child
     publication completes;
-  - edge creation API outcomes are named and idempotent:
-    `Aborted`, `Published`, `CommittedButRevoked`, and `Quarantined`;
-  - retries with the same transaction ID return the same outcome, so a client
-    cannot treat "no handle returned" after a committed-but-revoked or
-    quarantined transaction as an ordinary abort and accidentally create a
+  - edge creation API terminal outcomes are named:
+    `Aborted`, `Published`, `CommittedButRevoked`, and `ResourceLost`;
+  - recoverable observations such as `Recovering` and
+    `QuarantinedAwaitingEvidence` are not terminal outcomes. Repeated queries
+    with the same transaction ID may observe monotonic progress, but retries
+    never initiate a second transaction or child;
+  - recovery can transition to a terminal outcome only from trusted
+    journal/witness evidence, and capacity remains charged until the terminal
+    decision plus replay-window retirement;
+  - idempotent means no duplicate side effect: a client cannot treat "no handle
+    returned" after a committed-but-revoked, recovering, quarantined, or
+    resource-lost transaction as an ordinary abort and accidentally create a
     duplicate committed child under that transaction;
   - the journal owner is authoritative for transaction decision, the parent
     owner for outgoing edge state, and the child owner for inbound dependency
@@ -2809,9 +2837,14 @@ Verification:
   dependency edge commits and local child publication validation completes.
 - Host tests prove boundary code cannot authorize edge operations from
   caller-supplied parent/child/edge tuples. `DerivationControlPermit` values
-  are minted only after validating caller-held parent-object derivation rights,
-  required child-side authority, relation policy, execution identity, quotas,
-  audit capacity, destination identity, and transaction identity.
+  are minted only after validating caller-held parent-object kind-specific
+  relation-operation rights, required child-side authority, relation policy,
+  execution identity, quotas, audit capacity, destination identity, and
+  transaction identity.
+- Host tests prove `CommonRights::DERIVE` cannot create a new object
+  incarnation, `CREATE_DERIVED` always uses the edge protocol, relation policies
+  name the exact child-side right and consume/retain/revalidate behavior, and
+  `PROMOTE`/`DETACH_DERIVATION` are nondelegable by default.
 - Host tests prove `DerivationControlPermit` values are internal proof objects:
   nondelegable, one-shot, exact-operation-bound, consumed at the final mutation
   boundary, unavailable for capability-table storage, and rejected by stable
@@ -2822,16 +2855,18 @@ Verification:
   accidentally revoke the parent.
 - Host/model tests prove v1 child publication is single-parent-only, rejects
   adding an incoming edge to an already `Live` child, rejects any second parent
-  edge before mutation, enforces `parent_rank < child_rank` for hierarchical
-  relations, and cascades revocation from the committed parent when policy
-  requires it.
+  edge before mutation, accepts only `Live` published unfrozen parents, rejects
+  pending/revoking/recovering/quarantined/unpublished parents, computes
+  `child_depth = checked(parent_depth + 1)` under a fixed maximum, and cascades
+  revocation from the committed parent when policy requires it.
 - Host/model tests prove any attempted multi-parent child is rejected until a
   future `ParentSetManifest` milestone defines canonical parent-set identity,
   all-parent approvals, complete-set commit, rights intersection, concurrent
   revocation coalescing, promotion semantics, and recovery.
 - Host/model tests prove edge capacity exhaustion leaves no usable orphan,
-  crash between child creation and edge publication aborts or quarantines the
-  child, cyclic dependency attempts fail before mutation, and edge retirement
+  crash between child creation and edge publication aborts, recovers, or
+  reports resource loss without making the child usable, v1 cycles are
+  structurally impossible through parent-state/depth checks, and edge retirement
   plus source/object ID reuse cannot resurrect a stale child relationship.
 - Host/model tests prove successful promotion retires authority dependencies
   while appending immutable provenance records, and provenance records do not
@@ -2870,18 +2905,21 @@ Verification:
   progress are interpreted separately; received `edge_state` is not
   authoritative by itself, aborted pending edges remain replay-detectable until
   journal retirement, uncertain commit never becomes inferred abort, and
-  quarantine records are incarnation-bound.
+  recoverable quarantine records are incarnation-bound.
 - Host/model tests prove journal commit decision and local child publication
   are separate: no user-visible handle returns before local publication,
   publication verifies commit certificate, policy identity, owner
   incarnations, single v1 parent edge, parent-edge discoverability, and parent
   freeze/revocation state, and parent revocation between commit and publication
-  sends the child to `Revoking` or `Quarantined` without becoming usable.
-- Host/model tests prove committed-but-not-published API outcomes are stable:
-  `Aborted`, `Published`, `CommittedButRevoked`, and `Quarantined` are
-  idempotent by transaction ID, retries return the same outcome, and no handle
-  absence is treated as permission to duplicate a committed child under the same
-  transaction.
+  sends the child to `Revoking`, `QuarantinedAwaitingEvidence`, or
+  `ResourceLost` without becoming usable.
+- Host/model tests prove committed-but-not-published terminal outcomes are
+  stable: `Aborted`, `Published`, `CommittedButRevoked`, and `ResourceLost` are
+  idempotent by transaction ID. Recoverable `Recovering` and
+  `QuarantinedAwaitingEvidence` observations may make monotonic progress from
+  trusted journal/witness evidence, retries never create a second child, and no
+  handle absence is treated as permission to duplicate a committed child under
+  the same transaction.
 - Host/model tests inject every interleaving between commit decision, parent
   revoke, participant apply, acknowledgement, and child publication.
 - Host/model tests exhaust ordinary allocation, IPC, and best-effort journal
