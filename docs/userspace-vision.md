@@ -234,6 +234,18 @@ The SDK should include:
 - `aesynx-rt`: safe Rust wrappers for startup info, capability handles,
   structured input/output channels, logging, panic reporting, allocation hooks,
   and raw syscall or IPC entry points.
+- A minimal syscall/endpoint ABI with fixed-width numbers, flags, handles,
+  lengths, timeouts, transaction IDs, and error codes. It does not expose Rust
+  enum layout, slices, references, pointers, or compiler-dependent types across
+  the kernel/user boundary.
+- A process/domain lifecycle model where spawn, executable mapping, initial
+  capability grants, scheduling context, and launch result commit atomically;
+  failed construction restores quotas, mappings, capabilities, and scheduler
+  state before any child runs.
+- A termination lifecycle where fatal user faults, exits, kills, watchdog
+  resets, and service restarts fence execution, revoke authority, drain
+  resources, zero sensitive state where required, and publish exit status only
+  through an explicit capability.
 - Rust target specifications such as `x86_64-unknown-aesynx` and
   `aarch64-unknown-aesynx` for native apps.
 - A WASM target/profile such as `wasm32-wasip2-aesynx` for portable

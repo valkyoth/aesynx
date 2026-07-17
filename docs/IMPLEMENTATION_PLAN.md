@@ -1621,6 +1621,18 @@ Requirements:
   output, required capabilities, protocol versions, fuzz inputs, and rejection
   behavior so independent `service kind`, `message kind`, and `payload` fields
   cannot form nonsensical combinations.
+- The minimal syscall ABI is fixed-width and Aesynx-native: exact register
+  convention, stack alignment, version/feature negotiation, syscall numbers,
+  endpoint operation IDs, flags, handles, lengths, timeouts, transaction IDs,
+  and error codes are defined in `aesynx-abi`.
+- Capability handles are interpreted only in the caller's current capability
+  table and domain incarnation.
+- True syscalls stay narrow. Rich policy flows through endpoint RPC backed by
+  capabilities rather than POSIX-like ambient process state.
+- Blocking calls use an explicit transaction state so interruption/retry cannot
+  repeat an already committed mutation.
+- The ABI does not assume parent processes, current directories, file
+  descriptors, uid/gid, or an ambient filesystem namespace.
 
 ### 14.3 Runtime
 
@@ -1634,6 +1646,12 @@ Requirements:
 - Object wrappers.
 - Process wrappers.
 - Queue wrappers.
+- Startup information parsing with ABI version, runtime feature bits, initial
+  capability bundle, stack/TLS layout, endpoint handles, and redaction policy.
+- TLS contract: either explicitly unavailable for the first profile or
+  described through a startup block; user FS base is range checked, user GS is
+  reserved/prohibited when kernel GS is used, and TLS state is saved/restored
+  across context switch and migration.
 
 Example native app:
 

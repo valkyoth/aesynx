@@ -62,6 +62,14 @@ The future bootloader should:
 - Treat TPM measurement as evidence, not magic enforcement. The bootloader
   measures; key release policy decides whether a changed system is trusted.
 - Reject unsigned, malformed, stale, or policy-blocked capsules.
+- Enforce anti-rollback policy for production profiles through a monotonic
+  counter, TPM-backed state, or another hardware-backed rollback fence. Capsule
+  version metadata and measurements alone are not sufficient if an attacker can
+  boot an older signed image.
+- Define recovery-key policy before verified boot becomes enforcement:
+  recovery authorization, offline recovery media, operator approval, key
+  rotation, lost-key handling, and how recovery capsules avoid becoming a
+  rollback bypass.
 - Avoid parsing complex untrusted formats before verification.
 - Avoid loading unbounded configuration.
 

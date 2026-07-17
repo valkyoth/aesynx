@@ -4685,6 +4685,141 @@ Exit criteria:
 - Scheduler and AI policy work has a concrete task-ownership transfer protocol
   instead of treating migration as a local queue operation.
 
+### v0.46.4 - Minimal Capability Syscall ABI
+
+Goal:
+
+Define the native syscall and IPC ABI dispatched after ring-3 entry before
+`aesynx-abi`, `aesynx-rt`, init, or external commands depend on informal kernel
+entry conventions.
+
+Deliverables:
+
+- Exact x86_64 register calling convention for syscall entry, return, and
+  faulted return.
+- Stack alignment contract at entry and return.
+- ABI version, feature bitmap, and mandatory/optional feature negotiation.
+- Fixed-width syscall numbers, endpoint operation codes, flags, capability
+  handles, object handles, virtual addresses, lengths, timeouts, transaction
+  IDs, and error codes.
+- No Rust enum layout, trait object, pointer, reference, slice, `usize`-sized
+  semantic value, or compiler-dependent layout crosses the boundary.
+- Capability IDs are interpreted only in the caller's current capability-table
+  incarnation and domain incarnation.
+- Explicit split between true kernel syscalls and endpoint/service RPC:
+  syscalls are the narrow entry mechanism for scheduling, domain lifecycle,
+  memory/object/capability enforcement, and endpoint transport; rich policy
+  remains service RPC.
+- Minimal initial syscall set:
+  - endpoint send;
+  - endpoint receive;
+  - endpoint call;
+  - endpoint reply;
+  - yield;
+  - exit;
+  - capability-table inspection where authorized;
+  - controlled memory mapping/object operations needed by init and loader
+    bring-up.
+- Unknown syscall numbers, unsupported ABI versions, unknown mandatory flags,
+  malformed handles, stale handle generations, and reserved fields are rejected
+  before mutation.
+- Copy-in/copy-out ownership rules:
+  - copy-in produces a kernel-owned initialized snapshot before parsing;
+  - no authority field is reread from user memory after validation;
+  - copy-out completion is kernel-owned until the final user write;
+  - copy-out failure has a defined pending-completion or cancellation result.
+- Interruptible versus noninterruptible call classes.
+- Cancellation, timeout, and restart behavior for every blocking call.
+- Partial-result policy. A failed or interrupted syscall never leaves the caller
+  guessing whether a committed mutation must be retried.
+- Blocking transaction state:
+
+```text
+Entered -> Validated -> Pending -> Completed | Cancelled | Faulted
+```
+
+- User-visible retry semantics: retrying after interruption cannot repeat an
+  already committed operation.
+- Checked maximum kernel work per invocation, including copy, parse,
+  capability lookup, queue work, and fault handling.
+- Error namespace is Aesynx-native. POSIX `errno` values are not assumed unless
+  a compatibility layer explicitly maps to them.
+- No implicit parent process, current directory, file-descriptor table, global
+  filesystem namespace, uid/gid, or ambient authority.
+- Redacted syscall trace events that expose syscall class, result class, budget
+  class, and incarnation mismatch class without leaking raw capability IDs,
+  object IDs, pointers, or kernel addresses.
+
+Verification:
+
+- Host tests fuzz every register field, ABI version, syscall number, flag
+  combination, handle generation, pointer/length pair, timeout encoding, and
+  reserved field.
+- Host tests inject interruption at every blocking transaction state and prove
+  retry cannot duplicate committed work.
+- Host tests inject copy-in and copy-out faults and prove partial snapshots
+  cannot authorize mutation while committed completions are not silently lost.
+- Host tests prove unknown mandatory flags fail before mutation and optional
+  unknown flags are ignored or rejected according to the negotiated feature
+  policy.
+- QEMU smoke exercises endpoint send/receive/call/reply, yield, exit, denied
+  capability inspection, and one controlled mapping/object syscall through the
+  stable ABI.
+
+Exit criteria:
+
+- Aesynx has a stable minimal syscall/endpoint ABI contract before runtime
+  wrappers or init depend on it.
+
+### v0.46.5 - User Fault Delivery Policy
+
+Goal:
+
+Define how faults from hostile user domains are classified, charged, delivered,
+or converted into termination before native services rely on recoverable
+exceptions or debugger behavior.
+
+Deliverables:
+
+- Initial fatal policy for page faults, invalid instructions, divide errors,
+  protection violations, and explicit traps that are not covered by an
+  authorized exception endpoint.
+- Optional exception endpoints require explicit capability authority and are
+  bound to domain/task incarnation.
+- Kernel-stamped fault messages contain only redacted virtual-address class,
+  fault type, access type, task/domain incarnation class, instruction-pointer
+  class, and bounded register summary.
+- No raw kernel addresses, physical addresses, CR3 values, page-table roots, or
+  raw page-table entries in user fault messages.
+- Recursive exception-delivery depth limit.
+- Separate or guard-protected handler stack policy.
+- Full or faulting exception endpoint falls back to deterministic termination
+  through the domain teardown state machine.
+- Debugger capability can suspend and inspect only the explicitly targeted
+  domain and does not imply mapping, register-write, resume, or cross-domain
+  authority unless separately granted.
+- Fault delivery and repeated malicious faults are charged to the domain's
+  scheduling/request budget.
+- User fault handling integrates with domain termination and cannot leave a task
+  executable on an unfenced core after fatal classification.
+
+Verification:
+
+- QEMU tests trigger each initial user exception class and prove the configured
+  fatal or endpoint-delivery path.
+- Host tests prove fault messages redact addresses and reject stale
+  task/domain incarnations.
+- Tests prove recursive endpoint faults hit the depth limit and terminate
+  deterministically.
+- Tests prove debugger caps cannot inspect or resume unrelated domains.
+- Budget tests prove repeated user faults consume the domain budget or trigger
+  deterministic termination/reset.
+
+Exit criteria:
+
+- User exceptions have a deterministic policy before native services can expose
+  exception handlers or debugger capabilities.
+
 ### v0.47.0 - aesynx-abi And aesynx-rt
 
 Goal:
@@ -4699,10 +4834,38 @@ Deliverables:
 - Console write wrapper.
 - Panic wrapper.
 - Basic allocator if needed.
+- ABI constants and generated/centralized definitions for syscall numbers,
+  endpoint operation IDs, flags, handles, object IDs, error codes, wire
+  endianness, and value-schema IDs.
+- Safe wrappers over the v0.46.4 syscall/endpoint ABI. Runtime wrappers do not
+  expose kernel-private structs or raw unchecked capability IDs as authority.
+- User TLS contract:
+  - TLS is either explicitly unsupported in the first runtime profile or has a
+    documented startup block layout;
+  - user FS base is canonical and range-validated against the current user
+    address space;
+  - user GS is prohibited or reserved when kernel per-core state uses GS;
+  - context switch and task migration save/restore user TLS base;
+  - `SWAPGS` interactions are documented and tested;
+  - FSGSBASE instructions are disabled, trapped, or validated according to the
+    selected deployment profile;
+  - process creation and teardown reset TLS state;
+  - TLS descriptors cannot point into kernel space or another domain's address
+    space.
+- Startup information block with ABI version, runtime feature bits, initial
+  capability bundle, stack/TLS layout, endpoint handles, and redaction policy.
+- Runtime panic and exit reporting through explicit endpoint/capability
+  authority, not ambient process-parent assumptions.
 
 Verification:
 
 - User program writes through console/log queue.
+- Host tests verify ABI layout sizes, alignments, endianness, reserved-bit
+  rejection, and no Rust-only enum layout in public ABI values.
+- Host/QEMU tests cover TLS unsupported-mode rejection or TLS base validation,
+  save/restore, migration handoff, teardown reset, and FSGSBASE policy.
+- Runtime tests prove debug output redacts capability handles and raw object
+  identifiers.
 
 Exit criteria:
 
@@ -4743,6 +4906,209 @@ Exit criteria:
 - External developers have a documented path for writing Aesynx apps without
   learning kernel internals.
 
+### v0.47.2 - Executable Object Loader And User ASLR
+
+Goal:
+
+Load sealed executable objects into user address spaces through a bounded load
+plan with user-space layout randomization, without making the kernel a broad
+ELF policy engine.
+
+Architecture:
+
+- Full ELF parsing should live in a confined loader service where possible.
+- The kernel consumes a bounded canonical load plan bound to a sealed
+  executable-object hash.
+- The kernel independently validates every security-relevant mapping invariant
+  before installing mappings.
+- Initial `aesynx-init` may use a boot-capsule-provided, hash-bound load plan
+  to avoid a circular dependency on `loaderd`.
+
+Deliverables:
+
+- Sealed executable object identity: exact bytes, content hash, architecture,
+  ABI version, entry point, requested capability set, and manifest provenance.
+- Bounded canonical load-plan format with fixed-width fields and no Rust layout
+  dependency.
+- ELF validation policy for the loader service:
+  - supported class, endianness, machine, ABI, and file type;
+  - static ELF only initially;
+  - reject dynamic interpreter and unsupported dynamic linking;
+  - bounded program-header count;
+  - checked file offsets, lengths, and integer arithmetic;
+  - `p_filesz <= p_memsz`;
+  - canonical user virtual ranges;
+  - page alignment and offset/virtual-address congruence requirements;
+  - no overlapping or wraparound segments;
+  - no writable-executable segment;
+  - entry point lies inside an executable mapped segment;
+  - no mapping into kernel, null, guard, reserved, queue, shared-control, or
+    runtime-private regions;
+  - BSS zero initialization;
+  - no uninitialized padding disclosure;
+  - strict supported relocation list if user PIE is allowed;
+  - no text relocations;
+  - RELRO or equivalent sealing where applicable.
+- Executable backing cannot change between validation and mapping. The load
+  plan is bound to the sealed executable hash and manifest.
+- Transactional mapping creation: any failure removes every partially installed
+  segment, stack, heap, TLS, queue, and startup-block mapping.
+- User ASLR:
+  - prefer statically linked `ET_DYN`/PIE executables for randomized placement;
+  - randomize executable base, stack, heap, and future mapping region through
+    domain-separated DRBG labels;
+  - maintain guard gaps around stack, heap, shared queues, TLS, startup block,
+    and future mappings;
+  - preserve low/null unmapped regions;
+  - validate effective entropy after alignment and address-space constraints;
+  - deterministic fixed layout is allowed only for tests/debug profiles with
+    explicit non-production status;
+  - failure to obtain randomness follows the selected deployment profile rather
+    than silently claiming ASLR;
+  - address randomization never substitutes for capability checks, W^X, SMAP,
+    or usercopy discipline.
+- Redacted loader diagnostics and World Service facts expose object hash class,
+  segment counts, policy result, and entropy class without leaking raw user
+  layout.
+
+Verification:
+
+- Coverage fuzzing for malformed ELF headers, program headers, overlapping
+  segments, extreme counts, truncated files, invalid relocations, unsupported
+  dynamic fields, entry-point confusion, and wraparound arithmetic.
+- Differential tests against an independent host parser fixture for accepted
+  and rejected ELF/load-plan cases.
+- Host tests prove load-plan hash mismatch, manifest mismatch, backing-object
+  mutation, and unsupported relocation fail before mapping.
+- Host tests prove transactional failure removes every partially installed
+  segment and returns quotas/capability reservations.
+- QEMU smoke loads init from a sealed boot-capsule load plan, then loads a
+  second static executable through the loader service when available.
+- ASLR tests prove independent domain-separated placement for executable, stack,
+  heap, and mapping region, and prove deterministic mode is marked
+  non-production.
+
+Exit criteria:
+
+- Executable loading and user ASLR are explicit, sealed, fuzzed, and
+  transactional before external native commands run.
+
+### v0.47.3 - Transactional Domain Spawn
+
+Goal:
+
+Create a process/domain only when every required authority, mapping, budget,
+and scheduler component can be committed atomically.
+
+Deliverables:
+
+- Spawn transaction state machine for staging, validation, commit, abort, and
+  recovery.
+- Staged resources:
+  - new domain and task incarnations;
+  - capability table and quota escrow;
+  - address-space root;
+  - executable mappings from a sealed load plan;
+  - stack, TLS, startup block, and guard pages;
+  - scheduling context and CPU budget;
+  - initial endpoint and reply capabilities;
+  - explicit initial capability bundle;
+  - parent/creator launch-result capability if requested.
+- Child cannot become runnable until every component is valid and the spawn
+  commit record exists.
+- Failed construction restores quotas, removes mappings, clears pending
+  capabilities, retires journal records, and removes scheduler state.
+- Initial capabilities are explicit grants. The child never inherits the
+  creator's entire capability table, namespace, current directory, or ambient
+  authority.
+- Parent/creator identity does not imply authority over the child after launch.
+- Duplicate spawn commit cannot create two children from one transaction.
+- Stale launch results cannot bind to recycled domain or task IDs.
+- Spawn journal capacity is reserved separately from ordinary endpoint traffic.
+- Redacted spawn telemetry reports result class and denial reason without raw
+  capability or object identifiers.
+
+Verification:
+
+- Model tests prove no partially initialized child can execute.
+- Model tests prove spawn has exactly one final outcome and duplicate
+  prepare/commit/abort messages are idempotent.
+- Host tests inject failures after every staged component and prove quotas,
+  mappings, capability slots, scheduler records, TLS/startup memory, and
+  endpoint state are reclaimed or retired according to policy.
+- Host tests prove initial capability bundles are exact and no ambient creator
+  authority leaks into the child.
+- Host tests prove stale launch results are rejected after domain/task
+  incarnation reuse.
+
+Exit criteria:
+
+- Init and later spawn services can create domains without exposing partially
+  initialized execution or ambient authority inheritance.
+
+### v0.47.4 - Domain Termination And Resource Teardown
+
+Goal:
+
+Make the reverse lifecycle of domain creation explicit before separate
+restartable processes, shell restart, driver services, or hostile domains become
+normal.
+
+Deliverables:
+
+- Domain termination state machine:
+
+```text
+Running
+  -> StopRequested
+  -> ExecutionFenced
+  -> AuthorityRevoking
+  -> ResourcesDraining
+  -> Dead
+  -> Reclaimable
+```
+
+- Stop every task on every core and prevent new scheduling or migration.
+- Fatal user fault, explicit exit, creator-requested kill, budget exhaustion,
+  watchdog reset, and service restart all enter the same teardown protocol with
+  typed reasons.
+- Cancel or resolve pending calls and one-shot reply capabilities.
+- Remove timers, wakeups, wait-queue records, and donated scheduling contexts.
+- Revoke the domain capability table and resolve pending grants, move
+  transactions, quota credits, and launch results.
+- Tear down shared mappings and complete required TLB invalidation.
+- Quiesce DMA and IRQ authority where present.
+- Drain remote frees and allocator ownership.
+- Remove World Service query leases, projections, and result-stream state.
+- Zero sensitive stack, register-save, TLS, startup block, private heap, and
+  private memory before cross-domain reuse where policy requires zeroing.
+- Publish exit result through an explicit capability rather than an ambient
+  parent relationship.
+- Bound retained exit records so dead or zombie domains cannot exhaust kernel
+  memory.
+- Change domain incarnation before identifiers, capability-table slots,
+  endpoints, or task IDs can be reused.
+- Strong termination cannot report success while a task remains executable on
+  an unfenced core or while stale authority can still commit.
+
+Verification:
+
+- Model tests prove termination cannot report `Dead` before execution is fenced
+  on every relevant core.
+- Failure-injection tests cover task running during kill, pending reply,
+  donated budget, timer wake, in-flight grant, shared mapping, TLB ack loss,
+  remote-free backlog, world query lease, and stale exit-result delivery.
+- Host tests prove duplicate kill/exit/fault events are idempotent.
+- Host tests prove bounded exit records and zombie cleanup cannot exhaust
+  kernel memory.
+- Tests prove domain incarnation changes before ID reuse and stale launch/exit
+  results are rejected.
+
+Exit criteria:
+
+- Aesynx has an auditable domain teardown path before normal process restart or
+  hostile-domain lifecycle management.
+
 ### v0.48.0 - aesynx-init
 
 Goal:
@@ -4754,6 +5120,11 @@ Deliverables:
 - `aesynx-init`.
 - Initial capability bundle.
 - Boot object lookup.
+- Init executable loaded from a sealed executable object or boot-capsule load
+  plan validated by v0.47.2.
+- Init domain created through the v0.47.3 spawn transaction.
+- Init teardown, restart, and fatal fault paths use the v0.47.4 domain
+  termination state machine.
 - Init writes banner.
 
 Expected serial:
@@ -4765,7 +5136,7 @@ Aesynx userspace online
 
 Verification:
 
-- Kernel launches init.
+- Kernel launches init through the sealed loader and transactional spawn path.
 
 Exit criteria:
 
