@@ -505,9 +505,11 @@ Priority proof targets:
   single-parent publication, kernel-controlled child-owner placement,
   same-owner fast-path equivalence, parent-owner coordinator locality,
   owner-local reservation manifests, canonical required-reservation plans with
-  versioned domain-separated identities, parent-local preparing-record
-  persistence before remote side effects, transaction-bound reservation
-  consumption/release, fixed-memory capacity accounting, deadlock/livelock-free
+  versioned domain-separated identities that include placement-policy identity,
+  topology epoch, selected child-owner incarnation, and capacity-configuration
+  generation, parent-local preparing-record persistence before remote side
+  effects, transaction-bound reservation consumption/release, per-class
+  fixed-memory terminal-progress capacity accounting, deadlock/livelock-free
   reservation acquisition, deterministic priority conflict resolution, permit
   consumption at the parent-owned journal commit transition, parent-local audit
   placeholder finalization, recoverable quarantine, `ResourceLost` terminal
@@ -543,8 +545,9 @@ Priority proof targets:
   reservation deadlock/livelock, remote reservation before recoverable
   parent-local prepare state, inconsistent transaction-priority conflict
   handling, caller-controlled child-owner selection, local-path authorization
-  bypass, emergency-capacity consumption by ordinary requests, or cycle under
-  concurrent edge transactions.
+  bypass, same-transaction placement drift, emergency-capacity consumption by
+  ordinary requests, insufficient per-class terminal-progress reserve, or cycle
+  under concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
   eventually commit or abort, revocation/control traffic is not starved by
   telemetry floods, coordinator restart converges to one final result, and
