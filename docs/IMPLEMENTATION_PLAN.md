@@ -1078,10 +1078,12 @@ kernel-controlled, frozen into the reservation plan with placement-policy
 identity, topology epoch, selected owner incarnation, and capacity-configuration
 identity, and cannot be changed mid-transaction; caller locality preferences are
 hints, and destination-table ownership does not imply child ownership. The
-capacity identity is a hash of the canonical owner-capacity manifest, while each
-prepared reservation records its resource owner's local capacity generation.
-Placement/topology/capacity-manifest changes before prepare require replanning
-under a new transaction ID, while retries of the same transaction return the
+capacity identity is a hash of the required participant-capacity bindings, not
+a system-wide hash of every core, while each prepared reservation records its
+resource owner's local capacity generation and relevant class-limit digest.
+Placement/topology/required-capacity-manifest changes before prepare require
+replanning under a new transaction ID, while unrelated owner-capacity changes do
+not invalidate the transaction and retries of the same transaction return the
 original placement decision. Same-owner parent/child/destination
 transactions may elide IPC, but they keep the same logical manifest, states,
 reservations, audit placeholder, permit consumption, publication checks, and

@@ -506,11 +506,12 @@ Priority proof targets:
   same-owner fast-path equivalence, parent-owner coordinator locality,
   owner-local reservation manifests, canonical required-reservation plans with
   versioned domain-separated identities that include placement-policy identity,
-  topology epoch, selected child-owner incarnation, capacity-configuration
-  manifest identity, and owner-local capacity generations in prepared
-  reservations, parent-local preparing-record persistence before remote side
-  effects, transaction-bound reservation consumption/release, strongly typed
-  per-class fixed-memory terminal-progress capacity accounting,
+  topology epoch, selected child-owner incarnation, participant-scoped
+  capacity-configuration manifest identity, owner-local capacity generations,
+  and relevant class-limit digests in prepared reservations, parent-local
+  preparing-record persistence before remote side effects, transaction-bound
+  reservation consumption/release, strongly typed per-class fixed-memory
+  terminal-progress capacity accounting,
   deadlock/livelock-free reservation acquisition, deterministic priority
   conflict resolution, permit consumption at the parent-owned journal commit
   transition, parent-local audit placeholder finalization, recoverable
@@ -547,8 +548,9 @@ Priority proof targets:
   reservation deadlock/livelock, remote reservation before recoverable
   parent-local prepare state, inconsistent transaction-priority conflict
   handling, caller-controlled child-owner selection, local-path authorization
-  bypass, same-transaction placement drift, capacity-generation mismatch at
-  commit, scalar mixing of typed capacity classes, emergency-capacity
+  bypass, same-transaction placement drift, unrelated-core capacity changes
+  invalidating a transaction, required-participant capacity-generation mismatch
+  at commit, scalar mixing of typed capacity classes, emergency-capacity
   consumption by ordinary requests, insufficient per-class terminal-progress
   reserve, or cycle under concurrent edge transactions.
 - Required bounded-liveness properties: healthy grant/revoke transactions
